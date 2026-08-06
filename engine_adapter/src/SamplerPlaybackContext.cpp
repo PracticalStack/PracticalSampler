@@ -5,6 +5,14 @@
 
 namespace drs::engine
 {
+namespace
+{
+// MSVC's debug STL allocates container proxies even for empty vectors. Keep this immutable
+// fallback at process lifetime so an inactive playback context never constructs/destructs six
+// vector proxies inside each audio callback.
+const CompiledPerformanceProgram emptyPerformanceProgram;
+}
+
 SamplerPlaybackContext::SamplerPlaybackContext(PlaybackActivationLane lane) noexcept
     : contextLane(lane)
 {
@@ -231,9 +239,8 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
     result.activationApplied = applyPendingActivationAtBlockBoundary();
     eventScratch.clear();
     actionScratch.clear();
-    const CompiledPerformanceProgram emptyProgram;
     const auto& program = activeRenderModel == nullptr
-        ? emptyProgram : activeRenderModel->getPerformanceProgram();
+        ? emptyPerformanceProgram : activeRenderModel->getPerformanceProgram();
     auto hasPanicReset = false;
     for (std::size_t index = 0; index < events.size; ++index)
     {

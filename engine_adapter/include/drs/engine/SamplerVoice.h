@@ -31,6 +31,9 @@ struct SamplerVoiceRenderResult
 {
     bool accepted = false;
     std::uint32_t mixedFrameCount = 0;
+    std::uint32_t pageMissCount = 0;
+    std::uint32_t underrunFrameCount = 0;
+    std::uint32_t recoveryCount = 0;
     bool voiceFinished = false;
 };
 
@@ -49,6 +52,8 @@ class SamplerVoice final
 {
 public:
     static constexpr std::uint32_t compatibilityReleaseSampleCount = 2048;
+    static constexpr std::uint64_t pageLookAheadFrames = 4096;
+    static constexpr std::uint64_t pageIntentCadenceFrames = 256;
 
     bool start(const SamplerRenderModel& model, const SamplerVoiceStartRequest& request) noexcept;
     bool beginRelease(double overrideReleaseSeconds = 0.0) noexcept;
@@ -100,5 +105,7 @@ private:
     bool loopActive = false;
     std::uint32_t releaseSamplesRemaining = 0;
     std::uint32_t releaseSamplesTotal = 0;
+    bool underrunning = false;
+    std::uint64_t nextLookAheadPublicationFrame = 0;
 };
 } // namespace drs::engine

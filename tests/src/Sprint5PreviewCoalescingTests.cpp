@@ -1,5 +1,6 @@
 #include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/RuntimeLoader.h"
 
 #include <array>
 #include <chrono>
@@ -172,11 +173,36 @@ int main()
                 "Close/reopen must advance cancellation identity and clear warm reuse state.");
 
         EngineFacade cancellationFacade;
-        const auto retainedPreview = cancellationFacade.getPreviewActivationPayload();
-        require(retainedPreview != nullptr
-                    && cancellationFacade.stageDraftRevision(1)
+        const auto cancellationProject = loadPhase2ReferenceProjectManifest();
+        require(cancellationProject.loaded
+                    && cancellationFacade.replaceDraftPlaybackAuthoringProject(
+                        cancellationProject.project)
                     && cancellationFacade.refreshPreviewToCurrentDraft()
-                    && cancellationFacade.getDraftPlaybackStatus().pendingPreview.active,
+                    && cancellationFacade.waitForPreparedPlaybackIdle(
+                        std::chrono::milliseconds(2000)),
+                "Facade cancellation coverage requires a last-known-good authored Preview payload.");
+        const auto retainedPreview = cancellationFacade.getPreviewActivationPayload();
+        const auto stagedCancellationRevision = cancellationFacade.stageDraftRevision(1);
+        const auto requestedCancellationPreview = stagedCancellationRevision
+            && cancellationFacade.refreshPreviewToCurrentDraft();
+        const auto cancellationDraft = cancellationFacade.getDraftPlaybackStatus();
+        if (retainedPreview == nullptr || !stagedCancellationRevision
+            || !requestedCancellationPreview || !cancellationDraft.pendingPreview.active)
+        {
+            std::cerr << "Cancellation setup diagnostics: retained="
+                      << (retainedPreview != nullptr)
+                      << " retainedRevision="
+                      << (retainedPreview != nullptr ? retainedPreview->revision : 0)
+                      << " draftRevision=" << cancellationDraft.draftRevision
+                      << " staged=" << stagedCancellationRevision
+                      << " requested=" << requestedCancellationPreview
+                      << " pending=" << cancellationDraft.pendingPreview.active
+                      << " lastEvent=" << cancellationDraft.lastEvent << std::endl;
+        }
+        require(retainedPreview != nullptr
+                    && stagedCancellationRevision
+                    && requestedCancellationPreview
+                    && cancellationDraft.pendingPreview.active,
                 "Facade cancellation coverage requires a queued Preview preparation.");
         require(cancellationFacade.cancelPreviewPreparation("5.3 deterministic cancellation race")
                     && !cancellationFacade.getDraftPlaybackStatus().pendingPreview.active,

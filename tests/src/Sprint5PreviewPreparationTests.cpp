@@ -76,6 +76,26 @@ drs::engine::PlaybackActivationPayloadPtr preparePreview(
     return payload;
 }
 
+drs::engine::PlaybackActivationPayloadPtr prepareScopedPreview(
+    drs::engine::EngineFacade& facade,
+    const drs::engine::RuntimeProjectModel& project,
+    std::size_t revision,
+    drs::engine::PlaybackPreparationScopeRequest scope)
+{
+    require(facade.replaceDraftPlaybackAuthoringProject(project),
+            "Facade rejected a scoped authored Preview project.");
+    require(facade.stageDraftRevision(revision), "Facade rejected a scoped Preview revision.");
+    require(facade.refreshPreviewForPreparationScope(scope),
+            "Facade rejected scoped Preview preparation.");
+    require(facade.waitForPreparedPlaybackIdle(std::chrono::milliseconds(3000)),
+            "Scoped Preview worker did not settle.");
+    facade.serviceBackgroundWork();
+    const auto payload = facade.getPreviewActivationPayload();
+    require(payload != nullptr && payload->revision == revision,
+            "Scoped Preview worker did not publish the requested immutable payload.");
+    return payload;
+}
+
 drs::engine::AuthoringPreviewRequest makeRequest(
     drs::engine::AuthoringPreviewScope scope,
     std::size_t revision,
@@ -153,6 +173,97 @@ int main()
         project.sampleSources[0].path = wavPath.generic_string();
         project.sampleSources[1].path = flacPath.generic_string();
 
+        PlaybackSnapshotBuildResult closureSource;
+        closureSource.built = true;
+        closureSource.activationEligible = true;
+        closureSource.lifecycleState = PlaybackSnapshotLifecycleState::ready;
+        closureSource.snapshot.draftRevision = 200;
+        closureSource.snapshot.sampleIdentities = {
+            { "selected-source", "selected.wav", "sustain" },
+            { "xfade-source", "xfade.wav", "sustain" },
+            { "rr-source", "rr.wav", "sustain" },
+            { "release-source", "release.wav", "release" },
+            { "unrelated-source", "unrelated.wav", "sustain" }
+        };
+        PlaybackSnapshotZone selectedClosureZone;
+        selectedClosureZone.id = "selected";
+        selectedClosureZone.sampleSourceId = "selected-source";
+        selectedClosureZone.groupId = "selected-group";
+        selectedClosureZone.articulationId = "main";
+        selectedClosureZone.keyLow = 48;
+        selectedClosureZone.keyHigh = 72;
+        selectedClosureZone.velocityCrossfadeRuntime.fadeInNeighborZoneId = "xfade";
+        selectedClosureZone.roundRobin = RoundRobinDescriptor { "selected-pool", 2, 0,
+                                                                RoundRobinMode::sequential };
+        auto xfadeClosureZone = selectedClosureZone;
+        xfadeClosureZone.id = "xfade";
+        xfadeClosureZone.sampleSourceId = "xfade-source";
+        xfadeClosureZone.velocityCrossfadeRuntime = {};
+        xfadeClosureZone.roundRobin.reset();
+        auto rrClosureZone = selectedClosureZone;
+        rrClosureZone.id = "rr";
+        rrClosureZone.sampleSourceId = "rr-source";
+        rrClosureZone.velocityCrossfadeRuntime = {};
+        rrClosureZone.roundRobin->slotIndex = 1;
+        auto releaseClosureZone = selectedClosureZone;
+        releaseClosureZone.id = "release";
+        releaseClosureZone.sampleSourceId = "release-source";
+        releaseClosureZone.groupId = "release-group";
+        releaseClosureZone.velocityCrossfadeRuntime = {};
+        releaseClosureZone.roundRobin.reset();
+        releaseClosureZone.performance.event = PerformanceEventKind::release;
+        auto unrelatedClosureZone = selectedClosureZone;
+        unrelatedClosureZone.id = "unrelated";
+        unrelatedClosureZone.sampleSourceId = "unrelated-source";
+        unrelatedClosureZone.groupId = "unrelated-group";
+        unrelatedClosureZone.articulationId = "other";
+        unrelatedClosureZone.keyLow = 80;
+        unrelatedClosureZone.keyHigh = 90;
+        unrelatedClosureZone.velocityCrossfadeRuntime = {};
+        unrelatedClosureZone.roundRobin.reset();
+        closureSource.snapshot.zones = { selectedClosureZone,
+                                         xfadeClosureZone,
+                                         rrClosureZone,
+                                         releaseClosureZone,
+                                         unrelatedClosureZone };
+        closureSource.snapshot.groupRoutes = {
+            { "selected-group", { "main" }, { "selected", "xfade", "rr" } },
+            { "release-group", { "main" }, { "release" } },
+            { "unrelated-group", { "other" }, { "unrelated" } }
+        };
+        closureSource.snapshot.routingBuses = {
+            { "selected-bus", "Selected", "groups/selected-group" },
+            { "release-bus", "Release", "groups/release-group" },
+            { "unrelated-bus", "Unrelated", "groups/unrelated-group" },
+            { "master-bus", "Master", "instrument/master" }
+        };
+        closureSource.snapshot.contentDigest
+            = computePlaybackSnapshotContentDigest(closureSource.snapshot);
+        const auto dependencyClosure = scopePlaybackSnapshotForPreparation(
+            closureSource,
+            { PlaybackPreparationScope::selectedZone, "selected", {} });
+        require(dependencyClosure.built
+                    && dependencyClosure.unscopedZoneCount == 5
+                    && dependencyClosure.retainedZoneCount == 4
+                    && dependencyClosure.unscopedSampleCount == 5
+                    && dependencyClosure.retainedSampleCount == 4
+                    && std::none_of(dependencyClosure.snapshot.zones.begin(),
+                                    dependencyClosure.snapshot.zones.end(),
+                                    [](const auto& zone) { return zone.id == "unrelated"; })
+                    && std::none_of(dependencyClosure.snapshot.routingBuses.begin(),
+                                    dependencyClosure.snapshot.routingBuses.end(),
+                                    [](const auto& bus) { return bus.id == "unrelated-bus"; })
+                    && std::any_of(dependencyClosure.snapshot.routingBuses.begin(),
+                                   dependencyClosure.snapshot.routingBuses.end(),
+                                   [](const auto& bus) { return bus.id == "master-bus"; }),
+                "Selected-zone dependency closure must retain crossfade, round-robin, release, group-routing, and inherited master DSP dependencies only.");
+        const auto repeatedDependencyClosure = scopePlaybackSnapshotForPreparation(
+            closureSource,
+            { PlaybackPreparationScope::selectedZone, "selected", {} });
+        require(repeatedDependencyClosure.snapshot.contentDigest
+                    == dependencyClosure.snapshot.contentDigest,
+                "Equivalent pre-realization dependency closures must remain deterministic.");
+
         EngineFacade facade;
         const auto performanceBefore = facade.getPerformanceActivationPayload();
         auto payload = preparePreview(facade, project, 101);
@@ -222,6 +333,53 @@ int main()
                 "Current-draft preparation must retain all Preview-eligible authored routes.");
         require(facade.getPerformanceActivationPayload() == performanceBefore,
                 "Preview preparation must not publish or replace Performance.");
+
+        EngineFacade scopedZoneFacade;
+        PlaybackPreparationScopeRequest selectedZoneScope;
+        selectedZoneScope.scope = PlaybackPreparationScope::selectedZone;
+        selectedZoneScope.selectedZoneId = "lead-a4-sustain";
+        const auto scopedZonePayload = prepareScopedPreview(
+            scopedZoneFacade, project, 201, selectedZoneScope);
+        require(scopedZonePayload->preparationScope == PlaybackPreparationScope::selectedZone
+                    && scopedZonePayload->preparationSelectedZoneId == "lead-a4-sustain"
+                    && scopedZonePayload->unscopedZoneCount == 3
+                    && scopedZonePayload->retainedZoneCount == 1
+                    && scopedZonePayload->unscopedSampleCount == 2
+                    && scopedZonePayload->retainedSampleCount == 1
+                    && scopedZonePayload->snapshot->zones.size() == 1
+                    && scopedZonePayload->prepared->zones.size() == 1
+                    && scopedZonePayload->prepared->samples.size() == 1
+                    && scopedZonePayload->prepared->samples.front().sampleSourceId == "triangle-a4",
+                "Selected-zone scope must trim snapshot identities before production preparation decodes them.");
+        const auto selectedZoneDigest = scopedZonePayload->snapshotContentDigest;
+        require(scopedZoneFacade.refreshPreviewForPreparationScope(selectedZoneScope)
+                    && scopedZoneFacade.getPreviewActivationPayload() == scopedZonePayload
+                    && scopedZoneFacade.getPreviewActivationPayload()->snapshotContentDigest
+                        == selectedZoneDigest,
+                "Equivalent scoped requests must reuse deterministic prepared identity.");
+
+        EngineFacade scopedGroupFacade;
+        PlaybackPreparationScopeRequest selectedGroupScope;
+        selectedGroupScope.scope = PlaybackPreparationScope::selectedGroup;
+        selectedGroupScope.selectedGroupId = "pad-core";
+        const auto scopedGroupPayload = prepareScopedPreview(
+            scopedGroupFacade, project, 202, selectedGroupScope);
+        require(scopedGroupPayload->preparationScope == PlaybackPreparationScope::selectedGroup
+                    && scopedGroupPayload->preparationSelectedGroupId == "pad-core"
+                    && scopedGroupPayload->retainedZoneCount == 2
+                    && scopedGroupPayload->retainedSampleCount == 1
+                    && scopedGroupPayload->snapshot->zones.size() == 2
+                    && scopedGroupPayload->prepared->samples.size() == 1,
+                "Selected-group scope must prepare only its retained dependency set.");
+
+        EngineFacade explicitDraftFacade;
+        const auto explicitDraftPayload = prepareScopedPreview(
+            explicitDraftFacade, project, 203, {});
+        require(explicitDraftPayload->preparationScope == PlaybackPreparationScope::currentDraft
+                    && explicitDraftPayload->retainedZoneCount == 3
+                    && explicitDraftPayload->retainedSampleCount == 2
+                    && explicitDraftPayload->prepared->samples.size() == 2,
+                "Current-draft Preview must remain an explicit full-scope request.");
 
         auto invalidSnapshot = *payload->snapshot;
         invalidSnapshot.zones[1].id = invalidSnapshot.zones[0].id;

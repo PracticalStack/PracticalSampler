@@ -656,6 +656,16 @@ const char* toString(const PerformancePackagePayloadKind kind) noexcept
     return "unknown";
 }
 
+RuntimeCompileResult buildPackageRuntimeMetadata(const RuntimeCompileResult& compiledRuntime)
+{
+    return buildPackageCompileResult(compiledRuntime);
+}
+
+std::string serializePerformancePackageManifest(const PerformancePackageManifest& manifest)
+{
+    return serializePackageManifestJson(manifest);
+}
+
 PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePackageCompileWritePlan& plan,
                                                              const PerformancePackageWriteOptions& options)
 {
@@ -1016,6 +1026,16 @@ PerformancePackageInspectionResult inspectPerformancePackage(const std::string& 
     result.state = "Performance package inspection not attempted";
 
     std::string issue;
+    std::error_code sizeError;
+    const auto packageBytes = fs::file_size(fs::path(packagePath), sizeError);
+    if (!sizeError && packageBytes > maximumResidentV1PackageBytes)
+    {
+        result.packageFound = true;
+        addIssue(result,
+                 "This v1 package exceeds the 64 MiB resident compatibility ceiling; re-export it as package v2.");
+        result.state = "Performance package v1 requires re-export";
+        return result;
+    }
     const auto fileBytes = readBinaryFile(fs::path(packagePath), issue);
     if (!issue.empty())
     {

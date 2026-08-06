@@ -311,6 +311,7 @@ SampleSourceFingerprintResult fingerprintSampleSourceFile(const std::string& sam
 bool copySampleFileForImport(const std::string& sourcePath, const std::string& destinationPath);
 SampleInspectionResult inspectSampleFile(const std::string& samplePath,
                                          const std::string& knownFingerprintHex = {});
+SampleInspectionResult inspectSampleFileMetadataOnly(const std::string& samplePath);
 SampleImportResult importSampleFile(const std::string& samplePath,
                                     const std::string& knownFingerprintHex = {});
 WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,

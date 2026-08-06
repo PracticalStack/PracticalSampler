@@ -36,6 +36,23 @@ bool waitForPreviewState(drs::plugin::Processor& processor,
             return true;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
+    const auto controller = processor.getAuthoringPreviewControllerSnapshot();
+    const auto& draft = processor.getEngineFacade().getDraftPlaybackStatus();
+    const auto worker = processor.getEngineFacade().getPreparedPlaybackWorkerStatus();
+    std::cerr << "Preview deadline diagnostics: preparation="
+              << static_cast<int>(controller.preparationState)
+              << " activation=" << static_cast<int>(controller.activationState)
+              << " hasRequest=" << controller.hasRequest
+              << " failed=" << controller.hasFailedRequest
+              << " draftPending=" << draft.pendingPreview.active
+              << " draftState=" << draft.preview.state
+              << " draftFindings=" << draft.preview.findings.size()
+              << " failureCode=" << controller.failureFinding.code
+              << " failurePath=" << controller.failureFinding.path
+              << " failureMessage=" << controller.failureFinding.message
+              << " workerPending=" << worker.pendingWorkCount
+              << " workerRunning=" << worker.inFlightWorkCount
+              << " workerLast=" << worker.lastEvent << std::endl;
     return false;
 }
 } // namespace

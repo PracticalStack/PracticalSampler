@@ -1,5 +1,7 @@
 #include "drs/engine/ProjectRestoreCoordinator.h"
 
+#include "drs/engine/EngineFacade.h"
+#include "drs/engine/PackageReaderDispatch.h"
 #include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
@@ -304,6 +306,89 @@ void ProjectRestoreCoordinator::processRequest(const PendingRequest& pending)
     }
 
     const auto& hostState = *parsed.hostState;
+    if (hostState.performancePackageBinding.has_value())
+    {
+        const auto& binding = *hostState.performancePackageBinding;
+        const auto packagePath = pending.request.locatedManifestPath.empty()
+            ? binding.packagePath : pending.request.locatedManifestPath;
+        ProjectRestoreSnapshot loading;
+        loading.generation = pending.generation;
+        loading.state = ProjectRestoreState::loading;
+        loading.expectedProjectId = binding.packageId;
+        loading.resolvedManifestPath = packagePath;
+        loading.performancePackageOnly = true;
+        loading.hostState = hostState;
+        loading.message = "Loading performance package metadata";
+        if (!publishSnapshot(std::move(loading)) || !isCurrent(pending.generation))
+            return;
+
+        const auto dispatch = dispatchPerformancePackageReader(packagePath);
+        PreparedPerformancePackageActivationResult activation;
+        if (dispatch.format == PerformancePackageDiskFormat::version2)
+        {
+            const auto metadata = loadPerformancePackageV2Metadata(packagePath);
+            if (metadata.loaded)
+            {
+                activation = preparePerformancePackageV2Activation(
+                    metadata.metadata, metadata.package, metadata.sampleDescriptors);
+            }
+            else
+            {
+                activation.state = metadata.state;
+                activation.issues = metadata.issues;
+            }
+        }
+        else if (dispatch.opened)
+        {
+            const auto package = loadPerformancePackage(packagePath);
+            if (package.loaded)
+                activation = preparePerformancePackageActivation(package);
+            else
+            {
+                activation.state = package.state;
+                activation.issues = package.issues;
+            }
+        }
+
+        if (!isCurrent(pending.generation))
+            return;
+        if (!activation.prepared
+            || activation.packageLoad.manifest.packageId != binding.packageId)
+        {
+            ProjectRestoreSnapshot failed;
+            failed.generation = pending.generation;
+            failed.state = fs::is_regular_file(fs::path(packagePath))
+                ? ProjectRestoreState::failed : ProjectRestoreState::needsLocation;
+            failed.finding = fs::is_regular_file(fs::path(packagePath))
+                ? ProjectRestoreFinding::performancePackageInvalid
+                : ProjectRestoreFinding::candidateMissing;
+            failed.expectedProjectId = binding.packageId;
+            failed.resolvedManifestPath = packagePath;
+            failed.performancePackageOnly = true;
+            failed.hostState = hostState;
+            failed.message = activation.issues.empty()
+                ? (activation.state.empty()
+                       ? std::string("The saved performance package could not be prepared.")
+                       : activation.state)
+                : activation.issues.front();
+            publishSnapshot(std::move(failed));
+            return;
+        }
+
+        ProjectRestoreSnapshot ready;
+        ready.generation = pending.generation;
+        ready.state = ProjectRestoreState::ready;
+        ready.expectedProjectId = binding.packageId;
+        ready.resolvedManifestPath = packagePath;
+        ready.performancePackageOnly = true;
+        ready.hostState = hostState;
+        ready.packageActivation
+            = std::make_shared<PreparedPerformancePackageActivationResult>(std::move(activation));
+        ready.message = "Performance package activation is prepared";
+        publishSnapshot(std::move(ready));
+        return;
+    }
+
     ProjectRestoreSnapshot resolving;
     resolving.generation = pending.generation;
     resolving.state = ProjectRestoreState::resolving;
@@ -510,6 +595,7 @@ const char* toString(const ProjectRestoreFinding finding) noexcept
         case ProjectRestoreFinding::projectLoadFailed: return "ProjectLoadFailed";
         case ProjectRestoreFinding::checkpointInvalid: return "CheckpointInvalid";
         case ProjectRestoreFinding::projectBindingInvalid: return "ProjectBindingInvalid";
+        case ProjectRestoreFinding::performancePackageInvalid: return "PerformancePackageInvalid";
         case ProjectRestoreFinding::presetStateInvalid: return "PresetStateInvalid";
         case ProjectRestoreFinding::articulationMismatch: return "ArticulationMismatch";
         case ProjectRestoreFinding::draftPlaybackFailed: return "DraftPlaybackFailed";

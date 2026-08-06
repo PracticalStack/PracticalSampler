@@ -486,6 +486,9 @@ void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
         const auto target = routeTargets != nullptr && routeIndex < routeTargetCount
             ? routeTargets[routeIndex] : output;
         const auto voiceResult = slot.voice.render(target, startFrame, frameCount);
+        result.render.pageMissCount += voiceResult.pageMissCount;
+        result.render.underrunFrameCount += voiceResult.underrunFrameCount;
+        result.render.pageRecoveryCount += voiceResult.recoveryCount;
         if (voiceResult.voiceFinished)
         {
             slot.state = SamplerVoiceSlotState::finished;

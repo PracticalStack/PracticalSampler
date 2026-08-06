@@ -362,6 +362,10 @@ int main()
         standalonePackage.instrumentId = "drs.phase0.instrument";
         require(mainComponent.getProcessor().activatePerformancePackageWorkspace(standalonePackage),
                 "Standalone shell should accept a valid performance package workspace contract.");
+        require(mainComponent.getProcessor().getWorkspaceDocumentState().readiness
+                    == drs::engine::PackageSessionReadiness::metadataLoaded
+                    && !mainComponent.getProcessor().getWorkspaceDocumentState().playable,
+                "A manifest-only standalone package workspace must report metadata loaded, not playable.");
         mainComponent.resized();
         require(standaloneTabs->getNumTabs() == 1,
                 "Standalone shell should hide the Map tab in performance-only workspace mode.");
@@ -371,8 +375,32 @@ int main()
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
         mainComponent.getProcessor().getEngineFacade().resetSessionStateToDefault();
-        require(mainComponent.getProcessor().getEngineFacade().waitForPreparedPlaybackIdle()
-                    && mainComponent.getProcessor().serviceMessageThreadWork(),
+        const auto standalonePreparedIdle
+            = mainComponent.getProcessor().getEngineFacade().waitForPreparedPlaybackIdle();
+        const auto standaloneActivationServiced
+            = mainComponent.getProcessor().serviceMessageThreadWork();
+        if (!standalonePreparedIdle || !standaloneActivationServiced)
+        {
+            const auto& facade = mainComponent.getProcessor().getEngineFacade();
+            const auto& draft = facade.getDraftPlaybackStatus();
+            std::cerr << "Standalone bootstrap diagnostics: idle=" << standalonePreparedIdle
+                      << " serviced=" << standaloneActivationServiced
+                      << " performanceAvailable=" << draft.performance.available
+                      << " performancePayload="
+                      << (facade.getPerformanceActivationPayload() != nullptr)
+                      << " bootstrapPayload="
+                      << (facade.getBootstrapPerformanceActivationPayload() != nullptr)
+                      << " packagePayload="
+                      << (facade.getPerformancePackageActivationPayload() != nullptr)
+                      << " pendingPerformance=" << draft.pendingPerformance.active
+                      << " performanceState=" << draft.performance.state
+                      << " lastEvent=" << draft.lastEvent;
+            for (const auto& finding : draft.performance.findings)
+                std::cerr << " finding=" << finding.code << ":" << finding.message;
+            std::cerr
+                      << std::endl;
+        }
+        require(standalonePreparedIdle && standaloneActivationServiced,
                 "Standalone smoke validation should explicitly install the default Performance activation.");
         require(renderQueuedPerformanceSurfaceMagnitude(mainComponent.getProcessor(), 57, 0.8f) > 0.0001f,
                 "Standalone performance surface should render audible output through the shared processor path.");
@@ -426,6 +454,10 @@ int main()
         pluginPackage.instrumentId = "drs.phase0.plugin.instrument";
         require(processor.activatePerformancePackageWorkspace(pluginPackage),
                 "Plugin editor should accept a valid performance package workspace contract.");
+        require(processor.getWorkspaceDocumentState().readiness
+                    == drs::engine::PackageSessionReadiness::metadataLoaded
+                    && !processor.getWorkspaceDocumentState().playable,
+                "A manifest-only plug-in package workspace must report metadata loaded, not playable.");
         editor->resized();
         require(pluginTabs->getNumTabs() == 1,
                 "Plugin editor should hide the Map tab in performance-only workspace mode.");

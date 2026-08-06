@@ -19,6 +19,7 @@ When a package is opened successfully:
 - authoring controls such as the map/zone editor are absent
 - host state exports do not include project bindings
 - playback works through the same runtime engine used by exported projects
+- metadata-only readiness is labeled as deferred; head preparation, playable eligibility, pending activation, and callback-confirmed active are distinct states
 
 ## Triage flow
 
@@ -87,3 +88,5 @@ Escalate immediately if:
 - a package session resolves raw sample files outside the sealed payload
 - Save Project appears as the recovery path for a package session
 - the release-gate artifact fails determinism or exported-package reopen checks
+
+For package v2 page/source diagnostics, v1 re-export policy, and large-instrument support-bundle fields, see `docs/large-instrument-streaming-support.md`.

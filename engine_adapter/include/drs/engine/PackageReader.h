@@ -39,6 +39,16 @@ struct PerformancePackageLoadResult
     PerformancePackagePayloadLoadResult backgroundImage;
 };
 
+struct PerformancePackageManifestParseResult
+{
+    bool parsed = false;
+    PerformancePackageManifest manifest;
+    std::vector<std::string> issues;
+};
+
+PerformancePackageManifestParseResult parsePerformancePackageManifestJson(
+    const std::string& text);
+
 PerformancePackageReaderResult readPerformancePackage(
     const std::string& packagePath,
     const PackageCryptoProvider& cryptoProvider = getDeterministicPackageCryptoProvider(),

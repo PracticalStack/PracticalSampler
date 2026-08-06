@@ -57,6 +57,7 @@ The Windows-first bootstrap lives at:
 - `docs/windows-build.md`
 - `docs/architecture-overview.md`
 - `docs/host-validation.md`
+- `docs/large-instrument-streaming-support.md`
 
 The current automated baseline runs on GitHub Actions through:
 

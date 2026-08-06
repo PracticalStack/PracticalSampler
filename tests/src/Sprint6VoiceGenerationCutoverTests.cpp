@@ -217,7 +217,8 @@ void runHeldVoiceAndSustainMatrix()
                 && oldVoice->activationGeneration == oldGeneration
                 && oldVoice->modelRevision == 1
                 && oldVoice->loopActive
-                && oldVoice->baseGain < 0.1f,
+                && std::abs(oldVoice->baseGain
+                            - static_cast<float>(std::pow(10.0, -12.0 / 20.0))) < 1.0e-6f,
             "Removed old route must retain its original generation, loop, pitch, gain, and sample handle.");
     const auto* newVoice = findVoice(context.getVoicePool(), 60, voices);
     require(newVoice != nullptr

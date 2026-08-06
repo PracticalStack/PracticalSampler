@@ -186,7 +186,7 @@ void verifySelectedArticulationReachesVoiceRouting()
     SamplerRenderEvent playable = event(SamplerRenderEventType::noteOn, 0, 60, 1.0f);
     playable.articulationIndex = 1;
     const auto result = pool.renderBlock({ channels, 1, static_cast<std::uint32_t>(audio.size()) }, { &playable, 1 });
-    require(result.render.startedVoiceCount == 1 && std::abs(audio[0] - 0.1875f) < 0.0001f,
+    require(result.render.startedVoiceCount == 1 && std::abs(audio[0] - 0.75f) < 0.0001f,
             "A post-D0 playable note must start only the Staccato route, never the Sustain route (voices="
                 + std::to_string(result.render.startedVoiceCount) + ", sample=" + std::to_string(audio[0]) + ").");
 }

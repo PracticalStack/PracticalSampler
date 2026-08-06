@@ -15,6 +15,8 @@
 
 namespace drs::engine
 {
+class ISampleDataSource;
+
 struct PreparedPlaybackPageHandle
 {
     std::uint32_t pageIndex = 0;
@@ -60,6 +62,7 @@ struct PreparedPlaybackSampleHandle
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
     std::shared_ptr<const PreparedPlaybackDecodedSampleData> decodedSampleData;
+    std::shared_ptr<const ISampleDataSource> dataSource;
     std::string ownershipToken;
     std::string cacheKey;
     std::size_t ownershipRecordIndex = 0;
@@ -228,6 +231,33 @@ enum class PreparedPlaybackCompletionDisposition
     failed
 };
 
+enum class PreparedPlaybackReadinessState
+{
+    metadataLoaded,
+    playbackDeferred,
+    playable,
+    streamingRequired
+};
+
+struct ResidentPreparationSampleMetadata
+{
+    std::uint64_t frameCount = 0;
+    std::uint32_t channelCount = 0;
+};
+
+struct ResidentPreparationAdmissionResult
+{
+    PreparedPlaybackReadinessState readiness = PreparedPlaybackReadinessState::metadataLoaded;
+    bool metadataAvailable = false;
+    bool admitted = false;
+    bool arithmeticOverflow = false;
+    std::size_t sampleCount = 0;
+    std::uint64_t estimatedDecodedBytes = 0;
+    std::uint64_t residentBudgetBytes = 0;
+    std::string findingCode;
+    std::string guidance;
+};
+
 struct PreparedPlaybackSchedulerBudgets
 {
     std::size_t maximumPendingJobs = 2;
@@ -238,6 +268,8 @@ struct PreparedPlaybackSchedulerBudgets
     std::uint64_t maximumRequestToReadyMicros = 5000000;
     std::uint64_t maximumRetainedPreparedBytes = 512ull * 1024ull * 1024ull;
     std::uint64_t maximumMessageThreadServiceMicros = 250000;
+    std::uint64_t pageServicePollMilliseconds = 5;
+    bool allowWavStreaming = true;
 };
 
 struct PreparedPlaybackBuildRequest
@@ -282,6 +314,7 @@ struct PreparedPlaybackBuildResult
     std::size_t runningDepthAtStart = 0;
     std::string state;
     std::vector<PlaybackSnapshotFinding> findings;
+    ResidentPreparationAdmissionResult admission;
     PreparedPlaybackMetrics metrics;
     ImmutablePreparedPlayback prepared;
 };
@@ -341,6 +374,9 @@ struct PreparedPlaybackWorkerStatus
     std::size_t messageThreadServiceBudgetViolationCount = 0;
     std::size_t activeOwnershipRecordCount = 0;
     std::uint64_t activeOwnershipBytes = 0;
+    std::uint64_t pageIntentCount = 0;
+    std::uint64_t pagePrepareCount = 0;
+    std::uint64_t pagePrepareFailureCount = 0;
     std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
     std::string lastEvent;
@@ -357,6 +393,9 @@ bool operator==(const PreparedPlaybackStreamHandle& left, const PreparedPlayback
 bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZoneHandle& right);
 bool operator==(const PreparedPlaybackGroupRoute& left, const PreparedPlaybackGroupRoute& right);
 bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right);
+ResidentPreparationAdmissionResult assessResidentPreparationAdmission(
+    const std::vector<ResidentPreparationSampleMetadata>& samples,
+    std::uint64_t residentBudgetBytes = 512ull * 1024ull * 1024ull) noexcept;
 
 class PreparedPlaybackService
 {
@@ -383,6 +422,7 @@ public:
                                                std::uint64_t replacementBuildId,
                                                const std::string& state = "Prepared playback build superseded") const;
     void setBackgroundWorkerStream(const RuntimeStreamLoadResult& streamResult);
+    void registerPageServiceSource(const std::shared_ptr<const ISampleDataSource>& source);
     PreparedPlaybackWorkerStepResult processNextQueuedBuild(const RuntimeStreamLoadResult& streamResult);
     std::vector<PreparedPlaybackWorkerStepResult> drainCompletedBuilds();
     // Preview/Publish cancellation follows the same named entry-point rule as queue submission.
@@ -433,6 +473,7 @@ private:
         PreparedPlaybackWorkLane lane,
         const std::string& state);
     void runBackgroundWorker();
+    bool serviceStreamPageRequests();
     void refreshWorkerStatus();
     bool isCancellationRequested(const PreparedPlaybackBuildRequest& request) const noexcept;
     void retireSupersededCacheEntries(const std::string& sampleSourceId,
@@ -452,6 +493,9 @@ private:
     bool stopWorkerRequested = false;
     std::vector<std::pair<std::string, CacheEntry>> cacheEntries;
     std::vector<std::pair<std::string, CacheEntry>> retiredCacheEntries;
+    // Weak registrations let the background I/O worker follow page intents for every
+    // live render generation without extending a generation's ownership lifetime.
+    std::vector<std::weak_ptr<const ISampleDataSource>> pageServiceSources;
     std::vector<QueuedJob> queuedJobs;
     std::vector<PreparedPlaybackWorkerStepResult> completedResults;
     PreparedPlaybackWorkerStatus workerStatus;
@@ -472,4 +516,5 @@ std::string serializeImmutablePreparedPlayback(const ImmutablePreparedPlayback& 
 std::string toString(PreparedPlaybackWorkLane lane);
 std::string toString(PreparedPlaybackJobPriority priority);
 std::string toString(PreparedPlaybackCompletionDisposition disposition);
+std::string toString(PreparedPlaybackReadinessState state);
 } // namespace drs::engine

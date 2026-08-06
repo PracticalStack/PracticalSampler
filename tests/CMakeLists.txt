@@ -218,6 +218,7 @@ target_sources(drs_phase1_prepared_playback_worker_tests
 target_link_libraries(drs_phase1_prepared_playback_worker_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -232,6 +233,42 @@ add_test(
     NAME drs.phase1.prepared_playback_worker
     COMMAND drs_phase1_prepared_playback_worker_tests
 )
+
+add_executable(drs_package_v2_tests
+    src/PackageV2Tests.cpp
+)
+
+target_link_libraries(drs_package_v2_tests
+    PRIVATE
+        drs_sampler_core
+        drs_sample_import
+        juce::juce_audio_formats
+)
+target_compile_features(drs_package_v2_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.package_v2.records
+    COMMAND drs_package_v2_tests
+)
+
+add_executable(drs_large_instrument_qualification
+    src/LargeInstrumentQualification.cpp
+)
+
+target_link_libraries(drs_large_instrument_qualification
+    PRIVATE
+        drs_engine_adapter
+        drs_sampler_core
+        drs_sample_import
+        drs_app_shared
+        juce::juce_audio_formats
+)
+if(WIN32)
+    target_link_libraries(drs_large_instrument_qualification PRIVATE Psapi)
+endif()
+target_compile_features(drs_large_instrument_qualification PRIVATE cxx_std_17)
+target_compile_definitions(drs_large_instrument_qualification PRIVATE NOMINMAX)
+target_include_directories(drs_large_instrument_qualification PRIVATE ${CMAKE_SOURCE_DIR}/app/src)
 
 # Sprint 4 Entry Gate EG1 focused regression matrix.
 juce_add_console_app(drs_sprint4_entry_authored_input_tests
@@ -2732,6 +2769,9 @@ target_compile_features(drs_project_restore_coordinator_tests PRIVATE cxx_std_17
 target_link_libraries(drs_project_restore_coordinator_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
+        drs_sample_import
+        juce::juce_audio_formats
 )
 
 add_test(
@@ -3463,6 +3503,7 @@ target_sources(drs_phase1_performance_package_loader_tests
 target_link_libraries(drs_phase1_performance_package_loader_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -3589,6 +3630,7 @@ add_test(
     NAME drs.phase1.performance_package_host_validation
     COMMAND drs_phase1_performance_package_host_validation_tests
 )
+set_tests_properties(drs.phase1.performance_package_host_validation PROPERTIES RUN_SERIAL TRUE)
 
 juce_add_console_app(drs_phase1_performance_package_release_gate
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Release Gate"
@@ -3949,6 +3991,7 @@ add_custom_target(drs_all_tests)
 
 add_dependencies(drs_all_tests
     DecentRhapsodyStudioPlugin
+    drs_package_v2_tests
     drs_host_session_state_contract_tests
     drs_host_project_recall_tests
     drs_host_state_recovery_ui_tests

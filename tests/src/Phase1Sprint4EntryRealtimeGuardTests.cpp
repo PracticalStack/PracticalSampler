@@ -26,7 +26,9 @@ void notifyAllocation() noexcept
 void notifyDeallocation(void* pointer) noexcept
 {
     if (pointer != nullptr)
+    {
         drs::plugin::recordRealtimeGuardOperation(drs::plugin::RealtimeGuardOperation::deallocation);
+    }
 }
 
 void* allocateRaw(std::size_t size)
@@ -130,7 +132,9 @@ void runNegativeCase(drs::plugin::RealtimeGuardOperation operation, const std::s
     {
         if (other != operation)
             require(operationCount(snapshot, other) == 0,
-                    label + " contaminated another dedicated guard counter.");
+                    label + " contaminated dedicated guard counter "
+                        + std::to_string(static_cast<int>(other)) + " with count "
+                        + std::to_string(operationCount(snapshot, other)) + ".");
     }
 }
 

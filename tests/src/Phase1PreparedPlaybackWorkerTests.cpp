@@ -3,17 +3,27 @@
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/SampleImport.h"
+#include "drs/engine/SampleDataSource.h"
+#include "drs/engine/SamplerRenderModel.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
 namespace
 {
+namespace fs = std::filesystem;
+
 void require(bool condition, const std::string& message)
 {
     if (!condition)
@@ -75,6 +85,72 @@ bool waitForCondition(const std::function<bool()>& condition,
 
     return condition();
 }
+
+fs::path createSparseFingerprintFixture(std::uint64_t sizeBytes)
+{
+    const auto path = fs::temp_directory_path() / "drs-prepared-worker-slow-fingerprint.bin";
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    require(output.good(), "Could not create the slow prepared-worker fingerprint fixture.");
+    output.seekp(static_cast<std::streamoff>(sizeBytes - 1));
+    output.put('\0');
+    output.close();
+    require(fs::file_size(path) == sizeBytes,
+            "Slow prepared-worker fingerprint fixture did not retain its sparse size.");
+    return path;
+}
+
+void writeLe16(std::ostream& output, std::uint16_t value)
+{
+    const std::array<char, 2> bytes { static_cast<char>(value & 0xffu),
+                                      static_cast<char>((value >> 8u) & 0xffu) };
+    output.write(bytes.data(), bytes.size());
+}
+
+void writeLe32(std::ostream& output, std::uint32_t value)
+{
+    for (int shift = 0; shift < 32; shift += 8)
+        output.put(static_cast<char>((value >> shift) & 0xffu));
+}
+
+void writeLe64(std::ostream& output, std::uint64_t value)
+{
+    for (int shift = 0; shift < 64; shift += 8)
+        output.put(static_cast<char>((value >> shift) & 0xffu));
+}
+
+fs::path createSparseRf64Fixture(std::uint64_t dataSizeBytes)
+{
+    const auto path = fs::temp_directory_path() / "drs-sparse-rf64-fixture.wav";
+    constexpr std::uint64_t dataOffset = 80;
+    const auto fileSize = dataOffset + dataSizeBytes;
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    require(output.good(), "Could not create sparse RF64 descriptor fixture.");
+    output.write("RF64", 4);
+    writeLe32(output, 0xffffffffu);
+    output.write("WAVE", 4);
+    output.write("ds64", 4);
+    writeLe32(output, 28);
+    writeLe64(output, fileSize - 8);
+    writeLe64(output, dataSizeBytes);
+    writeLe64(output, dataSizeBytes / 4);
+    writeLe32(output, 0);
+    output.write("fmt ", 4);
+    writeLe32(output, 16);
+    writeLe16(output, 1);
+    writeLe16(output, 2);
+    writeLe32(output, 48000);
+    writeLe32(output, 192000);
+    writeLe16(output, 4);
+    writeLe16(output, 16);
+    output.write("data", 4);
+    writeLe32(output, 0xffffffffu);
+    output.seekp(static_cast<std::streamoff>(fileSize - 1));
+    output.put('\0');
+    output.close();
+    require(fs::file_size(path) == fileSize,
+            "Sparse RF64 descriptor fixture did not retain its declared range.");
+    return path;
+}
 } // namespace
 
 int main()
@@ -90,9 +166,316 @@ int main()
         const auto referenceStream = drs::engine::loadRuntimeStreamContainerForInstrument(referenceManifest);
         require(referenceStream.loaded, "Phase 1 reference stream must load before prepared worker tests run.");
 
+        for (const auto& source : phase2Project.project.sampleSources)
+        {
+            const auto wavDescriptor = drs::engine::buildWavSampleDataSourceDescriptor(
+                source.id, source.path);
+            require(wavDescriptor.built
+                        && wavDescriptor.descriptor.kind
+                            == drs::engine::SampleDataSourceKind::wavFile
+                        && wavDescriptor.descriptor.dataOffsetBytes > 0
+                        && wavDescriptor.descriptor.dataSizeBytes > 0
+                        && wavDescriptor.descriptor.frameCount > 0
+                        && wavDescriptor.descriptor.generation != 0
+                        && wavDescriptor.descriptor.headSizeBytes
+                            == drs::engine::defaultSampleHeadBytes
+                        && wavDescriptor.descriptor.pageSizeBytes
+                            == drs::engine::defaultSamplePageBytes,
+                    "Checked-in WAV sources must expose validated seekable 64-bit descriptors.");
+        }
+        const auto& pagedFixtureSource = phase2Project.project.sampleSources.front();
+        auto pagedDescriptor = drs::engine::buildWavSampleDataSourceDescriptor(
+            pagedFixtureSource.id, pagedFixtureSource.path);
+        drs::engine::WavPagedSampleDataSource pagedWav(std::move(pagedDescriptor));
+        require(pagedWav.acquireFrameView(0, 1).status
+                    == drs::engine::SampleFrameViewStatus::pageMissing,
+                "WAV audio views must never perform an implicit callback-thread range read.");
+        require(pagedWav.prepareHead(),
+                "Worker-side WAV head preparation should succeed.");
+        drs::engine::SamplePageRequestScheduler audioIntentScheduler(4);
+        require(pagedWav.publishPageIntent(pagedWav.headFrameCount(),
+                                           drs::engine::SamplePageRequestPriority::imminent,
+                                           77)
+                    && pagedWav.drainPageIntents(audioIntentScheduler) == 1,
+                "A callback-side primitive page intent must drain into the worker scheduler.");
+        drs::engine::SamplePageRequest audioIntentRequest;
+        require(audioIntentScheduler.popNext(audioIntentRequest)
+                    && audioIntentRequest.sourceGeneration == pagedWav.descriptor().generation
+                    && audioIntentRequest.pageIndex == 0
+                    && audioIntentRequest.priority
+                        == drs::engine::SamplePageRequestPriority::imminent
+                    && pagedWav.intentMetrics().publishedCount == 1
+                    && pagedWav.intentMetrics().consumedCount == 1,
+                "Page intents must preserve generation/page/priority without callback allocation.");
+        require(pagedWav.preparePage(0),
+                "Worker-side first-page preparation should succeed.");
+        const auto pagedHeadView = pagedWav.acquireFrameView(0, 8);
+        const auto pagedPageView = pagedWav.acquireFrameView(pagedWav.headFrameCount(), 8);
+        const auto decodedPagedFixture = drs::engine::importSampleFile(pagedFixtureSource.path);
+        require(decodedPagedFixture.imported
+                    && pagedHeadView.status == drs::engine::SampleFrameViewStatus::ready
+                    && pagedPageView.status == drs::engine::SampleFrameViewStatus::ready
+                    && std::abs(pagedHeadView.channels[0][0]
+                        - decodedPagedFixture.sample.normalizedChannels[0][0]) < 1.0e-6f
+                    && std::abs(pagedPageView.channels[0][0]
+                        - decodedPagedFixture.sample.normalizedChannels[0][pagedWav.headFrameCount()]) < 1.0e-6f,
+                "Bounded WAV range conversion must match the resident decoder at head/page boundaries.");
+        const auto pagedMetrics = pagedWav.metrics();
+        require(pagedMetrics.rangeReadCount == 2
+                    && pagedMetrics.bytesRead
+                        <= drs::engine::defaultSampleHeadBytes
+                            + drs::engine::defaultSamplePageBytes
+                    && pagedMetrics.residentHeadBytes > 0
+                    && pagedMetrics.residentPageBytes > 0,
+                "WAV preparation metrics must expose exactly bounded head/page reads and residency.");
+        require(pagedWav.preparePage(0)
+                    && pagedWav.metrics().rangeReadCount == 2
+                    && pagedWav.metrics().duplicateRequestCount == 1,
+                "Equivalent WAV page requests must deduplicate without another file read.");
+        drs::engine::SamplePageRequestScheduler pageScheduler(2);
+        const auto sourceGeneration = pagedWav.descriptor().generation;
+        require(pageScheduler.submit({ sourceGeneration, 0,
+                                       drs::engine::SamplePageRequestPriority::lookAhead })
+                    && pageScheduler.submit({ sourceGeneration, 1,
+                                              drs::engine::SamplePageRequestPriority::lookAhead })
+                    && pageScheduler.submit({ sourceGeneration, 0,
+                                              drs::engine::SamplePageRequestPriority::imminent })
+                    && pageScheduler.submit({ sourceGeneration, 2,
+                                              drs::engine::SamplePageRequestPriority::head }),
+                "Bounded page scheduling should admit, deduplicate/upgrade, and prioritize requests.");
+        drs::engine::SamplePageRequest scheduledPage;
+        require(pageScheduler.popNext(scheduledPage)
+                    && scheduledPage.pageIndex == 2
+                    && scheduledPage.priority == drs::engine::SamplePageRequestPriority::head
+                    && pageScheduler.popNext(scheduledPage)
+                    && scheduledPage.pageIndex == 0
+                    && scheduledPage.priority == drs::engine::SamplePageRequestPriority::imminent
+                    && pageScheduler.metrics().maximumPendingDepth == 2
+                    && pageScheduler.metrics().duplicateCount == 1
+                    && pageScheduler.metrics().displacedCount == 1,
+                "Page scheduling must remain bounded and dispatch head/imminent work deterministically.");
+        require(pageScheduler.submit({ sourceGeneration, 4,
+                                       drs::engine::SamplePageRequestPriority::lookAhead })
+                    && pageScheduler.submit({ sourceGeneration + 1, 0,
+                                              drs::engine::SamplePageRequestPriority::imminent })
+                    && pageScheduler.cancelGeneration(sourceGeneration) == 1
+                    && pageScheduler.popNext(scheduledPage)
+                    && scheduledPage.sourceGeneration == sourceGeneration + 1
+                    && pageScheduler.metrics().cancelledCount == 1,
+                "Generation cutover must cancel obsolete queued page work off the audio thread.");
+
+        auto cacheDescriptor = drs::engine::buildWavSampleDataSourceDescriptor(
+            pagedFixtureSource.id, pagedFixtureSource.path);
+        drs::engine::WavPagedSampleDataSource cacheWav(
+            std::move(cacheDescriptor), drs::engine::defaultSamplePageBytes);
+        require(cacheWav.pageCount() > 1 && cacheWav.prepareHead() && cacheWav.preparePage(0),
+                "Cache-pressure fixture requires at least two pages and a resident first page.");
+        auto pinnedPage = cacheWav.acquireFrameView(cacheWav.headFrameCount(), 1);
+        require(pinnedPage.status == drs::engine::SampleFrameViewStatus::ready
+                    && !cacheWav.preparePage(1)
+                    && cacheWav.metrics().allocatedPageBytes
+                        <= cacheWav.metrics().pageCacheBudgetBytes
+                    && cacheWav.metrics().leasedPageBytes
+                        == drs::engine::defaultSamplePageBytes
+                    && cacheWav.metrics().pinnedEvictionSkipCount > 0
+                    && cacheWav.metrics().cachePressureFailureCount == 1,
+                "A leased page must prevent eviction without overshooting the configured cache budget.");
+        pinnedPage = {};
+        const auto secondPagePrepared = cacheWav.preparePage(1);
+        const auto evictedPageView = cacheWav.acquireFrameView(cacheWav.headFrameCount(), 1);
+        const auto replacementPageView = cacheWav.acquireFrameView(
+            cacheWav.headFrameCount() + cacheWav.pageFrameCount(), 1);
+        const auto cacheMetrics = cacheWav.metrics();
+        std::cout << "Page cache trace: budgetBytes=" << cacheMetrics.pageCacheBudgetBytes
+                  << " peakAllocatedBytes=" << cacheMetrics.maximumAllocatedPageBytes
+                  << " evictions=" << cacheMetrics.evictionCount
+                  << " pinnedSkips=" << cacheMetrics.pinnedEvictionSkipCount
+                  << " pressureFailures=" << cacheMetrics.cachePressureFailureCount
+                  << " hits=" << cacheMetrics.pageHitCount
+                  << " misses=" << cacheMetrics.pageMissCount
+                  << " maxReadMicros=" << cacheMetrics.maximumReadLatencyMicros
+                  << std::endl;
+        require(secondPagePrepared
+                    && evictedPageView.status == drs::engine::SampleFrameViewStatus::pageMissing
+                    && replacementPageView.status == drs::engine::SampleFrameViewStatus::ready
+                    && cacheMetrics.evictionCount == 1
+                    && cacheMetrics.allocatedPageBytes <= cacheMetrics.pageCacheBudgetBytes
+                    && cacheMetrics.maximumAllocatedPageBytes <= cacheMetrics.pageCacheBudgetBytes
+                    && cacheMetrics.leasedPageBytes == drs::engine::defaultSamplePageBytes
+                    && cacheMetrics.pageHitCount >= 2
+                    && cacheMetrics.pageMissCount >= 1
+                    && cacheMetrics.maximumReadLatencyMicros
+                        <= cacheMetrics.totalReadLatencyMicros,
+                "Off-audio LRU must reclaim an unleased page before publishing its replacement.");
+
+        const auto mutationPath = fs::temp_directory_path() / "drs-wav-generation-mutation.wav";
+        std::error_code mutationError;
+        fs::copy_file(fs::path(pagedFixtureSource.path), mutationPath,
+                      fs::copy_options::overwrite_existing, mutationError);
+        require(!mutationError, "Could not create the WAV generation-mutation fixture.");
+        auto mutationDescriptor = drs::engine::buildWavSampleDataSourceDescriptor(
+            "mutation", mutationPath.generic_string());
+        drs::engine::WavPagedSampleDataSource mutatedWav(std::move(mutationDescriptor));
+        {
+            std::ofstream mutationOutput(mutationPath, std::ios::binary | std::ios::app);
+            mutationOutput.put('\0');
+        }
+        require(!mutatedWav.prepareHead()
+                    && mutatedWav.metrics().sourceMutationFailureCount == 1
+                    && mutatedWav.lastFailure().find("changed") != std::string::npos,
+                "Changed WAV generations must fail before publishing stale head/page data.");
+        fs::remove(mutationPath, mutationError);
+        require(!mutationError, "WAV generation-mutation fixture should clean up.");
+        constexpr std::uint64_t rf64DataSize = 5ull * 1024ull * 1024ull * 1024ull;
+        const auto sparseRf64Path = createSparseRf64Fixture(rf64DataSize);
+        const auto sparseRf64Descriptor = drs::engine::buildWavSampleDataSourceDescriptor(
+            "sparse-rf64", sparseRf64Path.generic_string());
+        require(sparseRf64Descriptor.built && sparseRf64Descriptor.rf64
+                    && sparseRf64Descriptor.descriptor.dataOffsetBytes == 80
+                    && sparseRf64Descriptor.descriptor.dataSizeBytes == rf64DataSize
+                    && sparseRf64Descriptor.descriptor.frameCount == rf64DataSize / 4
+                    && sparseRf64Descriptor.descriptor.frameCount
+                        > std::numeric_limits<std::uint32_t>::max() / 4,
+                "RF64 descriptors must preserve >4 GiB data and frame ranges without payload allocation.");
+        std::error_code sparseRf64CleanupError;
+        fs::remove(sparseRf64Path, sparseRf64CleanupError);
+        require(!sparseRf64CleanupError, "Sparse RF64 fixture should clean up after descriptor validation.");
+        const auto truncatedWavPath = fs::temp_directory_path() / "drs-truncated-wav-fixture.wav";
+        {
+            std::ofstream truncated(truncatedWavPath, std::ios::binary | std::ios::trunc);
+            truncated.write("RIFF", 4);
+        }
+        require(!drs::engine::buildWavSampleDataSourceDescriptor(
+                    "truncated", truncatedWavPath.generic_string()).built
+                    && !drs::engine::buildWavSampleDataSourceDescriptor(
+                        "missing", (truncatedWavPath.generic_string() + ".missing")).built,
+                "Missing and truncated WAVs must fail descriptor construction without reading PCM.");
+        fs::remove(truncatedWavPath, sparseRf64CleanupError);
+        require(!sparseRf64CleanupError, "Truncated WAV fixture should clean up.");
+
+        std::vector<drs::engine::ResidentPreparationSampleMetadata> salamanderScaleMetadata(
+            641, { 48000ull * 60ull, 2 });
+        const auto salamanderScaleAdmission
+            = drs::engine::assessResidentPreparationAdmission(salamanderScaleMetadata);
+        require(salamanderScaleAdmission.metadataAvailable
+                    && !salamanderScaleAdmission.admitted
+                    && !salamanderScaleAdmission.arithmeticOverflow
+                    && salamanderScaleAdmission.readiness
+                        == drs::engine::PreparedPlaybackReadinessState::streamingRequired
+                    && salamanderScaleAdmission.estimatedDecodedBytes
+                        > salamanderScaleAdmission.residentBudgetBytes
+                    && salamanderScaleAdmission.findingCode
+                        == "resident-admission-budget-exceeded",
+                "Salamander-scale metadata must require streaming under the 512 MiB resident policy.");
+        const auto overflowingAdmission = drs::engine::assessResidentPreparationAdmission(
+            { { std::numeric_limits<std::uint64_t>::max(), 2 } });
+        require(!overflowingAdmission.admitted
+                    && overflowingAdmission.arithmeticOverflow
+                    && overflowingAdmission.findingCode == "resident-admission-size-overflow",
+                "Resident admission must use checked 64-bit frame/channel/float arithmetic.");
+
         drs::engine::PlaybackSnapshotBuilder snapshotBuilder;
         drs::engine::PreparedPlaybackService preparedService;
         drs::engine::RuntimeProjectDocumentController controller(phase2Project.project);
+
+        drs::engine::PreparedPlaybackSchedulerBudgets oneByteResidentBudget;
+        oneByteResidentBudget.maximumRetainedPreparedBytes = 1;
+        oneByteResidentBudget.allowWavStreaming = false;
+        drs::engine::PreparedPlaybackService overBudgetService(
+            "phase1-prepared-playback-v2", 2, false, oneByteResidentBudget);
+        const auto overBudgetSnapshot = buildSnapshot(
+            snapshotBuilder, controller.getProject(), 0, false);
+        drs::engine::resetSampleImportIoCounters();
+        require(overBudgetService.enqueuePreviewBuild(overBudgetSnapshot).accepted,
+                "Over-budget resident preparation should queue for metadata admission.");
+        const auto overBudgetResult = overBudgetService.processNextQueuedBuild(referenceStream);
+        const auto overBudgetIo = drs::engine::getSampleImportIoCounters();
+        require(overBudgetResult.processed
+                    && !overBudgetResult.result.built
+                    && !overBudgetResult.result.activationEligible
+                    && overBudgetResult.result.completionDisposition
+                        == drs::engine::PreparedPlaybackCompletionDisposition::rejected
+                    && overBudgetResult.result.admission.readiness
+                        == drs::engine::PreparedPlaybackReadinessState::streamingRequired
+                    && overBudgetResult.result.admission.estimatedDecodedBytes > 1
+                    && overBudgetResult.result.metrics.decodedBytes == 0
+                    && overBudgetIo.fingerprintOpenCount == 0
+                    && overBudgetIo.fullFrameReadCount == 0,
+                "Resident admission must reject over-budget metadata before fingerprinting or PCM allocation.");
+        std::cout << "Resident admission trace: salamanderScaleEstimateBytes="
+                  << salamanderScaleAdmission.estimatedDecodedBytes
+                  << " residentBudgetBytes=" << salamanderScaleAdmission.residentBudgetBytes
+                  << " fixtureEstimateBytes="
+                  << overBudgetResult.result.admission.estimatedDecodedBytes
+                  << " fingerprintOpens=" << overBudgetIo.fingerprintOpenCount
+                  << " fullFrameReads=" << overBudgetIo.fullFrameReadCount << std::endl;
+
+        drs::engine::PreparedPlaybackSchedulerBudgets streamingBudget;
+        streamingBudget.maximumRetainedPreparedBytes = 1;
+        drs::engine::PreparedPlaybackService streamingService(
+            "phase1-prepared-playback-v2", 2, false, streamingBudget);
+        drs::engine::resetSampleImportIoCounters();
+        require(streamingService.enqueuePreviewBuild(overBudgetSnapshot).accepted,
+                "Over-budget WAV preparation should queue for the streaming path.");
+        const auto streamingResult = streamingService.processNextQueuedBuild(referenceStream);
+        const auto streamingIo = drs::engine::getSampleImportIoCounters();
+        require(streamingResult.processed && streamingResult.result.built
+                    && streamingResult.result.activationEligible
+                    && streamingResult.result.admission.readiness
+                        == drs::engine::PreparedPlaybackReadinessState::playable
+                    && streamingResult.result.metrics.decodedBytes == 0
+                    && streamingResult.result.metrics.preparedSampleDataBytes == 0
+                    && streamingIo.fingerprintOpenCount == 0
+                    && streamingIo.fullFrameReadCount == 0
+                    && std::all_of(streamingResult.result.prepared.samples.begin(),
+                                   streamingResult.result.prepared.samples.end(),
+                                   [](const auto& sample)
+                                   {
+                                       return sample.decodedSampleData == nullptr
+                                           && sample.dataSource != nullptr
+                                           && sample.dataSource->acquireFrameView(0, 1).status
+                                               == drs::engine::SampleFrameViewStatus::ready;
+                                   }),
+                "Over-budget WAV preparation must become head-ready without full PCM decoding.");
+        const auto streamingPayload = drs::engine::buildPlaybackActivationPayload(
+            drs::engine::PlaybackActivationLane::preview,
+            overBudgetSnapshot.requestedDraftRevision,
+            &overBudgetSnapshot,
+            &streamingResult.result);
+        const auto streamingRenderModel = drs::engine::buildSamplerRenderModel(streamingPayload);
+        require(streamingPayload != nullptr && streamingRenderModel.built
+                    && streamingRenderModel.model != nullptr,
+                "Head-ready WAV sources must build the common immutable render model.");
+
+        const auto scopedStreamingSnapshot = drs::engine::scopePlaybackSnapshotForPreparation(
+            overBudgetSnapshot,
+            { drs::engine::PlaybackPreparationScope::selectedZone,
+              "lead-a4-sustain",
+              {} });
+        drs::engine::PreparedPlaybackService scopedStreamingService(
+            "phase1-prepared-playback-v2", 2, false, streamingBudget);
+        require(scopedStreamingSnapshot.built
+                    && scopedStreamingService.enqueuePreviewBuild(scopedStreamingSnapshot).accepted,
+                "Selected-zone WAV streaming preparation should queue from the scoped snapshot.");
+        const auto scopedStreamingResult
+            = scopedStreamingService.processNextQueuedBuild(referenceStream);
+        require(scopedStreamingResult.processed && scopedStreamingResult.result.built
+                    && scopedStreamingResult.result.prepared.samples.size() == 1
+                    && scopedStreamingResult.result.prepared.zones.size() == 1
+                    && scopedStreamingResult.result.prepared.ownershipRecords.size() == 1
+                    && scopedStreamingResult.result.prepared.ownershipRecords.front().retainedBytes
+                        <= drs::engine::defaultSampleHeadBytes
+                    && scopedStreamingResult.result.metrics.decodedBytes == 0,
+                "Selected-zone WAV streaming must prime only one bounded dependency head.");
+        std::cout << "WAV streaming trace: rangeReads=" << pagedMetrics.rangeReadCount
+                  << " rangeBytes=" << pagedMetrics.bytesRead
+                  << " headResidentBytes=" << pagedMetrics.residentHeadBytes
+                  << " pageResidentBytes=" << pagedMetrics.residentPageBytes
+                  << " scopedHeadBytes="
+                  << scopedStreamingResult.result.prepared.ownershipRecords.front().retainedBytes
+                  << " scopedSources=" << scopedStreamingResult.result.prepared.samples.size()
+                  << " fullDecodedBytes=" << scopedStreamingResult.result.metrics.decodedBytes
+                  << std::endl;
 
         drs::engine::PreparedPlaybackService previewDecodeService;
         const auto coldPreviewRevision0 = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);
@@ -246,6 +629,85 @@ int main()
                 "Canceling queued background-worker jobs should not create a retired ownership backlog.");
         require(queuedCancellationCleanupService.getWorkerStatus().retiredBytesAwaitingCleanup == 0,
                 "Canceling queued background-worker jobs should not create retired ownership bytes.");
+
+        const auto slowFingerprintPath = createSparseFingerprintFixture(1ull << 30u);
+        auto slowProject = phase2Project.project;
+        for (auto& source : slowProject.sampleSources)
+            source.path = slowFingerprintPath.generic_string();
+        const auto slowSnapshot = buildSnapshot(snapshotBuilder, slowProject, 77, false);
+        std::uint64_t tracedMaximumStatusPollMicros = 0;
+        std::uint64_t tracedCancellationCommandMicros = 0;
+        {
+            drs::engine::PreparedPlaybackService slowService(
+                "phase1-prepared-playback-v2", 2, true);
+            slowService.setBackgroundWorkerStream(referenceStream);
+            require(slowService.enqueuePreviewBuild(slowSnapshot).accepted,
+                    "Slow-preparation latency coverage should queue a Preview build.");
+            require(waitForCondition([&]
+                    {
+                        return slowService.getWorkerStatus().inFlightWorkCount == 1;
+                    }, std::chrono::milliseconds(2000)),
+                    "Slow-preparation latency coverage should enter worker execution.");
+
+            std::uint64_t maximumStatusPollMicros = 0;
+            for (int poll = 0; poll < 64; ++poll)
+            {
+                const auto pollStarted = std::chrono::steady_clock::now();
+                const auto status = slowService.getWorkerStatus();
+                maximumStatusPollMicros = std::max<std::uint64_t>(
+                    maximumStatusPollMicros,
+                    static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now() - pollStarted).count()));
+                require(status.inFlightWorkCount <= status.configuredMaxInFlightWorkCount,
+                        "Status polling must preserve the in-flight worker bound.");
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            require(maximumStatusPollMicros < 16000,
+                    "Status polling must remain below 16 ms during deliberately slow preparation.");
+            tracedMaximumStatusPollMicros = maximumStatusPollMicros;
+
+            const auto cancellationStarted = std::chrono::steady_clock::now();
+            slowService.cancelQueuedPreviewBuilds("Cancel deliberately slow fingerprint work");
+            const auto cancellationCommandMicros = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - cancellationStarted).count());
+            require(cancellationCommandMicros < 16000,
+                    "In-flight cancellation submission must remain below 16 ms.");
+            tracedCancellationCommandMicros = cancellationCommandMicros;
+            require(slowService.waitForWorkerIdle(1000),
+                    "Cooperative cancellation must stop slow fingerprint work without reading the full fixture.");
+            const auto canceledSlowResults = slowService.drainCompletedBuilds();
+            require(canceledSlowResults.size() == 1
+                        && canceledSlowResults.front().result.lifecycleState
+                            == drs::engine::PlaybackSnapshotLifecycleState::canceled,
+                    "The deliberately slow in-flight build must publish one canceled completion.");
+        }
+
+        auto shutdownService = std::make_unique<drs::engine::PreparedPlaybackService>(
+            "phase1-prepared-playback-v2", 2, true);
+        shutdownService->setBackgroundWorkerStream(referenceStream);
+        require(shutdownService->enqueuePreviewBuild(slowSnapshot).accepted,
+                "Shutdown coverage should queue deliberately slow Preview work.");
+        require(waitForCondition([&]
+                {
+                    return shutdownService->getWorkerStatus().inFlightWorkCount == 1;
+                }, std::chrono::milliseconds(2000)),
+                "Shutdown coverage should enter deliberately slow worker execution.");
+        const auto shutdownStarted = std::chrono::steady_clock::now();
+        shutdownService.reset();
+        const auto shutdownMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - shutdownStarted).count());
+        require(shutdownMicros < 250000,
+                "Prepared worker shutdown must cooperatively cancel without reading the full fixture.");
+        std::cout << "Slow preparation concurrency trace: maxStatusPollMicros="
+                  << tracedMaximumStatusPollMicros
+                  << " cancellationCommandMicros=" << tracedCancellationCommandMicros
+                  << " shutdownMicros=" << shutdownMicros << std::endl;
+        std::error_code slowFixtureCleanupError;
+        fs::remove(slowFingerprintPath, slowFixtureCleanupError);
+        require(!slowFixtureCleanupError,
+                "Slow prepared-worker fingerprint fixture should be removed after concurrency coverage.");
 
         drs::engine::PreparedPlaybackService publishAdmissionPriorityService("phase1-prepared-playback-v2", 1, false);
         const auto maxBudgetPreview = buildSnapshot(snapshotBuilder, controller.getProject(), 0, false);

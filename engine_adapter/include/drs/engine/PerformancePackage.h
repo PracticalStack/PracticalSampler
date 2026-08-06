@@ -37,6 +37,22 @@ enum class WorkspaceMode
     performanceOnly
 };
 
+enum class PackageSessionReadiness
+{
+    metadataLoaded,
+    openingSources,
+    preparingHeads,
+    buildingModel,
+    playbackDeferred,
+    playable,
+    pendingActivation,
+    active,
+    degraded,
+    failed,
+    cancelled,
+    streamingRequired
+};
+
 struct PerformancePackageManifest
 {
     struct GroupRoute
@@ -74,6 +90,8 @@ struct WorkspaceDocumentState
     int minimumReaderSchemaVersion = 0;
     bool authoringAvailable = true;
     bool dirty = false;
+    PackageSessionReadiness readiness = PackageSessionReadiness::playbackDeferred;
+    bool playable = false;
 };
 
 inline const char* toString(const WorkspaceDocumentKind kind) noexcept
@@ -87,6 +105,99 @@ inline const char* toString(const WorkspaceDocumentKind kind) noexcept
     }
 
     return "unknown";
+}
+
+inline const char* toString(const PackageSessionReadiness readiness) noexcept
+{
+    switch (readiness)
+    {
+        case PackageSessionReadiness::metadataLoaded:
+            return "metadata-loaded";
+        case PackageSessionReadiness::openingSources:
+            return "opening-sources";
+        case PackageSessionReadiness::preparingHeads:
+            return "preparing-heads";
+        case PackageSessionReadiness::buildingModel:
+            return "building-model";
+        case PackageSessionReadiness::playbackDeferred:
+            return "playback-deferred";
+        case PackageSessionReadiness::playable:
+            return "playable";
+        case PackageSessionReadiness::pendingActivation:
+            return "pending-activation";
+        case PackageSessionReadiness::active:
+            return "active";
+        case PackageSessionReadiness::degraded:
+            return "degraded";
+        case PackageSessionReadiness::failed:
+            return "failed";
+        case PackageSessionReadiness::cancelled:
+            return "cancelled";
+        case PackageSessionReadiness::streamingRequired:
+            return "streaming-required";
+    }
+
+    return "unknown";
+}
+
+inline std::string packageWorkspaceStatusText(const PackageSessionReadiness readiness)
+{
+    switch (readiness)
+    {
+        case PackageSessionReadiness::metadataLoaded:
+            return "Package metadata loaded | Playback deferred";
+        case PackageSessionReadiness::openingSources:
+            return "Opening package sample sources";
+        case PackageSessionReadiness::preparingHeads:
+            return "Preparing bounded sample heads";
+        case PackageSessionReadiness::buildingModel:
+            return "Building package render model";
+        case PackageSessionReadiness::playbackDeferred:
+            return "Playback deferred";
+        case PackageSessionReadiness::playable:
+            return "Playable package";
+        case PackageSessionReadiness::pendingActivation:
+            return "Playable package | Audio activation pending";
+        case PackageSessionReadiness::active:
+            return "Playable package";
+        case PackageSessionReadiness::degraded:
+            return "Previous package active | Replacement degraded";
+        case PackageSessionReadiness::failed:
+            return "Package preparation failed";
+        case PackageSessionReadiness::cancelled:
+            return "Package preparation cancelled";
+        case PackageSessionReadiness::streamingRequired:
+            return "Streaming required";
+    }
+    return "Playback deferred";
+}
+
+inline std::string packageWorkspaceStatusTooltip(const WorkspaceDocumentState& document)
+{
+    std::string result;
+    switch (document.readiness)
+    {
+        case PackageSessionReadiness::playable:
+        case PackageSessionReadiness::active:
+            result = "Read-only playable package session.";
+            break;
+        case PackageSessionReadiness::degraded:
+            result = "The previous package remains active; the replacement requires attention.";
+            break;
+        case PackageSessionReadiness::failed:
+            result = "Package preparation failed before audio activation.";
+            break;
+        case PackageSessionReadiness::cancelled:
+            result = "Package preparation was cancelled.";
+            break;
+        default:
+            result = "Package metadata is loaded; bounded preparation continues before audio activation.";
+            break;
+    }
+    if (!document.sourcePath.empty())
+        result += "\nSource: " + document.sourcePath;
+    result += "\nCompatible reader schema: v" + std::to_string(document.minimumReaderSchemaVersion);
+    return result;
 }
 
 inline const char* toString(const PerformancePackageFailureCategory category) noexcept

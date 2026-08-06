@@ -5,6 +5,8 @@
 #include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/PackageReader.h"
+#include "drs/engine/PackageReaderDispatch.h"
+#include "drs/engine/PackageV2StreamingExport.h"
 #include "drs/engine/PackageWriter.h"
 #include "drs/engine/DspRenderGeneration.h"
 #include "drs/engine/RuntimeCompiler.h"
@@ -210,13 +212,17 @@ drs::engine::WorkspaceDocumentState buildAuthoringWorkspaceDocumentState(
 
 drs::engine::WorkspaceDocumentState buildPerformancePackageWorkspaceDocumentState(
     const drs::engine::PerformancePackageManifest& package,
-    const juce::File& resolvedPackageFile)
+    const juce::File& resolvedPackageFile,
+    drs::engine::PackageSessionReadiness readiness)
 {
     drs::engine::WorkspaceDocumentState state;
     state.kind = drs::engine::WorkspaceDocumentKind::performancePackage;
     state.workspaceMode = drs::engine::WorkspaceMode::performanceOnly;
     state.authoringAvailable = false;
     state.dirty = false;
+    state.readiness = readiness;
+    state.playable = readiness == drs::engine::PackageSessionReadiness::playable
+        || readiness == drs::engine::PackageSessionReadiness::active;
     state.documentId = package.packageId;
     state.schemaVersion = package.schemaVersion;
     state.minimumReaderSchemaVersion = package.minimumReaderSchemaVersion;
@@ -308,10 +314,26 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
     }
 
     const auto loadStartedAt = std::chrono::steady_clock::now();
-    const auto packageLoad = drs::engine::loadPerformancePackage(
-        packagePath,
-        drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::performancePackageSchemaVersion);
+    const auto dispatch = drs::engine::dispatchPerformancePackageReader(packagePath);
+    drs::engine::PerformancePackageLoadResult packageLoad;
+    drs::engine::PerformancePackageV2MetadataLoadResult packageV2;
+    if (dispatch.format == drs::engine::PerformancePackageDiskFormat::version2)
+    {
+        packageV2 = drs::engine::loadPerformancePackageV2Metadata(packagePath);
+        packageLoad = packageV2.metadata;
+    }
+    else if (dispatch.opened)
+    {
+        packageLoad = drs::engine::loadPerformancePackage(
+            packagePath,
+            drs::engine::getDeterministicPackageCryptoProvider(),
+            drs::engine::performancePackageSchemaVersion);
+    }
+    else
+    {
+        packageLoad.state = dispatch.state;
+        packageLoad.issues = dispatch.issues;
+    }
     result.timings.packageLoadMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - loadStartedAt).count());
@@ -326,8 +348,10 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
         return result;
     }
 
-    auto activation = drs::engine::preparePerformancePackageActivation(packageLoad,
-                                                                       result.timings);
+    auto activation = dispatch.format == drs::engine::PerformancePackageDiskFormat::version2
+        ? drs::engine::preparePerformancePackageV2Activation(
+            packageLoad, packageV2.package, packageV2.sampleDescriptors, result.timings)
+        : drs::engine::preparePerformancePackageActivation(packageLoad, result.timings);
     result.timings = activation.timings;
     result.failureCategory = activation.failureCategory;
     result.state = activation.state;
@@ -350,10 +374,24 @@ OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInter
     }
 
     const auto loadStartedAt = std::chrono::steady_clock::now();
-    result.packageLoad = drs::engine::loadPerformancePackageMetadataOnly(
-        packagePath,
-        drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::performancePackageSchemaVersion);
+    const auto dispatch = drs::engine::dispatchPerformancePackageReader(packagePath);
+    if (dispatch.format == drs::engine::PerformancePackageDiskFormat::version2)
+    {
+        auto v2 = drs::engine::loadPerformancePackageV2Metadata(packagePath);
+        result.packageLoad = std::move(v2.metadata);
+    }
+    else if (dispatch.opened)
+    {
+        result.packageLoad = drs::engine::loadPerformancePackageMetadataOnly(
+            packagePath,
+            drs::engine::getDeterministicPackageCryptoProvider(),
+            drs::engine::performancePackageSchemaVersion);
+    }
+    else
+    {
+        result.packageLoad.state = dispatch.state;
+        result.packageLoad.issues = dispatch.issues;
+    }
     result.timings.packageLoadMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - loadStartedAt).count());
@@ -389,6 +427,13 @@ std::vector<std::uint8_t> readValidJpegBytes(const juce::File& imageFile, std::s
     issue.clear();
     if (imageFile == juce::File() || !imageFile.existsAsFile())
         return {};
+
+    constexpr std::int64_t maximumBackgroundImageBytes = 16ll * 1024ll * 1024ll;
+    if (imageFile.getSize() > maximumBackgroundImageBytes)
+    {
+        issue = "Performance background image exceeds the 16 MiB package limit.";
+        return {};
+    }
 
     if (!imageFile.hasFileExtension("jpg;jpeg"))
     {
@@ -1372,7 +1417,6 @@ void Processor::prepareToPlay(double sampleRate, int samplesPerBlock)
     performancePlaybackContext.prepare(currentSampleRate);
     authoringPreviewPlaybackContext.prepare(currentSampleRate);
     primeRealtimeSafetyState(samplesPerBlock > 0 ? samplesPerBlock : 512);
-    serviceMessageThreadWork();
     updateRealtimeSafetyState();
 }
 
@@ -2287,7 +2331,10 @@ bool Processor::activatePerformancePackageWorkspace(
         return false;
     }
 
-    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(package, resolvedPackageFile);
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(
+        package,
+        resolvedPackageFile,
+        drs::engine::PackageSessionReadiness::metadataLoaded);
     return true;
 }
 
@@ -2312,8 +2359,12 @@ PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePack
     result.timings = preparedActivation.timings;
 
     auto packageManifest = preparedActivation.packageLoad.manifest;
+    const auto engineActivationStarted = std::chrono::steady_clock::now();
     const auto activation = engineFacade.activatePreparedPerformancePackageSession(
         std::move(preparedActivation));
+    result.timings.engineSessionActivationMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - engineActivationStarted).count());
     if (!activation.activated)
     {
         result.failureCategory = activation.failureCategory;
@@ -2324,6 +2375,7 @@ PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePack
         return result;
     }
 
+    const auto workspaceTransitionStarted = std::chrono::steady_clock::now();
     projectSourceValidationService.cancel("Performance package opened");
     engineFacade.cancelPreviewPreparation("Performance package opened");
     performancePlaybackContext.cancelPendingActivation();
@@ -2343,13 +2395,13 @@ PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePack
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
-    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(packageManifest,
-                                                                          resolvedPackageFile);
-    serviceMessageThreadWork();
-    updateRealtimeSafetyState();
-    publishAuthoringPreviewStatus();
-    refreshSerializedHostStatePublication(true);
-
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(
+        packageManifest,
+        resolvedPackageFile,
+        drs::engine::PackageSessionReadiness::playable);
+    result.timings.workspaceTransitionMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - workspaceTransitionStarted).count());
     result.loaded = true;
     result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
     result.state = "Performance package opened";
@@ -2394,13 +2446,10 @@ PerformancePackageWorkspaceLoadResult Processor::activateOpenedPerformancePackag
     observedDraftPlaybackProjectRevision = authoringSession.getDocumentState().revision;
     initializeAuthoringImportMetrics();
     initializeAuthoringSourceValidationSnapshot();
-    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(packageManifest,
-                                                                          resolvedPackageFile);
-    serviceMessageThreadWork();
-    updateRealtimeSafetyState();
-    publishAuthoringPreviewStatus();
-    refreshSerializedHostStatePublication(true);
-
+    workspaceDocumentState = buildPerformancePackageWorkspaceDocumentState(
+        packageManifest,
+        resolvedPackageFile,
+        drs::engine::PackageSessionReadiness::playable);
     result.loaded = true;
     result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
     result.state = activation.state.empty() ? std::string("Performance package opened") : activation.state;
@@ -2519,28 +2568,23 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
         return result;
     }
 
-    const auto streamWrite = drs::engine::writeCompiledStreamAssets(compileResult);
-    if (!streamWrite.written)
+    auto packagePlan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
+        preparation.manifest,
+        compileResult,
+        targetPackageFile.getFullPathName().toStdString(),
+        preparation.additionalPayloads);
+    if (!packagePlan.built)
     {
         cleanupStagingDirectory();
-        result.state = streamWrite.state;
-        result.issues = streamWrite.issues;
+        result.state = packagePlan.state;
+        result.issues = packagePlan.issues;
         if (result.issues.empty())
-        {
-            result.issues.push_back("The compiled runtime stream could not be materialized for playable package export.");
-        }
+            result.issues.push_back("The bounded package v2 record plan could not be built.");
         return result;
     }
 
-    drs::engine::PerformancePackageCompileWritePlan packagePlan;
-    packagePlan.manifest = preparation.manifest;
-    packagePlan.compiledRuntime = std::move(compileResult);
-    packagePlan.outputPackagePath = targetPackageFile.getFullPathName().toStdString();
-    packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
-    packagePlan.additionalPayloads = preparation.additionalPayloads;
-
-    const auto packageWrite = drs::engine::writePerformancePackage(
-        packagePlan,
+    const auto packageWrite = drs::engine::writePackageV2Streaming(
+        packagePlan.plan,
         drs::engine::getDeterministicPackageCryptoProvider());
     if (!packageWrite.written)
     {
@@ -2552,10 +2596,9 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
         return result;
     }
 
-    const auto verification = drs::engine::loadPerformancePackage(
-        packagePlan.outputPackagePath,
-        drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::performancePackageSchemaVersion);
+    const auto verification = drs::engine::loadPerformancePackageV2Metadata(
+        targetPackageFile.getFullPathName().toStdString(),
+        drs::engine::getDeterministicPackageCryptoProvider());
     cleanupStagingDirectory();
     if (!verification.loaded)
     {
@@ -2573,9 +2616,9 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
 
     result.exported = true;
     result.state = "Playable package exported";
-    result.packagePath = packageWrite.packagePath;
+    result.packagePath = targetPackageFile.getFullPathName().toStdString();
     result.packageBytes = packageWrite.packageBytes;
-    result.payloadCount = packageWrite.payloadCount;
+    result.payloadCount = static_cast<std::uint32_t>(packageWrite.completedRecordCount);
     return result;
 }
 
@@ -2646,6 +2689,11 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision, true);
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
+    // Opening an authored project authorizes one bounded selected-zone preparation. The worker
+    // now receives the scoped snapshot, so this does not imply full-draft decode or message-thread I/O.
+    authoringPreviewPreparationAuthorized
+        = !authoringSession.getProject().sampleSources.empty()
+        && authoringSession.getSelectedZone().has_value();
     resetAuthoringWaveformPreviewAuthorization();
     if (replacingDifferentProject)
     {
@@ -2835,6 +2883,28 @@ void Processor::refreshSerializedHostStatePublication(const bool force)
                     { binding.stableAuthoredId, binding.dspSlotId, binding.dspParameterId });
             }
         }
+    }
+    if (workspaceDocumentState.kind == drs::engine::WorkspaceDocumentKind::performancePackage
+        && !workspaceDocumentState.documentId.empty()
+        && !workspaceDocumentState.sourcePath.empty())
+    {
+        drs::engine::HostSessionState state;
+        state.presetState = presetState;
+        state.performancePackageBinding = drs::engine::HostPerformancePackageBinding {
+            workspaceDocumentState.documentId,
+            workspaceDocumentState.sourcePath,
+            fs::path(workspaceDocumentState.sourcePath).filename().generic_string()
+        };
+        const auto serialized = drs::engine::serializeHostSessionState(state);
+        if (serialized.serialized)
+        {
+            auto immutable = std::make_shared<const std::string>(serialized.text);
+            std::atomic_store_explicit(&serializedHostStatePublication,
+                                       std::move(immutable),
+                                       std::memory_order_release);
+            hostStatePublicationKey = key;
+        }
+        return;
     }
     if (project.projectId.empty())
     {
@@ -3180,6 +3250,60 @@ bool Processor::serviceProjectRestore()
     if (restore->state != drs::engine::ProjectRestoreState::ready)
         return false;
 
+    if (restore->performancePackageOnly)
+    {
+        handledRestoreGeneration = restore->generation;
+        if (!restore->hostState.has_value()
+            || !restore->hostState->performancePackageBinding.has_value()
+            || restore->packageActivation == nullptr)
+        {
+            setPendingRestoreAudioPolicy(false);
+            projectRestoreCoordinator.publishLifecycleState(
+                restore->generation,
+                drs::engine::ProjectRestoreState::failed,
+                drs::engine::ProjectRestoreFinding::performancePackageInvalid,
+                "The performance package restore did not contain a prepared activation.");
+            return true;
+        }
+
+        const auto packageFile = juce::File(juce::String::fromUTF8(
+            restore->resolvedManifestPath.c_str()));
+        auto load = activatePreparedPerformancePackageWorkspace(
+            std::move(*restore->packageActivation), packageFile);
+        if (!load.loaded)
+        {
+            setPendingRestoreAudioPolicy(false);
+            projectRestoreCoordinator.publishLifecycleState(
+                restore->generation,
+                drs::engine::ProjectRestoreState::failed,
+                drs::engine::ProjectRestoreFinding::performancePackageInvalid,
+                load.issues.empty() ? load.state : load.issues.front());
+            return true;
+        }
+
+        const auto preset = engineFacade.restorePresetStateJson(
+            drs::engine::serializeRuntimePresetState(restore->hostState->presetState));
+        if (!preset.restored)
+        {
+            setPendingRestoreAudioPolicy(false);
+            projectRestoreCoordinator.publishLifecycleState(
+                restore->generation,
+                drs::engine::ProjectRestoreState::degraded,
+                drs::engine::ProjectRestoreFinding::presetStateInvalid,
+                preset.state);
+            return true;
+        }
+        syncParametersFromEngine();
+        setPendingRestoreAudioPolicy(false);
+        projectRestoreCoordinator.publishLifecycleState(
+            restore->generation,
+            drs::engine::ProjectRestoreState::active,
+            {},
+            "Performance package locator restored and activated");
+        refreshSerializedHostStatePublication(true);
+        return true;
+    }
+
     if (restore->legacyPresetOnly && restore->legacyPreset.has_value())
     {
         const auto result = engineFacade.restorePresetStateJson(
@@ -3411,15 +3535,33 @@ bool Processor::serviceMessageThreadWork()
             controllerSnapshot.currentRequest.identity, serviceTimeMicros);
         controllerSnapshot = authoringPreviewController.getSnapshot();
     }
+    drs::engine::PlaybackPreparationScopeRequest preparationScope;
+    preparationScope.scope = requestedScope == drs::engine::AuthoringPreviewScope::selectedZone
+        ? drs::engine::PlaybackPreparationScope::selectedZone
+        : (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
+               ? drs::engine::PlaybackPreparationScope::selectedGroup
+               : drs::engine::PlaybackPreparationScope::currentDraft);
+    preparationScope.selectedZoneId = preparationScope.scope
+            == drs::engine::PlaybackPreparationScope::selectedZone
+        ? requestSelectedZoneId
+        : std::string {};
+    preparationScope.selectedGroupId = preparationScope.scope
+            == drs::engine::PlaybackPreparationScope::selectedGroup
+        ? requestSelectedGroupId
+        : std::string {};
     const auto preparedPayload = engineFacade.getPreviewActivationPayload();
     const auto directAuditionContentPrepared = preparedPayload != nullptr
         && preparedPayload->revision == authoringRevision
-        && preparedPayload->preparedBuildId != 0;
+        && preparedPayload->preparedBuildId != 0
+        && preparedPayload->preparationScope == preparationScope.scope
+        && preparedPayload->preparationSelectedZoneId == preparationScope.selectedZoneId
+        && preparedPayload->preparationSelectedGroupId == preparationScope.selectedGroupId;
     const auto launch = authoringPreviewController.launchIfEligible(
         serviceTimeMicros, directAuditionContentPrepared);
     if (launch.launched)
     {
-        if (!directAuditionContentPrepared && !engineFacade.refreshPreviewToCurrentDraft())
+        if (!directAuditionContentPrepared
+            && !engineFacade.refreshPreviewForPreparationScope(preparationScope))
         {
             const auto& draftStatus = engineFacade.getDraftPlaybackStatus();
             if (!draftStatus.preview.findings.empty())
@@ -3898,9 +4040,19 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
                 == drs::engine::PerformancePublishRequestOrigin::bootstrap);
     if (bootstrap && authorized == nullptr)
     {
-        payload = packageSession
-            ? engineFacade.getPerformancePackageActivationPayload()
-            : engineFacade.getBootstrapPerformanceActivationPayload();
+        if (packageSession)
+        {
+            payload = engineFacade.getPerformancePackageActivationPayload();
+            // A manifest-only workspace changes the shell topology without opening package
+            // content. If the engine was explicitly restored meanwhile, retain the valid
+            // bundled bootstrap instead of treating the absent package payload as silence.
+            if (payload == nullptr)
+                payload = engineFacade.getBootstrapPerformanceActivationPayload();
+        }
+        else
+        {
+            payload = engineFacade.getBootstrapPerformanceActivationPayload();
+        }
     }
     if (payload == nullptr)
         return false;
@@ -3963,7 +4115,18 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
         options.midiNoteOffset = computeMotionRenderNote(sessionState, 60) - 60;
         options.fixedVelocity = computeToneRenderVelocity(sessionState);
     }
-    const auto modelResult = drs::engine::buildSamplerRenderModel(payload, options);
+    auto modelResult = drs::engine::SamplerRenderModelBuildResult {};
+    if (packageSession)
+    {
+        modelResult.built = true;
+        modelResult.model = engineFacade.getPerformancePackageRenderModel();
+        if (modelResult.model == nullptr)
+            modelResult.built = false;
+    }
+    else
+    {
+        modelResult = drs::engine::buildSamplerRenderModel(payload, options);
+    }
     if (!modelResult.built || modelResult.model == nullptr)
     {
         if (authorized != nullptr)

@@ -29,6 +29,20 @@ enum class PlaybackSnapshotFindingSeverity
     error
 };
 
+enum class PlaybackPreparationScope
+{
+    currentDraft,
+    selectedZone,
+    selectedGroup
+};
+
+struct PlaybackPreparationScopeRequest
+{
+    PlaybackPreparationScope scope = PlaybackPreparationScope::currentDraft;
+    std::string selectedZoneId;
+    std::string selectedGroupId;
+};
+
 struct PlaybackSnapshotSampleIdentity
 {
     std::string sampleSourceId;
@@ -220,6 +234,13 @@ struct PlaybackSnapshotBuildResult
     std::string state;
     std::vector<PlaybackSnapshotFinding> findings;
     ImmutablePlaybackSnapshot snapshot;
+    PlaybackPreparationScope preparationScope = PlaybackPreparationScope::currentDraft;
+    std::string preparationSelectedZoneId;
+    std::string preparationSelectedGroupId;
+    std::size_t unscopedZoneCount = 0;
+    std::size_t retainedZoneCount = 0;
+    std::size_t unscopedSampleCount = 0;
+    std::size_t retainedSampleCount = 0;
 };
 
 class PlaybackSnapshotBuilder
@@ -243,4 +264,8 @@ std::string toString(PlaybackSnapshotFindingSeverity severity);
 std::string serializeImmutablePlaybackSnapshot(const ImmutablePlaybackSnapshot& snapshot);
 std::string computePlaybackSnapshotContentDigest(const ImmutablePlaybackSnapshot& snapshot);
 std::string computePlaybackSnapshotDspGraphDigest(const ImmutablePlaybackSnapshot& snapshot);
+PlaybackSnapshotBuildResult scopePlaybackSnapshotForPreparation(
+    const PlaybackSnapshotBuildResult& source,
+    const PlaybackPreparationScopeRequest& request);
+std::string toString(PlaybackPreparationScope scope);
 } // namespace drs::engine

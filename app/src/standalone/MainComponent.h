@@ -133,7 +133,7 @@ private:
     {
         juce::File file;
         std::shared_ptr<std::atomic<bool>> ready;
-        std::shared_ptr<drs::plugin::OpenedPerformancePackageWorkspaceLoadResult> result;
+        std::shared_ptr<drs::plugin::PreparedPerformancePackageWorkspaceLoadResult> result;
         std::uint64_t generation = 0;
     };
 

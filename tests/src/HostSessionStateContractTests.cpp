@@ -50,6 +50,7 @@ std::string replaceFirst(std::string text,
     text.replace(position, from.size(), to);
     return text;
 }
+
 } // namespace
 
 int main()
@@ -146,7 +147,12 @@ int main()
                 "Host-state serialization must be deterministic.");
 
         const auto dirty = drs::engine::parseHostSessionState(dirtyText);
-        require(dirty.isValidHostState(), "Dirty-project golden fixture must parse as valid host state.");
+        require(dirty.isValidHostState(),
+                "Dirty-project golden fixture must parse as valid host state"
+                    + (dirty.findings.empty()
+                           ? std::string(".")
+                           : std::string(": ") + dirty.findings.front().path + " "
+                               + dirty.findings.front().message));
         require(dirty.hostState->authoringState.dirty
                     && dirty.hostState->authoringState.projectSnapshot.has_value(),
                 "Dirty fixture must restore its embedded project snapshot.");
@@ -335,7 +341,7 @@ int main()
             firstProject.project, firstLocation);
         const auto secondDigest = drs::engine::computeHostProjectManifestDigest(
             secondProject.project, secondLocation);
-        require(firstDigest == "fnv1a64:a3c4d47aa04de4b1"
+        require(firstDigest == "fnv1a64:82e49267501d959a"
                     && secondDigest == firstDigest,
                 "Equivalent relocated project models must produce the checked-in canonical digest; first="
                     + firstDigest + ", second=" + secondDigest + ".");

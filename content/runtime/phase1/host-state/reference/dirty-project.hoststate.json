@@ -27,7 +27,7 @@
   "projectBinding": {
     "projectId": "drs.host-state.unsaved-project",
     "manifestFileName": "Unsaved Project.drsproj",
-    "manifestDigest": "fnv1a64:70517ee9917fb985"
+    "manifestDigest": "fnv1a64:676c6479c7bb37cc"
   },
   "authoringState": {
     "revision": 5,
@@ -47,6 +47,7 @@
         "selectedZoneId": "",
         "selectedGroupId": "",
         "selectedPerformanceBankId": "",
+        "masterGainDb": 0.0,
         "zones": [],
         "groups": [],
         "macros": [],

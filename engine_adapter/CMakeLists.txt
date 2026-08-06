@@ -150,12 +150,14 @@ target_compile_features(drs_sample_import PUBLIC cxx_std_17)
 
 add_library(drs_sampler_core STATIC
     src/AuthoringPreviewPreparation.cpp
+    src/DeferredPackageSession.cpp
     src/PerformanceLaneState.cpp
     src/SamplerPlaybackContext.cpp
     src/SamplerRenderModel.cpp
     src/SamplerVoice.cpp
     src/SamplerVoicePool.cpp
     include/drs/engine/AuthoringPreviewPreparation.h
+    include/drs/engine/DeferredPackageSession.h
     include/drs/engine/PerformanceLaneState.h
     include/drs/engine/SamplerPlaybackContext.h
     include/drs/engine/SamplerRenderModel.h
@@ -199,9 +201,13 @@ add_library(drs_engine_adapter STATIC
     src/PerformanceRuleContract.cpp
     src/PackageCrypto.cpp
     src/PackageReader.cpp
+    src/PackageReaderDispatch.cpp
+    src/PackageV2.cpp
+    src/PackageV2StreamingExport.cpp
     src/PackageWriter.cpp
     src/PublishedMacroBinding.cpp
     src/PreparedPlayback.cpp
+    src/SampleDataSource.cpp
     src/Phase1Baseline.cpp
     src/ProjectDocument.cpp
     src/ProjectRestoreCoordinator.cpp
@@ -245,9 +251,13 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PerformanceRuleContract.h
     include/drs/engine/PackageCrypto.h
     include/drs/engine/PackageReader.h
+    include/drs/engine/PackageReaderDispatch.h
+    include/drs/engine/PackageV2.h
+    include/drs/engine/PackageV2StreamingExport.h
     include/drs/engine/PackageWriter.h
     include/drs/engine/PublishedMacroBinding.h
     include/drs/engine/PreparedPlayback.h
+    include/drs/engine/SampleDataSource.h
     include/drs/engine/ProjectDocument.h
     include/drs/engine/ProjectRestoreCoordinator.h
     include/drs/engine/RuntimePresetState.h
@@ -315,9 +325,13 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/PerformanceRuleContract.cpp
     src/PackageCrypto.cpp
     src/PackageReader.cpp
+    src/PackageReaderDispatch.cpp
+    src/PackageV2.cpp
+    src/PackageV2StreamingExport.cpp
     src/PackageWriter.cpp
     src/PublishedMacroBinding.cpp
     src/PreparedPlayback.cpp
+    src/SampleDataSource.cpp
     src/Phase1Baseline.cpp
     src/ProjectDocument.cpp
     src/RuntimeCompiler.cpp
@@ -355,6 +369,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/PackageReader.h
     include/drs/engine/PackageWriter.h
     include/drs/engine/PreparedPlayback.h
+    include/drs/engine/SampleDataSource.h
     include/drs/engine/ProjectDocument.h
     include/drs/engine/RuntimeCompiler.h
     include/drs/engine/RuntimeLoadProfile.h

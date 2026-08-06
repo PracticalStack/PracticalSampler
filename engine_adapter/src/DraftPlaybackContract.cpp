@@ -89,6 +89,13 @@ PlaybackActivationPayloadPtr buildPlaybackActivationPayload(
     payload->sourceProvenanceDigest = preparedResult->prepared.sourceProvenanceDigest;
     payload->macroSchemaDigest = preparedResult->prepared.macroSchemaDigest;
     payload->retainedPreparedBytes = preparedResult->metrics.preparedBytes;
+    payload->preparationScope = snapshotResult->preparationScope;
+    payload->preparationSelectedZoneId = snapshotResult->preparationSelectedZoneId;
+    payload->preparationSelectedGroupId = snapshotResult->preparationSelectedGroupId;
+    payload->unscopedZoneCount = snapshotResult->unscopedZoneCount;
+    payload->retainedZoneCount = snapshotResult->retainedZoneCount;
+    payload->unscopedSampleCount = snapshotResult->unscopedSampleCount;
+    payload->retainedSampleCount = snapshotResult->retainedSampleCount;
     payload->snapshot = std::make_shared<const ImmutablePlaybackSnapshot>(snapshotResult->snapshot);
     payload->prepared = std::make_shared<const ImmutablePreparedPlayback>(preparedResult->prepared);
     return payload;
@@ -322,6 +329,12 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
                                           PlaybackActivationLane lane,
                                           const std::string& completedState)
 {
+    if (preparedBuildResult != nullptr)
+    {
+        prepared.readiness = preparedBuildResult->admission.readiness;
+        prepared.estimatedDecodedBytes = preparedBuildResult->admission.estimatedDecodedBytes;
+        prepared.residentBudgetBytes = preparedBuildResult->admission.residentBudgetBytes;
+    }
     const auto snapshotFailed = buildResult != nullptr && (!buildResult->built || !buildResult->activationEligible);
     const auto preparedFailed = preparedBuildResult != nullptr
         && (!preparedBuildResult->built || !preparedBuildResult->activationEligible);
@@ -546,6 +559,9 @@ void DraftPlaybackContract::resetPreparedRevision(DraftPlaybackPreparedRevision&
     prepared.preparedBuildId = 0;
     prepared.activationEligible = false;
     prepared.lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    prepared.readiness = PreparedPlaybackReadinessState::metadataLoaded;
+    prepared.estimatedDecodedBytes = 0;
+    prepared.residentBudgetBytes = 0;
     prepared.contentDigest.clear();
     prepared.preparedContentDigest.clear();
     prepared.routeDigest.clear();

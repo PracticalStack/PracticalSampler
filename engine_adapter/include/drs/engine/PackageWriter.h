@@ -13,6 +13,7 @@ namespace drs::engine
 {
 inline constexpr const char* performancePackageInternalUriPrefix = "package://payload/";
 inline constexpr std::uint32_t performancePackageFormatVersion = 1;
+inline constexpr std::uint64_t maximumResidentV1PackageBytes = 64ull * 1024ull * 1024ull;
 
 enum class PerformancePackagePayloadKind
 {
@@ -134,6 +135,8 @@ struct PerformancePackageInspectionResult
 };
 
 const char* toString(PerformancePackagePayloadKind kind) noexcept;
+RuntimeCompileResult buildPackageRuntimeMetadata(const RuntimeCompileResult& compiledRuntime);
+std::string serializePerformancePackageManifest(const PerformancePackageManifest& manifest);
 
 PerformancePackageWritePlan buildPerformancePackageWritePlan(
     const PerformancePackageCompileWritePlan& plan,

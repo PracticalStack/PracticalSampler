@@ -1,6 +1,8 @@
 #include "shared/PerformancePackageExportService.h"
 
 #include "drs/engine/PackageReader.h"
+#include "drs/engine/PackageReaderDispatch.h"
+#include "drs/engine/PackageV2StreamingExport.h"
 
 #include <algorithm>
 #include <cctype>
@@ -110,6 +112,13 @@ std::vector<std::uint8_t> readValidJpegBytes(const juce::File& imageFile, std::s
     issue.clear();
     if (imageFile == juce::File() || !imageFile.existsAsFile())
         return {};
+
+    constexpr std::int64_t maximumBackgroundImageBytes = 16ll * 1024ll * 1024ll;
+    if (imageFile.getSize() > maximumBackgroundImageBytes)
+    {
+        issue = "Performance background image exceeds the 16 MiB package limit.";
+        return {};
+    }
 
     if (!imageFile.hasFileExtension("jpg;jpeg"))
     {
@@ -704,35 +713,23 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         return cleanupAndReturn(std::move(result));
     }
 
-    const auto streamWrite = drs::engine::writeCompiledStreamAssets(
+    publishProgress(options,
+                    PerformancePackageExportStage::writingStream,
+                    streamStartProgress,
+                    "Writing compiled stream assets",
+                    "Building bounded package record plan");
+
+    auto packagePlan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
+        preparation.manifest,
         compileResult,
-        drs::engine::RuntimeStreamWriteOptions {
-            [options](const drs::engine::RuntimeStreamWriteProgress& progress)
-            {
-                publishProgress(options,
-                                PerformancePackageExportStage::writingStream,
-                                mapPhaseProgress(streamStartProgress,
-                                                 streamEndProgress,
-                                                 ratio(progress.bytesProcessed, progress.totalBytes)),
-                                "Writing compiled stream assets",
-                                progress.status,
-                                progress.bytesProcessed,
-                                progress.totalBytes,
-                                progress.sampleId);
-            },
-            options.cancellationProbe,
-            16384
-        });
-    if (!streamWrite.written)
+        targetPackageFile.getFullPathName().toStdString(),
+        preparation.additionalPayloads);
+    if (!packagePlan.built)
     {
-        result.state = streamWrite.state;
-        result.issues = streamWrite.issues;
+        result.state = packagePlan.state;
+        result.issues = packagePlan.issues;
         if (result.issues.empty())
-        {
-            result.issues.push_back("The compiled runtime stream could not be materialized for playable package export.");
-        }
-        if (streamWrite.state.find("canceled") != std::string::npos)
-            result.canceled = true;
+            result.issues.push_back("The bounded package v2 record plan could not be built.");
         return cleanupAndReturn(std::move(result));
     }
 
@@ -743,29 +740,23 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         return cleanupAndReturn(std::move(result));
     }
 
-    drs::engine::PerformancePackageCompileWritePlan packagePlan;
-    packagePlan.manifest = preparation.manifest;
-    packagePlan.compiledRuntime = std::move(compileResult);
-    packagePlan.outputPackagePath = targetPackageFile.getFullPathName().toStdString();
-    packagePlan.minimumCompatibleAppVersion = "0.5.0-internal";
-    packagePlan.additionalPayloads = preparation.additionalPayloads;
-
-    const auto packageWrite = drs::engine::writePerformancePackage(
-        packagePlan,
+    const auto packageWrite = drs::engine::writePackageV2Streaming(
+        packagePlan.plan,
         drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::PerformancePackageWriteOptions {
-            [options](const drs::engine::PerformancePackageWriteProgress& progress)
+        drs::engine::PackageV2StreamingWriteOptions {
+            [options](const drs::engine::PackageV2StreamingWriteProgress& progress)
             {
                 publishProgress(options,
                                 PerformancePackageExportStage::sealingPackage,
                                 mapPhaseProgress(packageStartProgress,
                                                  packageEndProgress,
-                                                 ratio(progress.bytesProcessed, progress.totalBytes)),
+                                                 ratio(progress.completedPlaintextBytes,
+                                                       progress.totalPlaintextBytes)),
                                 "Sealing playable package",
                                 progress.status,
-                                progress.bytesProcessed,
-                                progress.totalBytes,
-                                progress.payloadId);
+                                progress.completedPlaintextBytes,
+                                progress.totalPlaintextBytes,
+                                progress.identity.sourceId);
             },
             options.cancellationProbe
         });
@@ -775,7 +766,7 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         result.issues = packageWrite.issues;
         if (result.issues.empty())
             result.issues.push_back("The playable package file could not be written.");
-        if (packageWrite.state.find("canceled") != std::string::npos)
+        if (packageWrite.failure == drs::engine::PackageV2Failure::cancelled)
             result.canceled = true;
         return cleanupAndReturn(std::move(result));
     }
@@ -787,16 +778,15 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         return cleanupAndReturn(std::move(result));
     }
 
+    const auto packagePath = targetPackageFile.getFullPathName().toStdString();
     publishProgress(options,
                     PerformancePackageExportStage::verifying,
                     verifyStartProgress,
                     "Verifying playable package",
-                    juce::File(packagePlan.outputPackagePath).getFileName().toStdString());
+                    targetPackageFile.getFileName().toStdString());
 
-    const auto verification = drs::engine::loadPerformancePackage(
-        packagePlan.outputPackagePath,
-        drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::performancePackageSchemaVersion);
+    const auto verification = drs::engine::loadPerformancePackageV2Metadata(
+        packagePath, drs::engine::getDeterministicPackageCryptoProvider());
     if (!verification.loaded)
     {
         result.state = verification.state.empty()
@@ -813,9 +803,14 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
 
     result.exported = true;
     result.state = "Playable package exported";
-    result.packagePath = packageWrite.packagePath;
+    result.packagePath = packagePath;
     result.packageBytes = packageWrite.packageBytes;
-    result.payloadCount = packageWrite.payloadCount;
+    result.payloadCount = static_cast<std::uint32_t>(packageWrite.completedRecordCount);
+    result.peakPlaintextBufferBytes = packageWrite.peakPlaintextBufferBytes;
+    result.peakSealedBufferBytes = packageWrite.peakSealedBufferBytes;
+    result.verificationBytesRead = packageWrite.verificationBytesRead;
+    result.totalDurationMicros = packageWrite.totalDurationMicros;
+    result.plaintextThroughputBytesPerSecond = packageWrite.plaintextThroughputBytesPerSecond;
     publishProgress(options,
                     PerformancePackageExportStage::verifying,
                     verifyEndProgress,

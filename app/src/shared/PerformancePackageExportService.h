@@ -68,6 +68,11 @@ struct PerformancePackageExportOperationResult
     std::string packagePath;
     std::uint64_t packageBytes = 0;
     std::uint32_t payloadCount = 0;
+    std::uint64_t peakPlaintextBufferBytes = 0;
+    std::uint64_t peakSealedBufferBytes = 0;
+    std::uint64_t verificationBytesRead = 0;
+    std::uint64_t totalDurationMicros = 0;
+    double plaintextThroughputBytesPerSecond = 0.0;
 };
 
 struct PerformancePackageExportProgress

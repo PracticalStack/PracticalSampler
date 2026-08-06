@@ -209,7 +209,7 @@ void verifyFixedRootVoiceRouting()
     trigger.sustainPedalDown = true;
     const auto result = pool.renderBlock({ channels, 1, static_cast<std::uint32_t>(audio.size()) }, { &trigger, 1 });
     require(result.render.startedVoiceCount == 1 && pool.getSlotSnapshot(0).sourceMidiNote == 36
-                && std::abs(audio[0] - 0.1875f) < 0.0001f,
+                && std::abs(audio[0] - 0.75f) < 0.0001f,
             "A fixed-root pedal route must start as an untransposed root-key one-shot, not MIDI note zero.");
 }
 } // namespace

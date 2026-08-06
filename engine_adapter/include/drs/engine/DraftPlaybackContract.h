@@ -31,6 +31,13 @@ struct PlaybackActivationPayload final
     std::string sourceProvenanceDigest;
     std::string macroSchemaDigest;
     std::uint64_t retainedPreparedBytes = 0;
+    PlaybackPreparationScope preparationScope = PlaybackPreparationScope::currentDraft;
+    std::string preparationSelectedZoneId;
+    std::string preparationSelectedGroupId;
+    std::size_t unscopedZoneCount = 0;
+    std::size_t retainedZoneCount = 0;
+    std::size_t unscopedSampleCount = 0;
+    std::size_t retainedSampleCount = 0;
     std::shared_ptr<const ImmutablePlaybackSnapshot> snapshot;
     std::shared_ptr<const ImmutablePreparedPlayback> prepared;
 };
@@ -46,6 +53,9 @@ struct DraftPlaybackPreparedRevision
     std::uint64_t preparedBuildId = 0;
     bool activationEligible = false;
     PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
+    PreparedPlaybackReadinessState readiness = PreparedPlaybackReadinessState::metadataLoaded;
+    std::uint64_t estimatedDecodedBytes = 0;
+    std::uint64_t residentBudgetBytes = 0;
     std::string contentDigest;
     std::string preparedContentDigest;
     std::string routeDigest;

@@ -127,7 +127,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                               int keyLow = 0,
                                               int keyHigh = 127,
                                               std::size_t layerCount = 1,
-                                              drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated)
+                                              drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated,
+                                              bool paged = false)
 {
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 43;
@@ -158,15 +159,42 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         snapshotZone.triggerMode = triggerMode;
         snapshot.zones.push_back(std::move(snapshotZone));
 
-        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
-        decoded->normalizedChannels = { std::vector<float>(frameCount, 1.0f) };
         drs::engine::PreparedPlaybackSampleHandle sample;
         sample.sampleSourceId = sampleId;
         sample.streamSampleId = streamId;
         sample.sampleRate = 48000.0;
         sample.frameCount = frameCount;
         sample.channelCount = 1;
-        sample.decodedSampleData = std::move(decoded);
+        if (paged)
+        {
+            drs::engine::SampleDataSourceDescriptor descriptor;
+            descriptor.kind = drs::engine::SampleDataSourceKind::deterministicFake;
+            descriptor.sourceId = sampleId;
+            descriptor.canonicalSourceIdentity = "synthetic://" + sampleId;
+            descriptor.provenanceIdentity = sampleId + "-generation-1";
+            descriptor.formatName = "float32";
+            descriptor.channelLayout = "mono";
+            descriptor.generation = 100 + layerIndex;
+            descriptor.sampleRate = 48000.0;
+            descriptor.frameCount = frameCount;
+            descriptor.channelCount = 1;
+            descriptor.bytesPerFrame = sizeof(float);
+            descriptor.dataSizeBytes = frameCount * sizeof(float);
+            descriptor.headSizeBytes = 4 * sizeof(float);
+            descriptor.pageSizeBytes = 4 * sizeof(float);
+            const auto pageCount = frameCount <= 4 ? 0 : (frameCount - 4 + 3) / 4;
+            sample.dataSource = std::make_shared<
+                drs::engine::DeterministicFakePagedSampleDataSource>(
+                    std::move(descriptor),
+                    std::vector<std::vector<float>> { std::vector<float>(frameCount, 1.0f) },
+                    4, 4, std::vector<bool>(pageCount, true));
+        }
+        else
+        {
+            auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+            decoded->normalizedChannels = { std::vector<float>(frameCount, 1.0f) };
+            sample.decodedSampleData = std::move(decoded);
+        }
         prepared.samples.push_back(std::move(sample));
         drs::engine::PreparedPlaybackZoneHandle preparedZone;
         preparedZone.zoneId = zoneId;
@@ -758,6 +786,35 @@ void runOverflowDropAndRealtimeMatrix()
     require(invalidResult.render.droppedEventCount == 2,
             "No-route and invalid-velocity notes must report deterministic drops.");
 }
+
+void runPagedPolyphonyRealtimeMatrix()
+{
+    const auto model = buildModel(32, 0, 127, 2,
+                                  drs::engine::ZoneTriggerMode::gated, true);
+    drs::engine::SamplerVoicePool pool;
+    require(pool.prepare(*model, 48000.0),
+            "Ready paged layers should prepare through the common voice pool.");
+    drs::engine::SamplerEventBlock events;
+    require(events.push(noteOn(0, 60)) && events.push(noteOn(2, 64))
+                && events.push(noteOff(10, 60)),
+            "Paged polyphony fixture events should fit the bounded event block.");
+    StereoOutput output(16);
+    allocation_probe::reset();
+    allocation_probe::enabled = true;
+    const auto result = pool.renderBlock(output.view(), events.view());
+    allocation_probe::enabled = false;
+    require(result.accepted && result.render.startedVoiceCount == 4
+                && result.render.releasedVoiceCount == 2
+                && result.render.pageMissCount == 0
+                && result.render.underrunFrameCount == 0
+                && allocation_probe::allocations == 0
+                && allocation_probe::deallocations == 0,
+            "Paged layered polyphony must preserve scheduling/release semantics without callback allocation.");
+    requireNear(output.left[0], 2.0f,
+                "Two paged layers must mix identically at the resident-head start.");
+    requireNear(output.left[4], 4.0f,
+                "Two overlapping paged notes must mix identically across a page boundary.");
+}
 } // namespace
 
 int main()
@@ -772,6 +829,7 @@ int main()
         runRoundRobinRoutingMatrix();
         runCapacityAndStealMatrix();
         runOverflowDropAndRealtimeMatrix();
+        runPagedPolyphonyRealtimeMatrix();
         std::cout << "Sprint 4.3 fixed voice-pool and sample-accurate event matrix passed." << std::endl;
         return 0;
     }

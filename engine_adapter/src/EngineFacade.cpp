@@ -1376,6 +1376,43 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
     return result;
 }
 
+SamplerRenderModelBuildResult buildPerformancePackageRenderModel(
+    const PerformancePackageLoadResult& packageLoad,
+    const PlaybackActivationPayloadPtr& payload)
+{
+    SamplerRenderModelBuildOptions options;
+    const auto sessionState = buildDefaultRuntimeSessionState(packageLoad.instrument);
+    options.selectedArticulationId = sessionState.selectedArticulationId;
+    options.fixedVelocity = computeTonePreviewVelocity(sessionState, 64);
+    options.midiNoteOffset = computeMotionPreviewNote(sessionState, 60) - 60;
+    const auto& authoredRoutes = payload->snapshot->articulationRoutes;
+    const auto containsAuthoredArticulation = [&](const std::string& articulationId)
+    {
+        return !articulationId.empty()
+            && std::any_of(authoredRoutes.begin(), authoredRoutes.end(), [&](const auto& route)
+            {
+                return route.articulationId == articulationId && !route.zoneIds.empty();
+            });
+    };
+    if (!containsAuthoredArticulation(options.selectedArticulationId))
+    {
+        const auto authoredDefault = std::find_if(authoredRoutes.begin(), authoredRoutes.end(),
+            [](const auto& route)
+            {
+                return route.articulationId == "default" && !route.zoneIds.empty();
+            });
+        const auto authoredFallback = authoredDefault != authoredRoutes.end()
+            ? authoredDefault
+            : std::find_if(authoredRoutes.begin(), authoredRoutes.end(), [](const auto& route)
+            {
+                return !route.articulationId.empty() && !route.zoneIds.empty();
+            });
+        options.selectedArticulationId = authoredFallback != authoredRoutes.end()
+            ? authoredFallback->articulationId : std::string {};
+    }
+    return buildSamplerRenderModel(payload, options);
+}
+
 PreparedPerformancePackageActivationResult buildPreparedPerformancePackageActivation(
     const PerformancePackageLoadResult& packageLoad,
     const PerformancePackagePreparationTimings& priorTimings)
@@ -1454,6 +1491,27 @@ PreparedPerformancePackageActivationResult buildPreparedPerformancePackageActiva
         return result;
     }
 
+    const auto renderModelStartedAt = Clock::now();
+    const auto renderModel = buildPerformancePackageRenderModel(
+        packageLoad, result.activationPayload);
+    result.timings.renderModelBuildMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            Clock::now() - renderModelStartedAt).count());
+    result.timings.totalMicros += result.timings.renderModelBuildMicros;
+    if (!renderModel.built || renderModel.model == nullptr)
+    {
+        result.issues.push_back(renderModel.findings.empty()
+            ? std::string("The performance package render model could not be constructed.")
+            : renderModel.findings.front().message);
+        return result;
+    }
+    result.renderModel = renderModel.model;
+    // The immutable activation payload and render model own the published copies.
+    // Release the worker's mutable construction graphs before handing the result
+    // to the message thread so activation does not reclaim corpus-scale vectors.
+    result.snapshotResult = {};
+    result.preparedResult = {};
+
     result.prepared = true;
     result.failureCategory = PerformancePackageFailureCategory::none;
     result.state = "Performance package activation prepared";
@@ -1513,6 +1571,7 @@ EnginePerformancePackageActivationResult EngineFacade::openPerformancePackageSes
     draftPlaybackContract.closeProject();
     authoringProject = {};
     packagePerformanceActivationPayload.reset();
+    packagePerformanceRenderModel.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     referenceManifest = packageLoad.instrument;
@@ -1599,6 +1658,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
         return result;
 
     packagePerformanceActivationPayload = preparedActivation.activationPayload;
+    packagePerformanceRenderModel = preparedActivation.renderModel;
     if (packagePerformanceActivationPayload == nullptr)
     {
         result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
@@ -1606,8 +1666,20 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
         result.issues.push_back("The performance package activation payload could not be constructed.");
         return result;
     }
+    if (packagePerformanceRenderModel == nullptr)
+    {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+        result.state = "Performance package activation failed";
+        result.issues.push_back("The prepared performance package render model is unavailable.");
+        packagePerformanceActivationPayload.reset();
+        packagePerformanceRenderModel.reset();
+        return result;
+    }
+    if (packagePerformanceActivationPayload->prepared != nullptr)
+        for (const auto& sample : packagePerformanceActivationPayload->prepared->samples)
+            preparedPlaybackService.registerPageServiceSource(sample.dataSource);
 
-    const auto& packageLoad = preparedActivation.packageLoad;
+    auto& packageLoad = preparedActivation.packageLoad;
     clearPendingPreparedCompletions();
     ++performancePublishProjectGeneration;
     performancePublishController.reset(true, true);
@@ -1615,9 +1687,8 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
     authoringProject = {};
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
-    referenceManifest = packageLoad.instrument;
-    referenceStream = packageLoad.stream;
-    preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
+    referenceManifest = std::move(packageLoad.instrument);
+    referenceStream = std::move(packageLoad.stream);
     referenceInstrumentActive = true;
     currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
     if (!packageLoad.manifest.defaultLoadProfile.empty())
@@ -1653,6 +1724,7 @@ void EngineFacade::restoreBundledReferenceRuntimeSession()
     referenceManifest = bundledReferenceManifest;
     referenceStream = bundledReferenceStream;
     packagePerformanceActivationPayload.reset();
+    packagePerformanceRenderModel.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
@@ -1716,7 +1788,7 @@ bool EngineFacade::serviceBackgroundWork()
     preparedPlaybackService.recordMessageThreadServiceDuration(
         monotonicMicros() - serviceStartedAtMicros);
 
-    if (retiredCacheEntries != 0)
+    if (retiredCacheEntries != 0 || packagePerformanceActivationPayload != nullptr)
         refreshDiagnosticsSnapshot();
 
     return retiredCacheEntries != 0 || appliedCompletions;
@@ -2421,16 +2493,28 @@ bool EngineFacade::stageDraftRevision(std::size_t revision)
 
 bool EngineFacade::refreshPreviewToCurrentDraft()
 {
+    return refreshPreviewForPreparationScope({}, true);
+}
+
+bool EngineFacade::refreshPreviewForPreparationScope(
+    const PlaybackPreparationScopeRequest& scopeRequest,
+    const bool forceRebuild)
+{
     pumpPreparedPlaybackWorkerCompletions();
 
     if (!referenceInstrumentActive || !referenceManifest.loaded || !referenceStream.loaded || !authoringProject.loaded)
         return false;
 
     const auto& currentStatus = draftPlaybackContract.getStatus();
+    const auto currentPayload = currentStatus.preview.activationPayload;
+    const auto currentPayloadMatchesScope = currentPayload != nullptr
+        && currentPayload->preparationScope == scopeRequest.scope
+        && currentPayload->preparationSelectedZoneId == scopeRequest.selectedZoneId
+        && currentPayload->preparationSelectedGroupId == scopeRequest.selectedGroupId;
     if ((currentStatus.pendingPreview.active
          && currentStatus.pendingPreview.requestedRevision == currentStatus.draftRevision)
         || (currentStatus.preview.revision == currentStatus.draftRevision
-            && currentStatus.preview.activationPayload != nullptr))
+            && currentPayloadMatchesScope && !forceRebuild))
     {
         return true;
     }
@@ -2439,7 +2523,8 @@ bool EngineFacade::refreshPreviewToCurrentDraft()
     if (!request.accepted)
         return false;
 
-    const auto buildResult = buildCurrentPlaybackSnapshot(false);
+    const auto buildResult = scopePlaybackSnapshotForPreparation(
+        buildCurrentPlaybackSnapshot(false), scopeRequest);
     if (!buildResult.built || !buildResult.activationEligible)
     {
         const auto preparedResult = buildRejectedPreparedPlayback(buildResult);
@@ -3068,6 +3153,11 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
             if (payload != nullptr)
             {
                 packagePerformanceActivationPayload = payload;
+                SamplerRenderModelBuildOptions renderOptions;
+                renderOptions.selectedArticulationId = currentSessionState.selectedArticulationId;
+                const auto renderModel = buildSamplerRenderModel(payload, renderOptions);
+                packagePerformanceRenderModel = renderModel.built
+                    ? renderModel.model : SamplerRenderModelPtr {};
                 currentSessionState.transientMetrics.integrationState
                     = "Performance package prepared for activation";
                 currentSessionState.transientMetrics.lastFailure.clear();
@@ -3076,6 +3166,7 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
             else
             {
                 packagePerformanceActivationPayload.reset();
+                packagePerformanceRenderModel.reset();
                 currentSessionState.transientMetrics.integrationState
                     = "Performance package preparation failed";
                 currentSessionState.transientMetrics.lastFailure =
@@ -3614,6 +3705,7 @@ void EngineFacade::resetSessionStateToDefault()
     referenceManifest = bundledReferenceManifest;
     referenceStream = bundledReferenceStream;
     packagePerformanceActivationPayload.reset();
+    packagePerformanceRenderModel.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
@@ -3635,7 +3727,20 @@ void EngineFacade::resetSessionStateToDefault()
     currentSessionState.transientMetrics.integrationState = "Default preset state loaded";
     currentSessionState.transientMetrics.lastFailure.clear();
     previewPlaybackSnapshot = {};
+
+    // An unloaded authoring shell still needs a real immutable bootstrap for the explicit
+    // bundled-session reset. Snapshot the checked-in reference project for this build only;
+    // do not bind it as the user's authoring document.
+    const auto usedTemporaryBootstrapProject = !authoringProject.loaded;
+    if (usedTemporaryBootstrapProject)
+    {
+        auto bootstrapProject = loadPhase2ReferenceProjectManifest();
+        if (bootstrapProject.loaded)
+            authoringProject = std::move(bootstrapProject);
+    }
     initializeDraftPlaybackContract(true);
+    if (usedTemporaryBootstrapProject)
+        authoringProject = {};
     previewPlaybackSnapshot.articulationId = currentSessionState.selectedArticulationId;
     lastContentFailureProbe = {};
     refreshDiagnosticsSnapshot();
@@ -3842,6 +3947,25 @@ void EngineFacade::refreshDiagnosticsSnapshot()
     diagnosticsSnapshot.configuredMaxCachedPages = loadProfile->maxCachedPages;
     diagnosticsSnapshot.maxPrefetchBytesPerVoice = loadProfile->maxPrefetchBytesPerVoice;
 
+    if (packagePerformanceActivationPayload != nullptr)
+    {
+        const auto worker = preparedPlaybackService.getWorkerStatus();
+        diagnosticsSnapshot.headline = "Package v2 bounded-stream diagnostics ready";
+        diagnosticsSnapshot.cacheMissCount = worker.pageIntentCount;
+        diagnosticsSnapshot.pageMissCount = worker.pagePrepareFailureCount;
+        diagnosticsSnapshot.backgroundReadCount = worker.pagePrepareCount;
+        diagnosticsSnapshot.pendingPageCount = worker.pendingWorkCount;
+        diagnosticsSnapshot.lastContentProbeCategory = lastContentFailureProbe.categoryId;
+        diagnosticsSnapshot.lastContentProbeFailedGracefully
+            = lastContentFailureProbe.failedGracefully;
+        diagnosticsSnapshot.lastContentProbeState = lastContentFailureProbe.state;
+        diagnosticsSnapshot.lastContentProbeIssues = lastContentFailureProbe.issues;
+        diagnosticsSnapshot.hasFailure = worker.pagePrepareFailureCount != 0
+            || !currentSessionState.transientMetrics.lastFailure.empty();
+        diagnosticsSnapshot.failureState = currentSessionState.transientMetrics.lastFailure;
+        return;
+    }
+
     try
     {
         RuntimeStreamingService service(
@@ -3982,5 +4106,239 @@ PreparedPerformancePackageActivationResult preparePerformancePackageActivation(
     const PerformancePackagePreparationTimings& priorTimings)
 {
     return buildPreparedPerformancePackageActivation(packageLoad, priorTimings);
+}
+
+PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation(
+    const PerformancePackageLoadResult& packageLoad,
+    std::shared_ptr<const PackageV2OpenResult> package,
+    const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
+    const PerformancePackagePreparationTimings& priorTimings)
+{
+    PreparedPerformancePackageActivationResult result;
+    result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+    result.state = "Performance package v2 activation preparation failed";
+    result.packageLoad = packageLoad;
+    result.timings = priorTimings;
+    if (!packageLoad.loaded || package == nullptr || !package->opened
+        || sampleDescriptors.empty())
+    {
+        result.issues.push_back("Package v2 metadata, TOC, and sample descriptors are required.");
+        return result;
+    }
+
+    const auto snapshotStarted = Clock::now();
+    result.snapshotResult = buildPerformancePackagePlaybackSnapshot(packageLoad);
+    result.timings.snapshotBuildMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - snapshotStarted).count());
+    if (!result.snapshotResult.built || !result.snapshotResult.activationEligible)
+    {
+        for (const auto& finding : result.snapshotResult.findings)
+            if (finding.severity == PlaybackSnapshotFindingSeverity::error)
+                result.issues.push_back(finding.message);
+        return result;
+    }
+
+    const auto preparedStarted = Clock::now();
+    auto& preparedResult = result.preparedResult;
+    preparedResult.buildId = 1;
+    preparedResult.snapshotBuildId = result.snapshotResult.buildId;
+    preparedResult.requestedDraftRevision = result.snapshotResult.requestedDraftRevision;
+    preparedResult.lane = PreparedPlaybackWorkLane::performance;
+    preparedResult.priority = PreparedPlaybackJobPriority::performance;
+    preparedResult.lifecycleState = PlaybackSnapshotLifecycleState::ready;
+    auto& prepared = preparedResult.prepared;
+    prepared.snapshotBuildId = result.snapshotResult.buildId;
+    prepared.snapshotContentDigest = result.snapshotResult.snapshot.contentDigest;
+    prepared.snapshotDspGraphDigest = result.snapshotResult.snapshot.dspGraphDigest;
+    prepared.dspGraphDigest = result.snapshotResult.snapshot.dspGraphDigest;
+    prepared.compilerVersion = "package-v2-bounded-records";
+    prepared.draftRevision = result.snapshotResult.snapshot.draftRevision;
+    prepared.selectedGroupId = result.snapshotResult.snapshot.selectedGroupId;
+    prepared.masterGainDb = result.snapshotResult.snapshot.masterGainDb;
+    prepared.containerId = packageLoad.stream.container.containerId;
+    prepared.containerPath = package->packagePath;
+    prepared.payloadEncoding = "package-v2-paged-float32";
+    prepared.pageSizeBytes = packageLoad.stream.container.pageSizeBytes;
+
+    std::unordered_map<std::string, std::size_t> sampleIndices;
+    std::unordered_map<std::string, std::size_t> streamIndices;
+    for (const auto& identity : result.snapshotResult.snapshot.sampleIdentities)
+    {
+        const auto descriptor = std::find_if(sampleDescriptors.begin(), sampleDescriptors.end(),
+            [&](const auto& value) { return value.sourceId == identity.sampleSourceId; });
+        const auto streamSample = std::find_if(packageLoad.stream.container.samples.begin(),
+                                               packageLoad.stream.container.samples.end(),
+            [&](const auto& value) { return value.sampleId == identity.sampleSourceId; });
+        if (descriptor == sampleDescriptors.end()
+            || streamSample == packageLoad.stream.container.samples.end())
+        {
+            result.issues.push_back("Package v2 sample metadata is missing: "
+                                    + identity.sampleSourceId + ".");
+            return result;
+        }
+        auto source = std::make_shared<PackagePagedSampleDataSource>(*descriptor, package);
+        if (!source->prepareHead())
+        {
+            result.issues.push_back("Package v2 head preparation failed for '"
+                                    + identity.sampleSourceId + "': " + source->lastFailure());
+            return result;
+        }
+        PreparedPlaybackSampleHandle sample;
+        sample.sampleSourceId = identity.sampleSourceId;
+        sample.streamSampleId = streamSample->sampleId;
+        sample.sourcePath = streamSample->sourcePath;
+        sample.canonicalSourcePath = descriptor->canonicalSourceIdentity;
+        sample.canonicalSourceIdentity = descriptor->canonicalSourceIdentity;
+        sample.sourceFingerprintHex = descriptor->provenanceIdentity;
+        sample.formatName = descriptor->formatName;
+        sample.role = identity.role;
+        sample.channelLayout = descriptor->channelLayout;
+        sample.sampleRate = descriptor->sampleRate;
+        sample.frameCount = descriptor->frameCount;
+        sample.channelCount = descriptor->channelCount;
+        sample.rootMidiNotePresent = streamSample->rootMidiNotePresent;
+        sample.rootMidiNote = streamSample->rootMidiNote;
+        sample.loopRangePresent = streamSample->loopRangePresent;
+        sample.loopStartFrame = streamSample->loopStartFrame;
+        sample.loopEndFrame = streamSample->loopEndFrame;
+        sample.dataSource = source;
+        sample.ownershipToken = "package-v2-generation:"
+            + std::to_string(descriptor->generation);
+        sample.cacheKey = descriptor->provenanceIdentity;
+
+        PreparedPlaybackStreamHandle stream;
+        stream.sampleSourceId = identity.sampleSourceId;
+        stream.streamSampleId = streamSample->sampleId;
+        stream.containerId = packageLoad.stream.container.containerId;
+        stream.containerPath = package->packagePath;
+        stream.payloadEncoding = "package-v2-paged-float32";
+        stream.topologyKind = "package-v2-records";
+        stream.compiledStreamTopologyAvailable = true;
+        stream.pageSizeBytes = descriptor->pageSizeBytes;
+        stream.payloadOffsetBytes = streamSample->payloadOffsetBytes;
+        stream.payloadSizeBytes = streamSample->payloadSizeBytes;
+        stream.prefetchBytes = descriptor->headSizeBytes;
+        stream.streamedPayloadOffsetBytes = streamSample->payloadOffsetBytes
+            + descriptor->headSizeBytes;
+        stream.streamedPayloadBytes = streamSample->payloadSizeBytes > descriptor->headSizeBytes
+            ? streamSample->payloadSizeBytes - descriptor->headSizeBytes : 0;
+        stream.pageCount = streamSample->pages.size();
+        if (!streamSample->pages.empty())
+        {
+            stream.pageRangePresent = true;
+            stream.firstPageIndex = streamSample->pages.front().pageIndex;
+            stream.lastPageIndex = streamSample->pages.back().pageIndex;
+            stream.firstPageOffsetBytes = streamSample->pages.front().offsetBytes;
+            stream.lastPageOffsetBytes = streamSample->pages.back().offsetBytes;
+            stream.lastPageSizeBytes = streamSample->pages.back().sizeBytes;
+        }
+        for (const auto& page : streamSample->pages)
+            stream.pages.push_back({ page.pageIndex, page.offsetBytes, page.sizeBytes });
+        stream.ownershipToken = sample.ownershipToken;
+        stream.cacheKey = sample.cacheKey;
+
+        PreparedPlaybackOwnershipRecord ownership;
+        ownership.ownershipToken = sample.ownershipToken;
+        ownership.cacheKey = sample.cacheKey;
+        ownership.sampleSourceId = sample.sampleSourceId;
+        ownership.streamSampleId = sample.streamSampleId;
+        ownership.lifetimeState = "active-package-v2-generation";
+        ownership.retainedBytes = source->metrics().publishedHeadBytes;
+        ownership.preparedBuildId = preparedResult.buildId;
+        sample.ownershipRecordIndex = prepared.ownershipRecords.size();
+        stream.ownershipRecordIndex = sample.ownershipRecordIndex;
+        prepared.ownershipRecords.push_back(std::move(ownership));
+        sampleIndices.emplace(identity.sampleSourceId, prepared.samples.size());
+        streamIndices.emplace(identity.sampleSourceId, prepared.streams.size());
+        prepared.samples.push_back(std::move(sample));
+        prepared.streams.push_back(std::move(stream));
+    }
+
+    for (const auto& zone : result.snapshotResult.snapshot.zones)
+    {
+        const auto sample = sampleIndices.find(zone.sampleSourceId);
+        const auto stream = streamIndices.find(zone.sampleSourceId);
+        if (sample == sampleIndices.end() || stream == streamIndices.end())
+        {
+            result.issues.push_back("Package v2 zone sample binding failed: " + zone.id + ".");
+            return result;
+        }
+        prepared.zones.push_back({ zone.id, zone.sampleSourceId,
+            prepared.samples[sample->second].streamSampleId, sample->second, stream->second,
+            zone.rootKey, zone.keyLow, zone.keyHigh, zone.velocityLow, zone.velocityHigh,
+            zone.velocityCrossfade, zone.velocityCrossfadeRuntime, zone.gainDb, zone.pan,
+            zone.sampleStartFrame, zone.loopEnabled, zone.loopStartFrame, zone.loopEndFrame,
+            zone.releaseSeconds, zone.roundRobin, zone.roundRobinLength,
+            zone.roundRobinPosition, zone.triggerMode });
+    }
+    for (const auto& group : result.snapshotResult.snapshot.groupRoutes)
+    {
+        prepared.groupRoutes.push_back({ group.groupId, group.articulationIds, group.zoneIds,
+            group.displayName, group.displayOrder, group.routingSourceId, group.workspaceVisible,
+            group.gainDb, group.pan, group.routingBusId, group.auditionAnchorZoneId });
+    }
+    prepared.performanceProgram = result.snapshotResult.snapshot.performanceProgram;
+    prepared.routeDigest = computePreparedPlaybackRouteDigest(result.snapshotResult.snapshot, prepared);
+    prepared.sourceProvenanceDigest = computePreparedPlaybackSourceProvenanceDigest(prepared);
+    prepared.macroSchemaDigest = computePlaybackSnapshotMacroSchemaDigest(result.snapshotResult.snapshot);
+    prepared.preparedContentDigest = computePreparedPlaybackContentDigest(prepared);
+    preparedResult.metrics.preparedSampleCount = prepared.samples.size();
+    preparedResult.metrics.preparedStreamCount = prepared.streams.size();
+    preparedResult.metrics.preparedZoneCount = prepared.zones.size();
+    preparedResult.metrics.preparedOwnershipRecordCount = prepared.ownershipRecords.size();
+    for (const auto& ownership : prepared.ownershipRecords)
+        preparedResult.metrics.preparedOwnershipBytes += ownership.retainedBytes;
+    preparedResult.metrics.preparedBytes = preparedResult.metrics.preparedOwnershipBytes
+        + prepared.performanceProgram.retainedBytes;
+    preparedResult.metrics.preparedPerformanceProgramBytes = prepared.performanceProgram.retainedBytes;
+    preparedResult.admission.metadataAvailable = true;
+    preparedResult.admission.sampleCount = prepared.samples.size();
+    preparedResult.admission.readiness = PreparedPlaybackReadinessState::playable;
+    preparedResult.built = true;
+    preparedResult.activationEligible = true;
+    preparedResult.completionDisposition = PreparedPlaybackCompletionDisposition::completed;
+    preparedResult.state = "Package v2 prepared playback ready";
+    result.timings.preparedBuildMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - preparedStarted).count());
+
+    const auto payloadStarted = Clock::now();
+    result.activationPayload = buildPlaybackActivationPayload(
+        PlaybackActivationLane::performance,
+        result.snapshotResult.requestedDraftRevision,
+        &result.snapshotResult,
+        &preparedResult);
+    result.timings.activationPayloadMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - payloadStarted).count());
+    result.timings.totalMicros = result.timings.packageLoadMicros
+        + result.timings.snapshotBuildMicros + result.timings.preparedBuildMicros
+        + result.timings.activationPayloadMicros;
+    if (result.activationPayload == nullptr)
+    {
+        result.issues.push_back("Package v2 activation payload could not be built.");
+        return result;
+    }
+    const auto renderModelStarted = Clock::now();
+    const auto renderModel = buildPerformancePackageRenderModel(
+        packageLoad, result.activationPayload);
+    result.timings.renderModelBuildMicros = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            Clock::now() - renderModelStarted).count());
+    result.timings.totalMicros += result.timings.renderModelBuildMicros;
+    if (!renderModel.built || renderModel.model == nullptr)
+    {
+        result.issues.push_back(renderModel.findings.empty()
+            ? std::string("Package v2 render model could not be built.")
+            : renderModel.findings.front().message);
+        return result;
+    }
+    result.renderModel = renderModel.model;
+    // Keep corpus-scale reclamation on the preparation worker rather than the
+    // UI activation hand-off; the immutable payload/model retain the live data.
+    result.snapshotResult = {};
+    result.preparedResult = {};
+    result.prepared = true;
+    result.failureCategory = PerformancePackageFailureCategory::none;
+    result.state = "Performance package v2 activation prepared";
+    return result;
 }
 } // namespace drs::engine

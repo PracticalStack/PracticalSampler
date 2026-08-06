@@ -10,6 +10,17 @@ namespace drs::engine
 {
 namespace
 {
+std::uint64_t stableSourceGeneration(std::string_view identity) noexcept
+{
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const auto character : identity)
+    {
+        hash ^= static_cast<unsigned char>(character);
+        hash *= 1099511628211ull;
+    }
+    return hash == 0 ? 1 : hash;
+}
+
 void addError(SamplerRenderModelBuildResult& result,
               std::string code,
               std::string path,
@@ -351,22 +362,33 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         if (sample.channelCount < 1 || sample.channelCount > 2)
             addError(result, "render-model-channel-count-unsupported", path + ".channelCount",
                      "Sprint 4 renderer inputs support mono or stereo prepared samples.");
-        if (sample.decodedSampleData == nullptr)
+        if (sample.decodedSampleData == nullptr && sample.dataSource == nullptr)
         {
-            addError(result, "render-model-decoded-data-missing", path + ".decodedSampleData",
-                     "Prepared decoded PCM must be retained before renderer model construction.");
+            addError(result, "render-model-sample-source-missing", path + ".dataSource",
+                     "Prepared samples require either bounded resident PCM or a common sample data source.");
             continue;
         }
-
-        const auto& channels = sample.decodedSampleData->normalizedChannels;
-        if (channels.size() != sample.channelCount)
-            addError(result, "render-model-channel-layout-mismatch", path + ".decodedSampleData",
-                     "Decoded PCM channel storage must match prepared channel metadata.");
-        for (std::size_t channel = 0; channel < channels.size(); ++channel)
-            if (channels[channel].size() < sample.frameCount)
-                addError(result, "render-model-channel-frames-truncated",
-                         path + ".decodedSampleData.channels[" + std::to_string(channel) + "]",
-                         "Decoded PCM storage is shorter than the declared frame count.");
+        if (sample.dataSource != nullptr)
+        {
+            const auto validation = validateSampleDataSourceDescriptor(sample.dataSource->descriptor());
+            if (!validation.valid
+                || sample.dataSource->descriptor().frameCount != sample.frameCount
+                || sample.dataSource->descriptor().channelCount != sample.channelCount)
+                addError(result, "render-model-source-descriptor-invalid", path + ".dataSource",
+                         "Prepared source descriptor must validate and match sample dimensions.");
+        }
+        if (sample.decodedSampleData != nullptr)
+        {
+            const auto& channels = sample.decodedSampleData->normalizedChannels;
+            if (channels.size() != sample.channelCount)
+                addError(result, "render-model-channel-layout-mismatch", path + ".decodedSampleData",
+                         "Decoded PCM channel storage must match prepared channel metadata.");
+            for (std::size_t channel = 0; channel < channels.size(); ++channel)
+                if (channels[channel].size() < sample.frameCount)
+                    addError(result, "render-model-channel-frames-truncated",
+                             path + ".decodedSampleData.channels[" + std::to_string(channel) + "]",
+                             "Decoded PCM storage is shorter than the declared frame count.");
+        }
     }
 
     for (std::size_t index = 0; index < prepared.zones.size(); ++index)
@@ -540,13 +562,45 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     for (std::size_t index = 0; index < prepared.samples.size(); ++index)
     {
         const auto& sample = prepared.samples[index];
-        model->samples.push_back({ index,
-                                   sample.sampleSourceId,
-                                   sample.streamSampleId,
-                                   sample.sampleRate,
-                                   sample.frameCount,
-                                   sample.channelCount,
-                                   sample.decodedSampleData });
+        SampleDataSourceDescriptor descriptor;
+        SampleDataSourcePtr dataSource = sample.dataSource;
+        if (dataSource != nullptr)
+        {
+            descriptor = dataSource->descriptor();
+        }
+        else
+        {
+            descriptor.kind = SampleDataSourceKind::resident;
+            descriptor.sourceId = sample.sampleSourceId;
+            descriptor.canonicalSourceIdentity = sample.canonicalSourceIdentity.empty()
+                ? sample.sampleSourceId : sample.canonicalSourceIdentity;
+            descriptor.provenanceIdentity = sample.sourceFingerprintHex.empty()
+                ? "prepared-build:" + std::to_string(payload->preparedBuildId)
+                : sample.sourceFingerprintHex;
+            descriptor.formatName = sample.formatName.empty() ? "decoded-float32" : sample.formatName;
+            descriptor.channelLayout = sample.channelLayout.empty()
+                ? (sample.channelCount == 1 ? "mono" : "stereo") : sample.channelLayout;
+            descriptor.checksumHex = sample.sourceFingerprintHex;
+            descriptor.generation = stableSourceGeneration(descriptor.provenanceIdentity);
+            descriptor.sampleRate = sample.sampleRate;
+            descriptor.frameCount = sample.frameCount;
+            descriptor.channelCount = sample.channelCount;
+            descriptor.bytesPerFrame = static_cast<std::uint64_t>(sample.channelCount) * sizeof(float);
+            descriptor.dataSizeBytes = descriptor.frameCount * descriptor.bytesPerFrame;
+            dataSource = std::make_shared<ResidentSampleDataSource>(descriptor,
+                                                                   sample.decodedSampleData);
+        }
+        SamplerRenderSample renderSample;
+        renderSample.preparedSampleIndex = index;
+        renderSample.sampleSourceId = sample.sampleSourceId;
+        renderSample.streamSampleId = sample.streamSampleId;
+        renderSample.sampleRate = sample.sampleRate;
+        renderSample.frameCount = sample.frameCount;
+        renderSample.channelCount = sample.channelCount;
+        renderSample.sourceDescriptor = std::move(descriptor);
+        renderSample.dataSource = std::move(dataSource);
+        renderSample.decodedSampleData = sample.decodedSampleData;
+        model->samples.push_back(std::move(renderSample));
     }
 
     model->routes.reserve(selectedRouteCount);

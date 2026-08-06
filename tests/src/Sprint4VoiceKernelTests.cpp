@@ -51,7 +51,8 @@ struct ModelOptions
 };
 
 drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> channels,
-                                              const ModelOptions& options = {})
+                                              const ModelOptions& options = {},
+                                              drs::engine::SampleDataSourcePtr dataSource = nullptr)
 {
     require(!channels.empty() && !channels.front().empty(), "Voice test model requires PCM.");
     const auto frameCount = channels.front().size();
@@ -79,15 +80,20 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     snapshotGroup.displayName = "Voice Group";
     snapshot.groupRoutes.push_back(std::move(snapshotGroup));
 
-    auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
-    decoded->normalizedChannels = std::move(channels);
     drs::engine::PreparedPlaybackSampleHandle sample;
     sample.sampleSourceId = "voice-sample";
     sample.streamSampleId = "voice-stream";
     sample.sampleRate = options.sourceSampleRate;
     sample.frameCount = frameCount;
-    sample.channelCount = static_cast<std::uint32_t>(decoded->normalizedChannels.size());
-    sample.decodedSampleData = std::move(decoded);
+    sample.channelCount = static_cast<std::uint32_t>(channels.size());
+    if (dataSource != nullptr)
+        sample.dataSource = std::move(dataSource);
+    else
+    {
+        auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+        decoded->normalizedChannels = std::move(channels);
+        sample.decodedSampleData = std::move(decoded);
+    }
 
     drs::engine::ImmutablePreparedPlayback prepared;
     prepared.snapshotBuildId = 401;
@@ -157,6 +163,40 @@ struct StereoOutput
     {
         return { pointers.data(), 2, static_cast<std::uint32_t>(left.size()) };
     }
+};
+
+class IntentRecordingSource final : public drs::engine::ISampleDataSource
+{
+public:
+    explicit IntentRecordingSource(
+        std::shared_ptr<drs::engine::DeterministicFakePagedSampleDataSource> source)
+        : backing(std::move(source))
+    {
+    }
+
+    const drs::engine::SampleDataSourceDescriptor& descriptor() const noexcept override
+    {
+        return backing->descriptor();
+    }
+
+    drs::engine::SampleFrameView acquireFrameView(
+        std::uint64_t firstFrame, std::uint32_t frames) const noexcept override
+    {
+        return backing->acquireFrameView(firstFrame, frames);
+    }
+
+    bool publishPageIntent(std::uint64_t firstFrame,
+                           drs::engine::SamplePageRequestPriority,
+                           std::uint64_t) const noexcept override
+    {
+        lastRequestedFrame.store(firstFrame, std::memory_order_relaxed);
+        publicationCount.fetch_add(1, std::memory_order_relaxed);
+        return true;
+    }
+
+    std::shared_ptr<drs::engine::DeterministicFakePagedSampleDataSource> backing;
+    mutable std::atomic<std::uint64_t> publicationCount {0};
+    mutable std::atomic<std::uint64_t> lastRequestedFrame {0};
 };
 
 void runStartAndFormulaContract()
@@ -402,6 +442,96 @@ void runPartitionInvarianceMatrix()
     require(partitioned.getLifecycleState() == contiguous.getLifecycleState(),
             "Equivalent block partition changed lifecycle state.");
 }
+
+drs::engine::SampleDataSourceDescriptor makePagedDescriptor(const std::uint64_t frameCount)
+{
+    drs::engine::SampleDataSourceDescriptor descriptor;
+    descriptor.kind = drs::engine::SampleDataSourceKind::deterministicFake;
+    descriptor.sourceId = "voice-sample";
+    descriptor.canonicalSourceIdentity = "synthetic://voice-paged";
+    descriptor.provenanceIdentity = "voice-paged-generation-1";
+    descriptor.formatName = "float32";
+    descriptor.channelLayout = "mono";
+    descriptor.generation = 91;
+    descriptor.sampleRate = 48000.0;
+    descriptor.frameCount = frameCount;
+    descriptor.channelCount = 1;
+    descriptor.bytesPerFrame = sizeof(float);
+    descriptor.dataSizeBytes = frameCount * sizeof(float);
+    descriptor.headSizeBytes = 4 * sizeof(float);
+    descriptor.pageSizeBytes = 4 * sizeof(float);
+    return descriptor;
+}
+
+void runPagedBoundaryAndUnderrunMatrix()
+{
+    std::vector<float> source(12);
+    for (std::size_t index = 0; index < source.size(); ++index)
+        source[index] = static_cast<float>(index) / 11.0f;
+    const auto residentModel = buildModel({ source });
+    auto readySource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
+        makePagedDescriptor(source.size()), std::vector<std::vector<float>> { source },
+        4, 4, std::vector<bool> { true, true });
+    auto recordingSource = std::make_shared<IntentRecordingSource>(readySource);
+    const auto pagedModel = buildModel({ source }, {}, recordingSource);
+
+    drs::engine::SamplerVoice resident;
+    drs::engine::SamplerVoice paged;
+    require(resident.start(*residentModel, makeStart())
+                && paged.start(*pagedModel, makeStart()),
+            "Resident and paged parity voices should start.");
+    StereoOutput residentOutput(source.size());
+    StereoOutput pagedOutput(source.size());
+    const auto residentResult = resident.render(
+        residentOutput.view(), 0, static_cast<std::uint32_t>(source.size()));
+    const auto pagedResult = paged.render(
+        pagedOutput.view(), 0, static_cast<std::uint32_t>(source.size()));
+    requireVector(pagedOutput.left, residentOutput.left,
+                  "Ready pages changed resident output across head/page boundaries");
+    require(residentResult.mixedFrameCount == pagedResult.mixedFrameCount
+                && pagedResult.pageMissCount == 0
+                && pagedResult.underrunFrameCount == 0,
+            "Ready paged rendering must retain resident completion and zero-miss diagnostics.");
+    require(recordingSource->publicationCount.load(std::memory_order_relaxed) == 1
+                && recordingSource->lastRequestedFrame.load(std::memory_order_relaxed) == 11,
+            "The voice must publish one bounded proactive look-ahead intent before leaving its head.");
+
+    auto recoveringSource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
+        makePagedDescriptor(source.size()), std::vector<std::vector<float>> { source },
+        4, 4, std::vector<bool> { false, true });
+    const auto recoveringModel = buildModel({ source }, {}, recoveringSource);
+    drs::engine::SamplerVoice recovering;
+    require(recovering.start(*recoveringModel, makeStart()),
+            "Paged underrun voice should start from its resident head.");
+    StereoOutput recoveringOutput(8);
+    const auto missing = recovering.render(recoveringOutput.view(), 0, 6);
+    require(missing.pageMissCount == 3 && missing.underrunFrameCount == 3
+                && missing.recoveryCount == 0
+                && recovering.getPositionFrames() == 6.0,
+            "Missing pages must render bounded silence while advancing musical time.");
+    recoveringSource->setPageReady(0, true);
+    const auto resumed = recovering.render(recoveringOutput.view(), 6, 2);
+    require(resumed.recoveryCount == 1 && resumed.pageMissCount == 0
+                && recoveringOutput.left[6] == source[6]
+                && recoveringOutput.left[7] == source[7],
+            "A newly ready page must resume at the current musical position without replay.");
+
+    drs::engine::SamplePageIntentRing ring;
+    for (std::size_t index = 0; index < drs::engine::SamplePageIntentRing::capacity; ++index)
+        require(ring.push({ 91, index, drs::engine::SamplePageRequestPriority::lookAhead, 7 }),
+                "The fixed intent ring must accept exactly its advertised capacity.");
+    require(!ring.push({ 91, 999, drs::engine::SamplePageRequestPriority::imminent, 7 })
+                && ring.metrics().droppedCount == 1
+                && ring.metrics().maximumDepth == drs::engine::SamplePageIntentRing::capacity,
+            "Intent saturation must drop deterministically without blocking or allocating.");
+    drs::engine::SamplePageIntent intent;
+    for (std::size_t index = 0; index < drs::engine::SamplePageIntentRing::capacity; ++index)
+        require(ring.pop(intent) && intent.pageIndex == index,
+                "The SPSC intent ring must preserve FIFO ordering.");
+    require(!ring.pop(intent) && ring.metrics().consumedCount
+                == drs::engine::SamplePageIntentRing::capacity,
+            "The drained intent ring must report bounded publication/consumption metrics.");
+}
 } // namespace
 
 int main()
@@ -415,6 +545,7 @@ int main()
         runGainVelocityAndPanMatrix();
         runOffsetAccumulationAndFinalFrameMatrix();
         runPartitionInvarianceMatrix();
+        runPagedBoundaryAndUnderrunMatrix();
         std::cout << "Sprint 4.2 deterministic voice-kernel matrix passed." << std::endl;
         return 0;
     }

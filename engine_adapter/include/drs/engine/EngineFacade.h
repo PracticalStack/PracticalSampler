@@ -2,6 +2,9 @@
 
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PackageReader.h"
+#include "drs/engine/PackageV2.h"
+#include "drs/engine/SampleDataSource.h"
+#include "drs/engine/SamplerRenderModel.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PerformancePublishController.h"
 #include "drs/engine/PerformancePublishPresentation.h"
@@ -335,6 +338,9 @@ struct PerformancePackagePreparationTimings
     std::uint64_t snapshotBuildMicros = 0;
     std::uint64_t preparedBuildMicros = 0;
     std::uint64_t activationPayloadMicros = 0;
+    std::uint64_t renderModelBuildMicros = 0;
+    std::uint64_t engineSessionActivationMicros = 0;
+    std::uint64_t workspaceTransitionMicros = 0;
     std::uint64_t totalMicros = 0;
 };
 
@@ -348,6 +354,7 @@ struct PreparedPerformancePackageActivationResult
     PlaybackSnapshotBuildResult snapshotResult;
     PreparedPlaybackBuildResult preparedResult;
     PlaybackActivationPayloadPtr activationPayload;
+    SamplerRenderModelPtr renderModel;
     PerformancePackagePreparationTimings timings;
 };
 
@@ -402,6 +409,10 @@ public:
     {
         return packagePerformanceActivationPayload;
     }
+    SamplerRenderModelPtr getPerformancePackageRenderModel() const
+    {
+        return packagePerformanceRenderModel;
+    }
     PerformancePublishActivationPayloadPtr authorizePerformanceActivation(
         std::uint64_t nowMicros = 0);
     bool rejectPerformanceActivationStaging(
@@ -436,6 +447,8 @@ public:
     bool setMacroValue(const std::string& macroId, double value);
     bool stageDraftRevision(std::size_t revision);
     bool refreshPreviewToCurrentDraft();
+    bool refreshPreviewForPreparationScope(const PlaybackPreparationScopeRequest& scopeRequest,
+                                           bool forceRebuild = false);
     bool cancelPreviewPreparation(
         const std::string& reason = "Preview preparation superseded by a newer request");
     bool publishCurrentDraft();
@@ -503,6 +516,7 @@ private:
     RuntimeProjectLoadResult authoringProject;
     bool referenceInstrumentActive = false;
     PlaybackActivationPayloadPtr packagePerformanceActivationPayload;
+    SamplerRenderModelPtr packagePerformanceRenderModel;
     std::string packageBackgroundArtworkPayloadId;
     std::shared_ptr<const std::vector<std::uint8_t>> packageBackgroundArtworkJpgBytes;
     RuntimeSessionStateSnapshot currentSessionState;
@@ -524,5 +538,11 @@ private:
 
 PreparedPerformancePackageActivationResult preparePerformancePackageActivation(
     const PerformancePackageLoadResult& packageLoad,
+    const PerformancePackagePreparationTimings& priorTimings = {});
+
+PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation(
+    const PerformancePackageLoadResult& packageLoad,
+    std::shared_ptr<const PackageV2OpenResult> package,
+    const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
     const PerformancePackagePreparationTimings& priorTimings = {});
 } // namespace drs::engine

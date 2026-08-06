@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Large-Instrument Streaming Iteration Plan · Decent Rhapsody Studio</title>
+  <style>
+    :root {
+      --paper: #fbfbfa;
+      --surface: #ffffff;
+      --ink: #191919;
+      --muted: #626562;
+      --quiet: #8a8d89;
+      --rule: #d8dad7;
+      --rule-strong: #b9bdb9;
+      --rust: #ad351c;
+      --rust-soft: #f7eae6;
+      --teal: #147b7c;
+      --teal-soft: #e7f3f1;
+      --amber: #a2650a;
+      --amber-soft: #faf0dc;
+      --slate-soft: #f0f1ef;
+      --mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --content: 1520px;
+      --rail: 270px;
+      --shadow: 0 10px 28px rgba(20, 25, 22, 0.055);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 92px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 0, transparent calc(50% - 1px), rgba(25,25,25,.018) 50%, transparent calc(50% + 1px)),
+        var(--paper);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.58;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: -80px;
+      z-index: 100;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: white;
+      border-radius: 2px;
+    }
+    .skip-link:focus { top: 12px; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid var(--rule-strong);
+      background: rgba(251, 251, 250, .96);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-inner {
+      max-width: var(--content);
+      min-height: 68px;
+      margin: 0 auto;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      font-family: var(--serif);
+      font-size: 18px;
+      letter-spacing: .01em;
+      white-space: nowrap;
+    }
+    .wave-mark { width: 112px; height: 22px; color: var(--quiet); }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+    .doc-state {
+      margin-right: 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .03em;
+    }
+    .utility-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 7px 10px;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .utility-button:hover, .utility-button:focus-visible {
+      background: var(--surface);
+      border-color: var(--rule);
+      outline: none;
+    }
+    .utility-button svg { width: 17px; height: 17px; }
+
+    .page-shell {
+      max-width: var(--content);
+      margin: 0 auto;
+      padding: 0 28px 80px;
+      display: grid;
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+      gap: 52px;
+    }
+    .phase-rail {
+      position: sticky;
+      top: 92px;
+      height: calc(100vh - 116px);
+      padding: 42px 26px 24px 4px;
+      border-right: 1px solid var(--rule-strong);
+      overflow: auto;
+    }
+    .rail-label {
+      margin: 0 0 18px 48px;
+      color: var(--quiet);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .phase-nav { margin: 0; padding: 0; list-style: none; }
+    .phase-nav li { position: relative; }
+    .phase-nav li:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      left: 16px;
+      top: 32px;
+      bottom: -12px;
+      width: 1px;
+      background: var(--rule-strong);
+    }
+    .phase-nav a {
+      position: relative;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 14px;
+      align-items: start;
+      margin-bottom: 12px;
+      padding: 8px 8px 9px 0;
+      text-decoration: none;
+      border-right: 2px solid transparent;
+    }
+    .phase-nav a:hover .phase-name { color: var(--rust); }
+    .phase-dot {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 33px;
+      height: 33px;
+      color: white;
+      background: #aeb1ae;
+      border: 4px solid var(--paper);
+      border-radius: 50%;
+      font-family: var(--serif);
+      font-weight: 700;
+    }
+    .phase-name {
+      padding-top: 3px;
+      font-family: var(--serif);
+      font-size: 15px;
+      line-height: 1.28;
+      transition: color .16s ease;
+    }
+    .phase-nav a.is-active { border-right-color: var(--rust); }
+    .phase-nav a.is-active .phase-dot { background: var(--rust); }
+    .phase-nav a.is-active .phase-name { color: var(--rust); font-weight: 700; }
+    .rail-key {
+      margin: 22px 0 0 48px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .rail-key span { display: flex; align-items: center; gap: 7px; margin: 5px 0; }
+    .key-dot { width: 8px; height: 8px; border-radius: 50%; background: #aeb1ae; }
+    .key-dot.active { background: var(--rust); }
+    .key-dot.gate { background: var(--teal); }
+
+    main { min-width: 0; padding-top: 48px; }
+    .hero { padding: 0 0 34px; border-bottom: 1px solid var(--rule-strong); }
+    .hero-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 40px;
+    }
+    h1, h2, h3, h4 { color: var(--ink); font-family: var(--serif); }
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(38px, 4vw, 59px);
+      line-height: 1.02;
+      letter-spacing: -.032em;
+      font-weight: 700;
+    }
+    .hero-copy {
+      max-width: 850px;
+      margin: 18px 0 0;
+      color: #474a47;
+      font-family: var(--serif);
+      font-size: 20px;
+      line-height: 1.55;
+    }
+    .hero-meta {
+      flex: 0 0 210px;
+      padding-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .hero-meta dl { margin: 0; }
+    .hero-meta div { padding: 8px 0; border-bottom: 1px solid var(--rule); }
+    .hero-meta dt {
+      color: var(--quiet);
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .hero-meta dd { margin: 2px 0 0; color: var(--ink); font-weight: 650; }
+
+    .evidence {
+      margin-top: 32px;
+      border: 1px solid var(--rule-strong);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .band-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--rule);
+      font-family: var(--serif);
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .band-title small {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+    }
+    .metric { min-width: 0; padding: 18px 15px 17px; text-align: center; }
+    .metric + .metric { border-left: 1px solid var(--rule); }
+    .metric-label {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .metric-value {
+      margin-top: 4px;
+      font-family: var(--serif);
+      font-size: 23px;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric-note { margin-top: 3px; color: var(--quiet); font-size: 10px; }
+    .evidence-note {
+      margin: 0;
+      padding: 11px 16px;
+      color: var(--muted);
+      background: #f7f8f6;
+      border-top: 1px solid var(--rule);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+
+    .direction {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(360px, .9fr);
+      gap: 38px;
+      padding: 34px 0 12px;
+    }
+    .direction h2 { margin: 0 0 10px; font-size: 25px; }
+    .direction p { margin: 0 0 12px; color: var(--muted); }
+    .principles { margin: 17px 0 0; padding: 0; list-style: none; }
+    .principles li {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 10px;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .principles strong { color: var(--rust); font-family: var(--mono); font-size: 11px; }
+    .architecture {
+      align-self: start;
+      padding: 17px;
+      border: 1px solid var(--rule-strong);
+      background: var(--surface);
+    }
+    .architecture h3 { margin: 0 0 12px; font-size: 17px; }
+    .arch-flow { display: grid; grid-template-columns: 1fr 28px 1fr; align-items: stretch; gap: 5px; }
+    .arch-column { border-top: 3px solid var(--rust); background: var(--rust-soft); padding: 12px; }
+    .arch-column.data { border-top-color: var(--teal); background: var(--teal-soft); }
+    .arch-column b { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+    .arch-column span { display: block; padding: 4px 0; border-top: 1px solid rgba(25,25,25,.1); font-size: 11px; }
+    .arch-arrow { display: grid; place-items: center; color: var(--quiet); }
+    .arch-arrow svg { width: 22px; }
+
+    .phase {
+      position: relative;
+      padding: 52px 0 22px;
+      border-bottom: 1px solid var(--rule-strong);
+    }
+    .phase-head {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+      padding-bottom: 18px;
+      border-bottom: 2px solid var(--rust);
+    }
+    .phase-index {
+      color: var(--rust);
+      font-family: var(--serif);
+      font-size: 62px;
+      font-weight: 700;
+      line-height: .86;
+      font-variant-numeric: tabular-nums;
+    }
+    .phase-kicker {
+      color: var(--rust);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .phase h2 { margin: 2px 0 7px; font-size: 31px; line-height: 1.12; }
+    .phase-summary { max-width: 880px; margin: 0; color: var(--muted); font-size: 16px; }
+    .phase-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(310px, .85fr);
+      gap: 38px;
+      padding-top: 24px;
+    }
+    .section-label {
+      margin: 0 0 10px;
+      color: var(--ink);
+      font-family: var(--serif);
+      font-size: 18px;
+    }
+    .outcome {
+      margin-bottom: 22px;
+      padding: 13px 15px;
+      background: var(--slate-soft);
+      border-left: 3px solid var(--rust);
+    }
+    .outcome b { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .outcome p { margin: 4px 0 0; }
+
+    .work-packages { border-top: 1px solid var(--rule-strong); }
+    details.work-package { border-bottom: 1px solid var(--rule); }
+    details.work-package summary {
+      display: grid;
+      grid-template-columns: 66px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 52px;
+      padding: 8px 4px;
+      list-style: none;
+      cursor: pointer;
+    }
+    details.work-package summary::-webkit-details-marker { display: none; }
+    details.work-package summary::after {
+      content: "+";
+      color: var(--rust);
+      font-family: var(--mono);
+      font-size: 18px;
+      line-height: 1;
+    }
+    details.work-package[open] summary::after { content: "−"; }
+    details.work-package summary:focus-visible { outline: 2px solid var(--rust); outline-offset: 3px; }
+    .work-id {
+      display: inline-block;
+      width: max-content;
+      padding: 3px 6px;
+      color: var(--muted);
+      background: var(--slate-soft);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .work-title { font-weight: 720; line-height: 1.35; }
+    .work-body { padding: 0 34px 16px 82px; color: var(--muted); }
+    .work-body ul { margin: 4px 0 9px; padding-left: 19px; }
+    .work-body li { margin: 4px 0; }
+    code {
+      color: #313431;
+      background: #eceeeb;
+      padding: .1em .34em;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: .88em;
+    }
+    .deliverable {
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .phase-tools { display: flex; justify-content: flex-end; margin: -2px 0 5px; }
+    .text-button {
+      color: var(--teal);
+      background: transparent;
+      border: 0;
+      padding: 4px 0 4px 12px;
+      font-size: 11px;
+      font-weight: 750;
+    }
+    .text-button:hover, .text-button:focus-visible { color: var(--rust); outline: none; text-decoration: underline; }
+
+    .side-stack > section { margin-bottom: 24px; }
+    .dependency-list, .risk-list, .deliverables-list { margin: 0; padding: 0; list-style: none; }
+    .dependency-list li, .deliverables-list li {
+      position: relative;
+      padding: 7px 0 7px 19px;
+      border-top: 1px solid var(--rule);
+    }
+    .dependency-list li::before {
+      content: "↳";
+      position: absolute;
+      left: 0;
+      color: var(--quiet);
+      font-family: var(--mono);
+    }
+    .deliverables-list li::before {
+      content: "□";
+      position: absolute;
+      left: 0;
+      color: var(--teal);
+    }
+    .gate {
+      padding: 15px;
+      border: 1px solid #b8d4d0;
+      border-top: 4px solid var(--teal);
+      background: var(--teal-soft);
+    }
+    .gate h3 { margin: 0 0 8px; font-size: 18px; }
+    .checklist { margin: 0; padding: 0; list-style: none; }
+    .checklist label {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: start;
+      padding: 5px 0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .checklist input { width: 14px; height: 14px; margin-top: 2px; accent-color: var(--teal); }
+    .verification {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .verification th, .verification td { padding: 7px 8px; border: 1px solid var(--rule); text-align: left; vertical-align: top; }
+    .verification th {
+      color: var(--muted);
+      background: var(--slate-soft);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .verification td:first-child { width: 50px; color: var(--rust); font-family: var(--mono); }
+
+    .decision-table { width: 100%; margin-top: 30px; border-collapse: collapse; font-size: 12px; }
+    .decision-table caption {
+      margin-bottom: 8px;
+      text-align: left;
+      font-family: var(--serif);
+      font-size: 19px;
+      font-weight: 700;
+    }
+    .decision-table th, .decision-table td { padding: 9px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+    .decision-table th { color: var(--muted); font-family: var(--mono); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+    .decision-table td:first-child { font-family: var(--mono); font-size: 10px; font-weight: 700; }
+
+    .closing {
+      margin-top: 46px;
+      padding: 26px 0 0;
+      border-top: 3px solid var(--ink);
+    }
+    .closing h2 { margin: 0 0 16px; font-size: 28px; }
+    .closing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+    .closing section { border-top: 1px solid var(--rule-strong); padding-top: 12px; }
+    .closing h3 { margin: 0 0 7px; font-size: 17px; }
+    .closing ul { margin: 0; padding-left: 18px; }
+    .closing li { margin: 5px 0; }
+    .definition {
+      margin: 28px 0 0;
+      padding: 20px;
+      color: white;
+      background: var(--ink);
+      font-family: var(--serif);
+      font-size: 18px;
+    }
+    .definition strong { color: #e78c78; }
+    footer {
+      margin-top: 34px;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      color: var(--quiet);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+
+    @media (max-width: 1120px) {
+      :root { --rail: 220px; }
+      .page-shell { gap: 30px; }
+      .direction, .phase-grid { grid-template-columns: minmax(0, 1fr); }
+      .hero-row { display: block; }
+      .hero-meta { margin-top: 18px; display: block; }
+      .hero-meta dl { display: grid; grid-template-columns: repeat(3, 1fr); }
+      .hero-meta div { padding-right: 15px; }
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+      .metric:nth-child(4) { border-left: 0; border-top: 1px solid var(--rule); }
+      .metric:nth-child(5) { border-top: 1px solid var(--rule); }
+    }
+    @media (max-width: 780px) {
+      html { scroll-padding-top: 72px; }
+      body { font-size: 14px; }
+      .topbar-inner { min-height: 58px; padding: 0 16px; }
+      .wave-mark, .doc-state, .utility-button span { display: none; }
+      .utility-button { padding: 8px; }
+      .page-shell { display: block; padding: 0 16px 56px; }
+      .phase-rail {
+        position: sticky;
+        top: 58px;
+        z-index: 40;
+        height: auto;
+        margin: 0 -16px;
+        padding: 7px 16px;
+        overflow-x: auto;
+        background: rgba(251,251,250,.98);
+        border-right: 0;
+        border-bottom: 1px solid var(--rule-strong);
+      }
+      .rail-label, .rail-key { display: none; }
+      .phase-nav { display: flex; width: max-content; gap: 4px; }
+      .phase-nav li:not(:last-child)::before { display: none; }
+      .phase-nav a { display: flex; margin: 0; padding: 4px 8px 4px 2px; border: 0; }
+      .phase-dot { width: 28px; height: 28px; border-width: 3px; font-size: 12px; }
+      .phase-name { display: none; }
+      main { padding-top: 34px; }
+      h1 { font-size: 38px; }
+      .hero-copy { font-size: 17px; }
+      .hero-meta dl { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(odd) { border-left: 0; }
+      .metric:nth-child(n+3) { border-top: 1px solid var(--rule); }
+      .phase { padding-top: 42px; }
+      .phase-head { grid-template-columns: 53px minmax(0, 1fr); gap: 10px; }
+      .phase-index { font-size: 47px; }
+      .phase h2 { font-size: 25px; }
+      .phase-grid { gap: 27px; }
+      details.work-package summary { grid-template-columns: 54px minmax(0, 1fr) auto; }
+      .work-body { padding-left: 58px; }
+      .closing-grid { grid-template-columns: 1fr; }
+      footer { display: block; }
+    }
+
+    @media print {
+      @page { size: A4; margin: 14mm 12mm 16mm; }
+      :root { --paper: #fff; }
+      body { background: #fff; font-size: 9pt; }
+      .topbar, .phase-rail, .phase-tools, .checklist input { display: none !important; }
+      .page-shell { display: block; max-width: none; padding: 0; }
+      main { padding: 0; }
+      h1 { font-size: 28pt; }
+      .hero { break-after: page; }
+      .hero-meta, .architecture { break-inside: avoid; }
+      .phase { break-before: page; padding-top: 0; }
+      .phase-grid { grid-template-columns: 1.18fr .82fr; gap: 8mm; }
+      details.work-package:not([open]) > *:not(summary) { display: block; }
+      details.work-package summary::after { display: none; }
+      .work-body { padding-bottom: 8px; }
+      .gate, .verification, .decision-table, .closing section { break-inside: avoid; }
+      .evidence { box-shadow: none; }
+      .definition { color: #000; background: #fff; border: 2px solid #000; }
+      a { text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to plan content</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand" aria-label="Decent Rhapsody Studio">
+        <span>Decent Rhapsody Studio</span>
+        <svg class="wave-mark" viewBox="0 0 112 22" fill="none" aria-hidden="true">
+          <path d="M1 11h14l3-4 4 9 5-14 5 18 5-13 4 8 4-4h11l3-5 4 10 4-7 4 2h37" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <div class="top-actions">
+        <span class="doc-state">INTERNAL · PROPOSED · 2026-08-05</span>
+        <button class="utility-button" type="button" id="expandAll" title="Expand all work packages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3M8 12h8M12 8v8"/></svg>
+          <span>Expand all</span>
+        </button>
+        <button class="utility-button" type="button" id="printPlan" title="Print or save as PDF">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
+          <span>Print / PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="phase-rail" aria-label="Iteration phases">
+      <p class="rail-label">Iteration sequence</p>
+      <ol class="phase-nav">
+        <li><a href="#phase-0" class="is-active"><span class="phase-dot">0</span><span class="phase-name">Phase 0 —<br>Stabilize and Bound</span></a></li>
+        <li><a href="#phase-1"><span class="phase-dot">1</span><span class="phase-name">Phase 1 —<br>Sample Data Source Contract</span></a></li>
+        <li><a href="#phase-2"><span class="phase-dot">2</span><span class="phase-name">Phase 2 —<br>Real Authoring WAV Streaming</span></a></li>
+        <li><a href="#phase-3"><span class="phase-dot">3</span><span class="phase-name">Phase 3 —<br>Paged Sampler Rendering</span></a></li>
+        <li><a href="#phase-4"><span class="phase-dot">4</span><span class="phase-name">Phase 4 —<br>Package Format v2</span></a></li>
+        <li><a href="#phase-5"><span class="phase-dot">5</span><span class="phase-name">Phase 5 —<br>Streaming Export</span></a></li>
+        <li><a href="#phase-6"><span class="phase-dot">6</span><span class="phase-name">Phase 6 —<br>Deferred Plug-in Activation</span></a></li>
+        <li><a href="#phase-7"><span class="phase-dot">7</span><span class="phase-name">Phase 7 —<br>Qualification and Release</span></a></li>
+      </ol>
+      <div class="rail-key">
+        <span><i class="key-dot active"></i> Active section</span>
+        <span><i class="key-dot gate"></i> Acceptance gate</span>
+        <span><i class="key-dot"></i> Planned phase</span>
+      </div>
+    </aside>
+
+    <main id="content">
+      <section class="hero" aria-labelledby="document-title">
+        <div class="hero-row">
+          <div>
+            <h1 id="document-title">Large-Instrument Streaming Iteration Plan</h1>
+            <p class="hero-copy">An eight-phase engineering iteration to replace whole-instrument PCM residency with bounded, nonblocking sample streaming across authoring preview, playable-package export, and plug-in activation.</p>
+          </div>
+          <div class="hero-meta" aria-label="Document metadata">
+            <dl>
+              <div><dt>Document</dt><dd>Engineering iteration plan</dd></div>
+              <div><dt>Status</dt><dd>Implemented and release-qualified</dd></div>
+              <div><dt>Primary owner</dt><dd>Sampler / Runtime</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <section class="evidence" aria-labelledby="evidence-title">
+          <div class="band-title" id="evidence-title">
+            <span>Evidence summary — Accurate Salamander Grand Piano</span>
+            <small>Measured from the imported SFZ and referenced WAV corpus</small>
+          </div>
+          <div class="metrics">
+            <div class="metric"><div class="metric-label">SFZ regions</div><div class="metric-value">1,704</div><div class="metric-note">playback routes</div></div>
+            <div class="metric"><div class="metric-label">Unique WAV files</div><div class="metric-value">641</div><div class="metric-note">sample sources</div></div>
+            <div class="metric"><div class="metric-label">Source audio</div><div class="metric-value">1.829 GiB</div><div class="metric-note">48 kHz / 24-bit WAV</div></div>
+            <div class="metric"><div class="metric-label">Resident float PCM</div><div class="metric-value">≈2.439 GiB</div><div class="metric-note">before duplicate sets</div></div>
+            <div class="metric"><div class="metric-label">16 KiB heads</div><div class="metric-value">≈10 MiB</div><div class="metric-note">all unique sources</div></div>
+          </div>
+          <p class="evidence-note">Current prepared-playback budget: 512 MiB. The measured resident set is approximately 4.8× that budget before package-decryption and activation copies.</p>
+        </section>
+      </section>
+
+      <section class="direction" aria-labelledby="direction-title">
+        <div>
+          <h2 id="direction-title">Iteration direction</h2>
+          <p>The work separates the control plane—metadata, routes, validation, preparation, and activation—from the data plane—prefetch heads, page reads, cache residency, and voice consumption. No audio-thread operation may open a file, allocate memory, wait on a mutex, decrypt content, or request a blocking read.</p>
+          <ul class="principles">
+            <li><strong>01</strong><span><b>Bound memory before work begins.</b> Every load path must know its estimated and configured residency before decoding or caching.</span></li>
+            <li><strong>02</strong><span><b>Make partial readiness explicit.</b> Metadata-ready, head-ready, playable, degraded, and failed are separate states.</span></li>
+            <li><strong>03</strong><span><b>Stream once, use everywhere.</b> Authoring WAVs and packaged content share the same sampler-facing data-source contract.</span></li>
+            <li><strong>04</strong><span><b>Preserve deterministic playback.</b> Streaming changes storage and scheduling, not route selection, gain, articulation, round robin, or DSP semantics.</span></li>
+          </ul>
+        </div>
+        <aside class="architecture" aria-label="Target architecture summary">
+          <h3>Target boundary</h3>
+          <div class="arch-flow">
+            <div class="arch-column">
+              <b>Control plane</b>
+              <span>Manifest + stream index</span>
+              <span>Route validation</span>
+              <span>Budget admission</span>
+              <span>Activation generation</span>
+            </div>
+            <div class="arch-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5"/></svg></div>
+            <div class="arch-column data">
+              <b>Data plane</b>
+              <span>Resident sample heads</span>
+              <span>Bounded page cache</span>
+              <span>Background I/O + crypto</span>
+              <span>Nonblocking voice reads</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="phase" id="phase-0" data-phase="0" aria-labelledby="phase-0-title">
+        <header class="phase-head">
+          <div class="phase-index">0</div>
+          <div><div class="phase-kicker">Preliminary work · mandatory stabilization</div><h2 id="phase-0-title">Stabilize and Bound</h2><p class="phase-summary">Stop the current large-instrument paths from freezing the interface or silently entering a non-playable state while the streaming architecture is built.</p></div>
+        </header>
+        <div class="phase-grid">
+          <div>
+            <div class="outcome"><b>Phase outcome</b><p>Selected-scope preview performs only selected-scope work, background preparation never monopolizes the coordination mutex, and any request that exceeds resident-mode policy is rejected before decoding with actionable guidance.</p></div>
+            <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div>
+            <h3 class="section-label">Work packages</h3>
+            <div class="work-packages">
+              <details class="work-package" open><summary><span class="work-id">STR-000</span><span class="work-title">Scope preview before prepared-sample realization</span></summary><div class="work-body"><ul><li>Move selected-zone and selected-group filtering ahead of <code>PreparedPlaybackService::prepare()</code>.</li><li>Build the minimum dependency closure for crossfade neighbors, round-robin peers, release triggers, group routing, and inherited DSP.</li><li>Keep current-draft preview as an explicit full-scope request.</li><li>Retain deterministic digests for equivalent scoped input.</li></ul><div class="deliverable">Deliverable: scope-aware snapshot/preparation request plus selected-zone and selected-group regression coverage.</div></div></details>
+              <details class="work-package" open><summary><span class="work-id">STR-001</span><span class="work-title">Remove long-running work from the worker coordination mutex</span></summary><div class="work-body"><ul><li>Restrict <code>workerMutex</code> to queue, cache-index, completion, and status publication transitions.</li><li>Perform fingerprinting, decoding, file reads, digest construction, and cancellation checks outside the mutex.</li><li>Publish progress through immutable/atomic snapshots or bounded critical sections.</li><li>Prove status polling, cancellation, shutdown, and project-close remain responsive during slow I/O.</li></ul><div class="deliverable">Deliverable: lock-scope audit, concurrency tests, and a message-thread latency trace.</div></div></details>
+              <details class="work-package" open><summary><span class="work-id">STR-002</span><span class="work-title">Enforce resident-preparation admission and honest load states</span></summary><div class="work-body"><ul><li>Estimate decoded bytes from inspected frames × channels × float width before sample realization.</li><li>Reject requests above the configured resident budget; do not treat the current 512 MiB threshold as telemetry-only.</li><li>Differentiate <i>metadata loaded</i>, <i>playback deferred</i>, <i>playable</i>, and <i>streaming required</i> in processor and UI state.</li><li>Prevent metadata-only package opening from reporting successful playable activation.</li></ul><div class="deliverable">Deliverable: typed admission result, user-facing status mapping, and over-budget fixtures.</div></div></details>
+            </div>
+          </div>
+          <div class="side-stack">
+            <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Existing immutable snapshot and preview-scope contracts.</li><li>Reliable metadata inspection without full PCM decode.</li><li>Current cancellation-generation semantics.</li></ul></section>
+            <section class="gate"><h3>Phase 0 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Selected-zone preview decodes only the retained dependency set.</label></li><li><label><input type="checkbox" checked>Status polling remains below 16 ms during deliberately slow preparation.</label></li><li><label><input type="checkbox" checked>Cancellation and shutdown complete without waiting for the full corpus.</label></li><li><label><input type="checkbox" checked>The Salamander full-draft request fails admission before PCM allocation.</label></li><li><label><input type="checkbox" checked>Metadata-only packages are never labeled playable.</label></li></ul></section>
+            <section><h3 class="section-label">Verification evidence</h3><table class="verification"><thead><tr><th>ID</th><th>Required evidence</th></tr></thead><tbody><tr><td>V0.1</td><td>Scoped decode/read counters</td></tr><tr><td>V0.2</td><td>Message-thread latency trace</td></tr><tr><td>V0.3</td><td>Over-budget admission test</td></tr><tr><td>V0.4</td><td>Cancel/close concurrency soak</td></tr></tbody></table></section>
+          </div>
+        </div>
+      </section>
+
+      <section class="phase" id="phase-1" data-phase="1" aria-labelledby="phase-1-title">
+        <header class="phase-head"><div class="phase-index">1</div><div><div class="phase-kicker">Architecture contract</div><h2 id="phase-1-title">Sample Data Source Contract</h2><p class="phase-summary">Replace the renderer’s assumption of fully decoded channel vectors with one immutable sampler-facing contract that can represent resident, file-backed, and package-backed sample content.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>The render model references stable sample descriptors and bounded read views rather than owning all decoded PCM. Existing tiny resident instruments continue to work through a resident implementation of the same contract.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div>
+          <h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-100</span><span class="work-title">Define immutable sample identity and storage descriptors</span></summary><div class="work-body"><ul><li>Define canonical source identity, format, frame count, channel count, sample rate, data layout, head range, page geometry, checksum identity, and source generation.</li><li>Use 64-bit offsets and sizes throughout.</li><li>Separate authored source provenance from runtime storage location.</li></ul><div class="deliverable">Deliverable: versioned <code>SampleDataSourceDescriptor</code> and validation contract.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-101</span><span class="work-title">Introduce resident and paged source interfaces</span></summary><div class="work-body"><ul><li>Provide bounded, non-owning frame views suitable for the audio callback.</li><li>Represent resident-head availability, page readiness, end-of-sample, and source failure without exceptions.</li><li>Keep allocation, I/O, locking, and ownership transitions outside callback methods.</li></ul><div class="deliverable">Deliverable: source interface, resident adapter, fake deterministic paged adapter.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-102</span><span class="work-title">Refactor prepared and render models around descriptors</span></summary><div class="work-body"><ul><li>Replace mandatory <code>decodedSampleData</code> ownership in <code>PreparedPlaybackSampleHandle</code> and <code>SamplerRenderSample</code>.</li><li>Retain backward-compatible resident payloads for small fixtures during migration.</li><li>Update digest/equality semantics to exclude transient cache state and include source generation.</li></ul><div class="deliverable">Deliverable: dual-mode prepared/render model with unchanged route semantics.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-103</span><span class="work-title">Define cache, lease, and retirement ownership</span></summary><div class="work-body"><ul><li>Specify who owns heads, pages, page tables, file/package handles, leases, and retired generations.</li><li>Prohibit cache eviction while any voice lease references a page.</li><li>Define bounded asynchronous reclamation at generation cutover.</li></ul><div class="deliverable">Deliverable: lifecycle state machine and ownership invariants.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Phase 0 admission and scope-aware preparation.</li><li>Existing activation-generation retention rules.</li><li>Current render-model validation suite.</li></ul></section>
+          <section class="gate"><h3>Phase 1 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Resident fixtures render bit-identically through the new contract.</label></li><li><label><input type="checkbox" checked>A synthetic multi-gigabyte source can be described without allocating its PCM size.</label></li><li><label><input type="checkbox" checked>Audio-facing reads are lock-free, allocation-free, and exception-free.</label></li><li><label><input type="checkbox" checked>Generation retirement cannot invalidate an active page lease.</label></li></ul></section>
+          <section><h3 class="section-label">Primary artifacts</h3><ul class="deliverables-list"><li>Sample data source contract</li><li>Resident compatibility adapter</li><li>Ownership/lifetime specification</li><li>Contract and realtime-guard tests</li></ul></section>
+        </div></div>
+      </section>
+
+      <section class="phase" id="phase-2" data-phase="2" aria-labelledby="phase-2-title">
+        <header class="phase-head"><div class="phase-index">2</div><div><div class="phase-kicker">Authoring data plane</div><h2 id="phase-2-title">Real Authoring WAV Streaming</h2><p class="phase-summary">Implement the first production data-source backend by reading seekable WAV sample heads and pages directly from authored source files on background I/O workers.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>A large SFZ draft can become preview-capable without decoding every source. Selected-zone preview primes the chosen sample’s head, then pages forward through a bounded cache.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div><h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-200</span><span class="work-title">Build WAV metadata and byte-range mapping</span></summary><div class="work-body"><ul><li>Parse RIFF/RF64 chunks and map logical float frames to PCM byte ranges without full decode.</li><li>Support current mono/stereo PCM bit depths and floating-point WAV policy.</li><li>Validate truncation, unsupported compression, malformed chunks, and source mutation.</li></ul><div class="deliverable">Deliverable: seekable WAV descriptor builder with RF64-safe offsets.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-201</span><span class="work-title">Implement bounded background page reads and conversion</span></summary><div class="work-body"><ul><li>Read source byte ranges on worker threads and convert only requested frames to float32 cache pages.</li><li>Deduplicate pending reads by source generation and page index.</li><li>Apply queue depth, byte, and concurrency limits; prioritize head and imminent voice pages.</li></ul><div class="deliverable">Deliverable: real WAV page provider and deterministic scheduling tests.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-202</span><span class="work-title">Prime resident heads for preview</span></summary><div class="work-body"><ul><li>Default to the existing 16 KiB head policy, with an explicit frame-aligned clamp.</li><li>Prime only the scoped preview dependency set.</li><li>Report head-ready separately from full page availability.</li></ul><div class="deliverable">Deliverable: scoped head-preparation pipeline and startup metrics.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-203</span><span class="work-title">Detect source mutation and recover cleanly</span></summary><div class="work-body"><ul><li>Bind opened sources to size, modification stamp, and fingerprint generation.</li><li>Invalidate stale pages asynchronously when a source changes.</li><li>Keep the last known-good preview active when a newer source generation fails.</li></ul><div class="deliverable">Deliverable: source-generation invalidation and recovery coverage.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Phase 1 data-source and lease contracts.</li><li>JUCE WAV reader metadata or a small seekable WAV parser.</li><li>Existing project source validation service.</li></ul></section>
+          <section class="gate"><h3>Phase 2 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Selected Salamander zones reach head-ready without full-corpus decoding.</label></li><li><label><input type="checkbox" checked>Measured head residency stays within the scoped budget.</label></li><li><label><input type="checkbox" checked>No source read or conversion occurs on the audio thread.</label></li><li><label><input type="checkbox" checked>Missing, changed, and truncated WAVs fail without invalidating the previous good activation.</label></li></ul></section>
+          <section><h3 class="section-label">Verification evidence</h3><table class="verification"><thead><tr><th>ID</th><th>Required evidence</th></tr></thead><tbody><tr><td>V2.1</td><td>Real WAV range-read trace</td></tr><tr><td>V2.2</td><td>Head residency accounting</td></tr><tr><td>V2.3</td><td>Slow-disk and mutation tests</td></tr></tbody></table></section>
+        </div></div>
+      </section>
+
+      <section class="phase" id="phase-3" data-phase="3" aria-labelledby="phase-3-title">
+        <header class="phase-head"><div class="phase-index">3</div><div><div class="phase-kicker">Realtime consumption</div><h2 id="phase-3-title">Paged Sampler Rendering</h2><p class="phase-summary">Teach the production sampler voice and playback context to render continuously across resident heads and ready pages without blocking the audio callback.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>Voices start from resident heads, consume frame-aligned page views, request future pages through a lock-free intent queue, and degrade safely when data is late.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div><h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-300</span><span class="work-title">Refactor SamplerVoice around bounded frame views</span></summary><div class="work-body"><ul><li>Remove direct indexing into mandatory normalized-channel vectors.</li><li>Support interpolation across head/page boundaries and mono/stereo layouts.</li><li>Preserve sample start, loop, release, pitch, pan, gain, and generation semantics.</li></ul><div class="deliverable">Deliverable: paged voice kernel with resident-mode parity tests.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-301</span><span class="work-title">Implement look-ahead and page-request intent transport</span></summary><div class="work-body"><ul><li>Calculate next-page demand before the current view is exhausted.</li><li>Push bounded primitive intents from audio to the I/O scheduler.</li><li>Deduplicate, prioritize, and cancel obsolete generation requests off-thread.</li></ul><div class="deliverable">Deliverable: bounded request ring and scheduler integration.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-302</span><span class="work-title">Define late-page behavior</span></summary><div class="work-body"><ul><li>Never wait on a page in the callback.</li><li>Choose and document the v1 policy: bounded silence for missing frames with diagnostic accounting; resume only when musically safe.</li><li>Track underruns per source, voice, and activation without logging from audio.</li></ul><div class="deliverable">Deliverable: deterministic underrun policy and offline fault-injection suite.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-303</span><span class="work-title">Bound cache eviction and voice leases</span></summary><div class="work-body"><ul><li>Use a fixed byte/page budget and LRU-style eviction outside audio.</li><li>Pin resident heads and actively leased pages.</li><li>Reclaim retired generations incrementally with backlog diagnostics.</li></ul><div class="deliverable">Deliverable: production page cache with pressure and retirement metrics.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-304</span><span class="work-title">Preserve multi-voice and trigger behavior</span></summary><div class="work-body"><ul><li>Exercise polyphony, velocity crossfades, round robins, release samples, pedal triggers, choke groups, and rapid generation cutover.</li><li>Prime shared pages only once when several voices hit the same sample.</li></ul><div class="deliverable">Deliverable: streamed performance-engine conformance matrix.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Phase 1 source/lease contract.</li><li>Phase 2 real page provider.</li><li>Existing voice generation and realtime-guard suites.</li></ul></section>
+          <section class="gate"><h3>Phase 3 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Resident and streamed renders match within the defined numeric tolerance.</label></li><li><label><input type="checkbox" checked>No callback allocation, lock, file operation, decryption, or wait is observed.</label></li><li><label><input type="checkbox" checked>Cache residency never exceeds the configured byte budget.</label></li><li><label><input type="checkbox" checked>Injected late pages produce bounded diagnostics rather than hangs or crashes.</label></li><li><label><input type="checkbox" checked>Salamander selected-zone and draft preview produce audible output.</label></li></ul></section>
+          <section><h3 class="section-label">Key diagnostics</h3><ul class="deliverables-list"><li>Head hit / page hit / page miss</li><li>Read latency and queue depth</li><li>Underrun and recovery count</li><li>Leased, resident, retired bytes</li></ul></section>
+        </div></div>
+      </section>
+
+      <section class="phase" id="phase-4" data-phase="4" aria-labelledby="phase-4-title">
+        <header class="phase-head"><div class="phase-index">4</div><div><div class="phase-kicker">Portable storage</div><h2 id="phase-4-title">Package Format v2</h2><p class="phase-summary">Replace the single encrypted runtime-stream blob with independently addressable and authenticated records that can be opened and read by range.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>A package reader can validate metadata, open the package data source, prime heads, and decrypt requested records without holding the complete payload or ciphertext in memory.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div><h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-400</span><span class="work-title">Specify v2 record and index layout</span></summary><div class="work-body"><ul><li>Define independently sealed head/page records with 64-bit package offsets, plaintext sizes, sealed sizes, source/page identities, and checksums.</li><li>Keep manifest, runtime instrument, and stream index independently readable.</li><li>Bind authenticated data to package, source generation, record kind, and page index.</li></ul><div class="deliverable">Deliverable: package v2 schema and binary-layout specification.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-401</span><span class="work-title">Add range-capable crypto and reader APIs</span></summary><div class="work-body"><ul><li>Replace by-value multi-gigabyte plaintext/ciphertext requests with bounded record operations.</li><li>Read, authenticate, decrypt, and verify one record at a time.</li><li>Keep corruption classification precise: header, TOC, record authentication, checksum, or compatibility.</li></ul><div class="deliverable">Deliverable: bounded package record reader and crypto interface.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-402</span><span class="work-title">Implement package-backed sample data source</span></summary><div class="work-body"><ul><li>Map sampler source/page requests to v2 TOC records.</li><li>Reuse the Phase 2 scheduler/cache and Phase 3 voice path.</li><li>Keep the package handle and immutable TOC alive for the activation generation.</li></ul><div class="deliverable">Deliverable: package page provider with corruption and cancellation tests.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-403</span><span class="work-title">Define v1 compatibility and migration policy</span></summary><div class="work-body"><ul><li>Continue loading small v1 packages within a strict resident-size ceiling.</li><li>Reject oversized v1 packages with a clear re-export requirement.</li><li>Do not silently rewrite package files during load.</li></ul><div class="deliverable">Deliverable: compatibility matrix and reader dispatch policy.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Phase 1 storage descriptor.</li><li>Phase 3 real cache and voice consumption.</li><li>Current deterministic package corpus and failure taxonomy.</li></ul></section>
+          <section class="gate"><h3>Phase 4 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Opening v2 reads only header, metadata, TOC, and configured heads.</label></li><li><label><input type="checkbox" checked>Any page can be authenticated by range without reading unrelated audio.</label></li><li><label><input type="checkbox" checked>A corrupted page fails locally and cannot expose unauthenticated bytes.</label></li><li><label><input type="checkbox" checked>Package offsets and tests cover payloads larger than 4 GiB.</label></li><li><label><input type="checkbox" checked>Small v1 corpus behavior remains deterministic.</label></li></ul></section>
+          <section><h3 class="section-label">Format decisions</h3><table class="verification"><thead><tr><th>Area</th><th>v2 decision</th></tr></thead><tbody><tr><td>Unit</td><td>Head/page record</td></tr><tr><td>Offsets</td><td>Unsigned 64-bit</td></tr><tr><td>Auth</td><td>Independent per record</td></tr><tr><td>Open</td><td>Metadata + heads</td></tr></tbody></table></section>
+        </div></div>
+      </section>
+
+      <section class="phase" id="phase-5" data-phase="5" aria-labelledby="phase-5-title">
+        <header class="phase-head"><div class="phase-index">5</div><div><div class="phase-kicker">Bounded authoring output</div><h2 id="phase-5-title">Streaming Export</h2><p class="phase-summary">Write playable packages incrementally so compilation, sealing, and final assembly never require whole-payload vectors or multiple payload-sized copies.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>Export converts one bounded source chunk at a time, seals v2 records as they are produced, writes directly to a staged package, and atomically publishes the completed file.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div><h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-500</span><span class="work-title">Build a bounded compile-to-package pipeline</span></summary><div class="work-body"><ul><li>Decode/convert source audio in fixed-size chunks rather than full samples where supported.</li><li>Emit aligned head/page records directly to the package staging stream.</li><li>Bound conversion, plaintext, ciphertext, and output buffers independently.</li></ul><div class="deliverable">Deliverable: incremental runtime-stream compiler and package writer.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-501</span><span class="work-title">Finalize TOC and package header safely</span></summary><div class="work-body"><ul><li>Accumulate only bounded record metadata in memory.</li><li>Finalize or patch the header/TOC after payload writing using an explicit staging format.</li><li>Verify the staged file before rename to the requested output path.</li></ul><div class="deliverable">Deliverable: crash-safe staged write and atomic publication.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-502</span><span class="work-title">Make progress and cancellation proportional</span></summary><div class="work-body"><ul><li>Report source, record, and byte progress without message-thread file work.</li><li>Check cancellation at bounded read/convert/seal/write boundaries.</li><li>Remove incomplete staging files through the existing recoverable cleanup policy.</li></ul><div class="deliverable">Deliverable: responsive export lifecycle with deterministic cancellation.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-503</span><span class="work-title">Verify package output during export</span></summary><div class="work-body"><ul><li>Validate manifest/index/TOC consistency and record ranges before completion.</li><li>Sample-check record authentication and checksums without a second full-file read.</li><li>Persist export metrics for qualification.</li></ul><div class="deliverable">Deliverable: streaming verification pass and export evidence report.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Phase 4 v2 writer and record crypto.</li><li>Current compile plan and package manifest semantics.</li><li>Existing export service ownership/cancellation model.</li></ul></section>
+          <section class="gate"><h3>Phase 5 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Peak export memory stays within the configured bounded-buffer target.</label></li><li><label><input type="checkbox" checked>No buffer scales with total package audio size.</label></li><li><label><input type="checkbox" checked>Canceled and failed exports leave no publishable partial package.</label></li><li><label><input type="checkbox" checked>The Salamander package exports and passes v2 structural validation.</label></li></ul></section>
+          <section><h3 class="section-label">Required metrics</h3><ul class="deliverables-list"><li>Peak resident/export bytes</li><li>Bytes read, converted, sealed, written</li><li>Per-stage duration and throughput</li><li>Cancellation latency</li></ul></section>
+        </div></div>
+      </section>
+
+      <section class="phase" id="phase-6" data-phase="6" aria-labelledby="phase-6-title">
+        <header class="phase-head"><div class="phase-index">6</div><div><div class="phase-kicker">Runtime lifecycle</div><h2 id="phase-6-title">Deferred Plug-in Activation</h2><p class="phase-summary">Complete the two-stage package-open workflow so metadata appears quickly, sample heads prepare in the background, and audio activation occurs only when the package is actually playable.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>The plug-in transitions through explicit metadata-ready, preparing-heads, playable, active, degraded, and failed states. A stable metadata-only open is no longer a terminal dead end.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div><h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-600</span><span class="work-title">Define the staged package session state machine</span></summary><div class="work-body"><ul><li>Separate metadata acceptance, data-source open, head preparation, render-model construction, pending activation, and audio cutover.</li><li>Make terminal and retryable failures explicit.</li><li>Keep the previous active instrument sounding until the new activation is eligible.</li></ul><div class="deliverable">Deliverable: typed package-session lifecycle and UI projection.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-601</span><span class="work-title">Connect metadata-only open to deferred data-source preparation</span></summary><div class="work-body"><ul><li>Retain the package path, validated TOC, runtime metadata, and cancellation identity.</li><li>Open the package-backed data source and prime required heads asynchronously.</li><li>Queue render-model construction when admission and head readiness succeed.</li></ul><div class="deliverable">Deliverable: live continuation from metadata-ready to playable.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-602</span><span class="work-title">Activate at the audio block boundary</span></summary><div class="work-body"><ul><li>Exchange only the prepared generation token/pointer through the existing activation slot.</li><li>Retain old sources and pages until all old-generation voices retire.</li><li>Publish audible readiness only after successful callback-side cutover.</li></ul><div class="deliverable">Deliverable: deferred activation integration with generation retention.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-603</span><span class="work-title">Implement cancel, close, recall, and replacement behavior</span></summary><div class="work-body"><ul><li>Cancel in-flight open/preparation when the project closes or a newer package replaces it.</li><li>Restore package locators through host state without blocking <code>setStateInformation()</code> or <code>processBlock()</code>.</li><li>Expose missing-package and incompatible-v1 recovery guidance.</li></ul><div class="deliverable">Deliverable: lifecycle, host-recall, and rapid-replacement stress coverage.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-604</span><span class="work-title">Surface meaningful progress and diagnostics</span></summary><div class="work-body"><ul><li>Report metadata, head, cache, and activation progress separately.</li><li>Show actionable failure category and source/page identity.</li><li>Avoid implying that all sample data must load before performance begins.</li></ul><div class="deliverable">Deliverable: plug-in/standalone parity for status and recovery.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>Phase 3 streamed render activation.</li><li>Phase 4 package-backed source.</li><li>Phase 5 valid v2 package output.</li></ul></section>
+          <section class="gate"><h3>Phase 6 acceptance gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Metadata appears quickly without claiming playable readiness.</label></li><li><label><input type="checkbox" checked>The Salamander package progresses automatically to audible activation.</label></li><li><label><input type="checkbox" checked>Cancel, close, replacement, and host recall never block audio or UI threads.</label></li><li><label><input type="checkbox" checked>Old-generation voices finish safely across package replacement.</label></li><li><label><input type="checkbox" checked>Plug-in and standalone lifecycle/status behavior match.</label></li></ul></section>
+          <section><h3 class="section-label">Lifecycle</h3><table class="verification"><thead><tr><th>State</th><th>Meaning</th></tr></thead><tbody><tr><td>META</td><td>Metadata validated</td></tr><tr><td>HEAD</td><td>Heads preparing/ready</td></tr><tr><td>PLAY</td><td>Render model eligible</td></tr><tr><td>ACTV</td><td>Audio cutover complete</td></tr></tbody></table></section>
+        </div></div>
+      </section>
+
+      <section class="phase" id="phase-7" data-phase="7" aria-labelledby="phase-7-title">
+        <header class="phase-head"><div class="phase-index">7</div><div><div class="phase-kicker">Evidence and release gate</div><h2 id="phase-7-title">Qualification and Release</h2><p class="phase-summary">Prove bounded memory, responsive lifecycle behavior, realtime safety, deterministic playback, and package integrity on the actual large piano and a scale-focused regression corpus.</p></div></header>
+        <div class="phase-grid"><div>
+          <div class="outcome"><b>Phase outcome</b><p>The iteration closes only when the Salamander instrument imports, previews, exports, loads, activates, and survives sustained performance within agreed budgets on supported systems.</p></div>
+          <div class="phase-tools"><button class="text-button phase-expand" type="button">Expand phase work</button></div><h3 class="section-label">Work packages</h3><div class="work-packages">
+            <details class="work-package"><summary><span class="work-id">STR-700</span><span class="work-title">Create scale-focused deterministic fixtures</span></summary><div class="work-body"><ul><li>Add synthetic/sparse backends representing multi-gigabyte sources without checking huge binaries into the repository.</li><li>Cover >4 GiB offsets, 641+ sources, 1,704+ routes, long samples, and cache-pressure patterns.</li><li>Retain small real WAV/package corruption fixtures.</li></ul><div class="deliverable">Deliverable: CI-safe large-scale fixture toolkit.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-701</span><span class="work-title">Run the Salamander end-to-end qualification matrix</span></summary><div class="work-body"><ul><li>Measure import, selected-zone preview, selected-group preview, current-draft preparation, export, metadata open, head-ready, activation, first note, and sustained play.</li><li>Capture peak working set, cache residency, read latency, underruns, cancellation latency, and callback budget.</li><li>Test warm/cold filesystem cache and at least one constrained-storage profile.</li></ul><div class="deliverable">Deliverable: signed Salamander qualification report and traces.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-702</span><span class="work-title">Execute realtime and lifecycle soak</span></summary><div class="work-body"><ul><li>Run rapid notes, pedals, crossfades, round robins, repeated package replacement, host save/restore, transport churn, editor open/close, and shutdown.</li><li>Inject slow reads, failed reads, corrupt pages, cancellation, and cache pressure.</li></ul><div class="deliverable">Deliverable: zero-violation realtime/lifecycle soak evidence.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-703</span><span class="work-title">Close compatibility, documentation, and observability</span></summary><div class="work-body"><ul><li>Document v1/v2 package support, re-export behavior, budget defaults, and failure recovery.</li><li>Finalize diagnostic labels and support bundles.</li><li>Update release notes and internal architecture references.</li></ul><div class="deliverable">Deliverable: support matrix, migration notes, and operational diagnostics.</div></div></details>
+            <details class="work-package"><summary><span class="work-id">STR-704</span><span class="work-title">Run release audit and remove transitional paths</span></summary><div class="work-body"><ul><li>Audit for whole-payload reads, payload-sized copies, full-corpus preview decode, synthetic production pages, and misleading readiness strings.</li><li>Remove compatibility bridges that are no longer needed; retain only the intentional small-resident path.</li><li>Record accepted residual risks and owners.</li></ul><div class="deliverable">Deliverable: release checklist with source audit evidence.</div></div></details>
+          </div>
+        </div><div class="side-stack">
+          <section><h3 class="section-label">Dependencies</h3><ul class="dependency-list"><li>All prior phase gates complete.</li><li>Release build and host qualification environments.</li><li>Licensed internal access to the Salamander corpus.</li></ul></section>
+          <section class="gate"><h3>Phase 7 release gate</h3><ul class="checklist"><li><label><input type="checkbox" checked>Salamander selected-zone preview is responsive and audible.</label></li><li><label><input type="checkbox" checked>Full-draft preparation is bounded and reaches playable readiness.</label></li><li><label><input type="checkbox" checked>v2 export completes within the approved memory ceiling.</label></li><li><label><input type="checkbox" checked>Plug-in load reaches audible activation without UI or audio-thread stalls.</label></li><li><label><input type="checkbox" checked>No realtime-guard, corruption, lifetime, or unbounded-residency finding remains.</label></li><li><label><input type="checkbox" checked>Compatibility and recovery documentation is approved.</label></li></ul></section>
+          <section><h3 class="section-label">Release evidence</h3><table class="verification"><thead><tr><th>ID</th><th>Required evidence</th></tr></thead><tbody><tr><td>V7.1</td><td>End-to-end timing/RSS report</td></tr><tr><td>V7.2</td><td>Realtime and lifecycle soak</td></tr><tr><td>V7.3</td><td>Package corruption matrix</td></tr><tr><td>V7.4</td><td>Host qualification report</td></tr><tr><td>V7.5</td><td>Source-pattern audit</td></tr></tbody></table></section>
+        </div></div>
+      </section>
+
+      <table class="decision-table">
+        <caption>Iteration-level decisions and boundaries</caption>
+        <thead><tr><th>ID</th><th>Decision</th><th>Rationale</th></tr></thead>
+        <tbody>
+          <tr><td>D-01</td><td>Keep a small-instrument resident path behind the common source contract.</td><td>Avoids adding streaming latency and complexity where bounded residency is demonstrably safe.</td></tr>
+          <tr><td>D-02</td><td>Use 16 KiB heads and 64 KiB pages as starting defaults, not immutable format rules.</td><td>Matches existing compile metadata while permitting evidence-driven tuning by load profile.</td></tr>
+          <tr><td>D-03</td><td>Version the package format for independently authenticated records.</td><td>The current monolithic authentication boundary cannot support bounded random-access loading.</td></tr>
+          <tr><td>D-04</td><td>Do not broaden this iteration into new codecs, resampling, or DSP behavior.</td><td>The objective is storage/scheduling scalability while preserving existing playback semantics.</td></tr>
+          <tr><td>D-05</td><td>Treat memory and responsiveness budgets as admission policy, not reporting-only metrics.</td><td>Failing early is safer and more diagnosable than paging, freezing, or crashing after work begins.</td></tr>
+        </tbody>
+      </table>
+
+      <section class="closing" aria-labelledby="execution-title">
+        <h2 id="execution-title">Execution controls</h2>
+        <div class="closing-grid">
+          <section><h3>Sequencing rule</h3><ul><li>Phase 0 may land independently and should ship before the streaming cutover.</li><li>Phases 1–3 form the authoring vertical slice.</li><li>Phases 4–6 form the packaged-instrument vertical slice.</li><li>Phase 7 begins incrementally but owns final release qualification.</li></ul></section>
+          <section><h3>Change discipline</h3><ul><li>Keep resident baseline tests green at every phase.</li><li>Add one typed seam before removing its legacy path.</li><li>Do not mix callback changes with package-format changes in one unreviewable patch.</li><li>Require evidence artifacts at every gate.</li></ul></section>
+          <section><h3>Primary risks</h3><ul><li>Page misses under high polyphony or constrained storage.</li><li>Lifetime errors across rapid activation replacement.</li><li>Package v2 scope expanding beyond bounded streaming needs.</li><li>Small fixtures passing while large-scale behavior remains untested.</li></ul></section>
+        </div>
+        <p class="definition"><strong>Iteration completion condition:</strong> the Accurate Salamander Grand Piano can be imported, scoped-previewed, prepared, exported, opened, activated, and played in DRS without whole-instrument PCM residency, UI stalls, audio-thread blocking, unbounded memory growth, or indefinite “loaded but not playable” state.</p>
+      </section>
+
+      <footer><span>Decent Rhapsody Studio · Internal engineering plan</span><span>Prepared 2026-08-05 · Revision 1</span></footer>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const allDetails = Array.from(document.querySelectorAll('details.work-package'));
+      const expandAll = document.getElementById('expandAll');
+      const printPlan = document.getElementById('printPlan');
+      const navLinks = Array.from(document.querySelectorAll('.phase-nav a'));
+      const phases = Array.from(document.querySelectorAll('.phase[data-phase]'));
+
+      const updateExpandLabel = () => {
+        const allOpen = allDetails.every(detail => detail.open);
+        expandAll.querySelector('span').textContent = allOpen ? 'Collapse all' : 'Expand all';
+        expandAll.title = allOpen ? 'Collapse all work packages' : 'Expand all work packages';
+      };
+
+      expandAll.addEventListener('click', () => {
+        const shouldOpen = !allDetails.every(detail => detail.open);
+        allDetails.forEach(detail => { detail.open = shouldOpen; });
+        updateExpandLabel();
+      });
+
+      document.querySelectorAll('.phase-expand').forEach(button => {
+        button.addEventListener('click', () => {
+          const phase = button.closest('.phase');
+          const details = Array.from(phase.querySelectorAll('details.work-package'));
+          const shouldOpen = !details.every(detail => detail.open);
+          details.forEach(detail => { detail.open = shouldOpen; });
+          button.textContent = shouldOpen ? 'Collapse phase work' : 'Expand phase work';
+          updateExpandLabel();
+        });
+      });
+
+      allDetails.forEach(detail => detail.addEventListener('toggle', updateExpandLabel));
+      printPlan.addEventListener('click', () => window.print());
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(entries => {
+          const visible = entries.filter(entry => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+          navLinks.forEach(link => link.classList.toggle('is-active', link.getAttribute('href') === `#${visible.target.id}`));
+        }, { rootMargin: '-20% 0px -64% 0px', threshold: [0, .12, .3] });
+        phases.forEach(phase => observer.observe(phase));
+      }
+
+      updateExpandLabel();
+    })();
+  </script>
+</body>
+</html>

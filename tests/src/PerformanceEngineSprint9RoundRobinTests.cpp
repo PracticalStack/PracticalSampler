@@ -162,7 +162,7 @@ void verifyTargetedAndAllPoolResets()
 
     const auto first = renderOne(pool, noteOn());
     const auto second = renderOne(pool, noteOn());
-    require(std::abs(first - 0.05f) < 0.0001f && std::abs(second - 0.10f) < 0.0001f,
+    require(std::abs(first - 0.20f) < 0.0001f && std::abs(second - 0.40f) < 0.0001f,
             "Sequential Round Robin must advance from slot 1 to slot 2.");
 
     std::array<float, 1> silence {};
@@ -171,14 +171,14 @@ void verifyTargetedAndAllPoolResets()
     pool.renderBlock({ channels, 1, 1 }, { &pedalDown, 1 });
     SamplerRenderEvent pedalUp { SamplerRenderEventType::pedalUp, 0, 0, 0.0f };
     pool.renderBlock({ channels, 1, 1 }, { &pedalUp, 1 });
-    require(std::abs(renderOne(pool, noteOn()) - 0.05f) < 0.0001f,
+    require(std::abs(renderOne(pool, noteOn()) - 0.20f) < 0.0001f,
             "A targeted pedal-up reset must restore its pool to slot 1 before the next trigger.");
 
     renderOne(pool, noteOn());
     SamplerRenderEvent articulationReset { SamplerRenderEventType::roundRobinReset, 0, 0, 0.0f };
     articulationReset.roundRobinResetEvent = RoundRobinResetEvent::articulationChange;
     pool.renderBlock({ channels, 1, 1 }, { &articulationReset, 1 });
-    require(std::abs(renderOne(pool, noteOn()) - 0.05f) < 0.0001f,
+    require(std::abs(renderOne(pool, noteOn()) - 0.20f) < 0.0001f,
             "An articulation-change all-pools reset must precede its same-offset trigger selection.");
 }
 

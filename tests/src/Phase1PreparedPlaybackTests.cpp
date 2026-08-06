@@ -814,10 +814,19 @@ int main()
         require(unsupportedPreparedFinding->message.find("Sample format unsupported") != std::string::npos,
                 "Prepared unsupported-format findings should preserve importer state detail.");
 
-        const auto rejectedDecodePath = scratchDirectory / "prepared-high-rate-source.wav";
+        const auto rejectedDecodePath = scratchDirectory / "prepared-unsupported-source.aiff";
         const auto rejectionBuffer = buildReferenceBuffer();
-        juce::WavAudioFormat wavFormat;
-        writeAudioFile(rejectedDecodePath, wavFormat, rejectionBuffer, 96000.0);
+        juce::AiffAudioFormat aiffFormat;
+        writeAudioFile(rejectedDecodePath, aiffFormat, rejectionBuffer, 48000.0);
+        const auto rejectedInspection
+            = drs::engine::inspectSampleFileMetadataOnly(rejectedDecodePath.generic_string());
+        if (!rejectedInspection.inspected || rejectedInspection.accepted)
+            std::cerr << "Rejection fixture metadata: channels="
+                      << rejectedInspection.metadata.channelCount
+                      << " frames=" << rejectedInspection.metadata.frameCount
+                      << " format=" << rejectedInspection.metadata.formatName << std::endl;
+        require(rejectedInspection.inspected && !rejectedInspection.accepted,
+                "Prepared-playback rejection fixture must violate the current metadata policy.");
         auto rejectedDecodeProject = phase2Project.project;
         rejectedDecodeProject.sampleSources[0].path = rejectedDecodePath.generic_string();
         drs::engine::PreparedPlaybackService rejectedDecodeService;
@@ -832,6 +841,16 @@ int main()
         const auto rejectedDecodeResult = rejectedDecodeService.prepare(rejectedDecodeRequest,
                                                                         rejectedDecodeSnapshot,
                                                                         referenceStream);
+        if (rejectedDecodeResult.built || rejectedDecodeResult.activationEligible)
+        {
+            std::cerr << "Rejected decode diagnostics: state=" << rejectedDecodeResult.state
+                      << " samples=" << rejectedDecodeResult.prepared.samples.size()
+                      << " admission=" << drs::engine::toString(rejectedDecodeResult.admission.readiness)
+                      << " estimate=" << rejectedDecodeResult.admission.estimatedDecodedBytes;
+            for (const auto& finding : rejectedDecodeResult.findings)
+                std::cerr << " finding=" << finding.code << ":" << finding.message;
+            std::cerr << std::endl;
+        }
         require(!rejectedDecodeResult.built && !rejectedDecodeResult.activationEligible,
                 "Prepared playback should fail when worker-side decode policy rejects the source.");
         const auto* rejectedDecodeFinding = findFinding(rejectedDecodeResult,

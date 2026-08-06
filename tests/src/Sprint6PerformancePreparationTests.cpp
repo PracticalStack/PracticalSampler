@@ -1,5 +1,6 @@
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PerformancePublishPreparation.h"
+#include "drs/engine/SampleDataSource.h"
 
 #include <algorithm>
 #include <iostream>
@@ -244,6 +245,38 @@ int main()
                     && !valid.publishResult.sourceProvenanceDigest.empty()
                     && valid.publishResult.preparedMacroSchemaDigest == fixture.identity.macroSchemaDigest,
                 "The eligible result must carry every immutable conformance digest.");
+
+        auto paged = fixture.prepared;
+        for (auto& sample : paged.prepared.samples)
+        {
+            SampleDataSourceDescriptor descriptor;
+            descriptor.kind = SampleDataSourceKind::deterministicFake;
+            descriptor.sourceId = sample.sampleSourceId;
+            descriptor.canonicalSourceIdentity = sample.canonicalSourceIdentity;
+            descriptor.provenanceIdentity = sample.sourceFingerprintHex;
+            descriptor.formatName = sample.formatName;
+            descriptor.channelLayout = sample.channelLayout;
+            descriptor.checksumHex = sample.sourceFingerprintHex;
+            descriptor.sampleRate = sample.sampleRate;
+            descriptor.frameCount = sample.frameCount;
+            descriptor.channelCount = sample.channelCount;
+            descriptor.bytesPerFrame = sample.channelCount * sizeof(float);
+            descriptor.dataSizeBytes = sample.frameCount * descriptor.bytesPerFrame;
+            sample.dataSource = std::make_shared<DeterministicFakePagedSampleDataSource>(
+                descriptor,
+                std::vector<std::vector<float>> {
+                    std::vector<float>(128, 0.1f), std::vector<float>(128, -0.1f) },
+                16, 32, std::vector<bool>(4, true));
+            sample.decodedSampleData.reset();
+        }
+        paged.prepared.sourceProvenanceDigest
+            = computePreparedPlaybackSourceProvenanceDigest(paged.prepared);
+        paged.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(paged.prepared);
+        const auto pagedResult = validatePerformancePublishPreparation(
+            fixture.identity, fixture.snapshot, paged);
+        require(pagedResult.completeProject && pagedResult.activationEligible
+                    && pagedResult.findings.empty(),
+                "A complete paged project must publish without requiring resident decoded PCM.");
 
         const auto repeat = validatePerformancePublishPreparation(
             fixture.identity, fixture.snapshot, fixture.prepared);

@@ -176,6 +176,9 @@ void runImmutableModelContract()
             "Render model must preserve activation identity without mutable aggregate access.");
     require(result.model->getSamples().size() == 1
                 && result.model->getSamples().front().decodedSampleData.get() == decodedIdentity
+                && result.model->getSamples().front().dataSource != nullptr
+                && drs::engine::validateSampleDataSourceDescriptor(
+                    result.model->getSamples().front().sourceDescriptor).valid
                 && result.model->getSamples().front().channelCount == 2
                 && result.model->getSamples().front().frameCount == 8,
             "Render model must retain prepared PCM without copying decoded channels.");
@@ -204,6 +207,74 @@ void runImmutableModelContract()
     require(performance.built
                 && performance.model->getLane() == drs::engine::PlaybackActivationLane::performance,
             "Active Performance payload should use the same immutable model boundary.");
+}
+
+void runSampleDataSourceContract()
+{
+    static_assert(std::atomic<std::uint32_t>::is_always_lock_free,
+                  "Audio-facing page leases require lock-free atomic pin counters.");
+    drs::engine::SampleDataSourceDescriptor descriptor;
+    descriptor.kind = drs::engine::SampleDataSourceKind::deterministicFake;
+    descriptor.sourceId = "synthetic-multigig";
+    descriptor.canonicalSourceIdentity = "synthetic://multigig";
+    descriptor.provenanceIdentity = "fixture-generation-1";
+    descriptor.formatName = "float32";
+    descriptor.channelLayout = "stereo";
+    descriptor.sampleRate = 48000.0;
+    descriptor.frameCount = 3000000000ull;
+    descriptor.channelCount = 2;
+    descriptor.bytesPerFrame = 8;
+    descriptor.dataSizeBytes = descriptor.frameCount * descriptor.bytesPerFrame;
+    require(drs::engine::validateSampleDataSourceDescriptor(descriptor).valid,
+            "A multi-gigabyte source descriptor must validate without allocating its PCM size.");
+
+    auto overflow = descriptor;
+    overflow.frameCount = std::numeric_limits<std::uint64_t>::max();
+    require(!drs::engine::validateSampleDataSourceDescriptor(overflow).valid,
+            "Descriptor validation must reject overflowing 64-bit frame ranges.");
+
+    auto residentData = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
+    residentData->normalizedChannels = { { 0.0f, 0.25f, 0.5f, 0.75f },
+                                         { 0.0f, -0.25f, -0.5f, -0.75f } };
+    auto residentDescriptor = descriptor;
+    residentDescriptor.kind = drs::engine::SampleDataSourceKind::resident;
+    residentDescriptor.sourceId = "resident";
+    residentDescriptor.canonicalSourceIdentity = "resident://fixture";
+    residentDescriptor.frameCount = 4;
+    residentDescriptor.dataSizeBytes = 32;
+    drs::engine::ResidentSampleDataSource resident(residentDescriptor, residentData);
+    const auto residentView = resident.acquireFrameView(1, 2);
+    require(residentView.status == drs::engine::SampleFrameViewStatus::ready
+                && residentView.frameCount == 2
+                && residentView.channels[0][0] == 0.25f
+                && residentView.channels[1][1] == -0.5f,
+            "Resident adapters must expose bounded, non-owning frame views.");
+
+    auto fakeDescriptor = residentDescriptor;
+    fakeDescriptor.kind = drs::engine::SampleDataSourceKind::deterministicFake;
+    fakeDescriptor.frameCount = 8;
+    fakeDescriptor.dataSizeBytes = 64;
+    drs::engine::DeterministicFakePagedSampleDataSource fake(
+        fakeDescriptor,
+        { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 0, -1, -2, -3, -4, -5, -6, -7 } },
+        2,
+        2,
+        { true, false, true });
+    require(fake.acquireFrameView(0, 2).status == drs::engine::SampleFrameViewStatus::ready
+                && fake.acquireFrameView(2, 2).status == drs::engine::SampleFrameViewStatus::ready
+                && fake.acquireFrameView(4, 1).status == drs::engine::SampleFrameViewStatus::pageMissing
+                && fake.acquireFrameView(8, 1).status == drs::engine::SampleFrameViewStatus::endOfSource,
+            "Deterministic fake paged adapters must distinguish head, ready page, missing page, and end states.");
+    {
+        const auto leasedView = fake.acquireFrameView(2, 2);
+        require(leasedView.lease.active() && fake.pageLeaseCount(1) == 1,
+                "A ready page view must pin its generation/page storage.");
+        const auto copiedLeaseView = leasedView;
+        require(copiedLeaseView.lease.active() && fake.pageLeaseCount(1) == 2,
+                "Copied bounded views must preserve the active page lease.");
+    }
+    require(fake.pageLeaseCount(1) == 0,
+            "Page leases must release without invalidating source generation ownership.");
 }
 
 void runNonOwningViewContract()
@@ -294,7 +365,7 @@ void runSampleTopologyFailures()
     {
         value.prepared.samples[0].channelCount = 3;
     });
-    expectRejected("render-model-decoded-data-missing", [](RenderModelFixture& value)
+    expectRejected("render-model-sample-source-missing", [](RenderModelFixture& value)
     {
         value.prepared.samples[0].decodedSampleData.reset();
     });
@@ -461,6 +532,7 @@ int main()
 {
     try
     {
+        runSampleDataSourceContract();
         runImmutableModelContract();
         runNonOwningViewContract();
         runPayloadIdentityFailures();

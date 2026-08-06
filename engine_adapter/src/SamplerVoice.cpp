@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace drs::engine
 {
@@ -33,7 +34,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         return false;
 
     const auto& selectedSample = model.getSamples()[selectedRoute.preparedSampleIndex];
-    if (selectedSample.decodedSampleData == nullptr
+    if (selectedSample.dataSource == nullptr
         || selectedSample.frameCount == 0
         || selectedRoute.sampleStartFrame >= selectedSample.frameCount
         || !std::isfinite(selectedSample.sampleRate) || selectedSample.sampleRate <= 0.0)
@@ -61,6 +62,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     route = &selectedRoute;
     sample = &selectedSample;
     positionFrames = static_cast<double>(selectedRoute.sampleStartFrame);
+    nextLookAheadPublicationFrame = selectedRoute.sampleStartFrame;
     incrementFrames = increment;
     outputSampleRate = request.outputSampleRate;
     baseGain = static_cast<float>(gain);
@@ -115,8 +117,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
         return result;
     }
 
-    const auto& decodedChannels = sample->decodedSampleData->normalizedChannels;
-    const auto sourceChannelCount = decodedChannels.size();
+    const auto sourceChannelCount = static_cast<std::size_t>(sample->channelCount);
     for (std::uint32_t outputFrame = 0; outputFrame < frameCount; ++outputFrame)
     {
         if (positionFrames >= static_cast<double>(sample->frameCount))
@@ -135,12 +136,65 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             nextFrameIndex = static_cast<std::size_t>(route->loopStartFrame);
         }
         const auto fraction = static_cast<float>(positionFrames - static_cast<double>(frameIndex));
+        const auto currentView = sample->dataSource->acquireFrameView(frameIndex, 1);
+        const auto nextView = sample->dataSource->acquireFrameView(nextFrameIndex, 1);
+        if (currentView.status != SampleFrameViewStatus::ready
+            || nextView.status != SampleFrameViewStatus::ready)
+        {
+            // The paged policy is bounded silence: advance musical time without waiting.
+            ++result.pageMissCount;
+            ++result.underrunFrameCount;
+            underrunning = true;
+            if (currentView.status == SampleFrameViewStatus::pageMissing)
+                sample->dataSource->publishPageIntent(
+                    frameIndex, SamplePageRequestPriority::imminent, voiceId);
+            if (nextView.status == SampleFrameViewStatus::pageMissing)
+                sample->dataSource->publishPageIntent(
+                    nextFrameIndex, SamplePageRequestPriority::lookAhead, voiceId);
+            positionFrames += incrementFrames;
+            if (loopActive && positionFrames >= static_cast<double>(route->loopEndFrame))
+            {
+                const auto loopStart = static_cast<double>(route->loopStartFrame);
+                const auto loopLength = static_cast<double>(route->loopEndFrame - route->loopStartFrame);
+                positionFrames = loopStart + std::fmod(positionFrames - loopStart, loopLength);
+            }
+            if (isReleasing() && releaseSamplesRemaining > 0)
+            {
+                --releaseSamplesRemaining;
+                if (releaseSamplesRemaining == 0)
+                {
+                    finish();
+                    break;
+                }
+            }
+            else if (!loopActive && positionFrames >= static_cast<double>(sample->frameCount))
+            {
+                finish();
+                break;
+            }
+            continue;
+        }
+        if (underrunning)
+        {
+            underrunning = false;
+            ++result.recoveryCount;
+        }
+        if (frameIndex >= nextLookAheadPublicationFrame)
+        {
+            const auto lookAheadFrame = std::min<std::uint64_t>(
+                sample->frameCount - 1, frameIndex + pageLookAheadFrames);
+            sample->dataSource->publishPageIntent(
+                lookAheadFrame, SamplePageRequestPriority::lookAhead, voiceId);
+            nextLookAheadPublicationFrame = frameIndex > std::numeric_limits<std::uint64_t>::max()
+                    - pageIntentCadenceFrames
+                ? std::numeric_limits<std::uint64_t>::max()
+                : frameIndex + pageIntentCadenceFrames;
+        }
         const auto readInterpolated = [&](std::size_t channelIndex) noexcept
         {
             const auto resolvedChannel = std::min(channelIndex, sourceChannelCount - 1);
-            const auto& channel = decodedChannels[resolvedChannel];
-            const auto current = channel[frameIndex];
-            const auto next = channel[nextFrameIndex];
+            const auto current = currentView.channels[resolvedChannel][0];
+            const auto next = nextView.channels[resolvedChannel][0];
             return current + (next - current) * fraction;
         };
 
@@ -203,6 +257,8 @@ void SamplerVoice::reset() noexcept
     loopActive = false;
     releaseSamplesRemaining = 0;
     releaseSamplesTotal = 0;
+    underrunning = false;
+    nextLookAheadPublicationFrame = 0;
 }
 
 void SamplerVoice::finish() noexcept

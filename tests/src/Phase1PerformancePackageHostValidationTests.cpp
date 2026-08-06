@@ -9,6 +9,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -39,7 +40,8 @@ std::string summarizeIssues(const std::vector<std::string>& issues)
 float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
                                               const int midiNoteNumber,
                                               const float velocity,
-                                              const int blockCount = 8)
+                                              const int blockCount = 8,
+                                              const bool paceAsAudioDevice = false)
 {
     processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
 
@@ -51,10 +53,41 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
         buffer.clear();
         processor.processBlock(buffer, emptyMidiBuffer);
         maxMagnitude = std::max(maxMagnitude, buffer.getMagnitude(0, buffer.getNumSamples()));
+        if (paceAsAudioDevice)
+            std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
 
     processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
     return maxMagnitude;
+}
+
+drs::plugin::PerformancePackageWorkspaceLoadResult loadThroughBackgroundPreparation(
+    drs::plugin::Processor& processor,
+    const juce::File& packageFile,
+    std::chrono::microseconds& preparationElapsed,
+    std::chrono::microseconds& activationElapsed)
+{
+    const auto preparationStarted = Clock::now();
+    auto prepared = drs::plugin::preparePerformancePackageWorkspaceInBackground(
+        packageFile.getFullPathName().toStdString());
+    preparationElapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+        Clock::now() - preparationStarted);
+    if (!prepared.prepared)
+    {
+        drs::plugin::PerformancePackageWorkspaceLoadResult failed;
+        failed.failureCategory = prepared.failureCategory;
+        failed.state = prepared.state;
+        failed.issues = prepared.issues;
+        failed.timings = prepared.timings;
+        return failed;
+    }
+
+    const auto activationStarted = Clock::now();
+    auto activated = processor.activatePreparedPerformancePackageWorkspace(
+        std::move(prepared.activation), packageFile);
+    activationElapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+        Clock::now() - activationStarted);
+    return activated;
 }
 
 void requirePerformanceOnlyWorkspace(const drs::engine::WorkspaceDocumentState& state,
@@ -69,89 +102,194 @@ void requirePerformanceOnlyWorkspace(const drs::engine::WorkspaceDocumentState& 
 }
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     try
     {
         const auto checkedInCorpus = package_support::getCheckedInCorpusPaths();
-        require(std::filesystem::exists(checkedInCorpus.valid),
+        const auto selectedPackage = argc >= 2
+            ? std::filesystem::absolute(std::filesystem::path(argv[1]))
+            : checkedInCorpus.valid;
+        const auto largeV2Qualification = argc >= 2;
+        require(std::filesystem::exists(selectedPackage),
                 "Checked-in valid performance package fixture must exist for host validation.");
 
         juce::ScopedJuceInitialiser_GUI gui;
 
-        const auto packageFile = juce::File(juce::String::fromUTF8(checkedInCorpus.valid.generic_string().c_str()));
+        const auto packageFile = juce::File(juce::String::fromUTF8(selectedPackage.generic_string().c_str()));
 
-        drs::standalone::MainComponent standalone(false);
-        const auto standaloneOpenStarted = Clock::now();
-        const auto standaloneLoad = standalone.getProcessor().loadPerformancePackageWorkspace(packageFile);
+        auto standalone = std::make_unique<drs::standalone::MainComponent>(false);
+        std::chrono::microseconds standalonePreparationElapsed {};
+        std::chrono::microseconds standaloneActivationElapsed {};
+        const auto standaloneLoad = loadThroughBackgroundPreparation(
+            standalone->getProcessor(), packageFile,
+            standalonePreparationElapsed, standaloneActivationElapsed);
         const auto standaloneOpenElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            Clock::now() - standaloneOpenStarted);
+            standalonePreparationElapsed + standaloneActivationElapsed);
         require(standaloneLoad.loaded,
                 "Standalone host validation should load the checked-in package. state="
                     + standaloneLoad.state + " issues=" + summarizeIssues(standaloneLoad.issues));
         require(standaloneLoad.failureCategory == drs::engine::PerformancePackageFailureCategory::none,
                 "Standalone host validation should not publish a package failure category for the valid fixture.");
-        requirePerformanceOnlyWorkspace(standalone.getProcessor().getWorkspaceDocumentState(),
+        requirePerformanceOnlyWorkspace(standalone->getProcessor().getWorkspaceDocumentState(),
                                         "Standalone host validation");
-        standalone.getProcessor().prepareToPlay(44100.0, 512);
-        standalone.getProcessor().serviceMessageThreadWork();
+        standalone->getProcessor().prepareToPlay(44100.0, 512);
+        standalone->getProcessor().serviceMessageThreadWork();
 
         const auto standalonePlaybackStarted = Clock::now();
         const auto standaloneMagnitude = renderQueuedPerformanceSurfaceMagnitude(
-            standalone.getProcessor(), 69, 0.8f);
+            standalone->getProcessor(), 69, 0.8f,
+            largeV2Qualification ? 375 : 8, largeV2Qualification);
         const auto standalonePlaybackElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             Clock::now() - standalonePlaybackStarted);
+        standalone->getProcessor().serviceMessageThreadWork();
         require(standaloneMagnitude > 0.0001f,
                 "Standalone host validation should produce audible output from the checked-in package.");
-        const auto standaloneDiagnostics = standalone.getEngineFacade().getDiagnosticsSnapshot();
+        const auto standaloneDiagnostics = standalone->getEngineFacade().getDiagnosticsSnapshot();
+        const auto standaloneRealtime = standalone->getProcessor().getRealtimeSafetySnapshot();
         require(standaloneDiagnostics.available,
                 "Standalone host validation should publish diagnostics after opening the checked-in package.");
+        require(standaloneRealtime.getAudioThreadViolationCount() == 0,
+                "Standalone package playback reported a realtime-thread violation.");
+        require(!largeV2Qualification
+                    || (standaloneDiagnostics.cacheMissCount > 0
+                        && standaloneDiagnostics.backgroundReadCount > 0),
+                "Standalone large-package playback did not service pages beyond the resident head.");
         require(standaloneOpenElapsed <= std::chrono::milliseconds(3000),
                 "Standalone package open exceeded the reviewed host-validation budget.");
-        require(standalonePlaybackElapsed <= std::chrono::milliseconds(1000),
+        require(standalonePlaybackElapsed <= (largeV2Qualification
+                    ? std::chrono::milliseconds(6000) : std::chrono::milliseconds(1000)),
                 "Standalone initial package playback exceeded the reviewed host-validation budget.");
 
-        drs::plugin::Processor processor;
-        std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+        auto processor = std::make_unique<drs::plugin::Processor>();
+        std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditor());
         require(editor != nullptr, "Plugin editor should construct for package host validation.");
 
-        const auto pluginOpenStarted = Clock::now();
-        const auto pluginLoad = processor.loadPerformancePackageWorkspace(packageFile);
+        std::chrono::microseconds pluginPreparationElapsed {};
+        std::chrono::microseconds pluginActivationElapsed {};
+        const auto pluginLoad = loadThroughBackgroundPreparation(
+            *processor, packageFile, pluginPreparationElapsed, pluginActivationElapsed);
         const auto pluginOpenElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            Clock::now() - pluginOpenStarted);
+            pluginPreparationElapsed + pluginActivationElapsed);
         require(pluginLoad.loaded,
                 "Plugin host validation should load the checked-in package. state="
                     + pluginLoad.state + " issues=" + summarizeIssues(pluginLoad.issues));
         require(pluginLoad.failureCategory == drs::engine::PerformancePackageFailureCategory::none,
                 "Plugin host validation should not publish a package failure category for the valid fixture.");
-        requirePerformanceOnlyWorkspace(processor.getWorkspaceDocumentState(),
+        requirePerformanceOnlyWorkspace(processor->getWorkspaceDocumentState(),
                                         "Plugin host validation");
-        processor.prepareToPlay(44100.0, 512);
-        processor.serviceMessageThreadWork();
+        processor->prepareToPlay(44100.0, 512);
+        processor->serviceMessageThreadWork();
 
         const auto pluginPlaybackStarted = Clock::now();
-        const auto pluginMagnitude = renderQueuedPerformanceSurfaceMagnitude(processor, 69, 0.8f);
+        const auto pluginMagnitude = renderQueuedPerformanceSurfaceMagnitude(
+            *processor, 69, 0.8f,
+            largeV2Qualification ? 375 : 8, largeV2Qualification);
         const auto pluginPlaybackElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             Clock::now() - pluginPlaybackStarted);
+        processor->serviceMessageThreadWork();
         require(pluginMagnitude > 0.0001f,
                 "Plugin host validation should produce audible output from the checked-in package.");
-        const auto pluginDiagnostics = processor.getEngineFacade().getDiagnosticsSnapshot();
+        const auto pluginDiagnostics = processor->getEngineFacade().getDiagnosticsSnapshot();
+        const auto pluginRealtime = processor->getRealtimeSafetySnapshot();
         require(pluginDiagnostics.available,
                 "Plugin host validation should publish diagnostics after opening the checked-in package.");
+        require(pluginRealtime.getAudioThreadViolationCount() == 0,
+                "Plugin package playback reported a realtime-thread violation.");
+        require(!largeV2Qualification
+                    || (pluginDiagnostics.cacheMissCount > 0
+                        && pluginDiagnostics.backgroundReadCount > 0),
+                "Plugin large-package playback did not service pages beyond the resident head.");
         require(pluginOpenElapsed <= std::chrono::milliseconds(3000),
                 "Plugin package open exceeded the reviewed host-validation budget.");
-        require(pluginPlaybackElapsed <= std::chrono::milliseconds(1000),
+        require(pluginPlaybackElapsed <= (largeV2Qualification
+                    ? std::chrono::milliseconds(6000) : std::chrono::milliseconds(1000)),
                 "Plugin initial package playback exceeded the reviewed host-validation budget.");
+        require(!largeV2Qualification
+                    || (standaloneActivationElapsed <= std::chrono::milliseconds(16)
+                        && pluginActivationElapsed <= std::chrono::milliseconds(16)),
+                "Prepared package activation exceeded the 16 ms message-thread budget: standalone="
+                    + std::to_string(standaloneActivationElapsed.count()) + " us, plugin="
+                    + std::to_string(pluginActivationElapsed.count()) + " us.");
+
+        for (int iteration = 0; iteration < 8; ++iteration)
+        {
+            std::unique_ptr<juce::AudioProcessorEditor> churnedEditor(processor->createEditor());
+            require(churnedEditor != nullptr,
+                    "Plugin editor churn failed to construct an editor.");
+        }
+
+        juce::MemoryBlock savedState;
+        processor->getStateInformation(savedState);
+        const std::string savedStateText(
+            static_cast<const char*>(savedState.getData()), savedState.getSize());
+        require(savedStateText.find("performancePackageBinding") != std::string::npos
+                    && savedStateText.find(selectedPackage.filename().generic_string())
+                        != std::string::npos,
+                "Package host state did not persist its explicit package locator binding.");
+
+        const auto restoreStarted = Clock::now();
+        auto restoredProcessor = std::make_unique<drs::plugin::Processor>();
+        restoredProcessor->prepareToPlay(44100.0, 512);
+        const auto setStateStarted = Clock::now();
+        restoredProcessor->setStateInformation(savedState.getData(),
+                                               static_cast<int>(savedState.getSize()));
+        const auto setStateElapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+            Clock::now() - setStateStarted);
+        const auto restoreDeadline = Clock::now() + std::chrono::seconds(15);
+        while (Clock::now() < restoreDeadline
+               && restoredProcessor->getWorkspaceDocumentState().kind
+                   != drs::engine::WorkspaceDocumentKind::performancePackage)
+        {
+            restoredProcessor->serviceMessageThreadWork();
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        restoredProcessor->serviceMessageThreadWork();
+        const auto restoreElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            Clock::now() - restoreStarted);
+        require(setStateElapsed <= std::chrono::milliseconds(16),
+                "setStateInformation blocked while restoring a package locator.");
+        require(restoredProcessor->getWorkspaceDocumentState().kind
+                    == drs::engine::WorkspaceDocumentKind::performancePackage
+                    && restoredProcessor->getWorkspaceDocumentState().playable,
+                "Editor-closed host recall did not restore the package workspace to playable.");
+        require(renderQueuedPerformanceSurfaceMagnitude(
+                    *restoredProcessor, 69, 0.8f, largeV2Qualification ? 64 : 8,
+                    largeV2Qualification) > 0.0001f,
+                "Editor-closed host recall did not restore audible package playback.");
+        std::unique_ptr<juce::AudioProcessorEditor> restoredEditor(
+            restoredProcessor->createEditor());
+        require(restoredEditor != nullptr,
+                "An editor could not open after editor-closed package recall.");
 
         std::cout << "Performance package host validation passed:"
                   << " standaloneOpenMs=" << standaloneOpenElapsed.count()
+                  << " standalonePrepareUs=" << standalonePreparationElapsed.count()
+                  << " standaloneActivateUs=" << standaloneActivationElapsed.count()
+                  << " standaloneEngineActivateUs="
+                  << standaloneLoad.timings.engineSessionActivationMicros
+                  << " standaloneWorkspaceUs="
+                  << standaloneLoad.timings.workspaceTransitionMicros
                   << " standalonePlaybackMs=" << standalonePlaybackElapsed.count()
                   << " standaloneHeadBytesRead=" << standaloneDiagnostics.headBytesRead
                   << " standaloneCacheMissCount=" << standaloneDiagnostics.cacheMissCount
+                  << " standaloneBackgroundReadCount=" << standaloneDiagnostics.backgroundReadCount
                   << " pluginOpenMs=" << pluginOpenElapsed.count()
+                  << " pluginPrepareUs=" << pluginPreparationElapsed.count()
+                  << " pluginActivateUs=" << pluginActivationElapsed.count()
+                  << " pluginEngineActivateUs="
+                  << pluginLoad.timings.engineSessionActivationMicros
+                  << " pluginWorkspaceUs="
+                  << pluginLoad.timings.workspaceTransitionMicros
                   << " pluginPlaybackMs=" << pluginPlaybackElapsed.count()
                   << " pluginHeadBytesRead=" << pluginDiagnostics.headBytesRead
                   << " pluginCacheMissCount=" << pluginDiagnostics.cacheMissCount
+                  << " pluginBackgroundReadCount=" << pluginDiagnostics.backgroundReadCount
+                  << " restoreMs=" << restoreElapsed.count()
+                  << " setStateUs=" << setStateElapsed.count()
+                  << " standaloneRtViolations="
+                  << standaloneRealtime.getAudioThreadViolationCount()
+                  << " pluginRtViolations=" << pluginRealtime.getAudioThreadViolationCount()
                   << std::endl;
         return 0;
     }

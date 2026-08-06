@@ -201,6 +201,10 @@ int main()
                 "Standalone shell should mark package sessions as performance-package documents.");
         require(!standalone.getProcessor().getWorkspaceDocumentState().authoringAvailable,
                 "Standalone package sessions should suppress authoring.");
+        require(standalone.getProcessor().getWorkspaceDocumentState().readiness
+                    == drs::engine::PackageSessionReadiness::playable
+                    && standalone.getProcessor().getWorkspaceDocumentState().playable,
+                "Standalone package sessions must become playable only after immutable activation succeeds.");
         auto* standaloneStatus = dynamic_cast<juce::Label*>(
             findDescendantById(standalone, "standaloneWorkspaceStatusLabel"));
         require(standaloneStatus != nullptr, "Standalone shell should expose a package-session status label.");
@@ -260,6 +264,10 @@ int main()
                 "Plugin shell should mark package sessions as performance-package documents.");
         require(!processor.getWorkspaceDocumentState().authoringAvailable,
                 "Plugin package sessions should suppress authoring.");
+        require(processor.getWorkspaceDocumentState().readiness
+                    == drs::engine::PackageSessionReadiness::playable
+                    && processor.getWorkspaceDocumentState().playable,
+                "Plugin package sessions must become playable only after immutable activation succeeds.");
         auto* pluginStatus = dynamic_cast<juce::Label*>(
             findDescendantById(*editor, "pluginProjectStatusLabel"));
         require(pluginStatus != nullptr, "Plugin shell should expose a package-session status label.");

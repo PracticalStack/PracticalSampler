@@ -70,3 +70,9 @@ Phase 1 support and QA should classify failures using the package loader’s exp
 - `playback-compatibility-failure`
 
 These categories are part of the frozen support contract for Sprint 8 release gating.
+
+## Large-instrument extension
+
+Package v2 (`DRSPKG2`) is the bounded streaming format. It uses a clear fixed header/TOC and independently authenticated records with 64-bit offsets and identities. Package v1 remains readable only under the 64 MiB resident compatibility ceiling; a larger v1 package is rejected with explicit v2 re-export guidance. Loading never rewrites a package or resolves adjacent raw samples.
+
+See `docs/large-instrument-streaming-support.md` for budgets, lifecycle states, recovery, and qualification status.

@@ -66,6 +66,7 @@ enum class HostSessionStateFindingCode
     projectSnapshotTooLarge,
     presetInvalid,
     projectBindingInvalid,
+    performancePackageBindingInvalid,
     authoringStateInvalid,
     projectSnapshotInvalid,
     projectIdentityMismatch,
@@ -89,6 +90,13 @@ struct HostProjectBinding
     std::string manifestDigest;
     std::string contentRootHint;
     std::string portableRelativePath;
+};
+
+struct HostPerformancePackageBinding
+{
+    std::string packageId;
+    std::string packagePath;
+    std::string packageFileName;
 };
 
 struct HostAuthoringCheckpoint
@@ -132,6 +140,7 @@ struct HostSessionState
     std::string schemaName = hostSessionStateSchemaName;
     int schemaVersion = hostSessionStateSchemaVersion;
     RuntimePresetState presetState;
+    std::optional<HostPerformancePackageBinding> performancePackageBinding;
     HostProjectBinding projectBinding;
     HostAuthoringCheckpoint authoringState;
     std::optional<HostPublishedCheckpoint> publishedState;

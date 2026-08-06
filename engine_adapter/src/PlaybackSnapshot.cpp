@@ -42,6 +42,142 @@ bool containsValue(const std::vector<std::string>& values, const std::string& va
     return std::find(values.begin(), values.end(), value) != values.end();
 }
 
+void retainZoneId(std::vector<std::string>& retainedZoneIds,
+                  const std::string& zoneId,
+                  bool& changed)
+{
+    if (zoneId.empty() || containsValue(retainedZoneIds, zoneId))
+        return;
+
+    retainedZoneIds.push_back(zoneId);
+    changed = true;
+}
+
+bool keyRangesOverlap(const PlaybackSnapshotZone& left,
+                      const PlaybackSnapshotZone& right) noexcept
+{
+    return left.keyLow <= right.keyHigh && right.keyLow <= left.keyHigh;
+}
+
+bool hasChokeDependency(const PlaybackSnapshotZone& left,
+                        const PlaybackSnapshotZone& right)
+{
+    return (!right.exclusiveGroupId.empty()
+            && containsValue(left.exclusiveTargetGroupIds, right.exclusiveGroupId))
+        || (!left.exclusiveGroupId.empty()
+            && containsValue(right.exclusiveTargetGroupIds, left.exclusiveGroupId));
+}
+
+void expandPreparationDependencies(const ImmutablePlaybackSnapshot& snapshot,
+                                   std::vector<std::string>& retainedZoneIds)
+{
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (const auto& zone : snapshot.zones)
+        {
+            if (!containsValue(retainedZoneIds, zone.id))
+                continue;
+
+            retainZoneId(retainedZoneIds,
+                         zone.velocityCrossfadeRuntime.fadeInNeighborZoneId,
+                         changed);
+            retainZoneId(retainedZoneIds,
+                         zone.velocityCrossfadeRuntime.fadeOutNeighborZoneId,
+                         changed);
+
+            for (const auto& candidate : snapshot.zones)
+            {
+                const auto roundRobinPeer = zone.roundRobin.has_value()
+                    && candidate.roundRobin.has_value()
+                    && !zone.roundRobin->poolId.empty()
+                    && candidate.roundRobin->poolId == zone.roundRobin->poolId;
+                const auto releaseTrigger = candidate.performance.event == PerformanceEventKind::release
+                    && candidate.articulationId == zone.articulationId
+                    && keyRangesOverlap(candidate, zone);
+                if (roundRobinPeer || releaseTrigger || hasChokeDependency(zone, candidate))
+                    retainZoneId(retainedZoneIds, candidate.id, changed);
+            }
+        }
+    }
+}
+
+CompiledPerformanceProgram remapPerformanceProgram(
+    const CompiledPerformanceProgram& source,
+    const std::vector<std::size_t>& retainedZoneIndices,
+    const std::unordered_map<std::size_t, std::size_t>& zoneIndexMap)
+{
+    auto scoped = source;
+    scoped.zoneArticulationIndices.clear();
+    if (!source.zoneArticulationIndices.empty())
+    {
+        scoped.zoneArticulationIndices.reserve(retainedZoneIndices.size());
+        for (const auto retainedIndex : retainedZoneIndices)
+        {
+            scoped.zoneArticulationIndices.push_back(
+                retainedIndex < source.zoneArticulationIndices.size()
+                    ? source.zoneArticulationIndices[retainedIndex]
+                    : kInvalidPerformanceProgramIndex);
+        }
+    }
+
+    scoped.triggerRoutes.clear();
+    scoped.triggerRoutes.reserve(source.triggerRoutes.size());
+    for (const auto& route : source.triggerRoutes)
+    {
+        const auto mapped = zoneIndexMap.find(route.zoneIndex);
+        if (mapped == zoneIndexMap.end())
+            continue;
+
+        auto retainedRoute = route;
+        retainedRoute.zoneIndex = static_cast<std::uint32_t>(mapped->second);
+        scoped.triggerRoutes.push_back(retainedRoute);
+    }
+
+    for (std::size_t event = 0, first = 0; event < scoped.eventRanges.size(); ++event)
+    {
+        auto& range = scoped.eventRanges[event];
+        range.firstRoute = static_cast<std::uint32_t>(first);
+        while (first < scoped.triggerRoutes.size()
+               && static_cast<std::size_t>(scoped.triggerRoutes[first].event) == event)
+        {
+            ++first;
+        }
+        range.routeCount = static_cast<std::uint32_t>(first - range.firstRoute);
+    }
+
+    scoped.retainedBytes = sizeof(CompiledPerformanceProgram)
+        + scoped.triggerRoutes.size() * sizeof(CompiledPerformanceTriggerRoute)
+        + scoped.roundRobinResets.size() * sizeof(CompiledPerformanceRoundRobinReset)
+        + scoped.articulationStableIds.size() * sizeof(std::uint64_t)
+        + scoped.exclusiveGroupStableIds.size() * sizeof(std::uint64_t)
+        + scoped.roundRobinPoolStableIds.size() * sizeof(std::uint64_t)
+        + scoped.zoneArticulationIndices.size() * sizeof(std::uint32_t);
+    return scoped;
+}
+
+template <typename Route>
+void retainScopedRoutes(std::vector<Route>& routes,
+                        const std::vector<std::string>& retainedZoneIds)
+{
+    for (auto iterator = routes.begin(); iterator != routes.end();)
+    {
+        iterator->zoneIds.erase(
+            std::remove_if(iterator->zoneIds.begin(),
+                           iterator->zoneIds.end(),
+                           [&](const std::string& zoneId)
+                           {
+                               return !containsValue(retainedZoneIds, zoneId);
+                           }),
+            iterator->zoneIds.end());
+        if (iterator->zoneIds.empty())
+            iterator = routes.erase(iterator);
+        else
+            ++iterator;
+    }
+}
+
 std::string normalizeAssetPath(const std::string& contentRootPath, const std::string& candidatePath)
 {
     const fs::path path(candidatePath);
@@ -1354,6 +1490,156 @@ std::string toString(PlaybackSnapshotFindingSeverity severity)
     }
 
     return "unknown";
+}
+
+std::string toString(const PlaybackPreparationScope scope)
+{
+    switch (scope)
+    {
+    case PlaybackPreparationScope::currentDraft:
+        return "CurrentDraft";
+    case PlaybackPreparationScope::selectedZone:
+        return "SelectedZone";
+    case PlaybackPreparationScope::selectedGroup:
+        return "SelectedGroup";
+    }
+
+    return "CurrentDraft";
+}
+
+PlaybackSnapshotBuildResult scopePlaybackSnapshotForPreparation(
+    const PlaybackSnapshotBuildResult& source,
+    const PlaybackPreparationScopeRequest& request)
+{
+    auto result = source;
+    result.preparationScope = request.scope;
+    result.preparationSelectedZoneId = request.selectedZoneId;
+    result.preparationSelectedGroupId = request.selectedGroupId;
+    result.unscopedZoneCount = source.snapshot.zones.size();
+    result.unscopedSampleCount = source.snapshot.sampleIdentities.size();
+    result.retainedZoneCount = result.unscopedZoneCount;
+    result.retainedSampleCount = result.unscopedSampleCount;
+
+    if (!source.built || !source.activationEligible
+        || request.scope == PlaybackPreparationScope::currentDraft)
+    {
+        return result;
+    }
+
+    std::vector<std::string> retainedZoneIds;
+    if (request.scope == PlaybackPreparationScope::selectedZone)
+    {
+        if (!request.selectedZoneId.empty())
+            retainedZoneIds.push_back(request.selectedZoneId);
+    }
+    else
+    {
+        for (const auto& zone : source.snapshot.zones)
+        {
+            if (zone.groupId == request.selectedGroupId)
+                retainedZoneIds.push_back(zone.id);
+        }
+    }
+
+    const auto requestedZoneExists = request.scope != PlaybackPreparationScope::selectedZone
+        || std::any_of(source.snapshot.zones.begin(),
+                       source.snapshot.zones.end(),
+                       [&](const PlaybackSnapshotZone& zone)
+                       {
+                           return zone.id == request.selectedZoneId;
+                       });
+    if (retainedZoneIds.empty() || !requestedZoneExists)
+    {
+        result.built = false;
+        result.activationEligible = false;
+        result.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+        result.state = request.scope == PlaybackPreparationScope::selectedZone
+            ? "Selected-zone preparation scope was not found"
+            : "Selected-group preparation scope was not found";
+        addFinding(result,
+                   PlaybackSnapshotFindingSeverity::error,
+                   request.scope == PlaybackPreparationScope::selectedZone
+                       ? "snapshot-preparation-zone-missing"
+                       : "snapshot-preparation-group-missing",
+                   request.scope == PlaybackPreparationScope::selectedZone
+                       ? "preparationScope.selectedZoneId"
+                       : "preparationScope.selectedGroupId",
+                   "The requested Preview preparation scope does not exist in the immutable snapshot.");
+        result.retainedZoneCount = 0;
+        result.retainedSampleCount = 0;
+        return result;
+    }
+
+    expandPreparationDependencies(source.snapshot, retainedZoneIds);
+
+    std::vector<std::size_t> retainedZoneIndices;
+    std::unordered_map<std::size_t, std::size_t> zoneIndexMap;
+    retainedZoneIndices.reserve(retainedZoneIds.size());
+    for (std::size_t index = 0; index < source.snapshot.zones.size(); ++index)
+    {
+        if (!containsValue(retainedZoneIds, source.snapshot.zones[index].id))
+            continue;
+        zoneIndexMap.emplace(index, retainedZoneIndices.size());
+        retainedZoneIndices.push_back(index);
+    }
+
+    auto& scoped = result.snapshot;
+    scoped.zones.erase(
+        std::remove_if(scoped.zones.begin(),
+                       scoped.zones.end(),
+                       [&](const PlaybackSnapshotZone& zone)
+                       {
+                           return !containsValue(retainedZoneIds, zone.id);
+                       }),
+        scoped.zones.end());
+    scoped.sampleIdentities.erase(
+        std::remove_if(scoped.sampleIdentities.begin(),
+                       scoped.sampleIdentities.end(),
+                       [&](const PlaybackSnapshotSampleIdentity& sample)
+                       {
+                           return std::none_of(scoped.zones.begin(),
+                                               scoped.zones.end(),
+                                               [&](const PlaybackSnapshotZone& zone)
+                                               {
+                                                   return zone.sampleSourceId == sample.sampleSourceId;
+                                               });
+                       }),
+        scoped.sampleIdentities.end());
+    retainScopedRoutes(scoped.articulationRoutes, retainedZoneIds);
+    retainScopedRoutes(scoped.groupRoutes, retainedZoneIds);
+    scoped.routingBuses.erase(
+        std::remove_if(scoped.routingBuses.begin(),
+                       scoped.routingBuses.end(),
+                       [&](const PlaybackSnapshotRoutingBusReference& bus)
+                       {
+                           if (bus.inputSourceId.rfind("zones/", 0) == 0)
+                               return !containsValue(retainedZoneIds, bus.inputSourceId.substr(6));
+                           if (bus.inputSourceId.rfind("groups/", 0) == 0)
+                           {
+                               return std::none_of(scoped.zones.begin(),
+                                                   scoped.zones.end(),
+                                                   [&](const PlaybackSnapshotZone& zone)
+                                                   {
+                                                       return zone.groupId == bus.inputSourceId.substr(7);
+                                                   });
+                           }
+                           return false;
+                       }),
+        scoped.routingBuses.end());
+    scoped.performanceProgram = remapPerformanceProgram(source.snapshot.performanceProgram,
+                                                        retainedZoneIndices,
+                                                        zoneIndexMap);
+    scoped.selectedZoneId = request.selectedZoneId;
+    if (request.scope == PlaybackPreparationScope::selectedGroup)
+        scoped.selectedGroupId = request.selectedGroupId;
+    else if (!scoped.zones.empty())
+        scoped.selectedGroupId = scoped.zones.front().groupId;
+    scoped.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(scoped);
+    scoped.contentDigest = computePlaybackSnapshotContentDigest(scoped);
+    result.retainedZoneCount = scoped.zones.size();
+    result.retainedSampleCount = scoped.sampleIdentities.size();
+    result.state = "Playback snapshot scoped for " + toString(request.scope) + " preparation";
+    return result;
 }
 
 std::string serializeImmutablePlaybackSnapshot(const ImmutablePlaybackSnapshot& snapshot)

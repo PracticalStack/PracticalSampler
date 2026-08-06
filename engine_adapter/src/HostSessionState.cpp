@@ -402,6 +402,38 @@ void parseProjectBinding(const json& object, HostSessionStateParseResult& result
     }
 }
 
+void parsePerformancePackageBinding(const json& object,
+                                    HostSessionStateParseResult& result)
+{
+    static const std::unordered_set<std::string> allowed {
+        "packageId",
+        "packagePath",
+        "packageFileName"
+    };
+    validateAllowedFields(object, result, allowed, "/performancePackageBinding");
+
+    HostPerformancePackageBinding binding;
+    if (const auto value = readRequiredString(
+            object, result, "packageId", "/performancePackageBinding"))
+        binding.packageId = *value;
+    if (const auto value = readRequiredString(
+            object, result, "packagePath", "/performancePackageBinding"))
+        binding.packagePath = *value;
+    if (const auto value = readRequiredString(
+            object, result, "packageFileName", "/performancePackageBinding"))
+        binding.packageFileName = *value;
+    if (binding.packageId.empty() || binding.packagePath.empty()
+        || binding.packageFileName.empty())
+    {
+        addFinding(result,
+                   HostSessionStateFindingCode::performancePackageBindingInvalid,
+                   "/performancePackageBinding",
+                   "Package identity, path, and filename must not be empty.");
+        return;
+    }
+    result.hostState->performancePackageBinding = std::move(binding);
+}
+
 void parseAuthoringState(const json& object,
                          HostSessionStateParseResult& result,
                          const std::string& snapshotManifestPath)
@@ -670,6 +702,7 @@ HostSessionStateParseResult parseHostSessionState(const std::string& text,
         "schemaName",
         "schemaVersion",
         "presetState",
+        "performancePackageBinding",
         "projectBinding",
         "authoringState",
         "publishedState"
@@ -730,42 +763,59 @@ HostSessionStateParseResult parseHostSessionState(const std::string& text,
             result.hostState->presetState = preset.preset;
     }
 
+    const auto performancePackageBinding = root.find("performancePackageBinding");
+    if (performancePackageBinding != root.end())
+    {
+        if (!performancePackageBinding->is_object())
+        {
+            addFinding(result,
+                       HostSessionStateFindingCode::fieldTypeInvalid,
+                       "/performancePackageBinding",
+                       "performancePackageBinding must be an object.");
+        }
+        else
+        {
+            parsePerformancePackageBinding(*performancePackageBinding, result);
+        }
+    }
+    const auto packageState = result.hostState->performancePackageBinding.has_value();
+
     const auto projectBinding = root.find("projectBinding");
-    if (projectBinding == root.end())
+    if (projectBinding == root.end() && !packageState)
     {
         addFinding(result,
                    HostSessionStateFindingCode::requiredFieldMissing,
                    "/projectBinding",
                    "Required object 'projectBinding' is missing.");
     }
-    else if (!projectBinding->is_object())
+    else if (projectBinding != root.end() && !projectBinding->is_object())
     {
         addFinding(result,
                    HostSessionStateFindingCode::fieldTypeInvalid,
                    "/projectBinding",
                    "projectBinding must be an object.");
     }
-    else
+    else if (projectBinding != root.end())
     {
         parseProjectBinding(*projectBinding, result);
     }
 
     const auto authoringState = root.find("authoringState");
-    if (authoringState == root.end())
+    if (authoringState == root.end() && !packageState)
     {
         addFinding(result,
                    HostSessionStateFindingCode::requiredFieldMissing,
                    "/authoringState",
                    "Required object 'authoringState' is missing.");
     }
-    else if (!authoringState->is_object())
+    else if (authoringState != root.end() && !authoringState->is_object())
     {
         addFinding(result,
                    HostSessionStateFindingCode::fieldTypeInvalid,
                    "/authoringState",
                    "authoringState must be an object.");
     }
-    else
+    else if (authoringState != root.end())
     {
         parseAuthoringState(*authoringState, result, snapshotManifestPath);
     }
@@ -816,34 +866,44 @@ HostSessionStateSerializeResult serializeHostSessionState(
         root["schemaVersion"] = hostState.schemaVersion == 0
             ? hostSessionStateSchemaVersion : hostState.schemaVersion;
         root["presetState"] = parseSerializedObject(serializeRuntimePresetState(hostState.presetState));
-
-        ordered_json binding;
-        binding["projectId"] = hostState.projectBinding.projectId;
-        if (!hostState.projectBinding.manifestPath.empty())
-            binding["manifestPath"] = hostState.projectBinding.manifestPath;
-        binding["manifestFileName"] = hostState.projectBinding.manifestFileName;
-        binding["manifestDigest"] = hostState.projectBinding.manifestDigest;
-        if (!hostState.projectBinding.contentRootHint.empty())
-            binding["contentRootHint"] = hostState.projectBinding.contentRootHint;
-        if (!hostState.projectBinding.portableRelativePath.empty())
-            binding["portableRelativePath"] = hostState.projectBinding.portableRelativePath;
-        root["projectBinding"] = std::move(binding);
-
-        ordered_json authoring;
-        authoring["revision"] = hostState.authoringState.revision;
-        authoring["savedRevision"] = hostState.authoringState.savedRevision;
-        authoring["dirty"] = hostState.authoringState.dirty;
-        if (hostState.authoringState.projectSnapshot.has_value())
+        if (hostState.performancePackageBinding.has_value())
         {
-            auto path = snapshotManifestPath;
-            if (path.empty())
-                path = hostState.projectBinding.manifestPath;
-            if (path.empty())
-                path = hostState.projectBinding.manifestFileName;
-            authoring["projectSnapshot"] = parseSerializedObject(
-                serializeRuntimeProjectManifest(*hostState.authoringState.projectSnapshot, path));
+            ordered_json binding;
+            binding["packageId"] = hostState.performancePackageBinding->packageId;
+            binding["packagePath"] = hostState.performancePackageBinding->packagePath;
+            binding["packageFileName"] = hostState.performancePackageBinding->packageFileName;
+            root["performancePackageBinding"] = std::move(binding);
         }
-        root["authoringState"] = std::move(authoring);
+        else
+        {
+            ordered_json binding;
+            binding["projectId"] = hostState.projectBinding.projectId;
+            if (!hostState.projectBinding.manifestPath.empty())
+                binding["manifestPath"] = hostState.projectBinding.manifestPath;
+            binding["manifestFileName"] = hostState.projectBinding.manifestFileName;
+            binding["manifestDigest"] = hostState.projectBinding.manifestDigest;
+            if (!hostState.projectBinding.contentRootHint.empty())
+                binding["contentRootHint"] = hostState.projectBinding.contentRootHint;
+            if (!hostState.projectBinding.portableRelativePath.empty())
+                binding["portableRelativePath"] = hostState.projectBinding.portableRelativePath;
+            root["projectBinding"] = std::move(binding);
+
+            ordered_json authoring;
+            authoring["revision"] = hostState.authoringState.revision;
+            authoring["savedRevision"] = hostState.authoringState.savedRevision;
+            authoring["dirty"] = hostState.authoringState.dirty;
+            if (hostState.authoringState.projectSnapshot.has_value())
+            {
+                auto path = snapshotManifestPath;
+                if (path.empty())
+                    path = hostState.projectBinding.manifestPath;
+                if (path.empty())
+                    path = hostState.projectBinding.manifestFileName;
+                authoring["projectSnapshot"] = parseSerializedObject(
+                    serializeRuntimeProjectManifest(*hostState.authoringState.projectSnapshot, path));
+            }
+            root["authoringState"] = std::move(authoring);
+        }
 
         ordered_json published = ordered_json::object();
         if (hostState.publishedState.has_value())
@@ -984,6 +1044,8 @@ const char* toString(const HostSessionStateFindingCode code) noexcept
         case HostSessionStateFindingCode::projectSnapshotTooLarge: return "host-state-project-snapshot-too-large";
         case HostSessionStateFindingCode::presetInvalid: return "host-state-preset-invalid";
         case HostSessionStateFindingCode::projectBindingInvalid: return "host-state-project-binding-invalid";
+        case HostSessionStateFindingCode::performancePackageBindingInvalid:
+            return "host-state-performance-package-binding-invalid";
         case HostSessionStateFindingCode::authoringStateInvalid: return "host-state-authoring-state-invalid";
         case HostSessionStateFindingCode::projectSnapshotInvalid: return "host-state-project-snapshot-invalid";
         case HostSessionStateFindingCode::projectIdentityMismatch: return "host-state-project-identity-mismatch";

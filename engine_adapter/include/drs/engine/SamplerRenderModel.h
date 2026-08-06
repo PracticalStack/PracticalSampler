@@ -2,6 +2,7 @@
 
 #include "drs/engine/DraftPlaybackContract.h"
 #include "drs/engine/PerformanceProgram.h"
+#include "drs/engine/SampleDataSource.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -117,6 +118,9 @@ struct SamplerRenderResult
     std::uint32_t roundRobinPoolMissCount = 0;
     std::uint32_t roundRobinFallbackCount = 0;
     std::uint32_t chokedVoiceCount = 0;
+    std::uint32_t pageMissCount = 0;
+    std::uint32_t underrunFrameCount = 0;
+    std::uint32_t pageRecoveryCount = 0;
 };
 
 struct SamplerRenderSample
@@ -127,6 +131,9 @@ struct SamplerRenderSample
     double sampleRate = 0.0;
     std::uint64_t frameCount = 0;
     std::uint32_t channelCount = 0;
+    SampleDataSourceDescriptor sourceDescriptor;
+    SampleDataSourcePtr dataSource;
+    // Temporary bounded resident compatibility ownership; render voices use dataSource.
     std::shared_ptr<const PreparedPlaybackDecodedSampleData> decodedSampleData;
 };
 

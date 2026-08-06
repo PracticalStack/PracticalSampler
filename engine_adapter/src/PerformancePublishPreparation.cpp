@@ -1,4 +1,5 @@
 #include "drs/engine/PerformancePublishPreparation.h"
+#include "drs/engine/SampleDataSource.h"
 
 #include <algorithm>
 #include <string_view>
@@ -174,13 +175,20 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
                      "Prepared sample source ids must be non-empty and unique.");
         if (sample.canonicalSourceIdentity.empty() || sample.sourceFingerprintHex.empty()
             || sample.formatName.empty() || sample.frameCount == 0 || sample.channelCount == 0
-            || !sample.decodedSampleData)
+            || (sample.decodedSampleData == nullptr && sample.dataSource == nullptr))
             addError(result, "publish-source-provenance-incomplete", path,
-                     "Prepared source provenance and decoded immutable sample data must be complete.");
-        else if (sample.decodedSampleData->normalizedChannels.size() != sample.channelCount
-                 || std::any_of(sample.decodedSampleData->normalizedChannels.begin(),
-                                sample.decodedSampleData->normalizedChannels.end(),
-                                [&](const auto& channel) { return channel.size() < sample.frameCount; }))
+                     "Prepared source provenance and a resident or paged immutable source must be complete.");
+        else if (sample.dataSource != nullptr
+                 && (!validateSampleDataSourceDescriptor(sample.dataSource->descriptor()).valid
+                     || sample.dataSource->descriptor().frameCount != sample.frameCount
+                     || sample.dataSource->descriptor().channelCount != sample.channelCount))
+            addError(result, "publish-paged-source-incomplete", path + ".dataSource",
+                     "Paged source descriptor and immutable prepared sample dimensions must match.");
+        else if (sample.dataSource == nullptr
+                 && (sample.decodedSampleData->normalizedChannels.size() != sample.channelCount
+                     || std::any_of(sample.decodedSampleData->normalizedChannels.begin(),
+                                    sample.decodedSampleData->normalizedChannels.end(),
+                                    [&](const auto& channel) { return channel.size() < sample.frameCount; })))
             addError(result, "publish-decoded-source-incomplete", path + ".decodedSampleData",
                      "Decoded channel and frame coverage must match immutable source metadata.");
     }

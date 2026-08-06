@@ -16,6 +16,7 @@
 
 namespace drs::engine
 {
+struct PreparedPerformancePackageActivationResult;
 enum class ProjectRestoreState
 {
     idle,
@@ -43,6 +44,7 @@ enum class ProjectRestoreFinding
     projectLoadFailed,
     checkpointInvalid,
     projectBindingInvalid,
+    performancePackageInvalid,
     presetStateInvalid,
     articulationMismatch,
     draftPlaybackFailed,
@@ -69,9 +71,11 @@ struct ProjectRestoreSnapshot
     std::string message;
     bool restoredFromEmbeddedSnapshot = false;
     bool legacyPresetOnly = false;
+    bool performancePackageOnly = false;
     std::optional<HostSessionState> hostState;
     std::optional<RuntimePresetState> legacyPreset;
     std::optional<RuntimeProjectDocumentCheckpoint> checkpoint;
+    std::shared_ptr<PreparedPerformancePackageActivationResult> packageActivation;
 };
 
 struct ProjectRestoreCoordinatorOptions

@@ -115,3 +115,9 @@ WAV import now follows the same ownership pattern as the other product services:
 - `WavImportService` owns staging, fingerprinting, inspection, cancellation, and terminal snapshot publication on a joined worker thread;
 - `WavImportWorkflow` is completion-driven only and prepares apply/finalize/rollback commits from immutable terminal payloads instead of draining a synchronous authoring queue; and
 - startup, project replace, close, migration, restore, and waveform selection all expose honest `idle` or `not-run` diagnostics until explicit import or preview work is requested.
+
+## Large-instrument streaming boundary
+
+`SampleDataSource` is the common resident/WAV/package source contract. Voices acquire bounded, lock-free frame views; workers parse WAV/RF64 ranges, authenticate package v2 records, and populate a byte-budgeted cache. Audio publishes fixed-capacity page intents and produces bounded silence on a miss while musical time advances.
+
+Package v2 stores 64-bit TOC identities and independently sealed metadata, head, and page records. Streaming export writes one bounded record at a time to a stage file, verifies selected records, and atomically publishes. `DeferredPackageSession` advances metadata through heads/model/staging to callback-confirmed activation while old model/source/page ownership survives generation replacement.

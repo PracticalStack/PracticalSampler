@@ -1,5 +1,6 @@
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/SampleImport.h"
+#include "drs/engine/SampleDataSource.h"
 
 #include <json/json.hpp>
 
@@ -7,8 +8,10 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <sstream>
 #include <tuple>
 #include <unordered_map>
@@ -215,6 +218,16 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         sampleObject["ownershipToken"] = sample.ownershipToken;
         sampleObject["cacheKey"] = sample.cacheKey;
         sampleObject["ownershipRecordIndex"] = sample.ownershipRecordIndex;
+        if (sample.dataSource != nullptr)
+        {
+            const auto& descriptor = sample.dataSource->descriptor();
+            sampleObject["dataSourceKind"] = static_cast<int>(descriptor.kind);
+            sampleObject["dataSourceGeneration"] = descriptor.generation;
+            sampleObject["dataSourceCanonicalIdentity"] = descriptor.canonicalSourceIdentity;
+            sampleObject["dataSourceProvenanceIdentity"] = descriptor.provenanceIdentity;
+            sampleObject["dataSourceHeadSizeBytes"] = descriptor.headSizeBytes;
+            sampleObject["dataSourcePageSizeBytes"] = descriptor.pageSizeBytes;
+        }
         samples.push_back(std::move(sampleObject));
     }
     root["samples"] = std::move(samples);
@@ -643,6 +656,59 @@ const RuntimeStreamSampleDefinition* findStreamSampleById(const RuntimeStreamCon
 }
 } // namespace
 
+ResidentPreparationAdmissionResult assessResidentPreparationAdmission(
+    const std::vector<ResidentPreparationSampleMetadata>& samples,
+    const std::uint64_t residentBudgetBytes) noexcept
+{
+    ResidentPreparationAdmissionResult result;
+    result.sampleCount = samples.size();
+    result.residentBudgetBytes = residentBudgetBytes;
+    result.metadataAvailable = !samples.empty();
+
+    constexpr auto floatWidth = static_cast<std::uint64_t>(sizeof(float));
+    for (const auto& sample : samples)
+    {
+        const auto channels = static_cast<std::uint64_t>(sample.channelCount);
+        if (sample.frameCount == 0 || channels == 0
+            || sample.frameCount > std::numeric_limits<std::uint64_t>::max() / channels
+            || sample.frameCount * channels
+                > std::numeric_limits<std::uint64_t>::max() / floatWidth)
+        {
+            result.arithmeticOverflow = true;
+            result.readiness = PreparedPlaybackReadinessState::streamingRequired;
+            result.findingCode = "resident-admission-size-overflow";
+            result.guidance = "Sample dimensions cannot be represented safely for resident playback; use streaming preparation.";
+            return result;
+        }
+
+        const auto sampleBytes = sample.frameCount * channels * floatWidth;
+        if (sampleBytes > std::numeric_limits<std::uint64_t>::max()
+                - result.estimatedDecodedBytes)
+        {
+            result.arithmeticOverflow = true;
+            result.readiness = PreparedPlaybackReadinessState::streamingRequired;
+            result.findingCode = "resident-admission-size-overflow";
+            result.guidance = "Aggregate decoded size overflowed checked 64-bit accounting; use streaming preparation.";
+            return result;
+        }
+        result.estimatedDecodedBytes += sampleBytes;
+    }
+
+    if (result.estimatedDecodedBytes > residentBudgetBytes)
+    {
+        result.readiness = PreparedPlaybackReadinessState::streamingRequired;
+        result.findingCode = "resident-admission-budget-exceeded";
+        result.guidance = "This scope exceeds the resident preparation budget; select a smaller scope or use streaming preparation.";
+        return result;
+    }
+
+    result.admitted = result.metadataAvailable;
+    result.readiness = result.admitted
+        ? PreparedPlaybackReadinessState::playbackDeferred
+        : PreparedPlaybackReadinessState::metadataLoaded;
+    return result;
+}
+
 PreparedPlaybackService::PreparedPlaybackService(std::string compilerVersionIn,
                                                  std::size_t maxPendingJobsIn,
                                                  bool enableBackgroundWorkerIn,
@@ -667,6 +733,8 @@ PreparedPlaybackService::PreparedPlaybackService(std::string compilerVersionIn,
 
 PreparedPlaybackService::~PreparedPlaybackService()
 {
+    previewCancellationGeneration.fetch_add(1, std::memory_order_acq_rel);
+    performanceCancellationGeneration.fetch_add(1, std::memory_order_acq_rel);
     {
         std::lock_guard<std::mutex> lock(workerMutex);
         stopWorkerRequested = true;
@@ -801,16 +869,21 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         : request.state;
 
     const auto startTime = Clock::now();
-    std::lock_guard<std::mutex> lock(workerMutex);
 
     const auto finishCanceled = [&]()
     {
-        for (auto iterator = cacheEntries.begin(); iterator != cacheEntries.end();)
         {
-            if (iterator->second.ownership.preparedBuildId == request.buildId)
-                iterator = cacheEntries.erase(iterator);
-            else
-                ++iterator;
+            std::lock_guard<std::mutex> lock(workerMutex);
+            for (auto iterator = cacheEntries.begin(); iterator != cacheEntries.end();)
+            {
+                if (iterator->second.ownership.preparedBuildId == request.buildId)
+                    iterator = cacheEntries.erase(iterator);
+                else
+                    ++iterator;
+            }
+            ++workerStatus.cooperativeCancellationCount;
+            ++workerStatus.cancellationCount;
+            refreshWorkerStatus();
         }
         result.built = false;
         result.activationEligible = false;
@@ -824,14 +897,11 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                    "prepared-build-cooperatively-canceled",
                    toString(request.lane),
                    "A newer request or explicit cancellation invalidated this in-flight build.");
-        ++workerStatus.cooperativeCancellationCount;
-        ++workerStatus.cancellationCount;
         result.buildDurationMicros = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTime).count());
         result.requestToReadyMicros = request.queuedAtMicros == 0
             ? result.buildDurationMicros
             : clockMicros() - request.queuedAtMicros;
-        refreshWorkerStatus();
         return result;
     };
 
@@ -857,6 +927,83 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     const auto resolvedRequest = request.sampleResolutionReady
         ? request
         : resolveBuildRequest(request, snapshotResult, streamResult);
+
+    std::vector<ResidentPreparationSampleMetadata> residentMetadata;
+    residentMetadata.reserve(resolvedRequest.sampleResolutions.size());
+    auto residentMetadataComplete = !resolvedRequest.sampleResolutions.empty();
+    for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
+    {
+        if (isCancellationRequested(request))
+            return finishCanceled();
+        const auto* candidateStreamSample = !streamResult.loaded
+                || sampleResolution.selectedStreamSampleId.empty()
+            ? nullptr
+            : findStreamSampleById(streamResult.container,
+                                   sampleResolution.selectedStreamSampleId);
+        const auto* packageEmbeddedSample = streamResult.loaded
+                && streamResult.container.payloadEmbedded
+            ? candidateStreamSample
+            : nullptr;
+        if (packageEmbeddedSample != nullptr)
+        {
+            residentMetadata.push_back({ packageEmbeddedSample->frameCount,
+                                         packageEmbeddedSample->channelCount });
+            continue;
+        }
+
+        const auto inspection = inspectSampleFileMetadataOnly(
+            sampleResolution.normalizedSourcePath);
+        if (!inspection.inspected || !inspection.accepted)
+        {
+            residentMetadataComplete = false;
+            continue;
+        }
+        residentMetadata.push_back({ inspection.metadata.frameCount,
+                                     inspection.metadata.channelCount });
+    }
+
+    result.admission.residentBudgetBytes = schedulerBudgets.maximumRetainedPreparedBytes;
+    auto streamingPreparation = false;
+    if (residentMetadataComplete
+        && residentMetadata.size() == resolvedRequest.sampleResolutions.size())
+    {
+        result.admission = assessResidentPreparationAdmission(
+            residentMetadata, schedulerBudgets.maximumRetainedPreparedBytes);
+        if (!result.admission.admitted)
+        {
+            streamingPreparation = schedulerBudgets.allowWavStreaming
+                && !result.admission.arithmeticOverflow
+                && result.admission.readiness == PreparedPlaybackReadinessState::streamingRequired
+                && !streamResult.container.payloadEmbedded;
+            if (streamingPreparation)
+            {
+                result.admission.readiness = PreparedPlaybackReadinessState::playbackDeferred;
+                result.admission.guidance = "Resident budget exceeded; bounded WAV heads will be prepared for streaming playback.";
+            }
+            else
+            {
+            result.completionDisposition = PreparedPlaybackCompletionDisposition::rejected;
+            result.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+            result.state = "Prepared playback streaming required";
+            result.metrics.failureCount = 1;
+            addFinding(result,
+                       PlaybackSnapshotFindingSeverity::error,
+                       result.admission.findingCode,
+                       "residentAdmission",
+                       result.admission.guidance + " Estimated decoded bytes: "
+                           + std::to_string(result.admission.estimatedDecodedBytes)
+                           + "; resident budget bytes: "
+                           + std::to_string(result.admission.residentBudgetBytes) + ".");
+            result.buildDurationMicros = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    Clock::now() - startTime).count());
+            result.requestToReadyMicros = request.queuedAtMicros == 0
+                ? result.buildDurationMicros
+                : clockMicros() - request.queuedAtMicros;
+            return result;
+            }
+        }
+    }
 
     result.prepared.snapshotBuildId = snapshotResult.buildId;
     result.prepared.snapshotContentDigest = snapshotResult.snapshot.contentDigest;
@@ -885,6 +1032,95 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         if (isCancellationRequested(request))
             return finishCanceled();
         const auto path = "sampleIdentities[" + std::to_string(sampleResolution.snapshotSampleIndex) + "]";
+        if (streamingPreparation)
+        {
+            auto descriptorResult = buildWavSampleDataSourceDescriptor(
+                sampleResolution.sampleSourceId,
+                sampleResolution.normalizedSourcePath,
+                0,
+                defaultSampleHeadBytes,
+                defaultSamplePageBytes);
+            if (!descriptorResult.built)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "prepared-wav-descriptor-failed",
+                           path + ".sourcePath",
+                           descriptorResult.findings.empty()
+                               ? descriptorResult.state
+                               : summarizeIssues(descriptorResult.findings));
+                continue;
+            }
+            auto wavSource = std::make_shared<WavPagedSampleDataSource>(
+                std::move(descriptorResult));
+            if (!wavSource->prepareHead())
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "prepared-wav-head-failed",
+                           path + ".sourcePath",
+                           wavSource->lastFailure());
+                continue;
+            }
+            {
+                std::lock_guard<std::mutex> lock(workerMutex);
+                pageServiceSources.emplace_back(wavSource);
+            }
+            const auto& descriptor = wavSource->descriptor();
+            PreparedPlaybackSampleHandle sampleHandle;
+            sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
+            sampleHandle.streamSampleId = sampleResolution.sampleSourceId;
+            sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
+            sampleHandle.canonicalSourcePath = descriptor.canonicalSourceIdentity;
+            sampleHandle.canonicalSourceIdentity = descriptor.canonicalSourceIdentity;
+            sampleHandle.sourceFingerprintHex = descriptor.provenanceIdentity;
+            sampleHandle.formatName = descriptor.formatName;
+            sampleHandle.role = snapshotResult.snapshot.sampleIdentities[
+                sampleResolution.snapshotSampleIndex].role;
+            sampleHandle.channelLayout = descriptor.channelLayout;
+            sampleHandle.sampleRate = descriptor.sampleRate;
+            sampleHandle.frameCount = descriptor.frameCount;
+            sampleHandle.channelCount = descriptor.channelCount;
+            sampleHandle.dataSource = wavSource;
+            sampleHandle.ownershipToken = "wav-generation:"
+                + std::to_string(descriptor.generation);
+            sampleHandle.cacheKey = descriptor.provenanceIdentity;
+
+            PreparedPlaybackStreamHandle streamHandle;
+            streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
+            streamHandle.streamSampleId = sampleResolution.sampleSourceId;
+            streamHandle.payloadEncoding = descriptor.formatName;
+            streamHandle.topologyKind = "wav-paged";
+            streamHandle.pageSizeBytes = descriptor.pageSizeBytes;
+            streamHandle.payloadOffsetBytes = descriptor.dataOffsetBytes;
+            streamHandle.payloadSizeBytes = descriptor.dataSizeBytes;
+            streamHandle.prefetchBytes = descriptor.headSizeBytes;
+            streamHandle.ownershipToken = sampleHandle.ownershipToken;
+            streamHandle.cacheKey = sampleHandle.cacheKey;
+
+            PreparedPlaybackOwnershipRecord ownership;
+            ownership.ownershipToken = sampleHandle.ownershipToken;
+            ownership.cacheKey = sampleHandle.cacheKey;
+            ownership.sampleSourceId = sampleHandle.sampleSourceId;
+            ownership.streamSampleId = streamHandle.streamSampleId;
+            ownership.lifetimeState = "active-streaming-generation";
+            ownership.retainedBytes = wavSource->metrics().residentHeadBytes;
+            ownership.preparedBuildId = request.buildId;
+            const auto ownershipIndex = result.prepared.ownershipRecords.size();
+            result.prepared.ownershipRecords.push_back(ownership);
+            sampleHandle.ownershipRecordIndex = ownershipIndex;
+            streamHandle.ownershipRecordIndex = ownershipIndex;
+
+            const auto sampleIndex = result.prepared.samples.size();
+            result.prepared.samples.push_back(std::move(sampleHandle));
+            sampleIndices.emplace(sampleResolution.sampleSourceId, sampleIndex);
+            const auto streamIndex = result.prepared.streams.size();
+            result.prepared.streams.push_back(std::move(streamHandle));
+            streamIndices.emplace(sampleResolution.sampleSourceId, streamIndex);
+            result.metrics.preparedBytes += ownership.retainedBytes;
+            ++result.metrics.cacheMissCount;
+            continue;
+        }
         const auto* candidateStreamSample = !streamResult.loaded || sampleResolution.selectedStreamSampleId.empty()
             ? nullptr
             : findStreamSampleById(streamResult.container, sampleResolution.selectedStreamSampleId);
@@ -915,7 +1151,26 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         }
         else
         {
-            fingerprint = fingerprintSampleSourceFile(sampleResolution.normalizedSourcePath);
+            struct FingerprintCancellationCallbacks final : SampleFingerprintCallbacks
+            {
+                const std::atomic<std::uint64_t>* generation = nullptr;
+                std::uint64_t expectedGeneration = 0;
+
+                bool isCancellationRequested() const override
+                {
+                    return expectedGeneration != 0
+                        && generation != nullptr
+                        && generation->load(std::memory_order_acquire) != expectedGeneration;
+                }
+            } fingerprintCancellation;
+            fingerprintCancellation.generation = request.lane == PreparedPlaybackWorkLane::performance
+                ? &performanceCancellationGeneration
+                : &previewCancellationGeneration;
+            fingerprintCancellation.expectedGeneration = request.cancellationGeneration;
+            SampleFingerprintOptions fingerprintOptions;
+            fingerprintOptions.callbacks = &fingerprintCancellation;
+            fingerprint = fingerprintSampleSourceFile(sampleResolution.normalizedSourcePath,
+                                                       fingerprintOptions);
             if (isCancellationRequested(request))
                 return finishCanceled();
             if (!fingerprint.fingerprinted)
@@ -955,21 +1210,29 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                                             sampleResolution,
                                             sourceFingerprintHex,
                                             decodePolicyFingerprint);
-        const auto cacheIterator = std::find_if(cacheEntries.begin(),
-                                                cacheEntries.end(),
-                                                [&](const auto& entry)
-                                                {
-                                                    return entry.first == cacheKey;
-                                                });
-        const auto cacheHit = cacheIterator != cacheEntries.end();
+        std::optional<CacheEntry> cachedEntry;
+        {
+            std::lock_guard<std::mutex> lock(workerMutex);
+            const auto cacheIterator = std::find_if(cacheEntries.begin(),
+                                                    cacheEntries.end(),
+                                                    [&](const auto& entry)
+                                                    {
+                                                        return entry.first == cacheKey;
+                                                    });
+            if (cacheIterator != cacheEntries.end())
+                cachedEntry = cacheIterator->second;
+        }
+        const auto cacheHit = cachedEntry.has_value();
 
         PreparedPlaybackSampleHandle sampleHandle;
         PreparedPlaybackStreamHandle streamHandle;
+        PreparedPlaybackOwnershipRecord ownershipRecord;
 
         if (cacheHit)
         {
-            sampleHandle = cacheIterator->second.sample;
-            streamHandle = cacheIterator->second.stream;
+            sampleHandle = cachedEntry->sample;
+            streamHandle = cachedEntry->stream;
+            ownershipRecord = cachedEntry->ownership;
             ++result.metrics.cacheHitCount;
         }
         else
@@ -1130,8 +1393,6 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             if (isCancellationRequested(request))
                 return finishCanceled();
 
-            retireSupersededCacheEntries(sampleResolution.sampleSourceId, cacheKey, request.buildId);
-
             const auto retainedSampleBytes = computePreparedRetainedBytes(sampleHandle);
             CacheEntry entry;
             entry.ownership.ownershipToken = sampleHandle.ownershipToken;
@@ -1144,14 +1405,19 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             entry.sample = sampleHandle;
             entry.stream = streamHandle;
             entry.retainedBytes = retainedSampleBytes;
-            cacheEntries.push_back({ cacheKey, std::move(entry) });
+            {
+                std::lock_guard<std::mutex> lock(workerMutex);
+                retireSupersededCacheEntries(sampleResolution.sampleSourceId,
+                                             cacheKey,
+                                             request.buildId);
+                cacheEntries.push_back({ cacheKey, std::move(entry) });
+                ownershipRecord = cacheEntries.back().second.ownership;
+                refreshWorkerStatus();
+            }
             ++result.metrics.cacheMissCount;
         }
 
         const auto ownershipRecordIndex = result.prepared.ownershipRecords.size();
-        const auto& ownershipRecord = cacheHit
-            ? cacheIterator->second.ownership
-            : cacheEntries.back().second.ownership;
         result.prepared.ownershipRecords.push_back(ownershipRecord);
         sampleHandle.ownershipRecordIndex = ownershipRecordIndex;
         streamHandle.ownershipRecordIndex = ownershipRecordIndex;
@@ -1256,9 +1522,12 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         {
             return total + ownership.retainedBytes;
         });
-    result.metrics.activeCachedOwnershipRecordCount = cacheEntries.size();
-    result.metrics.retiredOwnershipRecordCount = retiredCacheEntries.size();
-    result.metrics.retiredBytesAwaitingCleanup = workerStatus.retiredBytesAwaitingCleanup;
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        result.metrics.activeCachedOwnershipRecordCount = cacheEntries.size();
+        result.metrics.retiredOwnershipRecordCount = retiredCacheEntries.size();
+        result.metrics.retiredBytesAwaitingCleanup = workerStatus.retiredBytesAwaitingCleanup;
+    }
 
     if (!snapshotResult.snapshot.contentDigest.empty())
         result.prepared.notes.push_back("Snapshot digest: " + snapshotResult.snapshot.contentDigest);
@@ -1297,6 +1566,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         result.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(result.prepared);
         if (isCancellationRequested(request))
             return finishCanceled();
+        result.admission.readiness = PreparedPlaybackReadinessState::playable;
     }
 
     result.buildDurationMicros = static_cast<std::uint64_t>(
@@ -1353,6 +1623,17 @@ void PreparedPlaybackService::setBackgroundWorkerStream(const RuntimeStreamLoadR
         workerStreamConfigured = true;
     }
 
+    workerCondition.notify_all();
+}
+
+void PreparedPlaybackService::registerPageServiceSource(const SampleDataSourcePtr& source)
+{
+    if (source == nullptr)
+        return;
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        pageServiceSources.emplace_back(source);
+    }
     workerCondition.notify_all();
 }
 
@@ -1732,11 +2013,14 @@ void PreparedPlaybackService::runBackgroundWorker()
     {
         QueuedJob job;
         RuntimeStreamLoadResult streamResult;
+        bool hasJob = false;
 
         {
             std::unique_lock<std::mutex> lock(workerMutex);
-            workerCondition.wait(
+            workerCondition.wait_for(
                 lock,
+                std::chrono::milliseconds(std::max<std::uint64_t>(
+                    1, schedulerBudgets.pageServicePollMilliseconds)),
                 [this]
                 {
                     return stopWorkerRequested
@@ -1747,29 +2031,40 @@ void PreparedPlaybackService::runBackgroundWorker()
             if (stopWorkerRequested)
                 break;
 
-            const auto selectedIterator = selectNextQueuedJob();
+            if (!queuedJobs.empty() && workerStreamConfigured
+                && completedResults.size() < schedulerBudgets.maximumCompletedResults)
+            {
+                const auto selectedIterator = selectNextQueuedJob();
 
-            job = *selectedIterator;
-            queuedJobs.erase(selectedIterator);
-            streamResult = workerStreamResult;
-            workerStatus.inFlightWorkCount = 1;
-            workerStatus.inFlightBuildId = job.request.buildId;
-            workerStatus.inFlightLane = job.lane;
-            if (job.lane == PreparedPlaybackWorkLane::performance)
-            {
-                ++workerStatus.performanceDispatchCount;
-                ++workerStatus.consecutivePerformanceDispatchCount;
-                workerStatus.maxConsecutivePerformanceDispatchCount = std::max(
-                    workerStatus.maxConsecutivePerformanceDispatchCount,
-                    workerStatus.consecutivePerformanceDispatchCount);
+                job = *selectedIterator;
+                queuedJobs.erase(selectedIterator);
+                streamResult = workerStreamResult;
+                hasJob = true;
+                workerStatus.inFlightWorkCount = 1;
+                workerStatus.inFlightBuildId = job.request.buildId;
+                workerStatus.inFlightLane = job.lane;
+                if (job.lane == PreparedPlaybackWorkLane::performance)
+                {
+                    ++workerStatus.performanceDispatchCount;
+                    ++workerStatus.consecutivePerformanceDispatchCount;
+                    workerStatus.maxConsecutivePerformanceDispatchCount = std::max(
+                        workerStatus.maxConsecutivePerformanceDispatchCount,
+                        workerStatus.consecutivePerformanceDispatchCount);
+                }
+                else
+                {
+                    ++workerStatus.previewDispatchCount;
+                    workerStatus.consecutivePerformanceDispatchCount = 0;
+                }
+                workerStatus.lastEvent = "Prepared playback worker processing " + toString(job.lane) + " request";
+                refreshWorkerStatus();
             }
-            else
-            {
-                ++workerStatus.previewDispatchCount;
-                workerStatus.consecutivePerformanceDispatchCount = 0;
-            }
-            workerStatus.lastEvent = "Prepared playback worker processing " + toString(job.lane) + " request";
-            refreshWorkerStatus();
+        }
+
+        if (!hasJob)
+        {
+            serviceStreamPageRequests();
+            continue;
         }
 
         auto stepResult = processQueuedJob(job, streamResult);
@@ -1793,6 +2088,79 @@ void PreparedPlaybackService::runBackgroundWorker()
 
         workerIdleCondition.notify_all();
     }
+}
+
+bool PreparedPlaybackService::serviceStreamPageRequests()
+{
+    std::vector<SampleDataSourcePtr> sources;
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        pageServiceSources.erase(
+            std::remove_if(pageServiceSources.begin(),
+                           pageServiceSources.end(),
+                           [](const auto& source) { return source.expired(); }),
+            pageServiceSources.end());
+        sources.reserve(cacheEntries.size() + pageServiceSources.size());
+        for (const auto& source : pageServiceSources)
+        {
+            if (auto retained = source.lock())
+                sources.push_back(std::move(retained));
+        }
+        for (const auto& entry : cacheEntries)
+        {
+            if (entry.second.sample.dataSource != nullptr)
+                sources.push_back(entry.second.sample.dataSource);
+        }
+    }
+
+    std::uint64_t intentCount = 0;
+    std::uint64_t preparedCount = 0;
+    std::uint64_t failureCount = 0;
+    for (const auto& source : sources)
+    {
+        SamplePageRequestScheduler scheduler(8);
+        if (const auto constWav = std::dynamic_pointer_cast<const WavPagedSampleDataSource>(source))
+        {
+            const auto wav = std::const_pointer_cast<WavPagedSampleDataSource>(constWav);
+            intentCount += wav->drainPageIntents(scheduler, 8);
+            SamplePageRequest request;
+            while (scheduler.popNext(request))
+            {
+                if (wav->preparePage(request.pageIndex))
+                    ++preparedCount;
+                else
+                    ++failureCount;
+            }
+        }
+        else if (const auto constPackage = std::dynamic_pointer_cast<const PackagePagedSampleDataSource>(source))
+        {
+            const auto package = std::const_pointer_cast<PackagePagedSampleDataSource>(constPackage);
+            intentCount += package->drainPageIntents(scheduler, 8);
+            SamplePageRequest request;
+            while (scheduler.popNext(request))
+            {
+                if (package->preparePage(request.pageIndex))
+                    ++preparedCount;
+                else
+                    ++failureCount;
+            }
+        }
+    }
+
+    if (intentCount == 0)
+        return false;
+
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        workerStatus.pageIntentCount += intentCount;
+        workerStatus.pagePrepareCount += preparedCount;
+        workerStatus.pagePrepareFailureCount += failureCount;
+        workerStatus.lastEvent = failureCount == 0
+            ? "Prepared streamed sample pages"
+            : "Streamed sample page preparation reported failures";
+        refreshWorkerStatus();
+    }
+    return preparedCount != 0;
 }
 
 void PreparedPlaybackService::refreshWorkerStatus()
@@ -2094,6 +2462,21 @@ bool operator==(const PreparedPlaybackOwnershipRecord& left, const PreparedPlayb
 
 bool operator==(const PreparedPlaybackSampleHandle& left, const PreparedPlaybackSampleHandle& right)
 {
+    const auto sourcesEqual = [&]()
+    {
+        if (left.dataSource == nullptr || right.dataSource == nullptr)
+            return left.dataSource == nullptr && right.dataSource == nullptr;
+        const auto& leftDescriptor = left.dataSource->descriptor();
+        const auto& rightDescriptor = right.dataSource->descriptor();
+        return leftDescriptor.kind == rightDescriptor.kind
+            && leftDescriptor.canonicalSourceIdentity == rightDescriptor.canonicalSourceIdentity
+            && leftDescriptor.provenanceIdentity == rightDescriptor.provenanceIdentity
+            && leftDescriptor.generation == rightDescriptor.generation
+            && leftDescriptor.frameCount == rightDescriptor.frameCount
+            && leftDescriptor.channelCount == rightDescriptor.channelCount
+            && leftDescriptor.headSizeBytes == rightDescriptor.headSizeBytes
+            && leftDescriptor.pageSizeBytes == rightDescriptor.pageSizeBytes;
+    };
     return left.sampleSourceId == right.sampleSourceId
         && left.streamSampleId == right.streamSampleId
         && left.sourcePath == right.sourcePath
@@ -2112,6 +2495,7 @@ bool operator==(const PreparedPlaybackSampleHandle& left, const PreparedPlayback
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
         && equalDecodedSampleData(left.decodedSampleData, right.decodedSampleData)
+        && sourcesEqual()
         && left.ownershipToken == right.ownershipToken
         && left.cacheKey == right.cacheKey
         && left.ownershipRecordIndex == right.ownershipRecordIndex;
@@ -2265,6 +2649,22 @@ std::string toString(PreparedPlaybackCompletionDisposition disposition)
         return "rejected";
     case PreparedPlaybackCompletionDisposition::failed:
         return "failed";
+    }
+    return "unknown";
+}
+
+std::string toString(PreparedPlaybackReadinessState state)
+{
+    switch (state)
+    {
+    case PreparedPlaybackReadinessState::metadataLoaded:
+        return "metadata-loaded";
+    case PreparedPlaybackReadinessState::playbackDeferred:
+        return "playback-deferred";
+    case PreparedPlaybackReadinessState::playable:
+        return "playable";
+    case PreparedPlaybackReadinessState::streamingRequired:
+        return "streaming-required";
     }
     return "unknown";
 }

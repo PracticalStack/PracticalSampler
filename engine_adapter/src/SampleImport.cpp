@@ -1192,6 +1192,15 @@ SampleInspectionResult inspectSampleFile(const std::string& samplePath,
     return result;
 }
 
+SampleInspectionResult inspectSampleFileMetadataOnly(const std::string& samplePath)
+{
+    // Admission needs container metadata before any corpus-sized fingerprint or PCM read.
+    // A private sentinel bypasses checksum calculation; it is removed from the public result.
+    auto result = inspectSampleFile(samplePath, "metadata-only-not-fingerprinted");
+    result.metadata.sourceChecksumHex.clear();
+    return result;
+}
+
 SampleImportResult importSampleFile(const std::string& samplePath,
                                     const std::string& knownFingerprintHex)
 {

@@ -1759,7 +1759,7 @@ bool MainComponent::loadPerformancePackageFromFile(const juce::File& file)
     auto task = PendingPerformancePackageOpenTask {};
     task.file = file;
     task.ready = std::make_shared<std::atomic<bool>>(false);
-    task.result = std::make_shared<drs::plugin::OpenedPerformancePackageWorkspaceLoadResult>();
+    task.result = std::make_shared<drs::plugin::PreparedPerformancePackageWorkspaceLoadResult>();
     task.generation = ++nextPerformancePackageOpenGeneration;
 
     const auto packagePath = file.getFullPathName().toStdString();
@@ -1768,7 +1768,7 @@ bool MainComponent::loadPerformancePackageFromFile(const juce::File& file)
     pendingPerformancePackageOpenTask = task;
     std::thread([packagePath, ready, result]()
     {
-        *result = drs::plugin::openPerformancePackageWorkspaceInBackground(packagePath);
+        *result = drs::plugin::preparePerformancePackageWorkspaceInBackground(packagePath);
         ready->store(true, std::memory_order_release);
     }).detach();
     updateWorkspaceStatusLabel();
@@ -1791,7 +1791,7 @@ void MainComponent::pollPerformancePackageOpenTask()
     auto prepared = std::move(*task.result);
     const auto timingSummary = buildPerformancePackageTimingSummary(prepared.timings);
 
-    if (!prepared.loaded)
+    if (!prepared.prepared)
     {
         auto issues = prepared.issues;
         if (!timingSummary.empty())
@@ -1808,8 +1808,8 @@ void MainComponent::pollPerformancePackageOpenTask()
         return;
     }
 
-    const auto loadResult = processor.activateOpenedPerformancePackageWorkspace(
-        std::move(prepared.packageLoad),
+    const auto loadResult = processor.activatePreparedPerformancePackageWorkspace(
+        std::move(prepared.activation),
         task.file);
     if (!loadResult.loaded)
     {
@@ -1987,7 +1987,9 @@ juce::String MainComponent::buildWorkspaceStatusText() const
 
     if (document.kind == drs::engine::WorkspaceDocumentKind::performancePackage)
     {
-        text += " | Playable package | Read-only | Reader v";
+        text += " | " + juce::String::fromUTF8(
+            drs::engine::packageWorkspaceStatusText(document.readiness).c_str());
+        text += " | Read-only | Reader v";
         text += juce::String(document.minimumReaderSchemaVersion);
     }
 
@@ -2008,11 +2010,7 @@ juce::String MainComponent::buildWorkspaceStatusTooltip() const
     if (document.kind != drs::engine::WorkspaceDocumentKind::performancePackage)
         return "Editable authoring workspace.";
 
-    auto tooltip = juce::String("Read-only playable package session.");
-    if (!document.sourcePath.empty())
-        tooltip += "\nSource: " + juce::String::fromUTF8(document.sourcePath.c_str());
-    tooltip += "\nCompatible reader schema: v" + juce::String(document.minimumReaderSchemaVersion);
-    return tooltip;
+    return juce::String::fromUTF8(drs::engine::packageWorkspaceStatusTooltip(document).c_str());
 }
 
 juce::String MainComponent::buildProjectIssueSummary(const std::vector<std::string>& issues) const
