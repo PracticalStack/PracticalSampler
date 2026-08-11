@@ -27,7 +27,8 @@ enum class PerformanceEventKind : std::uint8_t
     noteOff,
     release,
     pedalDown,
-    pedalUp
+    pedalUp,
+    controllerChange
 };
 
 enum class PerformanceSustainCondition : std::uint8_t
@@ -92,6 +93,31 @@ struct RuntimeProjectZonePerformanceDefinition
     PerformancePitchSource pitchSource = PerformancePitchSource::eventNote;
 };
 
+struct RuntimeControllerCondition
+{
+    int controllerNumber = 0;
+    int minimumValue = 0;
+    int maximumValue = 127;
+
+    bool operator==(const RuntimeControllerCondition& other) const noexcept
+    {
+        return controllerNumber == other.controllerNumber
+            && minimumValue == other.minimumValue
+            && maximumValue == other.maximumValue;
+    }
+};
+
+struct RuntimeControllerDefault
+{
+    int controllerNumber = 0;
+    int value = 0;
+
+    bool operator==(const RuntimeControllerDefault& other) const noexcept
+    {
+        return controllerNumber == other.controllerNumber && value == other.value;
+    }
+};
+
 struct RuntimeProjectZoneDefinition
 {
     std::string id;
@@ -120,6 +146,9 @@ struct RuntimeProjectZoneDefinition
     std::string exclusiveGroupId;
     std::vector<std::string> exclusiveTargetGroupIds;
     std::optional<double> chokeReleaseSeconds;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
+    std::vector<RuntimeControllerCondition> controllerConditions;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The
@@ -276,6 +305,7 @@ struct RuntimeProjectAuthoringState
     double masterGainDb = 0.0;
     std::vector<RuntimeProjectArticulationDefinition> articulations;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
+    std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectMacroDefinition> macros;
@@ -350,6 +380,9 @@ struct RuntimeZoneDefinition
     std::string exclusiveGroupId;
     std::vector<std::string> exclusiveTargetGroupIds;
     std::optional<double> chokeReleaseSeconds;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
+    std::vector<RuntimeControllerCondition> controllerConditions;
 };
 
 struct RuntimeInstrumentModel
@@ -366,6 +399,7 @@ struct RuntimeInstrumentModel
     std::vector<RuntimeGroupDefinition> groups;
     std::vector<RuntimeZoneDefinition> zones;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
+    std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> validationNotes;
 };
 

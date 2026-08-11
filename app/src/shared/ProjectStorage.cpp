@@ -370,11 +370,17 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.exclusiveGroupId = projectZone.exclusiveGroupId;
         zone.exclusiveTargetGroupIds = projectZone.exclusiveTargetGroupIds;
         zone.chokeReleaseSeconds = projectZone.chokeReleaseSeconds;
+        zone.fineTuneCents = projectZone.fineTuneCents;
+        zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
+        zone.controllerConditions = projectZone.controllerConditions;
         instrument.zones.push_back(std::move(zone));
     }
 
     if (instrument.schemaVersion >= 3)
+    {
         instrument.roundRobinResetRules = project.authoring.roundRobinResetRules;
+        instrument.controllerDefaults = project.authoring.controllerDefaults;
+    }
 
     populateCrossfadeRuntimeDescriptors(instrument.zones);
 

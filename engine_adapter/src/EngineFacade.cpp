@@ -1307,6 +1307,9 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.exclusiveGroupId = zone.exclusiveGroupId;
         snapshotZone.exclusiveTargetGroupIds = zone.exclusiveTargetGroupIds;
         snapshotZone.chokeReleaseSeconds = zone.chokeReleaseSeconds;
+        snapshotZone.fineTuneCents = zone.fineTuneCents;
+        snapshotZone.amplitudeVelocityTracking = zone.amplitudeVelocityTracking;
+        snapshotZone.controllerConditions = zone.controllerConditions;
         result.snapshot.zones.push_back(std::move(snapshotZone));
 
         if (!zone.articulationId.empty())
@@ -1336,6 +1339,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
     }
 
     result.snapshot.roundRobinResetRules = instrument.roundRobinResetRules;
+    result.snapshot.controllerDefaults = instrument.controllerDefaults;
 
     if (result.snapshot.sampleIdentities.empty())
     {

@@ -35,6 +35,9 @@ struct CompiledPerformanceTriggerRoute
     PerformanceEventKind event = PerformanceEventKind::noteOn;
     PerformanceSustainCondition sustain = PerformanceSustainCondition::any;
     PerformancePitchSource pitchSource = PerformancePitchSource::eventNote;
+    std::uint8_t triggerControllerNumber = 0;
+    std::uint8_t triggerControllerMinimum = 0;
+    std::uint8_t triggerControllerMaximum = 127;
 };
 
 struct CompiledPerformanceRoundRobinReset
@@ -45,8 +48,10 @@ struct CompiledPerformanceRoundRobinReset
 
 struct CompiledPerformanceProgram
 {
-    std::array<CompiledPerformanceEventRange, 5> eventRanges {};
+    std::array<CompiledPerformanceEventRange, 6> eventRanges {};
     std::array<CompiledPerformanceActivation, 128> activationByMidiNote {};
+    std::array<std::uint8_t, 128> controllerDefaults {};
+    std::array<bool, 128> hasControllerDefault {};
     std::vector<CompiledPerformanceTriggerRoute> triggerRoutes;
     std::vector<CompiledPerformanceRoundRobinReset> roundRobinResets;
     // Stable-ID hashes support allocation-free selection migration between published programs.

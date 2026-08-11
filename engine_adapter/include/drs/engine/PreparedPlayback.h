@@ -121,6 +121,9 @@ struct PreparedPlaybackZoneHandle
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
     ZoneTriggerMode triggerMode = ZoneTriggerMode::gated;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
+    std::vector<RuntimeControllerCondition> controllerConditions;
 };
 
 struct PreparedPlaybackGroupRoute
@@ -168,6 +171,7 @@ struct ImmutablePreparedPlayback
     std::vector<PreparedPlaybackStreamHandle> streams;
     std::vector<PreparedPlaybackGroupRoute> groupRoutes;
     std::vector<PreparedPlaybackZoneHandle> zones;
+    std::vector<RuntimeControllerDefault> controllerDefaults;
     CompiledPerformanceProgram performanceProgram;
     std::vector<std::string> notes;
 };

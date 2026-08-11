@@ -41,6 +41,9 @@ struct RuntimeCompileZoneDefinition
     std::vector<std::string> exclusiveTargetGroupIds;
     std::optional<double> chokeReleaseSeconds;
     std::uint64_t prefetchBytes = 16384;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
+    std::vector<RuntimeControllerCondition> controllerConditions;
 };
 
 struct RuntimeCompilePlan
@@ -62,6 +65,7 @@ struct RuntimeCompilePlan
     std::vector<RuntimeGroupDefinition> groups;
     std::vector<RuntimeCompileZoneDefinition> zones;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
+    std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> projectNotes;
     std::vector<std::string> instrumentValidationNotes;
     std::vector<std::string> streamNotes;

@@ -924,6 +924,12 @@ struct ImportedRoundRobinRepairKey
     int rootKey = 60;
     int keyLow = 0;
     int keyHigh = 127;
+    int velocityLow = 1;
+    int velocityHigh = 127;
+    int fadeInLowVelocity = 0;
+    int fadeInHighVelocity = 0;
+    int fadeOutLowVelocity = 0;
+    int fadeOutHighVelocity = 0;
     int triggerMode = 0;
 
     bool operator==(const ImportedRoundRobinRepairKey& other) const noexcept
@@ -932,6 +938,12 @@ struct ImportedRoundRobinRepairKey
             && rootKey == other.rootKey
             && keyLow == other.keyLow
             && keyHigh == other.keyHigh
+            && velocityLow == other.velocityLow
+            && velocityHigh == other.velocityHigh
+            && fadeInLowVelocity == other.fadeInLowVelocity
+            && fadeInHighVelocity == other.fadeInHighVelocity
+            && fadeOutLowVelocity == other.fadeOutLowVelocity
+            && fadeOutHighVelocity == other.fadeOutHighVelocity
             && triggerMode == other.triggerMode;
     }
 };
@@ -944,6 +956,12 @@ struct ImportedRoundRobinRepairKeyHash
         hash ^= std::hash<int> {}(key.rootKey) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         hash ^= std::hash<int> {}(key.keyLow) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         hash ^= std::hash<int> {}(key.keyHigh) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.velocityLow) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.velocityHigh) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.fadeInLowVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.fadeInHighVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.fadeOutLowVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
+        hash ^= std::hash<int> {}(key.fadeOutHighVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         hash ^= std::hash<int> {}(key.triggerMode) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         return hash;
     }
@@ -956,6 +974,12 @@ ImportedRoundRobinRepairKey makeImportedRoundRobinRepairKey(const RuntimeProject
         zone.rootKey,
         zone.keyLow,
         zone.keyHigh,
+        zone.velocityLow,
+        zone.velocityHigh,
+        zone.velocityCrossfade.fadeInLowVelocity,
+        zone.velocityCrossfade.fadeInHighVelocity,
+        zone.velocityCrossfade.fadeOutLowVelocity,
+        zone.velocityCrossfade.fadeOutHighVelocity,
         static_cast<int>(zone.triggerMode)
     };
 }
@@ -2809,7 +2833,8 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     std::vector<std::string> projectNotes,
     std::vector<std::string> authoringNotes,
     const std::string& label,
-    const bool reconcileInferredRoundRobin)
+    const bool reconcileInferredRoundRobin,
+    std::vector<RuntimeControllerDefault> controllerDefaults)
 {
     if (zones.empty())
         return makeRejectedResult(getDocumentState(),
@@ -2829,6 +2854,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
       const auto originalZoneCount = project.authoring.zones.size();
       const auto originalGroupCount = project.authoring.groups.size();
       const auto originalMasterGainDb = project.authoring.masterGainDb;
+      const auto originalControllerDefaultCount = project.authoring.controllerDefaults.size();
 
       project.sampleSources.insert(project.sampleSources.end(),
                                    std::make_move_iterator(sampleSources.begin()),
@@ -2837,6 +2863,17 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
                                      std::make_move_iterator(zones.begin()),
                                      std::make_move_iterator(zones.end()));
       project.authoring.masterGainDb += importedMasterGainDb;
+      for (const auto& importedDefault : controllerDefaults)
+      {
+          const auto existing = std::find_if(
+              project.authoring.controllerDefaults.begin(), project.authoring.controllerDefaults.end(),
+              [&](const RuntimeControllerDefault& value)
+              { return value.controllerNumber == importedDefault.controllerNumber; });
+          if (existing == project.authoring.controllerDefaults.end())
+              project.authoring.controllerDefaults.push_back(importedDefault);
+          else
+              *existing = importedDefault;
+      }
       if (usesExplicitZoneGroupsSchema(project))
       {
           auto nextDisplayOrder = static_cast<int>(project.authoring.groups.size());
@@ -2899,6 +2936,9 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
       };
       if (project.authoring.masterGainDb != originalMasterGainDb)
           changedPaths.push_back("authoring.masterGainDb");
+      if (!controllerDefaults.empty()
+          || project.authoring.controllerDefaults.size() != originalControllerDefaultCount)
+          changedPaths.push_back("authoring.controllerDefaults");
       if (usesExplicitZoneGroupsSchema(project))
       {
           changedPaths.push_back("authoring.selectedGroupId");

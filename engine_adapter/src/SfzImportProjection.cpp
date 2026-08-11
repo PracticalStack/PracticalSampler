@@ -164,6 +164,69 @@ std::optional<int> parseIntValue(const std::string& text)
     }
 }
 
+std::optional<int> parseControllerOpcodeNumber(const std::string& opcodeName,
+                                               const std::string& prefix)
+{
+    if (opcodeName.rfind(prefix, 0) != 0 || opcodeName.size() == prefix.size())
+        return std::nullopt;
+    const auto suffix = opcodeName.substr(prefix.size());
+    if (!std::all_of(suffix.begin(), suffix.end(), [](const unsigned char character)
+                     { return std::isdigit(character) != 0; }))
+        return std::nullopt;
+    const auto number = parseIntValue(suffix);
+    if (!number.has_value() || *number < 0 || *number > 127)
+        return std::nullopt;
+    return number;
+}
+
+std::vector<RuntimeControllerCondition> buildControllerConditions(
+    const SfzNormalizedSection& section,
+    bool& hasControllerTrigger,
+    int& triggerControllerNumber)
+{
+    struct Range { int low = 0; int high = 127; bool present = false; bool trigger = false; };
+    std::map<int, Range> ranges;
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        const auto apply = [&](const std::string& prefix, const bool isLow, const bool trigger)
+        {
+            const auto controller = parseControllerOpcodeNumber(opcode.name, prefix);
+            if (!controller.has_value()) return false;
+            auto& range = ranges[*controller];
+            range.present = true;
+            range.trigger = range.trigger || trigger;
+            const auto value = std::clamp(parseIntValue(opcode.value).value_or(isLow ? 0 : 127), 0, 127);
+            if (isLow) range.low = value; else range.high = value;
+            return true;
+        };
+        if (apply("on_locc", true, true) || apply("on_hicc", false, true)
+            || apply("locc", true, false) || apply("hicc", false, false))
+            continue;
+    }
+
+    std::vector<RuntimeControllerCondition> conditions;
+    conditions.reserve(ranges.size());
+    for (const auto& [controller, range] : ranges)
+    {
+        if (!range.present) continue;
+        conditions.push_back({ controller, range.low, range.high });
+        if (range.trigger && !hasControllerTrigger)
+        {
+            hasControllerTrigger = true;
+            triggerControllerNumber = controller;
+        }
+    }
+    if (hasControllerTrigger)
+    {
+        const auto triggerCondition = std::find_if(
+            conditions.begin(), conditions.end(), [&](const RuntimeControllerCondition& condition)
+            { return condition.controllerNumber == triggerControllerNumber; });
+        if (triggerCondition != conditions.end())
+            std::rotate(conditions.begin(), triggerCondition, triggerCondition + 1);
+    }
+    return conditions;
+}
+
 std::optional<std::uint64_t> parseFrameValue(const std::string& text)
 {
     try
@@ -282,16 +345,29 @@ std::string buildArticulationDisplayName(const std::string& articulationId)
 
 std::string buildArticulationId(const SfzNormalizedSection& section)
 {
+    std::string base = "sustain";
     if (const auto* trigger = findEffectiveOpcode(section, "trigger"))
     {
         const auto lowered = toLowerAscii(trigger->value);
         if (lowered == "release")
-            return "release";
-        if (lowered == "legato")
-            return "legato";
+            base = "release";
+        else if (lowered == "legato")
+            base = "legato";
     }
 
-    return "sustain";
+    std::ostringstream signature;
+    signature << base;
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        if (parseControllerOpcodeNumber(opcode.name, "locc").has_value()
+            || parseControllerOpcodeNumber(opcode.name, "hicc").has_value()
+            || parseControllerOpcodeNumber(opcode.name, "on_locc").has_value()
+            || parseControllerOpcodeNumber(opcode.name, "on_hicc").has_value()
+            || opcode.name == "tune"
+            || opcode.name == "group_volume")
+            signature << "-" << opcode.name << "-" << opcode.value;
+    }
+    return slugify(signature.str());
 }
 
 std::string buildGroupId(const SfzNormalizedSection& section,
@@ -667,6 +743,17 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
     project.authoring.zones.insert(project.authoring.zones.end(),
                                    projection.zones.begin(),
                                    projection.zones.end());
+    for (const auto& importedDefault : projection.controllerDefaults)
+    {
+        const auto existing = std::find_if(
+            project.authoring.controllerDefaults.begin(), project.authoring.controllerDefaults.end(),
+            [&](const RuntimeControllerDefault& value)
+            { return value.controllerNumber == importedDefault.controllerNumber; });
+        if (existing == project.authoring.controllerDefaults.end())
+            project.authoring.controllerDefaults.push_back(importedDefault);
+        else
+            *existing = importedDefault;
+    }
     project.notes.insert(project.notes.end(),
                          projection.projectNotes.begin(),
                          projection.projectNotes.end());
@@ -936,6 +1023,20 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     std::map<std::string, ProjectedGroupState> projectedGroupStates;
     ScopedGainState scopedGainState;
 
+    std::map<int, int> importedControllerDefaults;
+    for (const auto& section : analysis.normalizeResult.document.sections)
+    {
+        for (const auto& opcode : section.localOpcodes)
+        {
+            const auto controllerNumber = parseControllerOpcodeNumber(opcode.name, "set_cc");
+            if (!controllerNumber.has_value()) continue;
+            importedControllerDefaults[*controllerNumber]
+                = std::clamp(parseIntValue(opcode.value).value_or(0), 0, 127);
+        }
+    }
+    for (const auto& [controllerNumber, value] : importedControllerDefaults)
+        result.controllerDefaults.push_back({ controllerNumber, value });
+
     result.projectNotes = buildProjectNotes(analysis.report);
     result.authoringNotes = buildAuthoringNotes(analysis.report);
     for (const auto& omission : result.omittedRegionSummaries)
@@ -966,6 +1067,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             result.sampleSources.clear();
             result.groups.clear();
             result.zones.clear();
+            result.controllerDefaults.clear();
             result.projectNotes.clear();
             result.authoringNotes.clear();
             result.state = "SFZ projection canceled";
@@ -993,16 +1095,12 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
         if (section.scope == SfzOpcodeScope::group)
         {
-            if (const auto* volumeOpcode = findLocalOpcode(section, "volume"))
-            {
-                scopedGainState.groupGainDb = parseDoubleValue(volumeOpcode->value).value_or(0.0);
-                scopedGainState.hasGroupGain = true;
-            }
-            else
-            {
-                scopedGainState.groupGainDb = 0.0;
-                scopedGainState.hasGroupGain = false;
-            }
+            const auto* volumeOpcode = findLocalOpcode(section, "volume");
+            const auto* groupVolumeOpcode = findLocalOpcode(section, "group_volume");
+            scopedGainState.groupGainDb =
+                (volumeOpcode != nullptr ? parseDoubleValue(volumeOpcode->value).value_or(0.0) : 0.0)
+                + (groupVolumeOpcode != nullptr ? parseDoubleValue(groupVolumeOpcode->value).value_or(0.0) : 0.0);
+            scopedGainState.hasGroupGain = volumeOpcode != nullptr || groupVolumeOpcode != nullptr;
 
             continue;
         }
@@ -1096,6 +1194,17 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         if (preserveVelocityCrossfade)
             zone.velocityCrossfade = crossfade;
         zone.gainDb = scopedGainContribution.hasRegionGain ? scopedGainContribution.regionGainDb : 0.0;
+        zone.fineTuneCents = parseDoubleValue(findEffectiveOpcode(section, "tune") != nullptr
+                                                  ? findEffectiveOpcode(section, "tune")->value
+                                                  : "0")
+                                 .value_or(0.0);
+        zone.amplitudeVelocityTracking = std::clamp(
+            parseDoubleValue(findEffectiveOpcode(section, "amp_veltrack") != nullptr
+                                 ? findEffectiveOpcode(section, "amp_veltrack")->value
+                                 : "100")
+                .value_or(100.0),
+            0.0,
+            100.0);
         zone.releaseSeconds = parseDoubleValue(findEffectiveOpcode(section, "ampeg_release") != nullptr
                                                    ? findEffectiveOpcode(section, "ampeg_release")->value
                                                    : "0")
@@ -1130,11 +1239,39 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                                               usedRoundRobinPoolIds,
                                                               roundRobinPoolIdsBySignature);
 
+        bool hasControllerTrigger = false;
+        int triggerControllerNumber = -1;
+        zone.controllerConditions = buildControllerConditions(section,
+                                                              hasControllerTrigger,
+                                                              triggerControllerNumber);
+
         if (const auto* trigger = findEffectiveOpcode(section, "trigger"))
         {
             const auto lowered = toLowerAscii(trigger->value);
             if (lowered == "release")
+            {
                 zone.triggerMode = ZoneTriggerMode::oneShot;
+                zone.performance.event = PerformanceEventKind::release;
+                zone.performance.sustain = PerformanceSustainCondition::pedalUp;
+            }
+        }
+        if (hasControllerTrigger)
+        {
+            zone.triggerMode = ZoneTriggerMode::oneShot;
+            zone.performance.pitchSource = PerformancePitchSource::fixedRoot;
+            const auto triggerCondition = std::find_if(
+                zone.controllerConditions.begin(), zone.controllerConditions.end(),
+                [&](const RuntimeControllerCondition& condition)
+                { return condition.controllerNumber == triggerControllerNumber; });
+            if (triggerControllerNumber == 64 && triggerCondition != zone.controllerConditions.end())
+            {
+                zone.performance.event = triggerCondition->minimumValue >= 64
+                    ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
+            }
+            else
+            {
+                zone.performance.event = PerformanceEventKind::controllerChange;
+            }
         }
 
         if (scopedGainContribution.hasMasterGain)
@@ -1208,6 +1345,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         result.sampleSources.clear();
         result.groups.clear();
         result.zones.clear();
+        result.controllerDefaults.clear();
         result.projectNotes.clear();
         result.authoringNotes.clear();
         result.state = "SFZ projection canceled";
@@ -1260,6 +1398,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     {
         result.sampleSources.clear();
         result.zones.clear();
+        result.controllerDefaults.clear();
         result.projectNotes.clear();
         result.authoringNotes.clear();
         result.state = "SFZ projection canceled";
@@ -1318,6 +1457,7 @@ RuntimeProjectDocumentActionResult applySfzImportProjection(AuthoringSession& au
                                                   std::move(projection.projectNotes),
                                                   std::move(projection.authoringNotes),
                                                   label,
-                                                  false);
+                                                  false,
+                                                  std::move(projection.controllerDefaults));
 }
 } // namespace drs::engine

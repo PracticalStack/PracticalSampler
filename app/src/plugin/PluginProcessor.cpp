@@ -133,7 +133,9 @@ drs::engine::SamplerRenderEvent normalizeHostMidiEvent(
     const int midiNote,
     const int velocity,
     const int channel,
-    const int noteOffVelocity = 0) noexcept
+    const int noteOffVelocity = 0,
+    const int controllerNumber = 0,
+    const int controllerValue = 0) noexcept
 {
     drs::engine::SamplerRenderEvent event;
     event.type = type;
@@ -142,6 +144,8 @@ drs::engine::SamplerRenderEvent normalizeHostMidiEvent(
     event.velocity = static_cast<float>(clampMidiValue(velocity)) / 127.0f;
     event.midiChannel = static_cast<std::uint8_t>(std::clamp(channel, 0, 15));
     event.noteOffVelocity = static_cast<float>(clampMidiValue(noteOffVelocity)) / 127.0f;
+    event.controllerNumber = static_cast<std::uint8_t>(clampMidiValue(controllerNumber));
+    event.controllerValue = static_cast<std::uint8_t>(clampMidiValue(controllerValue));
     return event;
 }
 
@@ -779,10 +783,14 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.exclusiveTargetGroupIds = projectZone.exclusiveTargetGroupIds;
         zone.chokeReleaseSeconds = projectZone.chokeReleaseSeconds;
         zone.prefetchBytes = 16384;
+        zone.fineTuneCents = projectZone.fineTuneCents;
+        zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
+        zone.controllerConditions = projectZone.controllerConditions;
         plan.zones.push_back(std::move(zone));
     }
 
     plan.roundRobinResetRules = project.authoring.roundRobinResetRules;
+    plan.controllerDefaults = project.authoring.controllerDefaults;
 
     result.manifest.packageId = baseId;
     result.manifest.displayName = displayName;
@@ -1522,7 +1530,8 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         else if (command == 0xb0 && metadata.numBytes > 2 && eventData[1] == 64u)
         {
             queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::sustainPedal,
-                                                  eventSample, 0, eventData[2] & 0x7fu, channel));
+                                                  eventSample, 0, eventData[2] & 0x7fu, channel,
+                                                  0, 64, eventData[2] & 0x7fu));
         }
         else if (command == 0xb0 && metadata.numBytes > 1 && eventData[1] == 123u)
         {
@@ -1533,6 +1542,13 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         {
             queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::reset,
                                                   eventSample, 0, 0, channel));
+        }
+        else if (command == 0xb0 && metadata.numBytes > 2)
+        {
+            queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::controllerChange,
+                                                  eventSample, 0, 0, channel, 0,
+                                                  eventData[1] & 0x7fu,
+                                                  eventData[2] & 0x7fu));
         }
     }
 

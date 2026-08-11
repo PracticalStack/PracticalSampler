@@ -199,7 +199,8 @@ public:
                                                             std::vector<std::string> projectNotes,
                                                             std::vector<std::string> authoringNotes,
                                                             const std::string& label,
-                                                            bool reconcileInferredRoundRobin = true);
+                                                            bool reconcileInferredRoundRobin = true,
+                                                            std::vector<RuntimeControllerDefault> controllerDefaults = {});
     RuntimeProjectDocumentActionResult createMacro(const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);
     RuntimeProjectDocumentActionResult duplicateMacro(const std::string& macroId,

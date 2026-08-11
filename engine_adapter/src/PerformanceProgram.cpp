@@ -53,6 +53,19 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
     CompiledPerformanceProgramResult result;
     for (auto& activation : result.program.activationByMidiNote)
         activation.articulationIndex = kInvalidPerformanceProgramIndex;
+    for (const auto& controllerDefault : authoring.controllerDefaults)
+    {
+        if (controllerDefault.controllerNumber < 0 || controllerDefault.controllerNumber > 127
+            || controllerDefault.value < 0 || controllerDefault.value > 127)
+        {
+            result.issues.push_back("Performance compiler found an invalid controller default.");
+            continue;
+        }
+        const auto index = static_cast<std::size_t>(controllerDefault.controllerNumber);
+        result.program.controllerDefaults[index]
+            = static_cast<std::uint8_t>(controllerDefault.value);
+        result.program.hasControllerDefault[index] = true;
+    }
 
     const auto articulationIds = sortedIds(authoring.articulations, [](const auto& item) -> const std::string& { return item.id; });
     const auto articulationIndex = makeIndex(articulationIds);
@@ -146,6 +159,16 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
         route.event = zone.performance.event;
         route.sustain = zone.performance.sustain;
         route.pitchSource = zone.performance.pitchSource;
+        if (!zone.controllerConditions.empty())
+        {
+            const auto& condition = zone.controllerConditions.front();
+            route.triggerControllerNumber = static_cast<std::uint8_t>(
+                std::clamp(condition.controllerNumber, 0, 127));
+            route.triggerControllerMinimum = static_cast<std::uint8_t>(
+                std::clamp(condition.minimumValue, 0, 127));
+            route.triggerControllerMaximum = static_cast<std::uint8_t>(
+                std::clamp(condition.maximumValue, 0, 127));
+        }
         route.chokeReleaseSeconds = static_cast<float>(zone.chokeReleaseSeconds.value_or(0.0));
         if (!zone.exclusiveGroupId.empty())
         {
@@ -220,6 +243,12 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
             activations.push_back({ { "midiNote", note }, { "articulationIndex", activation.articulationIndex }, { "consume", activation.consume } });
     }
     root["activations"] = std::move(activations);
+    nlohmann::ordered_json controllerDefaults = nlohmann::ordered_json::array();
+    for (std::size_t controller = 0; controller < program.controllerDefaults.size(); ++controller)
+        if (program.hasControllerDefault[controller])
+            controllerDefaults.push_back({ { "controllerNumber", controller },
+                                           { "value", program.controllerDefaults[controller] } });
+    root["controllerDefaults"] = std::move(controllerDefaults);
     root["articulationStableIds"] = program.articulationStableIds;
     root["exclusiveGroupStableIds"] = program.exclusiveGroupStableIds;
     root["roundRobinPoolStableIds"] = program.roundRobinPoolStableIds;
@@ -229,7 +258,10 @@ std::string serializeCompiledPerformanceProgram(const CompiledPerformanceProgram
         routes.push_back({ { "zoneIndex", route.zoneIndex }, { "articulationIndex", route.articulationIndex },
                            { "exclusiveGroupIndex", route.exclusiveGroupIndex }, { "chokeTargetMask", route.chokeTargetMask },
                            { "chokeReleaseSeconds", route.chokeReleaseSeconds }, { "event", static_cast<int>(route.event) },
-                           { "sustain", static_cast<int>(route.sustain) }, { "pitchSource", static_cast<int>(route.pitchSource) } });
+                           { "sustain", static_cast<int>(route.sustain) }, { "pitchSource", static_cast<int>(route.pitchSource) },
+                           { "triggerControllerNumber", route.triggerControllerNumber },
+                           { "triggerControllerMinimum", route.triggerControllerMinimum },
+                           { "triggerControllerMaximum", route.triggerControllerMaximum } });
     root["triggerRoutes"] = std::move(routes);
     nlohmann::ordered_json resets = nlohmann::ordered_json::array();
     for (const auto& reset : program.roundRobinResets)

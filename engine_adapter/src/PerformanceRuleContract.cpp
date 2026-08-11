@@ -32,6 +32,7 @@ std::string_view performanceEventKindId(const PerformanceEventKind value) noexce
         case PerformanceEventKind::release: return "release";
         case PerformanceEventKind::pedalDown: return "pedal-down";
         case PerformanceEventKind::pedalUp: return "pedal-up";
+        case PerformanceEventKind::controllerChange: return "controller-change";
     }
     return {};
 }
@@ -79,7 +80,7 @@ bool parsePerformanceEventKind(const std::string_view value, PerformanceEventKin
 {
     for (const auto candidate : { PerformanceEventKind::noteOn, PerformanceEventKind::noteOff,
                                   PerformanceEventKind::release, PerformanceEventKind::pedalDown,
-                                  PerformanceEventKind::pedalUp })
+                                  PerformanceEventKind::pedalUp, PerformanceEventKind::controllerChange })
         if (value == performanceEventKindId(candidate)) { result = candidate; return true; }
     return false;
 }
@@ -155,6 +156,23 @@ PerformanceRuleValidationResult validatePerformanceRuleDeclarations(
         addFinding(result, "performance.activation.capacity", "authoring.articulations",
                    "Activation rule count exceeds the 128-rule limit.", "Remove or consolidate activation rules.");
 
+    std::unordered_set<int> controllerDefaultNumbers;
+    for (std::size_t index = 0; index < authoring.controllerDefaults.size(); ++index)
+    {
+        const auto& value = authoring.controllerDefaults[index];
+        if (value.controllerNumber < 0 || value.controllerNumber > 127
+            || value.value < 0 || value.value > 127)
+            addFinding(result, "performance.controller_default.invalid",
+                       "authoring.controllerDefaults[" + std::to_string(index) + "]",
+                       "Controller defaults must use a valid CC number and a 0-127 value.",
+                       "Choose a valid controller number and default value.");
+        else if (!controllerDefaultNumbers.insert(value.controllerNumber).second)
+            addFinding(result, "performance.controller_default.duplicate",
+                       "authoring.controllerDefaults[" + std::to_string(index) + "]",
+                       "Each controller may have only one authored default.",
+                       "Merge duplicate defaults for the same controller.");
+    }
+
     std::unordered_set<std::string> exclusiveGroups;
     for (std::size_t index = 0; index < authoring.zones.size(); ++index)
     {
@@ -186,10 +204,35 @@ PerformanceRuleValidationResult validatePerformanceRuleDeclarations(
             addFinding(result, "performance.zone.unreachable_condition", path + ".performance.sustain",
                        "Effective release is emitted only after the pedal is up.", "Use sustain pedal-up.");
         if (zone.performance.pitchSource == PerformancePitchSource::fixedRoot
-            && !isPedalTransition(zone.performance.event))
+            && !isPedalTransition(zone.performance.event)
+            && zone.performance.event != PerformanceEventKind::controllerChange)
             addFinding(result, "performance.zone.fixed_pitch_invalid", path + ".performance.pitchSource",
-                       "Fixed-root pitch is reserved for pedal transition routes in v1.",
-                       "Use event-note for note-on, note-off, and release routes.");
+                       "Fixed-root pitch is reserved for pedal transition and controller-change routes in v1.",
+                           "Use event-note for note-on, note-off, and release routes.");
+        if (!std::isfinite(zone.fineTuneCents) || zone.fineTuneCents < -1200.0 || zone.fineTuneCents > 1200.0)
+            addFinding(result, "performance.zone.fine_tune_invalid", path + ".fineTuneCents",
+                       "Fine tuning must be finite and between -1200 and 1200 cents.",
+                       "Choose a bounded fine-tuning value.");
+        if (!std::isfinite(zone.amplitudeVelocityTracking)
+            || zone.amplitudeVelocityTracking < 0.0 || zone.amplitudeVelocityTracking > 100.0)
+            addFinding(result, "performance.zone.velocity_tracking_invalid", path + ".amplitudeVelocityTracking",
+                       "Amplitude velocity tracking must be finite and between 0 and 100 percent.",
+                       "Choose a value supported by the native power law.");
+        for (std::size_t conditionIndex = 0;
+             conditionIndex < zone.controllerConditions.size(); ++conditionIndex)
+        {
+            const auto& condition = zone.controllerConditions[conditionIndex];
+            if (condition.controllerNumber < 0 || condition.controllerNumber > 127
+                || condition.minimumValue < 0 || condition.minimumValue > 127
+                || condition.maximumValue < condition.minimumValue
+                || condition.maximumValue > 127)
+            {
+                addFinding(result, "performance.zone.controller_condition_invalid",
+                           path + ".controllerConditions[" + std::to_string(conditionIndex) + "]",
+                           "Controller conditions must use a valid CC number and ordered 0-127 range.",
+                           "Choose a valid controller number and inclusive range.");
+            }
+        }
         if (zone.rootKey < 0 || zone.rootKey > 127)
             addFinding(result, "performance.zone.root_key_range", path + ".rootKey",
                        "Zone root key must be in the range 0-127.", "Choose a valid MIDI root key.");

@@ -157,5 +157,6 @@ private:
     std::uint64_t activeGeneration = 0;
     std::uint64_t nextGeneratedActivation = 1;
     bool sustainPedalDown = false;
+    std::array<std::uint8_t, 128> controllerValues {};
 };
 } // namespace drs::engine

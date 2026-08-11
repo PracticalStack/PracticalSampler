@@ -30,7 +30,7 @@ struct PerformanceLaneStateSnapshot
     std::uint32_t heldNoteCount = 0;
     std::uint32_t consumedNoteCount = 0;
     std::uint64_t actionOverflowCount = 0;
-    std::array<std::uint64_t, 5> semanticEventCounts {};
+    std::array<std::uint64_t, 6> semanticEventCounts {};
 };
 
 // Fixed action storage makes one normalized event all-or-nothing. Future trigger actions use
@@ -86,6 +86,6 @@ private:
     std::uint32_t articulationCount = 0;
     bool pedalIsDown = false;
     std::uint64_t actionOverflowCount = 0;
-    std::array<std::uint64_t, 5> semanticEventCounts {};
+    std::array<std::uint64_t, 6> semanticEventCounts {};
 };
 } // namespace drs::engine

@@ -806,6 +806,24 @@ void populateVelocityCrossfadeRuntimeDescriptors(std::vector<RuntimeZoneDefiniti
     }
 }
 
+ordered_json serializeControllerConditions(const std::vector<RuntimeControllerCondition>& conditions)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& condition : conditions)
+        array.push_back({ { "controllerNumber", condition.controllerNumber },
+                          { "minimumValue", condition.minimumValue },
+                          { "maximumValue", condition.maximumValue } });
+    return array;
+}
+
+ordered_json serializeControllerDefaults(const std::vector<RuntimeControllerDefault>& defaults)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& value : defaults)
+        array.push_back({ { "controllerNumber", value.controllerNumber }, { "value", value.value } });
+    return array;
+}
+
 ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones,
                                    bool useExplicitRoundRobin,
                                    bool usePerformanceRules)
@@ -848,6 +866,12 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
             zoneObject["triggerMode"] = "one-shot";
         if (usePerformanceRules)
         {
+            if (zone.fineTuneCents != 0.0)
+                zoneObject["fineTuneCents"] = zone.fineTuneCents;
+            if (zone.amplitudeVelocityTracking != 100.0)
+                zoneObject["amplitudeVelocityTracking"] = zone.amplitudeVelocityTracking;
+            if (!zone.controllerConditions.empty())
+                zoneObject["controllerConditions"] = serializeControllerConditions(zone.controllerConditions);
             zoneObject["performance"] = {
                 { "event", performanceEventKindId(zone.performance.event) },
                 { "sustain", performanceSustainConditionId(zone.performance.sustain) },
@@ -1333,6 +1357,29 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         zone.loopEndFrame = *loopEndFrame;
                     if (const auto releaseSeconds = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                         zone.releaseSeconds = *releaseSeconds;
+                    if (const auto tune = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
+                        zone.fineTuneCents = *tune;
+                    if (const auto velocityTrack = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
+                        zone.amplitudeVelocityTracking = *velocityTrack;
+                    if (zoneObject.contains("controllerConditions"))
+                    {
+                        const auto& conditions = zoneObject["controllerConditions"];
+                        if (!isObjectArray(conditions))
+                            addIssue(result, context + " field 'controllerConditions' must be an array of objects.");
+                        else
+                            for (std::size_t conditionIndex = 0; conditionIndex < conditions.size(); ++conditionIndex)
+                            {
+                                const auto conditionContext = context + ".ControllerCondition[" + std::to_string(conditionIndex) + "]";
+                                RuntimeControllerCondition condition;
+                                const auto controller = readRequired<RuntimeProjectLoadResult, int>(conditions[conditionIndex], result, "controllerNumber", conditionContext.c_str());
+                                const auto minimum = readRequired<RuntimeProjectLoadResult, int>(conditions[conditionIndex], result, "minimumValue", conditionContext.c_str());
+                                const auto maximum = readRequired<RuntimeProjectLoadResult, int>(conditions[conditionIndex], result, "maximumValue", conditionContext.c_str());
+                                if (controller) condition.controllerNumber = *controller;
+                                if (minimum) condition.minimumValue = *minimum;
+                                if (maximum) condition.maximumValue = *maximum;
+                                zone.controllerConditions.push_back(condition);
+                            }
+                    }
 
                     const auto explicitRoundRobin = readOptionalRoundRobin(zoneObject, result, "roundRobin", context.c_str());
                     const auto hasExplicitRoundRobinField = zoneObject.find("roundRobin") != zoneObject.end();
@@ -1411,6 +1458,23 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
             if (project.schemaVersion >= 6 && authoring.schemaVersion >= 5)
             {
+                const auto controllerDefaultsIterator = authoringIterator->find("controllerDefaults");
+                if (controllerDefaultsIterator != authoringIterator->end())
+                {
+                    if (!isObjectArray(*controllerDefaultsIterator))
+                        addIssue(result, "Project authoring field 'controllerDefaults' must be an array of objects.");
+                    else
+                        for (std::size_t index = 0; index < controllerDefaultsIterator->size(); ++index)
+                        {
+                            const auto context = "ControllerDefault[" + std::to_string(index) + "]";
+                            RuntimeControllerDefault value;
+                            const auto controller = readRequired<RuntimeProjectLoadResult, int>(controllerDefaultsIterator->at(index), result, "controllerNumber", context.c_str());
+                            const auto defaultValue = readRequired<RuntimeProjectLoadResult, int>(controllerDefaultsIterator->at(index), result, "value", context.c_str());
+                            if (controller) value.controllerNumber = *controller;
+                            if (defaultValue) value.value = *defaultValue;
+                            authoring.controllerDefaults.push_back(value);
+                        }
+                }
                 const auto resetRulesIterator = authoringIterator->find("roundRobinResetRules");
                 if (resetRulesIterator != authoringIterator->end())
                 {
@@ -2924,6 +2988,29 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 zone.prefetchBytes = *prefetchBytes;
             if (const auto releaseSeconds = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                 zone.releaseSeconds = *releaseSeconds;
+            if (const auto tune = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
+                zone.fineTuneCents = *tune;
+            if (const auto velocityTrack = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
+                zone.amplitudeVelocityTracking = *velocityTrack;
+            if (zoneObject.contains("controllerConditions"))
+            {
+                const auto& conditions = zoneObject["controllerConditions"];
+                if (!isObjectArray(conditions))
+                    addIssue(result, context + " field 'controllerConditions' must be an array of objects.");
+                else
+                    for (std::size_t conditionIndex = 0; conditionIndex < conditions.size(); ++conditionIndex)
+                    {
+                        const auto conditionContext = context + ".ControllerCondition[" + std::to_string(conditionIndex) + "]";
+                        RuntimeControllerCondition condition;
+                        const auto controller = readRequired<RuntimeManifestLoadResult, int>(conditions[conditionIndex], result, "controllerNumber", conditionContext.c_str());
+                        const auto minimum = readRequired<RuntimeManifestLoadResult, int>(conditions[conditionIndex], result, "minimumValue", conditionContext.c_str());
+                        const auto maximum = readRequired<RuntimeManifestLoadResult, int>(conditions[conditionIndex], result, "maximumValue", conditionContext.c_str());
+                        if (controller) condition.controllerNumber = *controller;
+                        if (minimum) condition.minimumValue = *minimum;
+                        if (maximum) condition.maximumValue = *maximum;
+                        zone.controllerConditions.push_back(condition);
+                    }
+            }
 
             const auto explicitRoundRobin = readOptionalRoundRobin(zoneObject, result, "roundRobin", context.c_str());
             const auto hasExplicitRoundRobinField = zoneObject.find("roundRobin") != zoneObject.end();
@@ -3005,6 +3092,17 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
             if (!std::isfinite(zone.gainDb))
                 addIssue(result, context + " field 'gainDb' must be finite.");
+            if (!std::isfinite(zone.fineTuneCents)
+                || zone.fineTuneCents < -1200.0 || zone.fineTuneCents > 1200.0)
+                addIssue(result, context + " field 'fineTuneCents' must be finite and between -1200 and 1200.");
+            if (!std::isfinite(zone.amplitudeVelocityTracking)
+                || zone.amplitudeVelocityTracking < 0.0 || zone.amplitudeVelocityTracking > 100.0)
+                addIssue(result, context + " field 'amplitudeVelocityTracking' must be finite and between 0 and 100.");
+            for (const auto& condition : zone.controllerConditions)
+                if (condition.controllerNumber < 0 || condition.controllerNumber > 127
+                    || condition.minimumValue < 0 || condition.maximumValue > 127
+                    || condition.minimumValue > condition.maximumValue)
+                    addIssue(result, context + " contains an invalid controller condition.");
 
             validateRoundRobinDescriptor(result,
                                          context,
@@ -3062,6 +3160,35 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 if (const auto pool = readOptional<RuntimeManifestLoadResult, std::string>(value, result, "targetPoolId", context.c_str())) rule.targetPoolId = *pool;
                 instrument.roundRobinResetRules.push_back(std::move(rule));
             }
+        }
+    }
+
+    if (instrument.schemaVersion >= 3 && root.contains("controllerDefaults"))
+    {
+        const auto& defaults = root["controllerDefaults"];
+        if (!isObjectArray(defaults))
+            addIssue(result, "Manifest field 'controllerDefaults' must be an array of objects.");
+        else
+            for (std::size_t index = 0; index < defaults.size(); ++index)
+            {
+                const auto context = "ControllerDefault[" + std::to_string(index) + "]";
+                RuntimeControllerDefault value;
+                const auto controller = readRequired<RuntimeManifestLoadResult, int>(defaults[index], result, "controllerNumber", context.c_str());
+                const auto defaultValue = readRequired<RuntimeManifestLoadResult, int>(defaults[index], result, "value", context.c_str());
+                if (controller) value.controllerNumber = *controller;
+                if (defaultValue) value.value = *defaultValue;
+                instrument.controllerDefaults.push_back(value);
+            }
+    }
+    {
+        std::unordered_set<int> controllerNumbers;
+        for (const auto& value : instrument.controllerDefaults)
+        {
+            if (value.controllerNumber < 0 || value.controllerNumber > 127
+                || value.value < 0 || value.value > 127)
+                addIssue(result, "Manifest controller defaults must use 0-127 controller numbers and values.");
+            else if (!controllerNumbers.insert(value.controllerNumber).second)
+                addIssue(result, "Manifest controller defaults must not contain duplicate controller numbers.");
         }
     }
 
@@ -3174,6 +3301,7 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         {
             authoring["articulations"] = serializeProjectArticulations(project.authoring.articulations);
             authoring["roundRobinResetRules"] = serializeRoundRobinResetRules(project.authoring.roundRobinResetRules);
+            authoring["controllerDefaults"] = serializeControllerDefaults(project.authoring.controllerDefaults);
         }
         authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3,
                                                      project.schemaVersion >= 6);
@@ -3285,6 +3413,9 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
             zoneObject["triggerMode"] = "one-shot";
         if (instrument.schemaVersion >= 3)
         {
+            if (zone.fineTuneCents != 0.0) zoneObject["fineTuneCents"] = zone.fineTuneCents;
+            if (zone.amplitudeVelocityTracking != 100.0) zoneObject["amplitudeVelocityTracking"] = zone.amplitudeVelocityTracking;
+            if (!zone.controllerConditions.empty()) zoneObject["controllerConditions"] = serializeControllerConditions(zone.controllerConditions);
             zoneObject["performance"] = {
                 { "event", performanceEventKindId(zone.performance.event) },
                 { "sustain", performanceSustainConditionId(zone.performance.sustain) },
@@ -3310,6 +3441,7 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
             resetRules.push_back(std::move(value));
         }
         root["roundRobinResetRules"] = std::move(resetRules);
+        root["controllerDefaults"] = serializeControllerDefaults(instrument.controllerDefaults);
     }
 
     root["validationNotes"] = serializeStringArray(instrument.validationNotes);

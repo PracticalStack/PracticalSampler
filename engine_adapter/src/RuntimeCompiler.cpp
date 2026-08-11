@@ -404,6 +404,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || zone.chokeReleaseSeconds.has_value();
         });
     const auto requiresPerformanceInstrumentSchema = !plan.roundRobinResetRules.empty()
+        || !plan.controllerDefaults.empty()
         || std::any_of(plan.articulations.begin(), plan.articulations.end(),
                        [](const RuntimeArticulationDefinition& value) { return value.activation.has_value(); })
         || std::any_of(plan.zones.begin(), plan.zones.end(), [](const RuntimeCompileZoneDefinition& zone)
@@ -413,7 +414,10 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || zone.performance.pitchSource != PerformancePitchSource::eventNote
                 || !zone.exclusiveGroupId.empty()
                 || !zone.exclusiveTargetGroupIds.empty()
-                || zone.chokeReleaseSeconds.has_value();
+                || zone.chokeReleaseSeconds.has_value()
+                || zone.fineTuneCents != 0.0
+                || zone.amplitudeVelocityTracking != 100.0
+                || !zone.controllerConditions.empty();
         });
     result.instrument.schemaName = "drs.instrument";
     result.instrument.schemaVersion = requiresPerformanceInstrumentSchema ? 3
@@ -427,6 +431,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     result.instrument.articulations = plan.articulations;
     result.instrument.groups = plan.groups;
     result.instrument.roundRobinResetRules = plan.roundRobinResetRules;
+    result.instrument.controllerDefaults = plan.controllerDefaults;
     result.instrument.validationNotes = plan.instrumentValidationNotes;
     result.payloadFilePath = buildCompiledStreamPayloadPath(plan.outputStreamPath);
 
@@ -613,6 +618,9 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.exclusiveGroupId = zonePlan.exclusiveGroupId;
         zone.exclusiveTargetGroupIds = zonePlan.exclusiveTargetGroupIds;
         zone.chokeReleaseSeconds = zonePlan.chokeReleaseSeconds;
+        zone.fineTuneCents = zonePlan.fineTuneCents;
+        zone.amplitudeVelocityTracking = zonePlan.amplitudeVelocityTracking;
+        zone.controllerConditions = zonePlan.controllerConditions;
         result.instrument.zones.push_back(std::move(zone));
     }
 

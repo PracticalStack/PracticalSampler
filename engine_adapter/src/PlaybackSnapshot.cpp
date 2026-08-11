@@ -593,6 +593,14 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
             zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["pan"] = zone.pan;
+        zoneObject["fineTuneCents"] = zone.fineTuneCents;
+        zoneObject["amplitudeVelocityTracking"] = zone.amplitudeVelocityTracking;
+        ordered_json controllerConditions = ordered_json::array();
+        for (const auto& condition : zone.controllerConditions)
+            controllerConditions.push_back({ { "controllerNumber", condition.controllerNumber },
+                                             { "minimumValue", condition.minimumValue },
+                                             { "maximumValue", condition.maximumValue } });
+        zoneObject["controllerConditions"] = std::move(controllerConditions);
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
@@ -618,6 +626,10 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         resetRules.push_back({ { "event", static_cast<int>(rule.event) }, { "targetAll", rule.targetAll },
                                { "targetPoolId", rule.targetPoolId } });
     root["roundRobinResetRules"] = std::move(resetRules);
+    ordered_json controllerDefaults = ordered_json::array();
+    for (const auto& value : snapshot.controllerDefaults)
+        controllerDefaults.push_back({ { "controllerNumber", value.controllerNumber }, { "value", value.value } });
+    root["controllerDefaults"] = std::move(controllerDefaults);
     root["performanceProgram"] = nlohmann::ordered_json::parse(serializeCompiledPerformanceProgram(snapshot.performanceProgram));
     root["notes"] = serializeStringArray(snapshot.notes);
     return root;
@@ -711,6 +723,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                                                              articulation.isDefault, articulation.displayOrder,
                                                              articulation.activation });
     result.snapshot.roundRobinResetRules = project.authoring.roundRobinResetRules;
+    result.snapshot.controllerDefaults = project.authoring.controllerDefaults;
 
     std::unordered_map<std::string, std::size_t> sampleIndices;
     result.snapshot.sampleIdentities.reserve(project.sampleSources.size());
@@ -1261,7 +1274,10 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.performance,
             zone.exclusiveGroupId,
             zone.exclusiveTargetGroupIds,
-            zone.chokeReleaseSeconds
+            zone.chokeReleaseSeconds,
+            zone.fineTuneCents,
+            zone.amplitudeVelocityTracking,
+            zone.controllerConditions
         });
 
         if (!zone.articulationId.empty())

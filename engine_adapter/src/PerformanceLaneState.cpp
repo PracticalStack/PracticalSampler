@@ -10,7 +10,9 @@ namespace
 bool hasTriggerRoute(const CompiledPerformanceProgram& program,
                      const PerformanceEventKind event,
                      const std::uint32_t articulationIndex,
-                     const bool pedalDown) noexcept
+                     const bool pedalDown,
+                     const int controllerNumber = -1,
+                     const int controllerValue = 0) noexcept
 {
     const auto eventIndex = static_cast<std::size_t>(event);
     if (eventIndex >= program.eventRanges.size()) return false;
@@ -21,6 +23,12 @@ bool hasTriggerRoute(const CompiledPerformanceProgram& program,
     {
         const auto& route = program.triggerRoutes[index];
         if (route.articulationIndex != articulationIndex) continue;
+        if (event == PerformanceEventKind::controllerChange
+            && (controllerNumber < 0
+                || route.triggerControllerNumber != controllerNumber
+                || controllerValue < route.triggerControllerMinimum
+                || controllerValue > route.triggerControllerMaximum))
+            continue;
         if (route.sustain == PerformanceSustainCondition::any
             || (route.sustain == PerformanceSustainCondition::pedalDown && pedalDown)
             || (route.sustain == PerformanceSustainCondition::pedalUp && !pedalDown))
@@ -337,6 +345,36 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                     }
             if (emitsPedalTrigger)
                 scratch.push(makePedalTriggerEvent(event, selectedArticulationIndex, pedalEvent, down));
+            return true;
+        }
+        case SamplerRenderEventType::controllerChange:
+        {
+            const auto emitsControllerTrigger = hasTriggerRoute(
+                program,
+                PerformanceEventKind::controllerChange,
+                selectedArticulationIndex,
+                pedalIsDown,
+                raw.controllerNumber,
+                raw.controllerValue);
+            if (scratch.size() + 1u + (emitsControllerTrigger ? 1u : 0u)
+                > PerformanceActionScratch::capacity)
+            {
+                ++actionOverflowCount;
+                return false;
+            }
+            scratch.push(raw);
+            ++semanticEventCounts[static_cast<std::size_t>(
+                PerformanceEventKind::controllerChange)];
+            if (emitsControllerTrigger)
+            {
+                event.type = SamplerRenderEventType::noteOn;
+                event.midiNote = 0;
+                event.velocity = 1.0f;
+                event.articulationIndex = selectedArticulationIndex;
+                event.performanceEvent = PerformanceEventKind::controllerChange;
+                event.sustainPedalDown = pedalIsDown;
+                scratch.push(event);
+            }
             return true;
         }
         case SamplerRenderEventType::allNotesOff:

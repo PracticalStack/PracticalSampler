@@ -79,12 +79,21 @@ bool routeCouldRespondToTrigger(const SamplerRenderRoute& route,
                                 int physicalVelocity,
                                 int effectiveVelocity,
                                 const PerformanceEventKind performanceEvent,
-                                const bool sustainPedalDown) noexcept
+                                const bool sustainPedalDown,
+                                const std::array<std::uint8_t, 128>& controllerValues) noexcept
 {
     if (route.performanceEvent != performanceEvent
         || (route.performanceSustain == PerformanceSustainCondition::pedalDown && !sustainPedalDown)
         || (route.performanceSustain == PerformanceSustainCondition::pedalUp && sustainPedalDown))
         return false;
+    for (const auto& condition : route.controllerConditions)
+    {
+        if (condition.controllerNumber < 0 || condition.controllerNumber > 127)
+            return false;
+        const auto value = controllerValues[static_cast<std::size_t>(condition.controllerNumber)];
+        if (value < condition.minimumValue || value > condition.maximumValue)
+            return false;
+    }
     const auto routeMidiNote = route.performancePitchSource == PerformancePitchSource::fixedRoot
         ? route.rootKey : midiNote;
     if (routeMidiNote < route.keyLow || routeMidiNote > route.keyHigh)
@@ -149,6 +158,7 @@ int eventPriorityAtSharedOffset(const SamplerRenderEvent& event) noexcept
         case SamplerRenderEventType::sustainPedal:
         case SamplerRenderEventType::pedalDown:
         case SamplerRenderEventType::pedalUp:
+        case SamplerRenderEventType::controllerChange:
             return 3;
         case SamplerRenderEventType::noteOff:
             return 4;
@@ -166,11 +176,20 @@ bool routeMatches(const SamplerRenderRoute& route,
                   std::size_t roundRobinSelectionCount,
                   std::uint32_t selectedArticulationIndex,
                   const PerformanceEventKind performanceEvent,
-                  const bool sustainPedalDown) noexcept
+                  const bool sustainPedalDown,
+                  const std::array<std::uint8_t, 128>& controllerValues) noexcept
 {
     if (selectedArticulationIndex != kInvalidPerformanceProgramIndex
         && route.performanceArticulationIndex != selectedArticulationIndex)
         return false;
+    for (const auto& condition : route.controllerConditions)
+    {
+        if (condition.controllerNumber < 0 || condition.controllerNumber > 127)
+            return false;
+        const auto value = controllerValues[static_cast<std::size_t>(condition.controllerNumber)];
+        if (value < condition.minimumValue || value > condition.maximumValue)
+            return false;
+    }
     if (route.performanceEvent != performanceEvent
         || (route.performanceSustain == PerformanceSustainCondition::pedalDown && !sustainPedalDown)
         || (route.performanceSustain == PerformanceSustainCondition::pedalUp && sustainPedalDown))
@@ -313,6 +332,12 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
     renderModel = &model;
     sampleRate = outputSampleRate;
     activeGeneration = activationGeneration;
+    controllerValues.fill(0);
+    const auto& program = model.getPerformanceProgram();
+    for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
+        if (program.hasControllerDefault[controller])
+            controllerValues[controller] = program.controllerDefaults[controller];
+    sustainPedalDown = controllerValues[64] >= 64;
     rebuildRoundRobinPools(model);
     applyRoundRobinResets(RoundRobinResetEvent::programActivation);
     return true;
@@ -328,6 +353,7 @@ void SamplerVoicePool::clearRenderModel() noexcept
     activeGeneration = 0;
     nextGeneratedActivation = 1;
     resetRoundRobinPools();
+    controllerValues.fill(0);
 }
 
 SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferView output,
@@ -581,7 +607,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                     && route.performanceArticulationIndex != event.articulationIndex)
                     continue;
                 if (!routeCouldRespondToTrigger(route, sourceMidiNote, eventVelocity, effectiveVelocity,
-                                                 event.performanceEvent, event.sustainPedalDown))
+                                                 event.performanceEvent, event.sustainPedalDown,
+                                                 controllerValues))
                     continue;
 
                 if (!routeUsesRoundRobin(route))
@@ -654,7 +681,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                     roundRobinSelectionCount,
                                     event.articulationIndex,
                                     event.performanceEvent,
-                                    event.sustainPedalDown);
+                                    event.sustainPedalDown,
+                                    controllerValues);
             });
             const auto routingVelocity = hasPhysicalVelocityRoute ? eventVelocity : effectiveVelocity;
             const auto hasMatchingRoute = hasPhysicalVelocityRoute
@@ -668,7 +696,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                             roundRobinSelectionCount,
                                             event.articulationIndex,
                                             event.performanceEvent,
-                                            event.sustainPedalDown);
+                                            event.sustainPedalDown,
+                                            controllerValues);
                     }));
             if (!hasMatchingRoute)
             {
@@ -710,7 +739,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   roundRobinSelectionCount,
                                   event.articulationIndex,
                                   event.performanceEvent,
-                                  event.sustainPedalDown))
+                                  event.sustainPedalDown,
+                                  controllerValues))
                     continue;
 
                 if (!routeHasCrossfade(routes[routeIndex]))
@@ -819,7 +849,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                       roundRobinSelectionCount,
                                       event.articulationIndex,
                                       event.performanceEvent,
-                                      event.sustainPedalDown))
+                                      event.sustainPedalDown,
+                                      controllerValues))
                         continue;
 
                     startRoute(routeIndex, 1.0, false);
@@ -839,7 +870,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   roundRobinSelectionCount,
                                   event.articulationIndex,
                                   event.performanceEvent,
-                                  event.sustainPedalDown)
+                                  event.sustainPedalDown,
+                                  controllerValues)
                     || routeHasCrossfade(routes[routeIndex]))
                 {
                     continue;
@@ -905,6 +937,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
         {
             const auto pressed = event.type == SamplerRenderEventType::pedalDown
                 || (event.type == SamplerRenderEventType::sustainPedal && event.velocity >= 0.5f);
+            controllerValues[64] = pressed ? std::uint8_t { 127 } : std::uint8_t { 0 };
             if (pressed == sustainPedalDown)
                 return;
             sustainPedalDown = pressed;
@@ -925,6 +958,15 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             }
             return;
         }
+
+        case SamplerRenderEventType::controllerChange:
+            if (event.controllerNumber > 127 || event.controllerValue > 127)
+            {
+                ++result.render.droppedEventCount;
+                return;
+            }
+            controllerValues[event.controllerNumber] = event.controllerValue;
+            return;
 
         case SamplerRenderEventType::allNotesOff:
             for (auto& slot : slots)
@@ -954,6 +996,15 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 slot.sustainDeferred = false;
             }
             sustainPedalDown = false;
+            controllerValues.fill(0);
+            if (renderModel != nullptr)
+            {
+                const auto& program = renderModel->getPerformanceProgram();
+                for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
+                    if (program.hasControllerDefault[controller])
+                        controllerValues[controller] = program.controllerDefaults[controller];
+                sustainPedalDown = controllerValues[64] >= 64;
+            }
             return;
     }
 

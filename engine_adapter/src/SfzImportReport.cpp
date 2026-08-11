@@ -170,7 +170,7 @@ std::optional<SfzImportSemanticDependency> classifySemanticDependency(
     {
         dependency.kind = SfzImportSemanticDependencyKind::controllerDefault;
         dependency.impact = SfzImportSemanticImpact::soundCritical;
-        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.support = SfzImportSemanticSupport::native;
         dependency.controllerNumber = *controllerNumber;
         return dependency;
     }
@@ -184,7 +184,7 @@ std::optional<SfzImportSemanticDependency> classifySemanticDependency(
                    ? SfzImportSemanticDependencyKind::controllerTriggerRange
                    : SfzImportSemanticDependencyKind::controllerRange);
         dependency.impact = SfzImportSemanticImpact::soundCritical;
-        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.support = SfzImportSemanticSupport::native;
         dependency.affectsRegionEligibility = true;
         dependency.controllerNumber = controllerNumber;
         return dependency;
@@ -205,9 +205,9 @@ std::optional<SfzImportSemanticDependency> classifySemanticDependency(
         dependency.impact = SfzImportSemanticImpact::soundCritical;
         dependency.affectsRegionEligibility = true;
         const auto triggerValue = toLowerAscii(opcode.value);
-        dependency.support = triggerValue == "attack"
+        dependency.support = triggerValue == "attack" || triggerValue == "release"
             ? SfzImportSemanticSupport::native
-            : ((triggerValue == "release" || triggerValue == "legato")
+            : (triggerValue == "legato"
                    ? SfzImportSemanticSupport::partial
                    : SfzImportSemanticSupport::unsupported);
         return dependency;
@@ -1200,6 +1200,74 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                  "sfz.round_robin.switch_policy.reported",
                  "Switch-driven round-robin policy will be reported",
                  "The importer recognizes SFZ switch-driven region-selection policy opcodes, but does not convert them into the native sequential Round Robin behavior." };
+    }
+
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "set_cc"))
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "authoring.controllerDefaults[" + std::to_string(*controllerNumber) + "]",
+                 "Controller defaults map directly into native authoring and playback controller state." };
+    }
+
+    const auto controllerConditionTarget = [&](const std::string& prefix,
+                                               const std::string& target)
+        -> std::optional<OpcodeClassification>
+    {
+        if (const auto controllerNumber = parseControllerNumber(opcodeName, prefix))
+        {
+            return OpcodeClassification {
+                SfzImportSupportDisposition::converted,
+                target + "[" + std::to_string(*controllerNumber) + "]",
+                "Controller eligibility ranges map into native per-zone controller conditions." };
+        }
+        return std::nullopt;
+    };
+    if (const auto classification = controllerConditionTarget("on_locc", "zone.performance.controllerTriggerRange"))
+        return *classification;
+    if (const auto classification = controllerConditionTarget("on_hicc", "zone.performance.controllerTriggerRange"))
+        return *classification;
+    if (const auto classification = controllerConditionTarget("locc", "zone.controllerConditions"))
+        return *classification;
+    if (const auto classification = controllerConditionTarget("hicc", "zone.controllerConditions"))
+        return *classification;
+
+    if (opcodeName == "trigger")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.performance.event",
+                 "Attack and release triggers map into explicit native performance events." };
+    }
+
+    if (opcodeName == "group_volume")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "authoring.groups.gainDb",
+                 "Group volume inherits through SFZ scope and maps into native group gain." };
+    }
+
+    if (opcodeName == "tune")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.fineTuneCents",
+                 "Fine tuning in cents maps directly into the native route pitch ratio." };
+    }
+
+    if (opcodeName == "amp_veltrack")
+    {
+        auto value = 100.0;
+        try { value = std::stod(opcode.value); } catch (...) {}
+        if (value >= 0.0 && value <= 100.0)
+        {
+            return { SfzImportSupportDisposition::converted,
+                     "zone.amplitudeVelocityTracking",
+                     "Velocity tracking uses the documented native power law gain=(velocity/127)^(amp_veltrack/100)." };
+        }
+        return { SfzImportSupportDisposition::approximated,
+                 "zone.amplitudeVelocityTracking",
+                 "Velocity tracking values outside 0..100 are clamped to the native power-law range.",
+                 "sfz.amp_veltrack.clamped",
+                 "Amplitude velocity tracking will be clamped",
+                 "The native velocity law supports 0..100 percent and clamps values outside that range." };
     }
 
     if (opcodeName == "volume")

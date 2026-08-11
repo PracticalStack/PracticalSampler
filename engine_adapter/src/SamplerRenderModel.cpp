@@ -186,6 +186,9 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
             == preparedZone.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity
         && snapshotZone.gainDb == preparedZone.gainDb
         && snapshotZone.pan == preparedZone.pan
+        && snapshotZone.fineTuneCents == preparedZone.fineTuneCents
+        && snapshotZone.amplitudeVelocityTracking == preparedZone.amplitudeVelocityTracking
+        && snapshotZone.controllerConditions == preparedZone.controllerConditions
         && snapshotZone.sampleStartFrame == preparedZone.sampleStartFrame
         && snapshotZone.loopEnabled == preparedZone.loopEnabled
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
@@ -664,7 +667,10 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   triggerRoute == prepared.performanceProgram.triggerRoutes.end()
                                       ? 0 : triggerRoute->chokeTargetMask,
                                   triggerRoute == prepared.performanceProgram.triggerRoutes.end()
-                                      ? 0.0f : triggerRoute->chokeReleaseSeconds });
+                                      ? 0.0f : triggerRoute->chokeReleaseSeconds,
+                                  zone.fineTuneCents,
+                                  zone.amplitudeVelocityTracking,
+                                  zone.controllerConditions });
     }
     model->performanceProgram.defaultArticulationIndex = resolveSelectedArticulationIndex(
         options,

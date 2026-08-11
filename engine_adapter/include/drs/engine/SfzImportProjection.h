@@ -38,6 +38,7 @@ struct SfzImportProjectionResult
     double masterGainDb = 0.0;
     std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectZoneDefinition> zones;
+    std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> projectNotes;
     std::vector<std::string> authoringNotes;
     SfzImportExecutionState execution;

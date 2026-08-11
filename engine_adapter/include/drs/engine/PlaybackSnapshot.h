@@ -166,6 +166,9 @@ struct PlaybackSnapshotZone
     std::string exclusiveGroupId;
     std::vector<std::string> exclusiveTargetGroupIds;
     std::optional<double> chokeReleaseSeconds;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
+    std::vector<RuntimeControllerCondition> controllerConditions;
 };
 
 // S3.7-T5 deferral note: this remains a public aggregate for current builder, facade, and
@@ -197,6 +200,7 @@ struct ImmutablePlaybackSnapshot
     std::vector<PlaybackSnapshotArticulationDefinition> articulationDefinitions;
     std::vector<PlaybackSnapshotGroupRoute> groupRoutes;
     std::vector<PlaybackSnapshotZone> zones;
+    std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     CompiledPerformanceProgram performanceProgram;
     std::vector<std::string> notes;

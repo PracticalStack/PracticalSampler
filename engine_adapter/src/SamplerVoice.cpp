@@ -42,10 +42,16 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         return false;
     }
 
-    const auto pitchRatio = std::pow(2.0,
-                                     static_cast<double>(request.effectiveMidiNote - selectedRoute.rootKey) / 12.0);
+    const auto pitchRatio = std::pow(
+        2.0,
+        ((static_cast<double>(request.effectiveMidiNote - selectedRoute.rootKey) * 100.0)
+         + selectedRoute.fineTuneCents) / 1200.0);
     const auto increment = pitchRatio * (selectedSample.sampleRate / request.outputSampleRate);
-    const auto gain = (static_cast<double>(request.effectiveVelocity) / 127.0)
+    // Native amp_veltrack law: 0% is velocity-independent, 100% retains the
+    // historical linear velocity gain, and intermediate values use a smooth power curve.
+    const auto normalizedVelocity = static_cast<double>(request.effectiveVelocity) / 127.0;
+    const auto velocityExponent = std::clamp(selectedRoute.amplitudeVelocityTracking, 0.0, 100.0) / 100.0;
+    const auto gain = std::pow(normalizedVelocity, velocityExponent)
         * request.routeGainMultiplier
         * std::pow(10.0, selectedRoute.gainDb / 20.0);
     if (!std::isfinite(increment) || increment <= 0.0 || !std::isfinite(gain))

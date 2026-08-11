@@ -35,7 +35,8 @@ enum class SamplerRenderEventType : std::uint8_t
     pedalUp,
     allNotesOff,
     roundRobinReset,
-    reset
+    reset,
+    controllerChange
 };
 
 struct SamplerRenderEvent
@@ -51,6 +52,8 @@ struct SamplerRenderEvent
     std::uint32_t articulationIndex = kInvalidPerformanceProgramIndex;
     PerformanceEventKind performanceEvent = PerformanceEventKind::noteOn;
     bool sustainPedalDown = false;
+    std::uint8_t controllerNumber = 0;
+    std::uint8_t controllerValue = 0;
     RoundRobinResetEvent roundRobinResetEvent = RoundRobinResetEvent::articulationChange;
 };
 
@@ -168,6 +171,9 @@ struct SamplerRenderRoute
     std::uint64_t performanceExclusiveGroupStableId = 0;
     std::uint64_t performanceChokeTargetMask = 0;
     float performanceChokeReleaseSeconds = 0.0f;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
+    std::vector<RuntimeControllerCondition> controllerConditions;
 };
 
 struct SamplerRenderModelBuildResult;

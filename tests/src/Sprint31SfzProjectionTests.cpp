@@ -710,44 +710,28 @@ int main()
         const auto soundSafeProjection = projectSfzImportDocument(
             blankProject, soundSafeFixturePath.generic_string());
         require(soundSafeProjection.projected && soundSafeProjection.playable
-                    && soundSafeProjection.lossy && !soundSafeProjection.blocking,
-                "Sound-safe omission should remain a playable, reviewed projection.");
+                    && !soundSafeProjection.lossy && !soundSafeProjection.blocking,
+                "Native controller and release semantics should remain a playable lossless projection.");
         require(soundSafeProjection.semanticAnalyzedRegionCount == 3
-                    && soundSafeProjection.unsafeUnconditionalRegionCount == 2
-                    && soundSafeProjection.omittedUnsafeRegionCount == 2,
-                "Sound-safe projection should classify and omit both conditional regions.");
-        require(soundSafeProjection.zones.size() == 1
-                    && soundSafeProjection.zones.front().rootKey == 60,
-                "Sound-safe projection should retain only the unconditional native zone.");
-        require(soundSafeProjection.omittedRegionSummaries.size() == 2,
-                "Sound-safe projection should summarize omissions by feature and source section.");
-        require(std::any_of(soundSafeProjection.omittedRegionSummaries.begin(),
-                            soundSafeProjection.omittedRegionSummaries.end(),
-                            [](const SfzImportOmittedRegionSummary& summary)
-                            {
-                                return summary.dependencyKind
-                                        == SfzImportSemanticDependencyKind::controllerRange
-                                    && summary.controllerNumber == 23
-                                    && summary.sourceScope == SfzOpcodeScope::group
-                                    && summary.affectedRegionCount == 1;
-                            }),
-                "Sound-safe review should summarize the group-scope CC23 omission.");
-        require(std::any_of(soundSafeProjection.omittedRegionSummaries.begin(),
-                            soundSafeProjection.omittedRegionSummaries.end(),
-                            [](const SfzImportOmittedRegionSummary& summary)
-                            {
-                                return summary.dependencyKind
-                                        == SfzImportSemanticDependencyKind::triggerEvent
-                                    && summary.sourceScope == SfzOpcodeScope::group
-                                    && summary.affectedRegionCount == 1;
-                            }),
-                "Sound-safe review should summarize the group-scope trigger omission.");
+                    && soundSafeProjection.unsafeUnconditionalRegionCount == 0
+                    && soundSafeProjection.omittedUnsafeRegionCount == 0,
+                "Controller and release regions should no longer be omitted.");
+        require(soundSafeProjection.zones.size() == 3
+                    && soundSafeProjection.controllerDefaults.size() == 1
+                    && soundSafeProjection.controllerDefaults.front().controllerNumber == 23,
+                "Projection should retain all zones and the authored CC23 default.");
+        require(soundSafeProjection.zones[1].controllerConditions.size() == 1
+                    && soundSafeProjection.zones[1].controllerConditions.front().controllerNumber == 23
+                    && soundSafeProjection.zones[2].performance.event == PerformanceEventKind::release
+                    && soundSafeProjection.zones[2].triggerMode == ZoneTriggerMode::oneShot,
+                "Projection should preserve controller eligibility and release trigger semantics.");
 
         AuthoringSession soundSafeSession(blankProject);
         const auto soundSafeApply = applySfzImportProjection(
             soundSafeSession, soundSafeProjection, "Import only sound-safe SFZ zones");
         require(soundSafeApply.applied
-                    && soundSafeSession.getProject().authoring.zones.size() == 1,
+                    && soundSafeSession.getProject().authoring.zones.size() == 3
+                    && soundSafeSession.getProject().authoring.controllerDefaults.size() == 1,
                 "Reviewed sound-safe apply should mutate the project with retained zones only.");
 
         const auto salamanderPath = resolveFixturePath(
@@ -757,11 +741,11 @@ int main()
         require(salamanderProjection.projected && salamanderProjection.playable,
                 "Accurate Salamander sound-safe projection should remain playable.");
         require(salamanderProjection.semanticAnalyzedRegionCount == 1704
-                    && salamanderProjection.unsafeUnconditionalRegionCount == 296
-                    && salamanderProjection.omittedUnsafeRegionCount == 296
-                    && salamanderProjection.zones.size() == 1408
-                    && salamanderProjection.sampleSources.size() == 480,
-                "Accurate Salamander sound-safe projection should omit 296 auxiliary regions and retain 1,408 piano regions; sources="
+                    && salamanderProjection.unsafeUnconditionalRegionCount == 4
+                    && salamanderProjection.omittedUnsafeRegionCount == 4
+                    && salamanderProjection.zones.size() == 1700
+                    && salamanderProjection.sampleSources.size() == 637,
+                "Accurate Salamander Phase 3 projection should retain controller/release layers and omit only four random pedal regions; sources="
                     + std::to_string(salamanderProjection.sampleSources.size()));
 
         std::cout << "Sprint 3.1.4 SFZ projection tests passed." << std::endl;

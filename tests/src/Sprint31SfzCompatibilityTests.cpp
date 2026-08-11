@@ -417,15 +417,14 @@ int main()
         require(semanticAnalysis.report.regionSemanticAnalysis.size() == 4
                     && semanticAnalysis.report.summary.semanticAnalyzedRegionCount == 4,
                 "Semantic dependency analysis should publish one result per region.");
-        require(semanticAnalysis.report.summary.unsafeUnconditionalRegionCount == 3,
-                "Controller-gated, release-triggered, and random/switch regions should be unsafe to project unconditionally.");
+        require(semanticAnalysis.report.summary.unsafeUnconditionalRegionCount == 1,
+                "Only random/switch regions should remain unsafe after native controller and release support.");
         require(semanticAnalysis.report.summary.presentationOnlyDependencyCount == 1,
                 "Presentation-only CC labels should be distinguished from sound-critical dependencies.");
 
         const auto& controllerGatedRegion = semanticAnalysis.report.regionSemanticAnalysis.at(0);
-        require(!controllerGatedRegion.safeToProjectUnconditionally
-                    && controllerGatedRegion.hasIncompleteSoundCriticalDependencies,
-                "Inherited controller and pedal conditions should make the first region unsafe.");
+        require(controllerGatedRegion.safeToProjectUnconditionally,
+                "Inherited controller and pedal eligibility should be natively projectable even when unrelated modulation remains reported.");
         const auto* cc23Condition = findSemanticDependency(
             controllerGatedRegion, SfzImportSemanticDependencyKind::controllerRange, 23);
         require(cc23Condition != nullptr && cc23Condition->inherited
@@ -452,10 +451,10 @@ int main()
         const auto& releaseRegion = semanticAnalysis.report.regionSemanticAnalysis.at(2);
         const auto* releaseTrigger = findSemanticDependency(
             releaseRegion, SfzImportSemanticDependencyKind::triggerEvent);
-        require(!releaseRegion.safeToProjectUnconditionally
+        require(releaseRegion.safeToProjectUnconditionally
                     && releaseTrigger != nullptr
-                    && releaseTrigger->support == SfzImportSemanticSupport::partial,
-                "Partially represented release semantics should be marked unsafe for unconditional playback.");
+                    && releaseTrigger->support == SfzImportSemanticSupport::native,
+                "Release semantics should be represented as a native performance event.");
 
         const auto& policyRegion = semanticAnalysis.report.regionSemanticAnalysis.at(3);
         require(!policyRegion.safeToProjectUnconditionally

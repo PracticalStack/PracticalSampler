@@ -464,10 +464,14 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.exclusiveTargetGroupIds = projectZone.exclusiveTargetGroupIds;
         zone.chokeReleaseSeconds = projectZone.chokeReleaseSeconds;
         zone.prefetchBytes = 16384;
+        zone.fineTuneCents = projectZone.fineTuneCents;
+        zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
+        zone.controllerConditions = projectZone.controllerConditions;
         plan.zones.push_back(std::move(zone));
     }
 
     plan.roundRobinResetRules = project.authoring.roundRobinResetRules;
+    plan.controllerDefaults = project.authoring.controllerDefaults;
 
     result.manifest.packageId = baseId;
     result.manifest.displayName = displayName;

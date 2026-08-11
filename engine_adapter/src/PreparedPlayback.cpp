@@ -300,6 +300,14 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
             zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["pan"] = zone.pan;
+        zoneObject["fineTuneCents"] = zone.fineTuneCents;
+        zoneObject["amplitudeVelocityTracking"] = zone.amplitudeVelocityTracking;
+        ordered_json controllerConditions = ordered_json::array();
+        for (const auto& condition : zone.controllerConditions)
+            controllerConditions.push_back({ { "controllerNumber", condition.controllerNumber },
+                                             { "minimumValue", condition.minimumValue },
+                                             { "maximumValue", condition.maximumValue } });
+        zoneObject["controllerConditions"] = std::move(controllerConditions);
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
@@ -312,6 +320,10 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);
+    ordered_json controllerDefaults = ordered_json::array();
+    for (const auto& value : prepared.controllerDefaults)
+        controllerDefaults.push_back({ { "controllerNumber", value.controllerNumber }, { "value", value.value } });
+    root["controllerDefaults"] = std::move(controllerDefaults);
 
     ordered_json notes = ordered_json::array();
     for (const auto& note : prepared.notes)
@@ -1013,6 +1025,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.draftRevision = snapshotResult.snapshot.draftRevision;
     result.prepared.selectedGroupId = snapshotResult.snapshot.selectedGroupId;
     result.prepared.masterGainDb = snapshotResult.snapshot.masterGainDb;
+    result.prepared.controllerDefaults = snapshotResult.snapshot.controllerDefaults;
     result.prepared.containerId = streamResult.container.containerId;
     result.prepared.containerPath = streamResult.containerPath;
     result.prepared.payloadEncoding = streamResult.container.payloadEncoding;
@@ -1475,7 +1488,10 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.roundRobin,
             zone.roundRobinLength,
             zone.roundRobinPosition,
-            zone.triggerMode
+            zone.triggerMode,
+            zone.fineTuneCents,
+            zone.amplitudeVelocityTracking,
+            zone.controllerConditions
         });
     }
 
@@ -2266,6 +2282,14 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
             value["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         value["gainDb"] = zone.gainDb;
         value["pan"] = zone.pan;
+        value["fineTuneCents"] = zone.fineTuneCents;
+        value["amplitudeVelocityTracking"] = zone.amplitudeVelocityTracking;
+        ordered_json authoredConditions = ordered_json::array();
+        for (const auto& condition : zone.controllerConditions)
+            authoredConditions.push_back({ { "controllerNumber", condition.controllerNumber },
+                                           { "minimumValue", condition.minimumValue },
+                                           { "maximumValue", condition.maximumValue } });
+        value["controllerConditions"] = std::move(authoredConditions);
         value["sampleStartFrame"] = zone.sampleStartFrame;
         value["loopEnabled"] = zone.loopEnabled;
         value["loopStartFrame"] = zone.loopStartFrame;
@@ -2302,6 +2326,14 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
             value["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(handle.velocityCrossfadeRuntime);
         value["gainDb"] = handle.gainDb;
         value["pan"] = handle.pan;
+        value["fineTuneCents"] = handle.fineTuneCents;
+        value["amplitudeVelocityTracking"] = handle.amplitudeVelocityTracking;
+        ordered_json preparedConditions = ordered_json::array();
+        for (const auto& condition : handle.controllerConditions)
+            preparedConditions.push_back({ { "controllerNumber", condition.controllerNumber },
+                                           { "minimumValue", condition.minimumValue },
+                                           { "maximumValue", condition.maximumValue } });
+        value["controllerConditions"] = std::move(preparedConditions);
         value["sampleStartFrame"] = handle.sampleStartFrame;
         value["loopEnabled"] = handle.loopEnabled;
         value["loopStartFrame"] = handle.loopStartFrame;
@@ -2555,6 +2587,9 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity == right.velocityCrossfadeRuntime.fadeOutOverlapHighVelocity
         && left.gainDb == right.gainDb
         && left.pan == right.pan
+        && left.fineTuneCents == right.fineTuneCents
+        && left.amplitudeVelocityTracking == right.amplitudeVelocityTracking
+        && left.controllerConditions == right.controllerConditions
         && left.sampleStartFrame == right.sampleStartFrame
         && left.loopEnabled == right.loopEnabled
         && left.loopStartFrame == right.loopStartFrame
@@ -2602,6 +2637,7 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.streams == right.streams
         && left.groupRoutes == right.groupRoutes
         && left.zones == right.zones
+        && left.controllerDefaults == right.controllerDefaults
         && serializeCompiledPerformanceProgram(left.performanceProgram)
             == serializeCompiledPerformanceProgram(right.performanceProgram)
         && left.notes == right.notes;
