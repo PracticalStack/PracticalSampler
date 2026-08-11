@@ -3575,6 +3575,7 @@ target_link_libraries(drs_performance_package_export_lifecycle_tests
     PRIVATE
         drs_app_shared
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC

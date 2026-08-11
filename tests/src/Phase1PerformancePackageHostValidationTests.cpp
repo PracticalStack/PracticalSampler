@@ -2,6 +2,7 @@
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
 #include "Phase1PerformancePackageSupport.h"
+#include "drs/engine/PackageV2StreamingExport.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
@@ -14,6 +15,7 @@
 namespace
 {
 using Clock = std::chrono::steady_clock;
+namespace fs = std::filesystem;
 namespace package_support = drs::tests::performance_package;
 
 void require(bool condition, const std::string& message)
@@ -100,19 +102,40 @@ void requirePerformanceOnlyWorkspace(const drs::engine::WorkspaceDocumentState& 
     require(!state.authoringAvailable,
             context + " should suppress authoring controls.");
 }
+
+fs::path buildSemanticPackageV2Fixture(const fs::path& scratchDirectory)
+{
+    fs::remove_all(scratchDirectory);
+    fs::create_directories(scratchDirectory);
+    const auto packagePath = scratchDirectory / "semantic-route-v2.drpkg";
+    auto packagePlan = package_support::buildPackagePlan(
+        scratchDirectory / "runtime", packagePath);
+    const auto v2Plan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
+        packagePlan.manifest,
+        packagePlan.compiledRuntime,
+        packagePath.generic_string(),
+        packagePlan.additionalPayloads);
+    require(v2Plan.built,
+            "The semantic package-v2 host fixture plan must build.");
+    const auto written = drs::engine::writePackageV2Streaming(v2Plan.plan);
+    require(written.written && written.verified && written.atomicallyPublished,
+            "The semantic package-v2 host fixture must export and verify.");
+    return packagePath;
+}
 } // namespace
 
 int main(int argc, char** argv)
 {
     try
     {
-        const auto checkedInCorpus = package_support::getCheckedInCorpusPaths();
+        const auto generatedFixtureRoot = fs::temp_directory_path()
+            / "drs-semantic-package-v2-host-validation";
         const auto selectedPackage = argc >= 2
             ? std::filesystem::absolute(std::filesystem::path(argv[1]))
-            : checkedInCorpus.valid;
+            : buildSemanticPackageV2Fixture(generatedFixtureRoot);
         const auto largeV2Qualification = argc >= 2;
         require(std::filesystem::exists(selectedPackage),
-                "Checked-in valid performance package fixture must exist for host validation.");
+                "The selected performance package fixture must exist for host validation.");
 
         juce::ScopedJuceInitialiser_GUI gui;
 
@@ -291,6 +314,13 @@ int main(int argc, char** argv)
                   << standaloneRealtime.getAudioThreadViolationCount()
                   << " pluginRtViolations=" << pluginRealtime.getAudioThreadViolationCount()
                   << std::endl;
+        restoredEditor.reset();
+        restoredProcessor.reset();
+        editor.reset();
+        processor.reset();
+        standalone.reset();
+        if (argc < 2)
+            fs::remove_all(generatedFixtureRoot);
         return 0;
     }
     catch (const std::exception& exception)

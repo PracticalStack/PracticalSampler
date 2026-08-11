@@ -1,6 +1,9 @@
 #include "Phase1PerformancePackageSupport.h"
+#include "drs/engine/EngineFacade.h"
+#include "drs/engine/PackageReaderDispatch.h"
 #include "shared/PerformancePackageExportService.h"
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -24,6 +27,13 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
 {
     drs::app::PerformancePackageExportRequest request;
     request.project = drs::tests::performance_package::buildAuthoringProjectFixture();
+    require(!request.project.authoring.zones.empty(),
+            "The package export fixture must contain a route.");
+    auto& semanticRoute = request.project.authoring.zones.front();
+    semanticRoute.fineTuneCents = 17.0;
+    semanticRoute.amplitudeVelocityTracking = 37.0;
+    semanticRoute.controllerConditions = { { 23, 0, 63 } };
+    semanticRoute.performance.event = drs::engine::PerformanceEventKind::release;
     request.sessionState.loadProfileId = "balanced";
     request.projectId = request.project.projectId;
     request.baseRevision = 1;
@@ -140,6 +150,46 @@ int main()
         require(completed->result->packageBytes > 0 && completed->result->payloadCount > 0,
                 "The completed export should report non-empty package metrics.");
         completionService.shutdown();
+
+        const auto completedPackage = (tempRoot / "completed.drpkg").generic_string();
+        const auto packageV2 = drs::engine::loadPerformancePackageV2Metadata(completedPackage);
+        require(packageV2.loaded && packageV2.package != nullptr,
+                "The exported semantic package must reopen through the package-v2 metadata path.");
+        auto preparedActivation = drs::engine::preparePerformancePackageV2Activation(
+            packageV2.metadata, packageV2.package, packageV2.sampleDescriptors);
+        require(preparedActivation.prepared
+                    && preparedActivation.activationPayload != nullptr
+                    && preparedActivation.activationPayload->snapshot != nullptr
+                    && preparedActivation.activationPayload->prepared != nullptr
+                    && preparedActivation.renderModel != nullptr,
+                "Package-v2 activation preparation must accept non-default route topology.");
+        const auto& preparedRoutes = preparedActivation.activationPayload->prepared->zones;
+        const auto preparedRoute = std::find_if(
+            preparedRoutes.begin(), preparedRoutes.end(), [](const auto& route)
+            {
+                return route.zoneId == "pad-a3";
+            });
+        require(preparedRoute != preparedRoutes.end()
+                    && preparedRoute->fineTuneCents == 17.0
+                    && preparedRoute->amplitudeVelocityTracking == 37.0
+                    && preparedRoute->controllerConditions
+                        == std::vector<drs::engine::RuntimeControllerCondition> { { 23, 0, 63 } },
+                "Package-v2 reconstruction must retain tuning, velocity tracking, and controller conditions.");
+        const auto& renderRoutes = preparedActivation.renderModel->getRoutes();
+        const auto renderRoute = std::find_if(
+            renderRoutes.begin(), renderRoutes.end(), [](const auto& route)
+            {
+                return route.zoneId == "pad-a3";
+            });
+        require(renderRoute != renderRoutes.end()
+                    && renderRoute->performanceEvent
+                        == drs::engine::PerformanceEventKind::release,
+                "Package-v2 reconstruction must rebuild non-note-on performance events.");
+        drs::engine::EngineFacade facade;
+        const auto activated = facade.activatePreparedPerformancePackageSession(
+            std::move(preparedActivation));
+        require(activated.activated,
+                "The reconstructed semantic package must activate through the production engine facade.");
 
         fs::remove_all(tempRoot);
 

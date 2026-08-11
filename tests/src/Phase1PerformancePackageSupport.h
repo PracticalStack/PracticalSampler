@@ -251,6 +251,10 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     padZone.velocityHigh = 95;
     padZone.gainDb = -0.75;
     padZone.prefetchBytes = 16384;
+    padZone.fineTuneCents = 17.0;
+    padZone.amplitudeVelocityTracking = 37.0;
+    padZone.controllerConditions = { { 23, 0, 63 } };
+    padZone.performance.event = drs::engine::PerformanceEventKind::release;
     plan.zones.push_back(std::move(padZone));
 
     drs::engine::RuntimeCompileZoneDefinition padAccentZone;

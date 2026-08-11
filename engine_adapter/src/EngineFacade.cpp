@@ -4,6 +4,7 @@
 #include "drs/engine/DspParameterControl.h"
 #include "drs/engine/HiseFrontendBridge.h"
 #include "drs/engine/HiseProjectContent.h"
+#include "drs/engine/PerformanceProgram.h"
 #include "drs/engine/PerformancePublishPreparation.h"
 #include "drs/engine/RuntimeLoadProfile.h"
 #include "drs/engine/RuntimePresetState.h"
@@ -1137,6 +1138,41 @@ fs::path buildChecksumMismatchFixture()
     return outputPath;
 }
 
+CompiledPerformanceProgramResult compilePerformancePackageProgram(
+    const RuntimeInstrumentModel& instrument)
+{
+    RuntimeProjectAuthoringState authoring;
+    authoring.articulations.reserve(instrument.articulations.size());
+    for (std::size_t index = 0; index < instrument.articulations.size(); ++index)
+    {
+        const auto& articulation = instrument.articulations[index];
+        authoring.articulations.push_back({ articulation.id,
+                                            articulation.name,
+                                            articulation.isDefault,
+                                            static_cast<int>(index),
+                                            articulation.activation });
+    }
+    authoring.zones.reserve(instrument.zones.size());
+    for (const auto& zone : instrument.zones)
+    {
+        RuntimeProjectZoneDefinition authoringZone;
+        authoringZone.id = zone.id;
+        authoringZone.articulationId = zone.articulationId;
+        authoringZone.roundRobin = zone.roundRobin;
+        authoringZone.roundRobinLength = zone.roundRobinLength;
+        authoringZone.roundRobinPosition = zone.roundRobinPosition;
+        authoringZone.performance = zone.performance;
+        authoringZone.exclusiveGroupId = zone.exclusiveGroupId;
+        authoringZone.exclusiveTargetGroupIds = zone.exclusiveTargetGroupIds;
+        authoringZone.chokeReleaseSeconds = zone.chokeReleaseSeconds;
+        authoringZone.controllerConditions = zone.controllerConditions;
+        authoring.zones.push_back(std::move(authoringZone));
+    }
+    authoring.roundRobinResetRules = instrument.roundRobinResetRules;
+    authoring.controllerDefaults = instrument.controllerDefaults;
+    return compilePerformanceProgram(authoring);
+}
+
 PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
     const PerformancePackageLoadResult& packageLoad)
 {
@@ -1340,6 +1376,23 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
 
     result.snapshot.roundRobinResetRules = instrument.roundRobinResetRules;
     result.snapshot.controllerDefaults = instrument.controllerDefaults;
+    if (instrument.schemaVersion >= 3)
+    {
+        const auto compilation = compilePerformancePackageProgram(instrument);
+        if (!compilation.compiled)
+        {
+            for (const auto& issue : compilation.issues)
+                addSnapshotFinding(result,
+                                   PlaybackSnapshotFindingSeverity::error,
+                                   "package-performance-program-compile-failed",
+                                   "instrument",
+                                   issue);
+        }
+        else
+        {
+            result.snapshot.performanceProgram = compilation.program;
+        }
+    }
 
     if (result.snapshot.sampleIdentities.empty())
     {
@@ -4273,7 +4326,8 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
             zone.velocityCrossfade, zone.velocityCrossfadeRuntime, zone.gainDb, zone.pan,
             zone.sampleStartFrame, zone.loopEnabled, zone.loopStartFrame, zone.loopEndFrame,
             zone.releaseSeconds, zone.roundRobin, zone.roundRobinLength,
-            zone.roundRobinPosition, zone.triggerMode });
+            zone.roundRobinPosition, zone.triggerMode, zone.fineTuneCents,
+            zone.amplitudeVelocityTracking, zone.controllerConditions });
     }
     for (const auto& group : result.snapshotResult.snapshot.groupRoutes)
     {

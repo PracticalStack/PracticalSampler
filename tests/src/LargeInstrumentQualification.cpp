@@ -1,5 +1,6 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/DraftPlaybackContract.h"
+#include "drs/engine/EngineFacade.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/PackageV2StreamingExport.h"
@@ -572,6 +573,18 @@ PackageQualificationResult exportAndActivatePackage(
     result.metadataOpenMicros = elapsedMicros(metadataStart);
     require(opened->opened && opened->records.size() == result.recordCount,
             "Exported actual-corpus package failed structural reopen.");
+    {
+        auto productionActivation = drs::engine::preparePerformancePackageV2Activation(
+            packageMetadata.metadata,
+            opened,
+            packageMetadata.sampleDescriptors);
+        require(productionActivation.prepared
+                    && productionActivation.activationPayload != nullptr
+                    && productionActivation.renderModel != nullptr,
+                "Exported actual-corpus package failed production package-v2 activation preparation: "
+                    + joinIssues(productionActivation.issues));
+        static_cast<void>(qualifySalamanderSemantics(*productionActivation.renderModel));
+    }
     const auto warmMetadataStart = Clock::now();
     const auto warmOpened = drs::engine::openPackageV2(packagePath.generic_string());
     result.warmMetadataOpenMicros = elapsedMicros(warmMetadataStart);
