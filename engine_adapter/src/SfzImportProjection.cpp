@@ -10,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <tuple>
 
 namespace drs::engine
 {
@@ -452,6 +453,116 @@ bool sectionUsesUnsupportedVelocityCrossfade(
     return false;
 }
 
+std::string semanticDependencyFeature(const SfzImportSemanticDependency& dependency)
+{
+    const auto controllerSuffix = dependency.controllerNumber >= 0
+        ? " (CC" + std::to_string(dependency.controllerNumber) + ")"
+        : std::string {};
+    switch (dependency.kind)
+    {
+        case SfzImportSemanticDependencyKind::controllerRange:
+            return "MIDI controller range" + controllerSuffix;
+        case SfzImportSemanticDependencyKind::controllerTriggerRange:
+            return "MIDI controller trigger range" + controllerSuffix;
+        case SfzImportSemanticDependencyKind::sustainPedalState:
+            return "sustain-pedal state" + controllerSuffix;
+        case SfzImportSemanticDependencyKind::triggerEvent:
+            return "trigger event";
+        case SfzImportSemanticDependencyKind::randomPolicy:
+            return "random selection policy";
+        case SfzImportSemanticDependencyKind::switchCondition:
+            return "switch condition";
+        case SfzImportSemanticDependencyKind::controllerDefault:
+            return "controller default" + controllerSuffix;
+        case SfzImportSemanticDependencyKind::controllerModulation:
+            return "controller modulation" + controllerSuffix;
+        case SfzImportSemanticDependencyKind::presentationMetadata:
+            return "presentation metadata";
+        case SfzImportSemanticDependencyKind::none:
+            break;
+    }
+    return "unsupported semantic dependency";
+}
+
+std::string sourceSectionLabel(const SfzOpcodeScope scope)
+{
+    switch (scope)
+    {
+        case SfzOpcodeScope::control: return "<control>";
+        case SfzOpcodeScope::global: return "<global>";
+        case SfzOpcodeScope::master: return "<master>";
+        case SfzOpcodeScope::group: return "<group>";
+        case SfzOpcodeScope::region: return "<region>";
+        case SfzOpcodeScope::curve: return "<curve>";
+        case SfzOpcodeScope::effect: return "<effect>";
+        case SfzOpcodeScope::midi: return "<midi>";
+        case SfzOpcodeScope::sample: return "<sample>";
+        case SfzOpcodeScope::unknown: break;
+    }
+    return "<unknown>";
+}
+
+std::vector<SfzImportOmittedRegionSummary> buildOmittedRegionSummaries(
+    const SfzImportReport& report)
+{
+    using SummaryKey = std::tuple<int, int, int, std::string>;
+    struct SummaryBuilder
+    {
+        SfzImportOmittedRegionSummary summary;
+        std::set<std::size_t> regionDocumentOrders;
+    };
+
+    std::map<SummaryKey, SummaryBuilder> builders;
+    for (const auto& region : report.regionSemanticAnalysis)
+    {
+        if (region.safeToProjectUnconditionally)
+            continue;
+
+        for (const auto& dependency : region.dependencies)
+        {
+            if (!dependency.affectsRegionEligibility
+                || dependency.support == SfzImportSemanticSupport::native)
+            {
+                continue;
+            }
+
+            const auto key = SummaryKey {
+                static_cast<int>(dependency.kind),
+                dependency.controllerNumber,
+                static_cast<int>(dependency.location.scope),
+                dependency.location.sourcePath
+            };
+            auto& builder = builders[key];
+            if (builder.summary.feature.empty())
+            {
+                builder.summary.dependencyKind = dependency.kind;
+                builder.summary.controllerNumber = dependency.controllerNumber;
+                builder.summary.sourceScope = dependency.location.scope;
+                builder.summary.sourcePath = dependency.location.sourcePath;
+                builder.summary.firstSourceLineNumber = dependency.location.lineNumber;
+                builder.summary.feature = semanticDependencyFeature(dependency);
+            }
+            else if (dependency.location.lineNumber > 0
+                     && (builder.summary.firstSourceLineNumber == 0
+                         || dependency.location.lineNumber
+                             < builder.summary.firstSourceLineNumber))
+            {
+                builder.summary.firstSourceLineNumber = dependency.location.lineNumber;
+            }
+            builder.regionDocumentOrders.insert(region.documentOrder);
+        }
+    }
+
+    std::vector<SfzImportOmittedRegionSummary> summaries;
+    summaries.reserve(builders.size());
+    for (auto& [_, builder] : builders)
+    {
+        builder.summary.affectedRegionCount = builder.regionDocumentOrders.size();
+        summaries.push_back(std::move(builder.summary));
+    }
+    return summaries;
+}
+
 std::vector<std::string> buildProjectNotes(const SfzImportReport& report)
 {
     std::vector<std::string> notes;
@@ -471,7 +582,7 @@ std::vector<std::string> buildProjectNotes(const SfzImportReport& report)
             "SFZ semantic safety analysis: "
             + std::to_string(report.summary.unsafeUnconditionalRegionCount)
             + " of " + std::to_string(report.summary.semanticAnalyzedRegionCount)
-            + " regions contain incomplete sound-critical eligibility dependencies and are unsafe to treat as unconditional playback.");
+            + " regions contained incomplete sound-critical eligibility dependencies and were omitted by the sound-safe import policy.");
     }
 
     const auto hasConvertedScopedGain = std::any_of(
@@ -793,6 +904,13 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         return result;
     }
 
+    const std::set<std::size_t> unsafeRegionDocumentOrders(
+        result.unsafeUnconditionalRegionDocumentOrders.begin(),
+        result.unsafeUnconditionalRegionDocumentOrders.end());
+    result.omittedUnsafeRegionCount = unsafeRegionDocumentOrders.size();
+    result.omittedRegionSummaries = buildOmittedRegionSummaries(analysis.report);
+    result.lossy = result.lossy || result.omittedUnsafeRegionCount > 0;
+
     std::set<std::string> usedSampleSourceIds;
     for (const auto& sampleSource : baseProject.sampleSources)
         usedSampleSourceIds.insert(sampleSource.id);
@@ -820,6 +938,23 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
     result.projectNotes = buildProjectNotes(analysis.report);
     result.authoringNotes = buildAuthoringNotes(analysis.report);
+    for (const auto& omission : result.omittedRegionSummaries)
+    {
+        std::ostringstream note;
+        note << "SFZ sound-safe omission: " << omission.feature
+             << " from " << sourceSectionLabel(omission.sourceScope)
+             << " affected " << omission.affectedRegionCount << " omitted region";
+        if (omission.affectedRegionCount != 1)
+            note << "s";
+        if (!omission.sourcePath.empty())
+        {
+            note << " in " << omission.sourcePath;
+            if (omission.firstSourceLineNumber > 0)
+                note << ":" << omission.firstSourceLineNumber;
+        }
+        note << ".";
+        result.authoringNotes.push_back(note.str());
+    }
 
     for (const auto& section : analysis.normalizeResult.document.sections)
     {
@@ -873,6 +1008,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         }
 
         if (section.scope != SfzOpcodeScope::region)
+            continue;
+
+        if (unsafeRegionDocumentOrders.count(section.documentOrder) > 0)
             continue;
 
         const auto scopedGainContribution = buildScopedGainContribution(section, scopedGainState);
@@ -1050,8 +1188,17 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     if (result.zones.empty())
     {
         result.state = "SFZ projection failed";
-        if (result.zones.empty())
+        if (result.omittedUnsafeRegionCount > 0)
+        {
+            result.issues.push_back(
+                "The sound-safe import policy omitted all "
+                + std::to_string(result.omittedUnsafeRegionCount)
+                + " conditional regions, leaving no safe zones to import.");
+        }
+        else
+        {
             result.issues.push_back("Projection did not create any zones.");
+        }
         return result;
     }
 
@@ -1125,7 +1272,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     result.projected = true;
     result.execution.disposition = SfzImportExecutionDisposition::completed;
     result.execution.failureReason = SfzImportFailureReason::none;
-    result.state = result.lossy ? "SFZ projection ready for reviewed apply" : "SFZ projection ready";
+    result.state = result.omittedUnsafeRegionCount > 0
+        ? "SFZ sound-safe projection ready for reviewed apply"
+        : (result.lossy ? "SFZ projection ready for reviewed apply" : "SFZ projection ready");
     context.reportProgress(SfzImportStage::reviewReady, 1.0f);
     return result;
 }

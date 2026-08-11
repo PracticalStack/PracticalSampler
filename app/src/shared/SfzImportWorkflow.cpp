@@ -29,6 +29,24 @@ juce::String formatGainDb(const double gainDb)
     return juce::String(roundedGain, 2) + " dB";
 }
 
+juce::String sourceSectionLabel(const drs::engine::SfzOpcodeScope scope)
+{
+    switch (scope)
+    {
+        case drs::engine::SfzOpcodeScope::control: return "<control>";
+        case drs::engine::SfzOpcodeScope::global: return "<global>";
+        case drs::engine::SfzOpcodeScope::master: return "<master>";
+        case drs::engine::SfzOpcodeScope::group: return "<group>";
+        case drs::engine::SfzOpcodeScope::region: return "<region>";
+        case drs::engine::SfzOpcodeScope::curve: return "<curve>";
+        case drs::engine::SfzOpcodeScope::effect: return "<effect>";
+        case drs::engine::SfzOpcodeScope::midi: return "<midi>";
+        case drs::engine::SfzOpcodeScope::sample: return "<sample>";
+        case drs::engine::SfzOpcodeScope::unknown: break;
+    }
+    return "<unknown>";
+}
+
 std::string summarizeFinding(const drs::engine::SfzImportFinding& finding)
 {
     std::ostringstream stream;
@@ -175,6 +193,9 @@ juce::String buildSfzImportAppliedSummary(const SfzImportReviewPreparationResult
     summary += "\nSample sources: " + juce::String(static_cast<int>(review.projection.sampleSources.size()));
     summary += "\nMaster gain: " + formatGainDb(review.projection.masterGainDb);
     summary += "\nWarnings: " + juce::String(static_cast<int>(review.analysis.report.summary.warningFindingCount));
+    if (review.projection.omittedUnsafeRegionCount > 0)
+        summary += "\nSound-safe omissions: "
+            + juce::String(static_cast<int>(review.projection.omittedUnsafeRegionCount));
 
     if (!review.projection.authoringNotes.empty())
         summary += "\nSaved review notes: " + juce::String(static_cast<int>(review.projection.authoringNotes.size()));
@@ -208,7 +229,11 @@ SfzImportReviewComponent::SfzImportReviewComponent(SfzImportReviewPreparationRes
     cancelButton.setComponentID("sfzImportReviewCancelButton");
     applyButton.setComponentID("sfzImportReviewApplyButton");
     applyButton.setEnabled(review.commitAllowed);
-    applyButton.setButtonText(review.commitAllowed ? "Import into Project" : "Import Unavailable");
+    applyButton.setButtonText(
+        !review.commitAllowed ? "Import Unavailable"
+                              : (review.projection.omittedUnsafeRegionCount > 0
+                                     ? "Import Safe Zones"
+                                     : "Import into Project"));
 
     cancelButton.onClick = [this]() { commitDecision(false); };
     applyButton.onClick = [this]() { commitDecision(true); };
@@ -242,7 +267,7 @@ void SfzImportReviewComponent::resized()
     area.removeFromTop(10);
     summaryLabel.setBounds(area.removeFromTop(84));
     area.removeFromTop(8);
-    projectionLabel.setBounds(area.removeFromTop(64));
+    projectionLabel.setBounds(area.removeFromTop(84));
     area.removeFromTop(10);
     auto buttonRow = area.removeFromBottom(42);
     findingsEditor.setBounds(area);
@@ -300,6 +325,13 @@ juce::String SfzImportReviewComponent::buildProjectionText() const
     text += " | Playable draft: " + juce::String(review.projection.playable ? "Yes" : "No");
     text += " | Saved notes: " + juce::String(static_cast<int>(review.projection.projectNotes.size()
                                                                  + review.projection.authoringNotes.size()));
+    if (review.projection.omittedUnsafeRegionCount > 0)
+    {
+        text += "\nSound-safe omissions: "
+            + juce::String(static_cast<int>(review.projection.omittedUnsafeRegionCount));
+        text += " | Retained regions: "
+            + juce::String(static_cast<int>(review.projection.zones.size()));
+    }
     return text;
 }
 
@@ -312,6 +344,29 @@ juce::String SfzImportReviewComponent::buildFindingsText() const
     {
         text += "Projection issues:\n";
         text += buildIssueSummary(review.issues, 20) + "\n";
+        text += "\n";
+    }
+
+    if (!review.projection.omittedRegionSummaries.empty())
+    {
+        text += "Sound-safe omissions:\n";
+        for (const auto& omission : review.projection.omittedRegionSummaries)
+        {
+            text += "- " + toDisplayString(omission.feature)
+                + " from " + sourceSectionLabel(omission.sourceScope)
+                + ": " + juce::String(static_cast<int>(omission.affectedRegionCount))
+                + " affected region";
+            if (omission.affectedRegionCount != 1)
+                text += "s";
+            if (!omission.sourcePath.empty())
+            {
+                text += " [" + toDisplayString(omission.sourcePath);
+                if (omission.firstSourceLineNumber > 0)
+                    text += ":" + juce::String(static_cast<int>(omission.firstSourceLineNumber));
+                text += "]";
+            }
+            text += "\n";
+        }
         text += "\n";
     }
 

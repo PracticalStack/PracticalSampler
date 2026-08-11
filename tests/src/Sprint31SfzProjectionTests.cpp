@@ -63,11 +63,9 @@ const drs::engine::RuntimeProjectGroupDefinition* findGroupById(
     return iterator == groups.end() ? nullptr : &(*iterator);
 }
 
-fs::path resolveFirstFixturePath()
+fs::path resolveFixturePath(const fs::path& relativeFixturePath)
 {
     const auto sourceRoot = fs::path(DRS_SOURCE_ROOT);
-    const auto relativeFixturePath =
-        fs::path("DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz");
 
     const auto localFixturePath = sourceRoot / relativeFixturePath;
     if (fs::exists(localFixturePath))
@@ -78,6 +76,12 @@ fs::path resolveFirstFixturePath()
         return workspaceFixturePath;
 
     throw std::runtime_error("Could not locate " + relativeFixturePath.generic_string());
+}
+
+fs::path resolveFirstFixturePath()
+{
+    return resolveFixturePath(
+        "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz");
 }
 
 fs::path resolveFirstSamplePath(const fs::path& fixturePath)
@@ -217,7 +221,9 @@ int main()
                 "The first SFZ fixture should still create one projected zone per region.");
         require(projection.semanticAnalyzedRegionCount == projection.zones.size()
                     && projection.unsafeUnconditionalRegionCount == 0
-                    && projection.unsafeUnconditionalRegionDocumentOrders.empty(),
+                    && projection.unsafeUnconditionalRegionDocumentOrders.empty()
+                    && projection.omittedUnsafeRegionCount == 0
+                    && projection.omittedRegionSummaries.empty(),
                 "Projection should carry semantic safety metadata without changing safe fixture zones.");
         require(!projection.projectNotes.empty(),
                 "Sprint 3.1.4 should persist at least one project-level SFZ provenance note.");
@@ -675,6 +681,88 @@ int main()
                     && !hasAnyVelocityCrossfadeValue(
                         fallbackSession.getProject().authoring.zones.front().velocityCrossfade),
                 "Unsupported topology fallback should persist as a plain native zone.");
+
+        const auto soundSafeFixturePath = unsupportedFixtureDirectory / "sound-safe-omission.sfz";
+        writeTextFile(
+            soundSafeFixturePath,
+            "<control>\n"
+            "set_cc23=0\n"
+            "<group>\n"
+            "<region>\n"
+            "sample=" + unsupportedSamplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "<group>\n"
+            "locc23=1\n"
+            "<region>\n"
+            "sample=" + unsupportedSamplePath.generic_string() + "\n"
+            "pitch_keycenter=61\n"
+            "lokey=61\n"
+            "hikey=61\n"
+            "<group>\n"
+            "trigger=release\n"
+            "<region>\n"
+            "sample=" + unsupportedSamplePath.generic_string() + "\n"
+            "pitch_keycenter=62\n"
+            "lokey=62\n"
+            "hikey=62\n");
+        const auto soundSafeProjection = projectSfzImportDocument(
+            blankProject, soundSafeFixturePath.generic_string());
+        require(soundSafeProjection.projected && soundSafeProjection.playable
+                    && soundSafeProjection.lossy && !soundSafeProjection.blocking,
+                "Sound-safe omission should remain a playable, reviewed projection.");
+        require(soundSafeProjection.semanticAnalyzedRegionCount == 3
+                    && soundSafeProjection.unsafeUnconditionalRegionCount == 2
+                    && soundSafeProjection.omittedUnsafeRegionCount == 2,
+                "Sound-safe projection should classify and omit both conditional regions.");
+        require(soundSafeProjection.zones.size() == 1
+                    && soundSafeProjection.zones.front().rootKey == 60,
+                "Sound-safe projection should retain only the unconditional native zone.");
+        require(soundSafeProjection.omittedRegionSummaries.size() == 2,
+                "Sound-safe projection should summarize omissions by feature and source section.");
+        require(std::any_of(soundSafeProjection.omittedRegionSummaries.begin(),
+                            soundSafeProjection.omittedRegionSummaries.end(),
+                            [](const SfzImportOmittedRegionSummary& summary)
+                            {
+                                return summary.dependencyKind
+                                        == SfzImportSemanticDependencyKind::controllerRange
+                                    && summary.controllerNumber == 23
+                                    && summary.sourceScope == SfzOpcodeScope::group
+                                    && summary.affectedRegionCount == 1;
+                            }),
+                "Sound-safe review should summarize the group-scope CC23 omission.");
+        require(std::any_of(soundSafeProjection.omittedRegionSummaries.begin(),
+                            soundSafeProjection.omittedRegionSummaries.end(),
+                            [](const SfzImportOmittedRegionSummary& summary)
+                            {
+                                return summary.dependencyKind
+                                        == SfzImportSemanticDependencyKind::triggerEvent
+                                    && summary.sourceScope == SfzOpcodeScope::group
+                                    && summary.affectedRegionCount == 1;
+                            }),
+                "Sound-safe review should summarize the group-scope trigger omission.");
+
+        AuthoringSession soundSafeSession(blankProject);
+        const auto soundSafeApply = applySfzImportProjection(
+            soundSafeSession, soundSafeProjection, "Import only sound-safe SFZ zones");
+        require(soundSafeApply.applied
+                    && soundSafeSession.getProject().authoring.zones.size() == 1,
+                "Reviewed sound-safe apply should mutate the project with retained zones only.");
+
+        const auto salamanderPath = resolveFixturePath(
+            "DemoSFVInstruments/AccurateSalamanderGrandPianoV6.2beta2_48khz24bit/sfz_daw/Accurate-SalamanderGrandPiano_flat.Recommended.sfz");
+        const auto salamanderProjection = projectSfzImportDocument(
+            makeBlankPhase2Project(salamanderPath), salamanderPath.generic_string());
+        require(salamanderProjection.projected && salamanderProjection.playable,
+                "Accurate Salamander sound-safe projection should remain playable.");
+        require(salamanderProjection.semanticAnalyzedRegionCount == 1704
+                    && salamanderProjection.unsafeUnconditionalRegionCount == 296
+                    && salamanderProjection.omittedUnsafeRegionCount == 296
+                    && salamanderProjection.zones.size() == 1408
+                    && salamanderProjection.sampleSources.size() == 480,
+                "Accurate Salamander sound-safe projection should omit 296 auxiliary regions and retain 1,408 piano regions; sources="
+                    + std::to_string(salamanderProjection.sampleSources.size()));
 
         std::cout << "Sprint 3.1.4 SFZ projection tests passed." << std::endl;
         return 0;

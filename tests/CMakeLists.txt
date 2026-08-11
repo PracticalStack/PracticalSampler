@@ -1435,6 +1435,7 @@ target_link_libraries(drs_sprint31_sfz_report_model_tests
     PRIVATE
         drs_app_shared
         drs_sample_import
+        drs_sampler_core
 )
 
 target_compile_definitions(drs_sprint31_sfz_report_model_tests

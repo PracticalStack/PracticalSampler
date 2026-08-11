@@ -81,7 +81,8 @@ inline SfzImportReportModel makeSfzImportReportModel(
     model.reviewDisposition = analysis.report.reviewDisposition;
     model.commitAllowed = model.reviewDisposition != drs::engine::SfzImportReviewDisposition::blocked;
     model.confirmationRequired
-        = model.reviewDisposition == drs::engine::SfzImportReviewDisposition::confirmationRequired;
+        = model.reviewDisposition == drs::engine::SfzImportReviewDisposition::confirmationRequired
+        || analysis.report.summary.unsafeUnconditionalRegionCount > 0;
     model.documentPath = analysis.report.rootDocumentPath;
     model.convertedCount = analysis.report.summary.convertedOpcodeCount;
     model.approximatedCount = analysis.report.summary.approximatedOpcodeCount;
@@ -105,7 +106,13 @@ inline SfzImportReportModel makeSfzImportReportModel(
     else if (model.confirmationRequired)
     {
         model.headline = "Review SFZ import";
-        if (reportHasVelocityCrossfadeWithDisposition(report, drs::engine::SfzImportSupportDisposition::approximated))
+        if (report.summary.unsafeUnconditionalRegionCount > 0)
+        {
+            model.headline = "Review sound-safe SFZ import";
+            model.guidance = std::to_string(report.summary.unsafeUnconditionalRegionCount)
+                + " conditionally gated regions use incomplete sound-critical semantics and will be omitted. Choose Import Safe Zones to continue, or Cancel to leave the project unchanged.";
+        }
+        else if (reportHasVelocityCrossfadeWithDisposition(report, drs::engine::SfzImportSupportDisposition::approximated))
         {
             model.guidance =
                 "Some velocity crossfades still fall outside the supported linear-adjacent contract, or other review-only features remain. Confirm the findings before final import.";

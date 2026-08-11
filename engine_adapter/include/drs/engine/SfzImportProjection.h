@@ -9,6 +9,18 @@
 
 namespace drs::engine
 {
+struct SfzImportOmittedRegionSummary
+{
+    SfzImportSemanticDependencyKind dependencyKind
+        = SfzImportSemanticDependencyKind::none;
+    int controllerNumber = -1;
+    SfzOpcodeScope sourceScope = SfzOpcodeScope::unknown;
+    std::string sourcePath;
+    std::size_t firstSourceLineNumber = 0;
+    std::string feature;
+    std::size_t affectedRegionCount = 0;
+};
+
 struct SfzImportProjectionResult
 {
     bool projected = false;
@@ -18,6 +30,8 @@ struct SfzImportProjectionResult
     std::size_t semanticAnalyzedRegionCount = 0;
     std::size_t unsafeUnconditionalRegionCount = 0;
     std::vector<std::size_t> unsafeUnconditionalRegionDocumentOrders;
+    std::size_t omittedUnsafeRegionCount = 0;
+    std::vector<SfzImportOmittedRegionSummary> omittedRegionSummaries;
     std::string state;
     std::vector<std::string> issues;
     std::vector<RuntimeProjectSampleSource> sampleSources;

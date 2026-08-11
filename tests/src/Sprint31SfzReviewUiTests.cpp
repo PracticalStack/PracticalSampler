@@ -199,6 +199,58 @@ int main()
         require(acceptedDecision.has_value() && *acceptedDecision,
                 "Review UI should report an accepted decision when the import button is used.");
 
+        auto omissionReview = review;
+        omissionReview.analysis.report.summary.unsafeUnconditionalRegionCount = 2;
+        omissionReview.reportModel = drs::app::makeSfzImportReportModel(omissionReview.analysis);
+        omissionReview.projection.omittedUnsafeRegionCount = 2;
+        drs::engine::SfzImportOmittedRegionSummary omissionSummary;
+        omissionSummary.dependencyKind
+            = drs::engine::SfzImportSemanticDependencyKind::controllerRange;
+        omissionSummary.controllerNumber = 23;
+        omissionSummary.sourceScope = drs::engine::SfzOpcodeScope::group;
+        omissionSummary.sourcePath = fixturePath.generic_string();
+        omissionSummary.firstSourceLineNumber = 42;
+        omissionSummary.feature = "MIDI controller range (CC23)";
+        omissionSummary.affectedRegionCount = 2;
+        omissionReview.projection.omittedRegionSummaries = { omissionSummary };
+
+        std::optional<bool> omissionDecision;
+        {
+            drs::app::SfzImportReviewComponent component(
+                omissionReview,
+                [&omissionDecision](bool accepted)
+                {
+                    omissionDecision = accepted;
+                });
+            component.setSize(760, 620);
+            DesktopHostedComponent host(component);
+            pumpMessages(30);
+
+            requireLabelContains(component,
+                                 "sfzImportReviewGuidanceLabel",
+                                 "will be omitted",
+                                 "Sound-safe review should explain that unsafe regions will be omitted.");
+            requireLabelContains(component,
+                                 "sfzImportReviewProjectionLabel",
+                                 "Sound-safe omissions: 2",
+                                 "Sound-safe review should surface the omitted-region count.");
+            require(requireButton(component, "sfzImportReviewApplyButton").getButtonText()
+                        == "Import Safe Zones",
+                    "Sound-safe review should offer the explicit safe import choice.");
+            const auto omissionText = requireEditor(
+                component, "sfzImportReviewFindingsEditor").getText();
+            require(omissionText.contains("Sound-safe omissions:")
+                        && omissionText.contains("MIDI controller range (CC23)")
+                        && omissionText.contains("<group>")
+                        && omissionText.contains("2 affected regions"),
+                    "Sound-safe review should summarize omissions by feature and source section.");
+
+            requireButton(component, "sfzImportReviewCancelButton").onClick();
+            pumpMessages(30);
+        }
+        require(omissionDecision.has_value() && !*omissionDecision,
+                "Sound-safe review should preserve Cancel as the explicit no-mutation choice.");
+
         auto blockedReview = review;
         blockedReview.commitAllowed = false;
         blockedReview.blocking = true;

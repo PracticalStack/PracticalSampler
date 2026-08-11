@@ -503,14 +503,16 @@ int main(int argc, char** argv)
         require(projection.projected && projection.playable && !projection.blocking,
                 "Salamander import projection failed: " + projection.state + " :: "
                     + joinIssues(projection.issues));
-        require(projection.sampleSources.size() >= 641,
-                "Salamander projection did not retain at least 641 sample sources.");
-        require(projection.zones.size() >= 1704,
-                "Salamander projection did not retain at least 1,704 zones/routes.");
+        require(projection.sampleSources.size() == 480,
+                "Salamander sound-safe projection did not retain exactly 480 piano sample sources.");
+        require(projection.zones.size() == 1408,
+                "Salamander sound-safe projection did not retain exactly 1,408 ordinary piano regions.");
         require(projection.semanticAnalyzedRegionCount == 1704,
                 "Salamander semantic analysis did not classify all 1,704 regions.");
         require(projection.unsafeUnconditionalRegionCount == 296,
                 "Salamander semantic analysis did not identify the expected 296 unsafe auxiliary regions.");
+        require(projection.omittedUnsafeRegionCount == 296,
+                "Salamander sound-safe projection did not omit all 296 unsafe auxiliary regions.");
 
         drs::engine::AuthoringSession session(blankProject);
         const auto applyStart = Clock::now();
@@ -523,8 +525,8 @@ int main(int argc, char** argv)
         const auto snapshotStart = Clock::now();
         const auto fullSnapshot = buildSnapshot(snapshotBuilder, session.getProject(), 1);
         const auto snapshotMicros = elapsedMicros(snapshotStart);
-        require(fullSnapshot.snapshot.sampleIdentities.size() >= 641
-                    && fullSnapshot.snapshot.zones.size() >= 1704,
+        require(fullSnapshot.snapshot.sampleIdentities.size() == 480
+                    && fullSnapshot.snapshot.zones.size() == 1408,
                 "Full-draft snapshot lost Salamander dependencies.");
 
         const auto& anchorZone = fullSnapshot.snapshot.zones.front();

@@ -138,6 +138,20 @@ void requireRegionSemanticAnalysisEquals(const drs::engine::SfzImportRegionSeman
                                         context + " dependency mismatch at index " + std::to_string(index));
 }
 
+void requireOmittedRegionSummaryEquals(const drs::engine::SfzImportOmittedRegionSummary& expected,
+                                       const drs::engine::SfzImportOmittedRegionSummary& actual,
+                                       const std::string& context)
+{
+    require(expected.dependencyKind == actual.dependencyKind
+                && expected.controllerNumber == actual.controllerNumber
+                && expected.sourceScope == actual.sourceScope
+                && expected.sourcePath == actual.sourcePath
+                && expected.firstSourceLineNumber == actual.firstSourceLineNumber
+                && expected.feature == actual.feature
+                && expected.affectedRegionCount == actual.affectedRegionCount,
+            context);
+}
+
 void requireSupportSummaryEquals(const drs::engine::SfzImportOpcodeSupportSummary& expected,
                                  const drs::engine::SfzImportOpcodeSupportSummary& actual,
                                  const std::string& context)
@@ -221,13 +235,22 @@ void requireProjectionEquals(const drs::engine::SfzImportProjectionResult& expec
                 && expected.unsafeUnconditionalRegionCount == actual.unsafeUnconditionalRegionCount
                 && expected.unsafeUnconditionalRegionDocumentOrders
                     == actual.unsafeUnconditionalRegionDocumentOrders
+                && expected.omittedUnsafeRegionCount == actual.omittedUnsafeRegionCount
                 && expected.masterGainDb == actual.masterGainDb
                 && expected.projectNotes == actual.projectNotes
                 && expected.authoringNotes == actual.authoringNotes
                 && expected.sampleSources.size() == actual.sampleSources.size()
                 && expected.groups.size() == actual.groups.size()
-                && expected.zones.size() == actual.zones.size(),
+                && expected.zones.size() == actual.zones.size()
+                && expected.omittedRegionSummaries.size()
+                    == actual.omittedRegionSummaries.size(),
             context);
+
+    for (std::size_t index = 0; index < expected.omittedRegionSummaries.size(); ++index)
+        requireOmittedRegionSummaryEquals(
+            expected.omittedRegionSummaries[index],
+            actual.omittedRegionSummaries[index],
+            context + " omission summary mismatch at index " + std::to_string(index));
 
     for (std::size_t index = 0; index < expected.sampleSources.size(); ++index)
         requireSampleSourceEquals(expected.sampleSources[index],
