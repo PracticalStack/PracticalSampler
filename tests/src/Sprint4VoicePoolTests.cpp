@@ -128,7 +128,9 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                               int keyHigh = 127,
                                               std::size_t layerCount = 1,
                                               drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated,
-                                              bool paged = false)
+                                              bool paged = false,
+                                              drs::engine::PerformancePitchSource pitchSource
+                                                  = drs::engine::PerformancePitchSource::eventNote)
 {
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 43;
@@ -157,6 +159,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         snapshotZone.velocityLow = 1;
         snapshotZone.velocityHigh = 127;
         snapshotZone.triggerMode = triggerMode;
+        snapshotZone.performance.pitchSource = pitchSource;
         snapshot.zones.push_back(std::move(snapshotZone));
 
         drs::engine::PreparedPlaybackSampleHandle sample;
@@ -209,6 +212,27 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         preparedZone.velocityHigh = 127;
         preparedZone.triggerMode = triggerMode;
         prepared.zones.push_back(std::move(preparedZone));
+    }
+
+    if (pitchSource != drs::engine::PerformancePitchSource::eventNote)
+    {
+        drs::engine::CompiledPerformanceProgram program;
+        program.articulationCount = 1;
+        program.defaultArticulationIndex = 0;
+        program.articulationStableIds = { 1 };
+        program.zoneArticulationIndices.assign(layerCount, 0);
+        for (std::size_t index = 0; index < layerCount; ++index)
+        {
+            drs::engine::CompiledPerformanceTriggerRoute route;
+            route.zoneIndex = static_cast<std::uint32_t>(index);
+            route.articulationIndex = 0;
+            route.pitchSource = pitchSource;
+            program.triggerRoutes.push_back(route);
+        }
+        program.eventRanges[static_cast<std::size_t>(drs::engine::PerformanceEventKind::noteOn)]
+            = { 0, static_cast<std::uint32_t>(layerCount) };
+        snapshot.performanceProgram = program;
+        prepared.performanceProgram = std::move(program);
     }
 
     drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
@@ -492,6 +516,26 @@ void runSampleAccurateTimingMatrix()
     const std::array<drs::engine::SamplerRenderEvent, 1> outside { noteOn(8) };
     require(!invalidPool.renderBlock(invalidOutput.view(), { outside.data(), outside.size() }).accepted,
             "Event offsets at or beyond the block end must be rejected.");
+}
+
+void runEventKeyFixedPitchMatrix()
+{
+    const auto fixedPitchModel = buildModel(
+        64, 21, 21, 1, drs::engine::ZoneTriggerMode::gated, false,
+        drs::engine::PerformancePitchSource::eventKeyFixedPitch);
+    drs::engine::SamplerVoicePool fixedPitchPool;
+    require(fixedPitchPool.prepare(*fixedPitchModel, 48000.0),
+            "Fixed-pitch voice pool should prepare.");
+    drs::engine::SamplerEventBlock events;
+    events.push(noteOn(0, 21));
+    StereoOutput output(1);
+    const auto result = fixedPitchPool.renderBlock(output.view(), events.view());
+    const auto voice = fixedPitchPool.getSlotSnapshot(0);
+    require(result.render.startedVoiceCount == 1
+                && voice.state == drs::engine::SamplerVoiceSlotState::active
+                && voice.effectiveMidiNote == 60
+                && std::abs(voice.incrementFrames - 1.0) < 1.0e-12,
+            "pitch_keytrack=0 must use note 21 for eligibility while playing its root-60 sample without transposition.");
 }
 
 void runNoteOwnershipAndCommandMatrix()
@@ -823,6 +867,7 @@ int main()
     {
         runEventBlockContract();
         runSampleAccurateTimingMatrix();
+        runEventKeyFixedPitchMatrix();
         runNoteOwnershipAndCommandMatrix();
         runOverlappingLayerMatrix();
         runTriggerModeMatrix();

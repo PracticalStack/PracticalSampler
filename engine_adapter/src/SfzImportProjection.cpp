@@ -337,27 +337,10 @@ std::string buildArticulationDisplayName(const std::string& articulationId)
 
 std::string buildArticulationId(const SfzNormalizedSection& section)
 {
-    std::string base = "sustain";
-    if (const auto* trigger = findEffectiveOpcode(section, "trigger"))
-    {
-        const auto lowered = toLowerAscii(trigger->value);
-        if (lowered == "release")
-            base = "release";
-        else if (lowered == "legato")
-            base = "legato";
-    }
-
-    std::ostringstream signature;
-    signature << base;
-    for (const auto& opcode : section.effectiveOpcodes)
-    {
-        if (parseControllerOpcodeNumber(opcode.name, "locc").has_value()
-            || parseControllerOpcodeNumber(opcode.name, "hicc").has_value()
-            || parseControllerOpcodeNumber(opcode.name, "on_locc").has_value()
-            || parseControllerOpcodeNumber(opcode.name, "on_hicc").has_value())
-            signature << "-" << opcode.name << "-" << opcode.value;
-    }
-    return slugify(signature.str());
+    static_cast<void>(section);
+    // A single SFZ program is one selectable articulation. Trigger kinds and controller
+    // conditions are route eligibility, not articulation-selection dimensions.
+    return "sustain";
 }
 
 std::string buildGroupId(const SfzNormalizedSection& section,
@@ -1195,6 +1178,12 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                 .value_or(100.0),
             0.0,
             100.0);
+        if (const auto* pitchKeytrack = findEffectiveOpcode(section, "pitch_keytrack"))
+        {
+            const auto value = parseDoubleValue(pitchKeytrack->value);
+            if (value.has_value() && std::abs(*value) < 0.000001)
+                zone.performance.pitchSource = PerformancePitchSource::eventKeyFixedPitch;
+        }
         zone.releaseSeconds = parseDoubleValue(findEffectiveOpcode(section, "ampeg_release") != nullptr
                                                    ? findEffectiveOpcode(section, "ampeg_release")->value
                                                    : "0")

@@ -44,7 +44,8 @@ enum class PerformanceSustainCondition : std::uint8_t
 enum class PerformancePitchSource : std::uint8_t
 {
     eventNote,
-    fixedRoot
+    fixedRoot,
+    eventKeyFixedPitch
 };
 
 enum class ArticulationActivationMode : std::uint8_t

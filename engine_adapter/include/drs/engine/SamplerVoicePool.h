@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 namespace drs::engine
 {
@@ -60,6 +61,28 @@ struct SamplerVoicePoolRenderResult
     std::uint32_t sustainDeferredVoiceCount = 0;
     std::uint32_t resetVoiceCount = 0;
 };
+
+struct SamplerRouteEligibilityQuery
+{
+    int midiNote = 60;
+    int velocity = 64;
+    PerformanceEventKind performanceEvent = PerformanceEventKind::noteOn;
+    bool sustainPedalDown = false;
+    std::uint32_t articulationIndex = kInvalidPerformanceProgramIndex;
+    std::array<std::uint8_t, 128> controllerValues {};
+};
+
+struct SamplerRouteEligibilityResult
+{
+    bool evaluated = false;
+    std::vector<std::size_t> eligibleRouteIndices;
+};
+
+// Qualification-side read-only evaluator. It intentionally reports every semantically eligible
+// route before crossfade weighting or one-slot round-robin selection.
+SamplerRouteEligibilityResult evaluateSamplerRouteEligibility(
+    const SamplerRenderModel& model,
+    const SamplerRouteEligibilityQuery& query);
 
 class SamplerVoicePool final
 {

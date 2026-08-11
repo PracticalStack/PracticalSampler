@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -706,9 +707,10 @@ int main()
             "hikey=61\n"
             "<group>\n"
             "trigger=release\n"
+            "pitch_keytrack=0\n"
             "<region>\n"
             "sample=" + unsupportedSamplePath.generic_string() + "\n"
-            "pitch_keycenter=62\n"
+            "pitch_keycenter=60\n"
             "lokey=62\n"
             "hikey=62\n"
             "<group>\n"
@@ -740,8 +742,10 @@ int main()
         require(soundSafeProjection.zones[1].controllerConditions.size() == 1
                     && soundSafeProjection.zones[1].controllerConditions.front().controllerNumber == 23
                     && soundSafeProjection.zones[2].performance.event == PerformanceEventKind::release
+                    && soundSafeProjection.zones[2].performance.pitchSource
+                        == PerformancePitchSource::eventKeyFixedPitch
                     && soundSafeProjection.zones[2].triggerMode == ZoneTriggerMode::oneShot,
-                "Projection should preserve controller eligibility and release trigger semantics.");
+                "Projection should preserve controller eligibility, release triggers, and zero pitch tracking.");
         require(soundSafeProjection.zones[3].performance.event == PerformanceEventKind::controllerChange
                     && soundSafeProjection.zones[3].performance.triggerControllerNumber == 23
                     && soundSafeProjection.zones[3].controllerConditions.size() == 2
@@ -769,6 +773,116 @@ int main()
                     && salamanderProjection.sampleSources.size() == 637,
                 "Accurate Salamander Phase 3 projection should retain controller/release layers and omit only four random pedal regions; sources="
                     + std::to_string(salamanderProjection.sampleSources.size()));
+
+        const auto hasControllerCondition = [](const RuntimeProjectZoneDefinition& zone,
+                                               const int controller)
+        {
+            return std::any_of(zone.controllerConditions.begin(), zone.controllerConditions.end(),
+                               [&](const RuntimeControllerCondition& condition)
+                               { return condition.controllerNumber == controller; });
+        };
+        const auto resonanceZoneCount = std::count_if(
+            salamanderProjection.zones.begin(), salamanderProjection.zones.end(),
+            [&](const RuntimeProjectZoneDefinition& zone)
+            {
+                return zone.performance.event == PerformanceEventKind::noteOn
+                    && hasControllerCondition(zone, 23) && hasControllerCondition(zone, 64);
+            });
+        const auto sampledReleaseZoneCount = std::count_if(
+            salamanderProjection.zones.begin(), salamanderProjection.zones.end(),
+            [&](const RuntimeProjectZoneDefinition& zone)
+            {
+                return zone.performance.event == PerformanceEventKind::release
+                    && hasControllerCondition(zone, 20) && hasControllerCondition(zone, 64);
+            });
+        const auto hammerZoneCount = std::count_if(
+            salamanderProjection.zones.begin(), salamanderProjection.zones.end(),
+            [&](const RuntimeProjectZoneDefinition& zone)
+            {
+                return zone.performance.event == PerformanceEventKind::release
+                    && hasControllerCondition(zone, 21) && hasControllerCondition(zone, 64);
+            });
+        const auto retainedPedalActionCount = std::count_if(
+            salamanderProjection.zones.begin(), salamanderProjection.zones.end(),
+            [](const RuntimeProjectZoneDefinition& zone)
+            {
+                return zone.performance.event == PerformanceEventKind::pedalDown
+                    || zone.performance.event == PerformanceEventKind::pedalUp;
+            });
+        require(resonanceZoneCount == 135 && sampledReleaseZoneCount == 69
+                    && hammerZoneCount == 88 && retainedPedalActionCount == 0,
+                "Phase 4 must retain 135 gated resonance and 157 gated release/hammer zones while omitting all four random pedal variants.");
+        require(std::all_of(
+                    salamanderProjection.zones.begin(), salamanderProjection.zones.end(),
+                    [&](const RuntimeProjectZoneDefinition& zone)
+                    {
+                        return !(zone.performance.event == PerformanceEventKind::release
+                                 && hasControllerCondition(zone, 21))
+                            || zone.performance.pitchSource == PerformancePitchSource::eventKeyFixedPitch;
+                    }),
+                "Every Salamander hammer-noise route must use event-key eligibility without transposing its sample.");
+
+        std::vector<const RuntimeProjectZoneDefinition*> middleCResonanceZones;
+        for (const auto& zone : salamanderProjection.zones)
+            if (zone.performance.event == PerformanceEventKind::noteOn
+                && zone.keyLow <= 60 && zone.keyHigh >= 60
+                && hasControllerCondition(zone, 23) && hasControllerCondition(zone, 64))
+                middleCResonanceZones.push_back(&zone);
+        require(middleCResonanceZones.size() == 2,
+                "Enabled Salamander middle-C resonance must add exactly its two intended sympathetic routes.");
+        require(std::all_of(
+                    middleCResonanceZones.begin(), middleCResonanceZones.end(),
+                    [&](const RuntimeProjectZoneDefinition* zone)
+                    {
+                        const auto* group = findGroupById(salamanderProjection.groups, zone->groupId);
+                        return group != nullptr
+                            && std::abs(group->gainDb + zone->gainDb + 6.0) < 0.000001;
+                    })
+                    && std::any_of(salamanderProjection.zones.begin(), salamanderProjection.zones.end(),
+                                   [&](const RuntimeProjectZoneDefinition& zone)
+                                   {
+                                       return hasControllerCondition(zone, 23)
+                                           && zone.fineTuneCents != 0.0;
+                                   }),
+                "Salamander resonance must retain its -6 dB middle-register group attenuation and authored fine tuning.");
+        const auto omittedRandomRegionCount = std::accumulate(
+            salamanderProjection.omittedRegionSummaries.begin(),
+            salamanderProjection.omittedRegionSummaries.end(), std::size_t { 0 },
+            [](const std::size_t count, const SfzImportOmittedRegionSummary& summary)
+            {
+                return count + (summary.dependencyKind == SfzImportSemanticDependencyKind::randomPolicy
+                    ? summary.affectedRegionCount : 0);
+            });
+        require(omittedRandomRegionCount == 4
+                    && std::all_of(salamanderProjection.omittedRegionSummaries.begin(),
+                                   salamanderProjection.omittedRegionSummaries.end(),
+                                   [](const SfzImportOmittedRegionSummary& summary)
+                                   {
+                                       return !summary.feature.empty() && !summary.sourcePath.empty()
+                                           && summary.firstSourceLineNumber > 0;
+                                   }),
+                "The sound-safe random policy must report every omitted pedal variant with feature and source context.");
+
+        const auto pedalFixturePath = unsupportedFixtureDirectory / "phase4-pedal-actions.sfz";
+        writeTextFile(
+            pedalFixturePath,
+            "<control>\nset_cc22=0\n"
+            "<master> locc22=1\n"
+            "<group> on_locc64=126 on_hicc64=127\n"
+            "<region> sample=" + unsupportedSamplePath.generic_string()
+                + " pitch_keycenter=60 lokey=60 hikey=60\n"
+                  "<group> on_locc64=0 on_hicc64=1\n"
+                  "<region> sample=" + unsupportedSamplePath.generic_string()
+                + " pitch_keycenter=60 lokey=60 hikey=60\n");
+        const auto pedalProjection = projectSfzImportDocument(
+            blankPhase6Project, pedalFixturePath.generic_string());
+        require(pedalProjection.projected && pedalProjection.playable
+                    && pedalProjection.zones.size() == 2
+                    && pedalProjection.zones[0].performance.event == PerformanceEventKind::pedalDown
+                    && pedalProjection.zones[1].performance.event == PerformanceEventKind::pedalUp
+                    && pedalProjection.zones[0].performance.triggerControllerNumber == 64
+                    && pedalProjection.zones[1].performance.triggerControllerNumber == 64,
+                "Non-random pedal-action regions must map only to their matching CC64 transitions.");
 
         std::cout << "Sprint 3.1.4 SFZ projection tests passed." << std::endl;
         return 0;

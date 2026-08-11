@@ -6,6 +6,7 @@
 #include "drs/engine/DeferredPackageSession.h"
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "drs/engine/SamplerRenderModel.h"
+#include "drs/engine/SamplerVoicePool.h"
 #include "drs/engine/SfzImportProjection.h"
 #include "drs/engine/PackageReaderDispatch.h"
 #include "shared/PerformancePackageExportService.h"
@@ -132,6 +133,316 @@ PreparedRun prepareSynchronously(const drs::engine::PlaybackSnapshotBuildResult&
     require(step.result.metrics.decodedBytes == 0,
             "Streaming preparation decoded full sample PCM.");
     return { std::move(step), elapsed };
+}
+
+drs::engine::SamplerRenderModelPtr buildQualificationRenderModel(
+    const drs::engine::PlaybackSnapshotBuildResult& snapshot,
+    const drs::engine::PreparedPlaybackBuildResult& prepared)
+{
+    const auto payload = drs::engine::buildPlaybackActivationPayload(
+        drs::engine::PlaybackActivationLane::performance,
+        snapshot.requestedDraftRevision,
+        &snapshot,
+        &prepared);
+    drs::engine::SamplerRenderModelBuildOptions options;
+    options.selectedArticulationId = "sustain";
+    const auto build = drs::engine::buildSamplerRenderModel(payload, options);
+    require(build.built && build.model != nullptr,
+            "Semantic qualification could not build the full render model.");
+    return build.model;
+}
+
+drs::engine::SamplerRouteEligibilityQuery makeDefaultEligibilityQuery(
+    const drs::engine::SamplerRenderModel& model,
+    const drs::engine::PerformanceEventKind event,
+    const int note,
+    const int velocity)
+{
+    drs::engine::SamplerRouteEligibilityQuery query;
+    query.performanceEvent = event;
+    query.midiNote = note;
+    query.velocity = velocity;
+    const auto& program = model.getPerformanceProgram();
+    query.articulationIndex = program.defaultArticulationIndex;
+    for (std::size_t controller = 0; controller < query.controllerValues.size(); ++controller)
+        if (program.hasControllerDefault[controller])
+            query.controllerValues[controller] = program.controllerDefaults[controller];
+    query.sustainPedalDown = query.controllerValues[64] >= 64;
+    return query;
+}
+
+bool routeHasControllerCondition(const drs::engine::SamplerRenderRoute& route,
+                                 const int controller)
+{
+    return std::any_of(route.controllerConditions.begin(), route.controllerConditions.end(),
+                       [&](const drs::engine::RuntimeControllerCondition& condition)
+                       { return condition.controllerNumber == controller; });
+}
+
+struct SemanticQualificationResult
+{
+    std::size_t defaultMiddleCRoutes = 0;
+    std::size_t enabledResonanceRoutes = 0;
+    std::size_t sampledReleaseRoutes = 0;
+    std::size_t hammerRoutes = 0;
+    std::size_t pedalTransitionRoutes = 0;
+};
+
+SemanticQualificationResult qualifySalamanderSemantics(
+    const drs::engine::SamplerRenderModel& model)
+{
+    const auto evaluate = [&](const drs::engine::SamplerRouteEligibilityQuery& query)
+    {
+        const auto result = drs::engine::evaluateSamplerRouteEligibility(model, query);
+        require(result.evaluated, "A semantic route-state query was rejected.");
+        return result.eligibleRouteIndices;
+    };
+
+    auto defaultNote = makeDefaultEligibilityQuery(
+        model, drs::engine::PerformanceEventKind::noteOn, 60, 64);
+    const auto defaultRoutes = evaluate(defaultNote);
+    require(defaultRoutes.size() == 1,
+            "Default-controller middle C must start exactly one ordinary piano route.");
+
+    auto resonanceWithoutPedal = defaultNote;
+    resonanceWithoutPedal.controllerValues[23] = 1;
+    require(evaluate(resonanceWithoutPedal).size() == 1,
+            "CC23 alone must not enable pseudo pedal resonance while sustain is up.");
+
+    auto pedalWithoutResonance = defaultNote;
+    pedalWithoutResonance.controllerValues[64] = 127;
+    pedalWithoutResonance.sustainPedalDown = true;
+    require(evaluate(pedalWithoutResonance).size() == 1,
+            "Sustain alone must not enable pseudo pedal resonance while CC23 is disabled.");
+
+    auto enabledResonance = pedalWithoutResonance;
+    enabledResonance.controllerValues[23] = 1;
+    const auto resonanceRoutes = evaluate(enabledResonance);
+    require(resonanceRoutes.size() == 3,
+            "Enabled middle-C resonance must produce one piano route plus two sympathetic routes; actual="
+                + std::to_string(resonanceRoutes.size()));
+    std::vector<std::size_t> auxiliaryResonanceRoutes;
+    for (const auto routeIndex : resonanceRoutes)
+        if (routeHasControllerCondition(model.getRoutes().at(routeIndex), 23))
+            auxiliaryResonanceRoutes.push_back(routeIndex);
+    require(auxiliaryResonanceRoutes.size() == 2
+                && std::all_of(auxiliaryResonanceRoutes.begin(), auxiliaryResonanceRoutes.end(),
+                               [&](const std::size_t routeIndex)
+                               { return std::abs(model.getRoutes().at(routeIndex).gainDb + 6.0) < 0.000001; }),
+            "Middle-C resonance must retain exactly two -6 dB auxiliary routes.");
+
+    auto tunedResonance = enabledResonance;
+    tunedResonance.midiNote = 61;
+    const auto tunedRoutes = evaluate(tunedResonance);
+    require(std::any_of(tunedRoutes.begin(), tunedRoutes.end(),
+                        [&](const std::size_t routeIndex)
+                        {
+                            const auto& route = model.getRoutes().at(routeIndex);
+                            return routeHasControllerCondition(route, 23)
+                                && std::abs(route.fineTuneCents - 1.0) < 0.000001;
+                        }),
+            "The enabled resonance matrix must retain its authored +1-cent C#4 auxiliary route.");
+
+    auto defaultRelease = makeDefaultEligibilityQuery(
+        model, drs::engine::PerformanceEventKind::release, 60, 64);
+    require(evaluate(defaultRelease).empty(),
+            "Release and hammer routes must remain silent at default controller values.");
+    auto sampledRelease = defaultRelease;
+    sampledRelease.controllerValues[20] = 1;
+    const auto sampledReleaseRoutes = evaluate(sampledRelease);
+    require(sampledReleaseRoutes.size() == 2,
+            "CC20-enabled middle-C release must select the intended two sampled-release layers.");
+    auto hammerRelease = defaultRelease;
+    hammerRelease.controllerValues[21] = 1;
+    const auto hammerRoutes = evaluate(hammerRelease);
+    require(hammerRoutes.size() == 1,
+            "CC21-enabled middle-C release must select exactly one hammer-noise route.");
+    const auto& hammerRoute = model.getRoutes().at(hammerRoutes.front());
+    require(hammerRoute.performancePitchSource
+                == drs::engine::PerformancePitchSource::eventKeyFixedPitch
+                && std::abs(hammerRoute.gainDb + 37.0) < 0.000001,
+            "The middle-C hammer route must remain untransposed at its intended -37 dB gain.");
+
+    auto pedalDown = makeDefaultEligibilityQuery(
+        model, drs::engine::PerformanceEventKind::pedalDown, 60, 127);
+    pedalDown.controllerValues[22] = 1;
+    pedalDown.controllerValues[64] = 127;
+    pedalDown.sustainPedalDown = true;
+    auto pedalUp = makeDefaultEligibilityQuery(
+        model, drs::engine::PerformanceEventKind::pedalUp, 60, 127);
+    pedalUp.controllerValues[22] = 1;
+    pedalUp.controllerValues[64] = 0;
+    const auto pedalTransitionRouteCount = evaluate(pedalDown).size() + evaluate(pedalUp).size();
+    require(pedalTransitionRouteCount == 0,
+            "The explicit sound-safe random policy must keep all random pedal-action routes silent.");
+
+    return { defaultRoutes.size(),
+             auxiliaryResonanceRoutes.size(),
+             sampledReleaseRoutes.size(),
+             hammerRoutes.size(),
+             pedalTransitionRouteCount };
+}
+
+PreparedRun prepareResidentSynchronously(
+    const drs::engine::PlaybackSnapshotBuildResult& snapshot)
+{
+    drs::engine::PreparedPlaybackService service(
+        "sfz-semantic-parity-resident-reference", 1, false);
+    const drs::engine::RuntimeStreamLoadResult noCompiledStream;
+    const auto start = Clock::now();
+    require(service.enqueuePreviewBuild(snapshot).accepted,
+            "Resident reference preparation request was rejected.");
+    auto step = service.processNextQueuedBuild(noCompiledStream);
+    const auto elapsed = elapsedMicros(start);
+    require(step.processed && step.result.built && step.result.activationEligible,
+            "Resident reference preparation failed: " + step.result.state + " :: "
+                + joinFindings(step.result.findings));
+    require(step.result.metrics.decodedBytes > 0,
+            "Selected-zone audio reference was not decoded into deterministic resident PCM.");
+    return { std::move(step), elapsed };
+}
+
+std::string findDefaultMiddleCZoneId(const drs::engine::SamplerRenderModel& model)
+{
+    const auto query = makeDefaultEligibilityQuery(
+        model, drs::engine::PerformanceEventKind::noteOn, 60, 64);
+    const auto routes = drs::engine::evaluateSamplerRouteEligibility(model, query);
+    require(routes.evaluated && routes.eligibleRouteIndices.size() == 1,
+            "Default middle-C reference selection must resolve exactly one route.");
+    return model.getRoutes().at(routes.eligibleRouteIndices.front()).zoneId;
+}
+
+struct DeterministicAudioRender
+{
+    std::vector<float> mono;
+    double peak = 0.0;
+    double rms = 0.0;
+    std::int64_t lastNonZeroFrame = -1;
+    std::array<double, 8> spectralProfile {};
+};
+
+DeterministicAudioRender renderDeterministicReference(
+    const drs::engine::SamplerRenderModelPtr& model)
+{
+    require(model != nullptr, "Deterministic reference render requires a model.");
+    drs::engine::SamplerPlaybackContext context(drs::engine::PlaybackActivationLane::performance);
+    require(context.prepare(48000.0) && context.stageActivation(model),
+            "Deterministic reference context could not prepare and stage its model.");
+
+    constexpr std::uint32_t framesPerBlock = 256;
+    constexpr std::size_t blockCount = 375;
+    constexpr std::size_t noteOffBlock = 94;
+    DeterministicAudioRender result;
+    result.mono.reserve(framesPerBlock * blockCount);
+    std::array<std::vector<float>, 2> storage {
+        std::vector<float>(framesPerBlock), std::vector<float>(framesPerBlock)
+    };
+    std::array<float*, 2> channels { storage[0].data(), storage[1].data() };
+    for (std::size_t block = 0; block < blockCount; ++block)
+    {
+        std::fill(storage[0].begin(), storage[0].end(), 0.0f);
+        std::fill(storage[1].begin(), storage[1].end(), 0.0f);
+        std::array<drs::engine::SamplerRenderEvent, 1> events {};
+        std::size_t eventCount = 0;
+        if (block == 0 || block == noteOffBlock)
+        {
+            events[0].type = block == 0
+                ? drs::engine::SamplerRenderEventType::noteOn
+                : drs::engine::SamplerRenderEventType::noteOff;
+            events[0].midiNote = 60;
+            events[0].velocity = 64.0f / 127.0f;
+            events[0].noteOffVelocity = 64.0f / 127.0f;
+            eventCount = 1;
+        }
+        drs::engine::SamplerAudioBufferView output { channels.data(), 2, framesPerBlock };
+        const auto rendered = context.renderBlock(output, { events.data(), eventCount });
+        require(rendered.accepted && rendered.voicePool.render.pageMissCount == 0
+                    && rendered.voicePool.render.underrunFrameCount == 0,
+                "Resident deterministic reference render encountered a page miss or underrun.");
+        for (std::size_t frame = 0; frame < framesPerBlock; ++frame)
+            result.mono.push_back((storage[0][frame] + storage[1][frame]) * 0.5f);
+    }
+
+    long double squared = 0.0;
+    for (std::size_t frame = 0; frame < result.mono.size(); ++frame)
+    {
+        const auto value = static_cast<double>(result.mono[frame]);
+        result.peak = std::max(result.peak, std::abs(value));
+        squared += static_cast<long double>(value) * static_cast<long double>(value);
+        if (std::abs(value) > 1.0e-8)
+            result.lastNonZeroFrame = static_cast<std::int64_t>(frame);
+    }
+    result.rms = std::sqrt(static_cast<double>(squared / result.mono.size()));
+
+    constexpr std::array<std::size_t, 8> bins { 1, 2, 4, 8, 16, 32, 64, 128 };
+    const auto spectrumFrames = std::min<std::size_t>(4096, result.mono.size());
+    constexpr auto twoPi = 6.283185307179586476925286766559;
+    for (std::size_t band = 0; band < bins.size(); ++band)
+    {
+        long double real = 0.0;
+        long double imaginary = 0.0;
+        for (std::size_t frame = 0; frame < spectrumFrames; ++frame)
+        {
+            const auto phase = twoPi * static_cast<double>(bins[band] * frame)
+                / static_cast<double>(spectrumFrames);
+            const auto window = 0.5 - 0.5 * std::cos(twoPi * static_cast<double>(frame)
+                / static_cast<double>(spectrumFrames - 1));
+            const auto sample = static_cast<double>(result.mono[frame]) * window;
+            real += sample * std::cos(phase);
+            imaginary -= sample * std::sin(phase);
+        }
+        result.spectralProfile[band] = std::sqrt(
+            static_cast<double>(real * real + imaginary * imaginary))
+            / static_cast<double>(spectrumFrames);
+    }
+    return result;
+}
+
+struct AudioParityQualificationResult
+{
+    double standardPeak = 0.0;
+    double referencePeak = 0.0;
+    double standardRms = 0.0;
+    double referenceRms = 0.0;
+    std::int64_t durationFrames = 0;
+    double maximumSampleError = 0.0;
+    double rmsSampleError = 0.0;
+    double maximumSpectralError = 0.0;
+};
+
+AudioParityQualificationResult compareApprovedAudioReference(
+    const DeterministicAudioRender& standard,
+    const DeterministicAudioRender& reference)
+{
+    require(standard.mono.size() == reference.mono.size(),
+            "Standard and approved minimum-reference renders have different frame counts.");
+    long double squaredError = 0.0;
+    double maximumError = 0.0;
+    for (std::size_t frame = 0; frame < standard.mono.size(); ++frame)
+    {
+        const auto error = std::abs(static_cast<double>(standard.mono[frame])
+                                    - static_cast<double>(reference.mono[frame]));
+        maximumError = std::max(maximumError, error);
+        squaredError += static_cast<long double>(error) * static_cast<long double>(error);
+    }
+    const auto rmsError = std::sqrt(static_cast<double>(squaredError / standard.mono.size()));
+    double maximumSpectralError = 0.0;
+    for (std::size_t band = 0; band < standard.spectralProfile.size(); ++band)
+        maximumSpectralError = std::max(
+            maximumSpectralError,
+            std::abs(standard.spectralProfile[band] - reference.spectralProfile[band]));
+
+    require(std::abs(standard.peak - reference.peak) <= 1.0e-6
+                && std::abs(standard.rms - reference.rms) <= 1.0e-7,
+            "Standard and approved minimum-reference peak/RMS metrics diverged.");
+    require(standard.lastNonZeroFrame == reference.lastNonZeroFrame,
+            "Standard and approved minimum-reference render durations diverged.");
+    require(maximumSpectralError <= 1.0e-8,
+            "Standard and approved minimum-reference spectral profiles diverged.");
+    require(maximumError <= 1.0e-6 && rmsError <= 1.0e-7,
+            "Standard and approved minimum-reference samples are not aligned within tolerance.");
+    return { standard.peak, reference.peak, standard.rms, reference.rms,
+             standard.lastNonZeroFrame + 1, maximumError, rmsError, maximumSpectralError };
 }
 
 struct SourceMetrics
@@ -286,9 +597,12 @@ PackageQualificationResult exportAndActivatePackage(
         fullSnapshot.requestedDraftRevision,
         &fullSnapshot,
         &packagePrepared);
-    const auto model = drs::engine::buildSamplerRenderModel(payload);
+    drs::engine::SamplerRenderModelBuildOptions packageModelOptions;
+    packageModelOptions.selectedArticulationId = "sustain";
+    const auto model = drs::engine::buildSamplerRenderModel(payload, packageModelOptions);
     require(model.built && model.model != nullptr,
             "Exported actual-corpus package did not build the common render model.");
+    static_cast<void>(qualifySalamanderSemantics(*model.model));
 
     drs::engine::DeferredPackageSession deferred;
     drs::engine::DeferredPackageSessionPlan plan;
@@ -553,6 +867,61 @@ int main(int argc, char** argv)
         const auto fullSources = collectSourceMetrics(fullPrepared.step.result.prepared);
         require(fullSources.headBytes <= 16ull * 1024ull * projection.sampleSources.size(),
                 "Prepared Salamander heads exceeded the configured 16 KiB-per-source ceiling.");
+        const auto fullRenderModel = buildQualificationRenderModel(
+            fullSnapshot, fullPrepared.step.result);
+        const auto semanticQualification = qualifySalamanderSemantics(*fullRenderModel);
+
+        const auto minimumSfzPath = sfzPath.parent_path().parent_path()
+            / "sfz_minimum" / sfzPath.filename();
+        require(fs::is_regular_file(minimumSfzPath),
+                "Approved minimum Salamander audio reference does not exist.");
+        const auto minimumBlankProject = makeBlankProject(minimumSfzPath);
+        const auto minimumProjection = drs::engine::projectSfzImportDocument(
+            minimumBlankProject, minimumSfzPath.generic_string());
+        require(minimumProjection.projected && minimumProjection.playable
+                    && minimumProjection.semanticAnalyzedRegionCount == 1408
+                    && minimumProjection.unsafeUnconditionalRegionCount == 0
+                    && minimumProjection.omittedUnsafeRegionCount == 0,
+                "Approved minimum Salamander reference must remain a sound-safe 1,408-region piano-only import.");
+        drs::engine::AuthoringSession minimumSession(minimumBlankProject);
+        require(drs::engine::applySfzImportProjection(
+                    minimumSession, minimumProjection,
+                    "Import minimum Salamander audio reference").applied,
+                "Approved minimum Salamander reference projection did not apply.");
+        drs::engine::PlaybackSnapshotBuilder minimumSnapshotBuilder;
+        const auto minimumSnapshot = buildSnapshot(
+            minimumSnapshotBuilder, minimumSession.getProject(), 2);
+        const auto minimumPrepared = prepareSynchronously(minimumSnapshot);
+        const auto minimumRenderModel = buildQualificationRenderModel(
+            minimumSnapshot, minimumPrepared.step.result);
+        const auto minimumDefaultQuery = makeDefaultEligibilityQuery(
+            *minimumRenderModel, drs::engine::PerformanceEventKind::noteOn, 60, 64);
+        require(drs::engine::evaluateSamplerRouteEligibility(
+                    *minimumRenderModel, minimumDefaultQuery).eligibleRouteIndices.size() == 1,
+                "Approved minimum Salamander reference must start exactly one default middle-C route.");
+
+        const auto standardReferenceZoneId = findDefaultMiddleCZoneId(*fullRenderModel);
+        const auto minimumReferenceZoneId = findDefaultMiddleCZoneId(*minimumRenderModel);
+        const auto standardReferenceSnapshot = drs::engine::scopePlaybackSnapshotForPreparation(
+            fullSnapshot,
+            { drs::engine::PlaybackPreparationScope::selectedZone,
+              standardReferenceZoneId, {} });
+        const auto minimumReferenceSnapshot = drs::engine::scopePlaybackSnapshotForPreparation(
+            minimumSnapshot,
+            { drs::engine::PlaybackPreparationScope::selectedZone,
+              minimumReferenceZoneId, {} });
+        require(standardReferenceSnapshot.built && minimumReferenceSnapshot.built,
+                "Standard/minimum middle-C reference scoping failed.");
+        const auto standardResident = prepareResidentSynchronously(standardReferenceSnapshot);
+        const auto minimumResident = prepareResidentSynchronously(minimumReferenceSnapshot);
+        const auto standardReferenceModel = buildQualificationRenderModel(
+            standardReferenceSnapshot, standardResident.step.result);
+        const auto minimumReferenceModel = buildQualificationRenderModel(
+            minimumReferenceSnapshot, minimumResident.step.result);
+        const auto standardReferenceAudio = renderDeterministicReference(standardReferenceModel);
+        const auto minimumReferenceAudio = renderDeterministicReference(minimumReferenceModel);
+        const auto audioParity = compareApprovedAudioReference(
+            standardReferenceAudio, minimumReferenceAudio);
 
         const auto zonePlayback = runSustainedPlayback(
             scopedZone,
@@ -603,6 +972,30 @@ int main(int argc, char** argv)
                << fullPrepared.step.result.admission.estimatedDecodedBytes << "\n"
                << "- Full-draft decoded bytes: " << fullPrepared.step.result.metrics.decodedBytes << "\n"
                << "- Full-draft resident-head bytes: " << fullSources.headBytes << "\n"
+               << "- Default middle-C eligible routes: "
+               << semanticQualification.defaultMiddleCRoutes << "\n"
+               << "- Enabled middle-C auxiliary resonance routes: "
+               << semanticQualification.enabledResonanceRoutes << "\n"
+               << "- CC20 middle-C sampled-release routes: "
+               << semanticQualification.sampledReleaseRoutes << "\n"
+               << "- CC21 middle-C hammer routes: "
+               << semanticQualification.hammerRoutes << "\n"
+               << "- Retained random pedal-transition routes: "
+               << semanticQualification.pedalTransitionRoutes << "\n"
+               << "- Approved minimum-reference regions: "
+               << minimumProjection.semanticAnalyzedRegionCount << "\n"
+               << "- Standard/minimum reference peak: " << audioParity.standardPeak
+               << "/" << audioParity.referencePeak << "\n"
+               << "- Standard/minimum reference RMS: " << audioParity.standardRms
+               << "/" << audioParity.referenceRms << "\n"
+               << "- Standard/minimum reference duration frames: "
+               << audioParity.durationFrames << "\n"
+               << "- Standard/minimum maximum sample-aligned error: "
+               << audioParity.maximumSampleError << "\n"
+               << "- Standard/minimum RMS sample-aligned error: "
+               << audioParity.rmsSampleError << "\n"
+               << "- Standard/minimum maximum spectral-profile error: "
+               << audioParity.maximumSpectralError << "\n"
                << "- Selected-zone sustained peak/elapsed: " << std::setprecision(9)
                << zonePlayback.peak << "/" << zonePlayback.elapsed << " us\n"
                << "- Selected-group sustained peak/elapsed: " << groupPlayback.peak

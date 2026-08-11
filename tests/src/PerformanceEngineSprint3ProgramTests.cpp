@@ -46,7 +46,8 @@ RuntimeProjectModel makeProject()
     main.chokeReleaseSeconds = 0.02;
     auto& release = project.authoring.zones[1];
     release.triggerMode = ZoneTriggerMode::oneShot;
-    release.performance = { PerformanceEventKind::release, PerformanceSustainCondition::pedalUp, PerformancePitchSource::eventNote };
+    release.performance = { PerformanceEventKind::release, PerformanceSustainCondition::pedalUp,
+                            PerformancePitchSource::eventKeyFixedPitch };
     release.exclusiveGroupId = "release";
     auto& pedal = project.authoring.zones[2];
     pedal.triggerMode = ZoneTriggerMode::oneShot;
@@ -142,8 +143,10 @@ void verifyProgramAndSnapshot()
         << serializeRuntimeProjectManifest(project, projectPath);
     const auto reloaded = loadRuntimeProjectManifest(projectPath);
     require(reloaded.loaded
-                && reloaded.project.authoring.zones[2].performance.triggerControllerNumber == 23,
-            "Project persistence must retain the explicit trigger controller identity.");
+                && reloaded.project.authoring.zones[2].performance.triggerControllerNumber == 23
+                && reloaded.project.authoring.zones[1].performance.pitchSource
+                    == PerformancePitchSource::eventKeyFixedPitch,
+            "Project persistence must retain explicit trigger-controller and fixed-pitch identities.");
 }
 
 void verifyInstrumentV3AndCompatibility()
@@ -156,6 +159,7 @@ void verifyInstrumentV3AndCompatibility()
     instrument.zones.front().exclusiveGroupId = "voices";
     instrument.zones.front().exclusiveTargetGroupIds = { "release" };
     instrument.zones.front().chokeReleaseSeconds = 0.02;
+    instrument.zones.front().performance.pitchSource = PerformancePitchSource::eventKeyFixedPitch;
     instrument.roundRobinResetRules = { { RoundRobinResetEvent::pedalUp, true, {} } };
     const auto output = fs::temp_directory_path() / "drs-performance-engine-s3-v3.drinst";
     std::ofstream(output, std::ios::binary) << serializeRuntimeInstrumentManifest(instrument, output.generic_string());
@@ -163,6 +167,8 @@ void verifyInstrumentV3AndCompatibility()
     require(reloaded.loaded && reloaded.instrument.schemaVersion == 3, "Schema-3 instruments must load.");
     require(reloaded.instrument.articulations.front().activation.has_value()
                 && reloaded.instrument.zones.front().exclusiveTargetGroupIds.size() == 1
+                && reloaded.instrument.zones.front().performance.pitchSource
+                    == PerformancePitchSource::eventKeyFixedPitch
                 && reloaded.instrument.roundRobinResetRules.size() == 1,
             "Schema-3 round-trip must preserve performance declarations.");
 }

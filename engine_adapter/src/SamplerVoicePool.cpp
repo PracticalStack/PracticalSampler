@@ -252,6 +252,36 @@ bool areCrossfadeNeighbors(const SamplerRenderRoute& left,
 }
 } // namespace
 
+SamplerRouteEligibilityResult evaluateSamplerRouteEligibility(
+    const SamplerRenderModel& model,
+    const SamplerRouteEligibilityQuery& query)
+{
+    SamplerRouteEligibilityResult result;
+    if (query.midiNote < 0 || query.midiNote > 127
+        || query.velocity < 1 || query.velocity > 127)
+        return result;
+
+    result.evaluated = true;
+    const auto& routes = model.getRoutes();
+    result.eligibleRouteIndices.reserve(routes.size());
+    for (std::size_t routeIndex = 0; routeIndex < routes.size(); ++routeIndex)
+    {
+        const auto& route = routes[routeIndex];
+        if (query.articulationIndex != kInvalidPerformanceProgramIndex
+            && route.performanceArticulationIndex != query.articulationIndex)
+            continue;
+        if (routeCouldRespondToTrigger(route,
+                                       query.midiNote,
+                                       query.velocity,
+                                       query.velocity,
+                                       query.performanceEvent,
+                                       query.sustainPedalDown,
+                                       query.controllerValues))
+            result.eligibleRouteIndices.push_back(routeIndex);
+    }
+    return result;
+}
+
 bool SamplerEventBlock::push(SamplerRenderEvent event) noexcept
 {
     if (eventCount >= events.size())
@@ -801,8 +831,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 const auto slotIndex = acquireSlot(stolen, generationStolen, releasingStolen);
                 auto& slot = slots[slotIndex];
                 const auto& route = routes[routeIndex];
-                const auto routeSourceMidiNote = route.performancePitchSource == PerformancePitchSource::fixedRoot
-                    ? route.rootKey : sourceMidiNote;
+                const auto routeSourceMidiNote = route.performancePitchSource == PerformancePitchSource::eventNote
+                    ? sourceMidiNote : route.rootKey;
                 const auto routeEffectiveMidiNote = std::clamp(routeSourceMidiNote + midiNoteOffset, 0, 127);
                 SamplerVoiceStartRequest request;
                 request.voiceId = nextVoiceId;

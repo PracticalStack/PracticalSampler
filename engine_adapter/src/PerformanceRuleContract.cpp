@@ -54,6 +54,7 @@ std::string_view performancePitchSourceId(const PerformancePitchSource value) no
     {
         case PerformancePitchSource::eventNote: return "event-note";
         case PerformancePitchSource::fixedRoot: return "fixed-root";
+        case PerformancePitchSource::eventKeyFixedPitch: return "event-key-fixed-pitch";
     }
     return {};
 }
@@ -95,7 +96,9 @@ bool parsePerformanceSustainCondition(const std::string_view value, PerformanceS
 
 bool parsePerformancePitchSource(const std::string_view value, PerformancePitchSource& result) noexcept
 {
-    for (const auto candidate : { PerformancePitchSource::eventNote, PerformancePitchSource::fixedRoot })
+    for (const auto candidate : { PerformancePitchSource::eventNote,
+                                  PerformancePitchSource::fixedRoot,
+                                  PerformancePitchSource::eventKeyFixedPitch })
         if (value == performancePitchSourceId(candidate)) { result = candidate; return true; }
     return false;
 }

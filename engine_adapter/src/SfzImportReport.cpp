@@ -1143,6 +1143,34 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                  "Pitch centers map directly into native root-key metadata." };
     }
 
+    if (opcodeName == "pitch_keytrack")
+    {
+        auto value = 100.0;
+        try { value = std::stod(opcode.value); } catch (...) {}
+        if (std::abs(value) < 0.000001)
+        {
+            return { SfzImportSupportDisposition::converted,
+                     "zone.performance.pitchSource",
+                     "Zero pitch tracking keeps event-note eligibility while rendering the sample at its fixed root pitch." };
+        }
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "report.pitch.keyTracking",
+                 "Nonzero partial pitch tracking remains review-only; native playback currently supports full tracking or fixed pitch.",
+                 "sfz.pitch.keytrack.reported",
+                 "Partial pitch tracking will be reported",
+                 "The importer supports pitch_keytrack values of 0 or 100, but does not approximate intermediate tracking ratios." };
+    }
+
+    if (opcodeName == "rt_decay")
+    {
+        return { SfzImportSupportDisposition::approximated,
+                 "zone.performance.release",
+                 "Release eligibility and velocity are native, while duration-dependent rt_decay attenuation is not yet applied.",
+                 "sfz.release.rt_decay.approximated",
+                 "Release-trigger decay will be approximated",
+                 "The release sample is triggered under the correct controller and pedal state, but its gain does not yet vary with held-note duration." };
+    }
+
     if (opcodeName == "lovel")
     {
         return { SfzImportSupportDisposition::converted,

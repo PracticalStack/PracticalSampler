@@ -119,6 +119,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     sustainConditionRow.getComboBox().addItem("Pedal up", 3);
     pitchSourceRow.getComboBox().addItem("Event note", 1);
     pitchSourceRow.getComboBox().addItem("Fixed root", 2);
+    pitchSourceRow.getComboBox().addItem("Event key / fixed pitch", 3);
     createRoundRobinPoolRow.getButton().setComponentID("authoringCreateRoundRobinPoolButton");
     addCompatibleZonesRow.getButton().setComponentID("authoringAddCompatibleZonesButton");
     normalizeRoundRobinPoolRow.getButton().setComponentID("authoringNormalizeRoundRobinPoolButton");
@@ -538,9 +539,12 @@ ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
     values.performanceSustain = sustainId == 2 ? drs::engine::PerformanceSustainCondition::pedalDown
         : sustainId == 3 ? drs::engine::PerformanceSustainCondition::pedalUp
                          : drs::engine::PerformanceSustainCondition::any;
-    values.performancePitchSource = pitchSourceRow.getComboBox().getSelectedId() == 2
+    const auto pitchSourceId = pitchSourceRow.getComboBox().getSelectedId();
+    values.performancePitchSource = pitchSourceId == 2
         ? drs::engine::PerformancePitchSource::fixedRoot
-        : drs::engine::PerformancePitchSource::eventNote;
+        : pitchSourceId == 3
+            ? drs::engine::PerformancePitchSource::eventKeyFixedPitch
+            : drs::engine::PerformancePitchSource::eventNote;
     values.exclusiveGroupId = chokeGroupRow.getComboBox().getSelectedId() > 1
         ? chokeGroupRow.getComboBox().getText().toStdString() : std::string {};
     values.exclusiveTargetGroupId = chokeTargetRow.getComboBox().getSelectedId() > 1
@@ -663,7 +667,8 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     const auto pedalEvent = values.performanceEvent == drs::engine::PerformanceEventKind::pedalDown
         || values.performanceEvent == drs::engine::PerformanceEventKind::pedalUp;
     pitchSourceRow.getComboBox().setSelectedId(
-        values.performancePitchSource == drs::engine::PerformancePitchSource::fixedRoot ? 2 : 1,
+        values.performancePitchSource == drs::engine::PerformancePitchSource::fixedRoot ? 2
+        : values.performancePitchSource == drs::engine::PerformancePitchSource::eventKeyFixedPitch ? 3 : 1,
         juce::dontSendNotification);
     pitchSourceRow.getComboBox().setItemEnabled(2, pedalEvent);
     chokeGroupRow.getComboBox().clear(juce::dontSendNotification);
