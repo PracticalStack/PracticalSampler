@@ -47,6 +47,8 @@ struct ModelOptions
     int rootKey = 60;
     double gainDb = 0.0;
     double pan = 0.0;
+    double fineTuneCents = 0.0;
+    double amplitudeVelocityTracking = 100.0;
     std::uint64_t sampleStartFrame = 0;
 };
 
@@ -71,6 +73,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     snapshotZone.rootKey = options.rootKey;
     snapshotZone.gainDb = options.gainDb;
     snapshotZone.pan = options.pan;
+    snapshotZone.fineTuneCents = options.fineTuneCents;
+    snapshotZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
     snapshot.zones.push_back(std::move(snapshotZone));
     drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
@@ -108,6 +112,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     preparedZone.rootKey = options.rootKey;
     preparedZone.gainDb = options.gainDb;
     preparedZone.pan = options.pan;
+    preparedZone.fineTuneCents = options.fineTuneCents;
+    preparedZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
     prepared.zones.push_back(std::move(preparedZone));
     drs::engine::PreparedPlaybackGroupRoute preparedGroup;
@@ -380,6 +386,32 @@ void runGainVelocityAndPanMatrix()
     halfRightVoice.render(halfRightOutput.view(), 0, 1);
     requireNear(halfRightOutput.left[0], 0.5, renderTolerance, "Linear left balance changed.");
     requireNear(halfRightOutput.right[0], 1.0, renderTolerance, "Linear right balance changed.");
+
+    ModelOptions untracked;
+    untracked.amplitudeVelocityTracking = 0.0;
+    const auto untrackedModel = buildModel({ constant }, untracked);
+    drs::engine::SamplerVoice untrackedVoice;
+    require(untrackedVoice.start(*untrackedModel, makeStart(60, 1)),
+            "Velocity-independent voice should start.");
+    requireNear(untrackedVoice.getBaseGain(), 1.0, renderTolerance,
+                "amp_veltrack=0 must produce velocity-independent unity gain.");
+
+    ModelOptions halfTracked;
+    halfTracked.amplitudeVelocityTracking = 50.0;
+    const auto halfTrackedModel = buildModel({ constant }, halfTracked);
+    drs::engine::SamplerVoice halfTrackedVoice;
+    require(halfTrackedVoice.start(*halfTrackedModel, makeStart(60, 32)),
+            "Partially velocity-tracked voice should start.");
+    requireNear(halfTrackedVoice.getBaseGain(), std::sqrt(32.0 / 127.0), renderTolerance,
+                "amp_veltrack=50 must use the documented native square-root law.");
+
+    ModelOptions tuned;
+    tuned.fineTuneCents = 100.0;
+    const auto tunedModel = buildModel({ constant }, tuned);
+    drs::engine::SamplerVoice tunedVoice;
+    require(tunedVoice.start(*tunedModel, makeStart()), "+100-cent voice should start.");
+    requireNear(tunedVoice.getIncrementFrames(), std::pow(2.0, 1.0 / 12.0), 1.0e-12,
+                "Fine tuning must apply cents in the playback pitch ratio.");
 }
 
 void runOffsetAccumulationAndFinalFrameMatrix()

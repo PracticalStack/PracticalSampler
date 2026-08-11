@@ -159,15 +159,28 @@ CompiledPerformanceProgramResult compilePerformanceProgram(const RuntimeProjectA
         route.event = zone.performance.event;
         route.sustain = zone.performance.sustain;
         route.pitchSource = zone.performance.pitchSource;
-        if (!zone.controllerConditions.empty())
+        if (zone.performance.event == PerformanceEventKind::controllerChange)
         {
-            const auto& condition = zone.controllerConditions.front();
+            auto triggerControllerNumber = zone.performance.triggerControllerNumber;
+            if (!triggerControllerNumber.has_value() && zone.controllerConditions.size() == 1)
+                triggerControllerNumber = zone.controllerConditions.front().controllerNumber;
+            const auto condition = triggerControllerNumber.has_value()
+                ? std::find_if(zone.controllerConditions.begin(), zone.controllerConditions.end(),
+                               [&](const RuntimeControllerCondition& value)
+                               { return value.controllerNumber == *triggerControllerNumber; })
+                : zone.controllerConditions.end();
+            if (!triggerControllerNumber.has_value() || condition == zone.controllerConditions.end())
+            {
+                result.issues.push_back("Performance compiler could not resolve a controller-change trigger condition for zone '"
+                                        + zone.id + "'.");
+                continue;
+            }
             route.triggerControllerNumber = static_cast<std::uint8_t>(
-                std::clamp(condition.controllerNumber, 0, 127));
+                std::clamp(condition->controllerNumber, 0, 127));
             route.triggerControllerMinimum = static_cast<std::uint8_t>(
-                std::clamp(condition.minimumValue, 0, 127));
+                std::clamp(condition->minimumValue, 0, 127));
             route.triggerControllerMaximum = static_cast<std::uint8_t>(
-                std::clamp(condition.maximumValue, 0, 127));
+                std::clamp(condition->maximumValue, 0, 127));
         }
         route.chokeReleaseSeconds = static_cast<float>(zone.chokeReleaseSeconds.value_or(0.0));
         if (!zone.exclusiveGroupId.empty())

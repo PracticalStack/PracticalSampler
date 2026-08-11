@@ -216,14 +216,6 @@ std::vector<RuntimeControllerCondition> buildControllerConditions(
             triggerControllerNumber = controller;
         }
     }
-    if (hasControllerTrigger)
-    {
-        const auto triggerCondition = std::find_if(
-            conditions.begin(), conditions.end(), [&](const RuntimeControllerCondition& condition)
-            { return condition.controllerNumber == triggerControllerNumber; });
-        if (triggerCondition != conditions.end())
-            std::rotate(conditions.begin(), triggerCondition, triggerCondition + 1);
-    }
     return conditions;
 }
 
@@ -362,9 +354,7 @@ std::string buildArticulationId(const SfzNormalizedSection& section)
         if (parseControllerOpcodeNumber(opcode.name, "locc").has_value()
             || parseControllerOpcodeNumber(opcode.name, "hicc").has_value()
             || parseControllerOpcodeNumber(opcode.name, "on_locc").has_value()
-            || parseControllerOpcodeNumber(opcode.name, "on_hicc").has_value()
-            || opcode.name == "tune"
-            || opcode.name == "group_volume")
+            || parseControllerOpcodeNumber(opcode.name, "on_hicc").has_value())
             signature << "-" << opcode.name << "-" << opcode.value;
     }
     return slugify(signature.str());
@@ -1259,6 +1249,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         {
             zone.triggerMode = ZoneTriggerMode::oneShot;
             zone.performance.pitchSource = PerformancePitchSource::fixedRoot;
+            zone.performance.triggerControllerNumber = triggerControllerNumber;
             const auto triggerCondition = std::find_if(
                 zone.controllerConditions.begin(), zone.controllerConditions.end(),
                 [&](const RuntimeControllerCondition& condition)

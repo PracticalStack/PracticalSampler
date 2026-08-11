@@ -877,6 +877,9 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
                 { "sustain", performanceSustainConditionId(zone.performance.sustain) },
                 { "pitchSource", performancePitchSourceId(zone.performance.pitchSource) }
             };
+            if (zone.performance.triggerControllerNumber.has_value())
+                zoneObject["performance"]["triggerControllerNumber"]
+                    = *zone.performance.triggerControllerNumber;
             if (!zone.exclusiveGroupId.empty())
                 zoneObject["exclusiveGroupId"] = zone.exclusiveGroupId;
             if (!zone.exclusiveTargetGroupIds.empty())
@@ -1437,6 +1440,9 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                                 if (!parsePerformanceSustainCondition(*sustain, zone.performance.sustain)) addIssue(result, context + " performance field 'sustain' is unsupported.");
                             if (const auto pitchSource = readRequired<RuntimeProjectLoadResult, std::string>(*performanceIterator, result, "pitchSource", context.c_str()))
                                 if (!parsePerformancePitchSource(*pitchSource, zone.performance.pitchSource)) addIssue(result, context + " performance field 'pitchSource' is unsupported.");
+                            if (const auto triggerController = readOptional<RuntimeProjectLoadResult, int>(
+                                    *performanceIterator, result, "triggerControllerNumber", context.c_str()))
+                                zone.performance.triggerControllerNumber = *triggerController;
                         }
                     }
                     if (const auto exclusiveGroupId = readOptional<RuntimeProjectLoadResult, std::string>(zoneObject, result, "exclusiveGroupId", context.c_str()))
@@ -3063,6 +3069,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                     if (event && !parsePerformanceEventKind(*event, zone.performance.event)) addIssue(result, context + " performance event is unsupported.");
                     if (sustain && !parsePerformanceSustainCondition(*sustain, zone.performance.sustain)) addIssue(result, context + " performance sustain is unsupported.");
                     if (pitch && !parsePerformancePitchSource(*pitch, zone.performance.pitchSource)) addIssue(result, context + " performance pitchSource is unsupported.");
+                    if (const auto triggerController = readOptional<RuntimeManifestLoadResult, int>(
+                            performance, result, "triggerControllerNumber", context.c_str()))
+                        zone.performance.triggerControllerNumber = *triggerController;
                 }
             }
             if (instrument.schemaVersion >= 3)
@@ -3103,6 +3112,21 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                     || condition.minimumValue < 0 || condition.maximumValue > 127
                     || condition.minimumValue > condition.maximumValue)
                     addIssue(result, context + " contains an invalid controller condition.");
+            if (zone.performance.triggerControllerNumber.has_value()
+                && (*zone.performance.triggerControllerNumber < 0
+                    || *zone.performance.triggerControllerNumber > 127))
+                addIssue(result, context + " contains an invalid performance triggerControllerNumber.");
+            if (zone.performance.event == PerformanceEventKind::controllerChange)
+            {
+                const auto triggerController = zone.performance.triggerControllerNumber;
+                const auto matchingCondition = triggerController.has_value()
+                    ? std::find_if(zone.controllerConditions.begin(), zone.controllerConditions.end(),
+                                   [&](const RuntimeControllerCondition& condition)
+                                   { return condition.controllerNumber == *triggerController; })
+                    : zone.controllerConditions.end();
+                if (!triggerController.has_value() || matchingCondition == zone.controllerConditions.end())
+                    addIssue(result, context + " controller-change performance route requires a matching trigger controller condition.");
+            }
 
             validateRoundRobinDescriptor(result,
                                          context,
@@ -3421,6 +3445,9 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
                 { "sustain", performanceSustainConditionId(zone.performance.sustain) },
                 { "pitchSource", performancePitchSourceId(zone.performance.pitchSource) }
             };
+            if (zone.performance.triggerControllerNumber.has_value())
+                zoneObject["performance"]["triggerControllerNumber"]
+                    = *zone.performance.triggerControllerNumber;
             if (!zone.exclusiveGroupId.empty()) zoneObject["exclusiveGroupId"] = zone.exclusiveGroupId;
             if (!zone.exclusiveTargetGroupIds.empty()) zoneObject["exclusiveTargetGroupIds"] = serializeStringArray(zone.exclusiveTargetGroupIds);
             if (zone.chokeReleaseSeconds.has_value()) zoneObject["chokeReleaseSeconds"] = *zone.chokeReleaseSeconds;

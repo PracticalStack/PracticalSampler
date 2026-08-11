@@ -924,12 +924,6 @@ struct ImportedRoundRobinRepairKey
     int rootKey = 60;
     int keyLow = 0;
     int keyHigh = 127;
-    int velocityLow = 1;
-    int velocityHigh = 127;
-    int fadeInLowVelocity = 0;
-    int fadeInHighVelocity = 0;
-    int fadeOutLowVelocity = 0;
-    int fadeOutHighVelocity = 0;
     int triggerMode = 0;
 
     bool operator==(const ImportedRoundRobinRepairKey& other) const noexcept
@@ -938,12 +932,6 @@ struct ImportedRoundRobinRepairKey
             && rootKey == other.rootKey
             && keyLow == other.keyLow
             && keyHigh == other.keyHigh
-            && velocityLow == other.velocityLow
-            && velocityHigh == other.velocityHigh
-            && fadeInLowVelocity == other.fadeInLowVelocity
-            && fadeInHighVelocity == other.fadeInHighVelocity
-            && fadeOutLowVelocity == other.fadeOutLowVelocity
-            && fadeOutHighVelocity == other.fadeOutHighVelocity
             && triggerMode == other.triggerMode;
     }
 };
@@ -956,12 +944,6 @@ struct ImportedRoundRobinRepairKeyHash
         hash ^= std::hash<int> {}(key.rootKey) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         hash ^= std::hash<int> {}(key.keyLow) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         hash ^= std::hash<int> {}(key.keyHigh) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-        hash ^= std::hash<int> {}(key.velocityLow) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-        hash ^= std::hash<int> {}(key.velocityHigh) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-        hash ^= std::hash<int> {}(key.fadeInLowVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-        hash ^= std::hash<int> {}(key.fadeInHighVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-        hash ^= std::hash<int> {}(key.fadeOutLowVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-        hash ^= std::hash<int> {}(key.fadeOutHighVelocity) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         hash ^= std::hash<int> {}(key.triggerMode) + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
         return hash;
     }
@@ -974,12 +956,6 @@ ImportedRoundRobinRepairKey makeImportedRoundRobinRepairKey(const RuntimeProject
         zone.rootKey,
         zone.keyLow,
         zone.keyHigh,
-        zone.velocityLow,
-        zone.velocityHigh,
-        zone.velocityCrossfade.fadeInLowVelocity,
-        zone.velocityCrossfade.fadeInHighVelocity,
-        zone.velocityCrossfade.fadeOutLowVelocity,
-        zone.velocityCrossfade.fadeOutHighVelocity,
         static_cast<int>(zone.triggerMode)
     };
 }
@@ -1116,7 +1092,6 @@ bool roundRobinPoolIsImportedVelocityStack(const RuntimeProjectModel& project, c
     std::vector<VelocityCrossfadeTopologyZoneDefinition> topologyZones;
     topologyZones.reserve(project.authoring.zones.size());
 
-    std::unordered_set<std::string> groupIds;
     std::optional<ImportedRoundRobinRepairKey> referenceKey;
     bool hasCrossfade = false;
 
@@ -1130,7 +1105,6 @@ bool roundRobinPoolIsImportedVelocityStack(const RuntimeProjectModel& project, c
         else if (!(makeImportedRoundRobinRepairKey(zone) == *referenceKey))
             return false;
 
-        groupIds.insert(zone.groupId);
         hasCrossfade = hasCrossfade || hasAnyVelocityCrossfadeValue(zone.velocityCrossfade);
 
         VelocityCrossfadeTopologyZoneDefinition topologyZone;
@@ -1148,7 +1122,7 @@ bool roundRobinPoolIsImportedVelocityStack(const RuntimeProjectModel& project, c
         topologyZones.push_back(std::move(topologyZone));
     }
 
-    if (topologyZones.size() < 2 || groupIds.size() < 2 || !hasCrossfade)
+    if (topologyZones.size() < 2 || !hasCrossfade)
         return false;
 
     std::vector<VelocityCrossfadeTopologyFinding> findings;

@@ -483,8 +483,8 @@ int main()
                 "The standard Accurate Salamander SFZ should produce semantic safety analysis.");
         require(salamanderAnalysis.report.summary.semanticAnalyzedRegionCount == 1704,
                 "Accurate Salamander analysis should classify all 1,704 regions.");
-        require(salamanderAnalysis.report.summary.unsafeUnconditionalRegionCount == 296,
-                "Accurate Salamander analysis should identify all 296 unsafe auxiliary regions.");
+        require(salamanderAnalysis.report.summary.unsafeUnconditionalRegionCount == 4,
+                "Accurate Salamander analysis should identify only the four unsupported random regions.");
         require(countRegionsWithSemanticDependency(
                     salamanderAnalysis.report,
                     SfzImportSemanticDependencyKind::controllerRange,

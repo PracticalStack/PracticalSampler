@@ -615,6 +615,9 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
             { "sustain", static_cast<int>(zone.performance.sustain) },
             { "pitchSource", static_cast<int>(zone.performance.pitchSource) }
         };
+        if (zone.performance.triggerControllerNumber.has_value())
+            zoneObject["performance"]["triggerControllerNumber"]
+                = *zone.performance.triggerControllerNumber;
         if (!zone.exclusiveGroupId.empty()) zoneObject["exclusiveGroupId"] = zone.exclusiveGroupId;
         if (!zone.exclusiveTargetGroupIds.empty()) zoneObject["exclusiveTargetGroupIds"] = serializeStringArray(zone.exclusiveTargetGroupIds);
         if (zone.chokeReleaseSeconds.has_value()) zoneObject["chokeReleaseSeconds"] = *zone.chokeReleaseSeconds;

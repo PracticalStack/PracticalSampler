@@ -233,6 +233,21 @@ PerformanceRuleValidationResult validatePerformanceRuleDeclarations(
                            "Choose a valid controller number and inclusive range.");
             }
         }
+        if (zone.performance.event == PerformanceEventKind::controllerChange)
+        {
+            const auto triggerController = zone.performance.triggerControllerNumber;
+            const auto matchingCondition = triggerController.has_value()
+                ? std::find_if(zone.controllerConditions.begin(), zone.controllerConditions.end(),
+                               [&](const RuntimeControllerCondition& condition)
+                               { return condition.controllerNumber == *triggerController; })
+                : zone.controllerConditions.end();
+            if (!triggerController.has_value() || *triggerController < 0 || *triggerController > 127
+                || matchingCondition == zone.controllerConditions.end())
+                addFinding(result, "performance.zone.controller_trigger_invalid",
+                           path + ".performance.triggerControllerNumber",
+                           "Controller-change routes must identify a valid trigger CC with a matching condition.",
+                           "Set triggerControllerNumber to the CC used by on_loccN/on_hiccN.");
+        }
         if (zone.rootKey < 0 || zone.rootKey > 127)
             addFinding(result, "performance.zone.root_key_range", path + ".rootKey",
                        "Zone root key must be in the range 0-127.", "Choose a valid MIDI root key.");

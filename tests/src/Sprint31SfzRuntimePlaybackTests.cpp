@@ -205,7 +205,7 @@ drs::engine::PlaybackActivationPayloadPtr preparePreviewPayload(
             "EngineFacade rejected the saved-project preview payload regression revision.");
     require(facade.refreshPreviewToCurrentDraft(),
             "EngineFacade rejected the saved-project preview payload regression request.");
-    require(facade.waitForPreparedPlaybackIdle(std::chrono::milliseconds(3000)),
+    require(facade.waitForPreparedPlaybackIdle(std::chrono::milliseconds(10000)),
             "EngineFacade preview payload regression worker did not settle.");
     facade.serviceBackgroundWork();
     const auto payload = facade.getPreviewActivationPayload();

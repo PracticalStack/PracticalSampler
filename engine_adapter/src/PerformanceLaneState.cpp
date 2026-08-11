@@ -97,6 +97,7 @@ void PerformanceLaneState::migrateProgram(const CompiledPerformanceProgram& prog
     articulationCount = program.articulationCount;
     selectedArticulationStableId = migrated < program.articulationStableIds.size()
         ? program.articulationStableIds[migrated] : 0;
+    pedalIsDown = program.hasControllerDefault[64] && program.controllerDefaults[64] >= 64;
     // Existing records deliberately retain their original generation and articulation.
     (void) activationGeneration;
 }
@@ -392,7 +393,7 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                 return false;
             }
             heldNotes = {};
-            pedalIsDown = false;
+            pedalIsDown = program.hasControllerDefault[64] && program.controllerDefaults[64] >= 64;
             return scratch.push(event);
     }
     return false;

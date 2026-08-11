@@ -66,7 +66,7 @@ struct SamplerPlaybackContextSnapshot
     std::uint32_t heldNoteCount = 0;
     std::uint32_t consumedNoteCount = 0;
     std::uint64_t actionOverflowCount = 0;
-    std::array<std::uint64_t, 6> semanticEventCounts {};
+    std::array<std::uint64_t, kPerformanceEventKindCount> semanticEventCounts {};
     std::size_t retiredActivationBacklog = 0;
     SamplerPlaybackContextCounters counters;
 };
@@ -203,7 +203,7 @@ private:
     std::atomic<std::uint32_t> diagnosticHeldNoteCount { 0 };
     std::atomic<std::uint32_t> diagnosticConsumedNoteCount { 0 };
     std::atomic<std::uint64_t> diagnosticActionOverflowCount { 0 };
-    std::array<std::atomic<std::uint64_t>, 5> diagnosticSemanticEventCounts {};
+    std::array<std::atomic<std::uint64_t>, kPerformanceEventKindCount> diagnosticSemanticEventCounts {};
     std::atomic<std::uint64_t> diagnosticRenderedBlockCount { 0 };
     std::atomic<std::uint64_t> diagnosticStartedVoiceCount { 0 };
     std::atomic<std::uint64_t> diagnosticReleasedVoiceCount { 0 };

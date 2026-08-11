@@ -95,6 +95,36 @@ void verifyIsolationMigrationAndOverflow()
                 && overflow.getSnapshot().heldNoteCount == PerformanceLaneState::noteCount,
             "Overflow must reject an entire event without partial state.");
 }
+
+void verifyControllerDefaultPedalState()
+{
+    auto program = makeProgram();
+    program.hasControllerDefault[64] = true;
+    program.controllerDefaults[64] = 127;
+
+    PerformanceLaneState state;
+    PerformanceActionScratch scratch;
+    state.migrateProgram(program, 40);
+    require(state.getSnapshot().pedalDown,
+            "CC64 program defaults must initialize the semantic lane to pedal-down.");
+
+    require(state.normalize(event(SamplerRenderEventType::noteOn, 0, 60), 40, program, scratch),
+            "Default-pedal note-on must normalize.");
+    scratch.clear();
+    require(state.normalize(event(SamplerRenderEventType::noteOff, 1, 60), 40, program, scratch)
+                && state.getHeldNote(0, 60).pedalDeferred,
+            "A note released under the default CC64-down state must remain pedal-deferred.");
+
+    scratch.clear();
+    require(state.normalize(event(SamplerRenderEventType::reset, 2), 40, program, scratch)
+                && state.getSnapshot().pedalDown,
+            "Reset must restore the compiled CC64 default just like the voice pool.");
+
+    auto pedalUpProgram = makeProgram();
+    state.migrateProgram(pedalUpProgram, 41);
+    require(!state.getSnapshot().pedalDown,
+            "Program activation without a CC64 default must reset semantic pedal state to up.");
+}
 } // namespace
 
 int main()
@@ -103,6 +133,7 @@ int main()
     {
         verifyStateVectors();
         verifyIsolationMigrationAndOverflow();
+        verifyControllerDefaultPedalState();
         std::cout << "Performance-engine Sprint 4 state tests passed.\n";
         return 0;
     }

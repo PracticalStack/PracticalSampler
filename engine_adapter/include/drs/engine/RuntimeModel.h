@@ -2,6 +2,7 @@
 
 #include "drs/engine/VelocityCrossfade.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -30,6 +31,8 @@ enum class PerformanceEventKind : std::uint8_t
     pedalUp,
     controllerChange
 };
+
+inline constexpr std::size_t kPerformanceEventKindCount = 6;
 
 enum class PerformanceSustainCondition : std::uint8_t
 {
@@ -91,6 +94,9 @@ struct RuntimeProjectZonePerformanceDefinition
     PerformanceEventKind event = PerformanceEventKind::noteOn;
     PerformanceSustainCondition sustain = PerformanceSustainCondition::any;
     PerformancePitchSource pitchSource = PerformancePitchSource::eventNote;
+    // Identifies the CC edge that emits a controllerChange trigger. Static
+    // controllerConditions remain independent and retain their authored order.
+    std::optional<int> triggerControllerNumber;
 };
 
 struct RuntimeControllerCondition

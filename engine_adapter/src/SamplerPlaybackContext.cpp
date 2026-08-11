@@ -29,6 +29,7 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
     if (activeDspGeneration != nullptr)
         activeDspGeneration->setControlSampleRate(sampleRate);
     isPrepared = true;
+    performanceState.reset();
     if (activeRenderModel != nullptr)
     {
         voicePool.prepare(*activeRenderModel,
@@ -42,7 +43,6 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
         voicePool.clearRenderModel();
     eventScratch.clear();
     actionScratch.clear();
-    performanceState.reset();
     collectFinishedRetirements();
     publishRealtimeDiagnostics();
     return true;

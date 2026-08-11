@@ -48,7 +48,7 @@ struct CompiledPerformanceRoundRobinReset
 
 struct CompiledPerformanceProgram
 {
-    std::array<CompiledPerformanceEventRange, 6> eventRanges {};
+    std::array<CompiledPerformanceEventRange, kPerformanceEventKindCount> eventRanges {};
     std::array<CompiledPerformanceActivation, 128> activationByMidiNote {};
     std::array<std::uint8_t, 128> controllerDefaults {};
     std::array<bool, 128> hasControllerDefault {};

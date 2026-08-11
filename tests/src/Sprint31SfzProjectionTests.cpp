@@ -688,6 +688,10 @@ int main()
             "<control>\n"
             "set_cc23=0\n"
             "<group>\n"
+            "volume=-2\n"
+            "group_volume=-3\n"
+            "tune=25\n"
+            "amp_veltrack=50\n"
             "<region>\n"
             "sample=" + unsupportedSamplePath.generic_string() + "\n"
             "pitch_keycenter=60\n"
@@ -706,31 +710,49 @@ int main()
             "sample=" + unsupportedSamplePath.generic_string() + "\n"
             "pitch_keycenter=62\n"
             "lokey=62\n"
-            "hikey=62\n");
+            "hikey=62\n"
+            "<group>\n"
+            "locc11=64\n"
+            "on_locc23=1\n"
+            "on_hicc23=63\n"
+            "<region>\n"
+            "sample=" + unsupportedSamplePath.generic_string() + "\n"
+            "pitch_keycenter=63\n"
+            "lokey=63\n"
+            "hikey=63\n");
         const auto soundSafeProjection = projectSfzImportDocument(
             blankProject, soundSafeFixturePath.generic_string());
         require(soundSafeProjection.projected && soundSafeProjection.playable
                     && !soundSafeProjection.lossy && !soundSafeProjection.blocking,
                 "Native controller and release semantics should remain a playable lossless projection.");
-        require(soundSafeProjection.semanticAnalyzedRegionCount == 3
+        require(soundSafeProjection.semanticAnalyzedRegionCount == 4
                     && soundSafeProjection.unsafeUnconditionalRegionCount == 0
                     && soundSafeProjection.omittedUnsafeRegionCount == 0,
                 "Controller and release regions should no longer be omitted.");
-        require(soundSafeProjection.zones.size() == 3
+        require(soundSafeProjection.zones.size() == 4
                     && soundSafeProjection.controllerDefaults.size() == 1
                     && soundSafeProjection.controllerDefaults.front().controllerNumber == 23,
                 "Projection should retain all zones and the authored CC23 default.");
+        require(soundSafeProjection.groups.front().gainDb == -5.0
+                    && soundSafeProjection.zones.front().fineTuneCents == 25.0
+                    && soundSafeProjection.zones.front().amplitudeVelocityTracking == 50.0,
+                "Projection must preserve inherited group_volume, fine tuning, and velocity tracking.");
         require(soundSafeProjection.zones[1].controllerConditions.size() == 1
                     && soundSafeProjection.zones[1].controllerConditions.front().controllerNumber == 23
                     && soundSafeProjection.zones[2].performance.event == PerformanceEventKind::release
                     && soundSafeProjection.zones[2].triggerMode == ZoneTriggerMode::oneShot,
                 "Projection should preserve controller eligibility and release trigger semantics.");
+        require(soundSafeProjection.zones[3].performance.event == PerformanceEventKind::controllerChange
+                    && soundSafeProjection.zones[3].performance.triggerControllerNumber == 23
+                    && soundSafeProjection.zones[3].controllerConditions.size() == 2
+                    && soundSafeProjection.zones[3].controllerConditions.front().controllerNumber == 11,
+                "Projection must represent the controller trigger explicitly without reordering static conditions.");
 
         AuthoringSession soundSafeSession(blankProject);
         const auto soundSafeApply = applySfzImportProjection(
             soundSafeSession, soundSafeProjection, "Import only sound-safe SFZ zones");
         require(soundSafeApply.applied
-                    && soundSafeSession.getProject().authoring.zones.size() == 3
+                    && soundSafeSession.getProject().authoring.zones.size() == 4
                     && soundSafeSession.getProject().authoring.controllerDefaults.size() == 1,
                 "Reviewed sound-safe apply should mutate the project with retained zones only.");
 

@@ -52,6 +52,9 @@ RuntimeProjectModel makeProject()
     pedal.triggerMode = ZoneTriggerMode::oneShot;
     pedal.rootKey = 36;
     pedal.performance = { PerformanceEventKind::pedalUp, PerformanceSustainCondition::pedalUp, PerformancePitchSource::fixedRoot };
+    pedal.performance.event = PerformanceEventKind::controllerChange;
+    pedal.performance.triggerControllerNumber = 23;
+    pedal.controllerConditions = { { 11, 64, 127 }, { 23, 1, 63 } };
     project.authoring.roundRobinResetRules = { { RoundRobinResetEvent::articulationChange, true, {} } };
     require(validateRuntimeProjectModel(project).valid, "Sprint 3 fixture must validate.");
     return project;
@@ -79,6 +82,15 @@ void verifyProgramAndSnapshot()
                 && first.program.exclusiveGroupStableIds.size() == first.program.exclusiveGroupCount
                 && first.program.retainedBytes > 0,
             "Trigger routes must retain numeric choke masks, stable group identities, and memory accounting.");
+    const auto controllerRange = first.program.eventRanges[
+        static_cast<std::size_t>(PerformanceEventKind::controllerChange)];
+    require(controllerRange.routeCount == 1,
+            "Controller-change routes must compile into their dedicated event range.");
+    const auto& controllerRoute = first.program.triggerRoutes[controllerRange.firstRoute];
+    require(controllerRoute.triggerControllerNumber == 23
+                && controllerRoute.triggerControllerMinimum == 1
+                && controllerRoute.triggerControllerMaximum == 63,
+            "Controller trigger compilation must use the explicit trigger CC instead of condition ordering.");
 
     PlaybackSnapshotBuilder builder;
     const auto snapshot = builder.buildSnapshot(builder.requestBuild(3, true), project);
@@ -124,6 +136,14 @@ void verifyProgramAndSnapshot()
     require(text.find("\"performanceProgram\"") != std::string::npos
                 && text.find("\"exclusiveTargetGroupIds\"") != std::string::npos,
             "Snapshot diagnostics must contain declarations and program data.");
+
+    const auto projectPath = (fs::temp_directory_path() / "drs-performance-trigger-roundtrip.drsproj").generic_string();
+    std::ofstream(projectPath, std::ios::binary)
+        << serializeRuntimeProjectManifest(project, projectPath);
+    const auto reloaded = loadRuntimeProjectManifest(projectPath);
+    require(reloaded.loaded
+                && reloaded.project.authoring.zones[2].performance.triggerControllerNumber == 23,
+            "Project persistence must retain the explicit trigger controller identity.");
 }
 
 void verifyInstrumentV3AndCompatibility()
