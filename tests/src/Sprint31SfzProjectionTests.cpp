@@ -215,6 +215,10 @@ int main()
                 "The first SFZ fixture should still project its 195 unique sample sources.");
         require(projection.zones.size() == 225,
                 "The first SFZ fixture should still create one projected zone per region.");
+        require(projection.semanticAnalyzedRegionCount == projection.zones.size()
+                    && projection.unsafeUnconditionalRegionCount == 0
+                    && projection.unsafeUnconditionalRegionDocumentOrders.empty(),
+                "Projection should carry semantic safety metadata without changing safe fixture zones.");
         require(!projection.projectNotes.empty(),
                 "Sprint 3.1.4 should persist at least one project-level SFZ provenance note.");
         require(!projection.authoringNotes.empty(),

@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SFZ Playback Semantic Parity Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f4ef;
+      --surface: #fffefb;
+      --ink: #222522;
+      --muted: #626862;
+      --rule: #d9d8d1;
+      --accent: #286b66;
+      --accent-soft: #e8f2f0;
+      --warning: #8a5a17;
+      --warning-soft: #faf0dd;
+      --danger: #8b3932;
+      --danger-soft: #f8e9e7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: clamp(24px, 5vw, 56px);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+    }
+
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.2rem); }
+    h2 { margin-top: 2.4rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--rule); }
+    h3 { margin: 1.6rem 0 0.4rem; }
+    p { max-width: 76ch; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 0.45rem; }
+    code { font: 0.9em ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+    table {
+      width: 100%;
+      margin: 1rem 0;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--rule);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f0efe9; }
+
+    .meta { margin: 0 0 2rem; color: var(--muted); }
+    .summary, .guardrail, .confirmed {
+      margin: 1.5rem 0;
+      padding: 1rem 1.2rem;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+    }
+    .confirmed {
+      border-left-color: var(--danger);
+      background: var(--danger-soft);
+    }
+    .guardrail {
+      border-left-color: var(--warning);
+      background: var(--warning-soft);
+    }
+    .phase {
+      margin-top: 1rem;
+      padding: 1rem 1.2rem;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+    }
+    .phase h3 { margin-top: 0; }
+    .label { color: var(--accent); font-weight: 700; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SFZ Playback Semantic Parity Plan</h1>
+      <p class="meta">Decent Rhapsody Studio · High-level implementation and qualification plan</p>
+    </header>
+
+    <section class="confirmed">
+      <strong>Confirmed defect:</strong> the standard Accurate Salamander SFZ sounds chorused after DRS import and packaging, while the minimum SFZ does not. The standard file contains optional pseudo-resonance and mechanical layers controlled by SFZ trigger and MIDI CC conditions. DRS currently imports their regions without preserving those conditions, making some optional layers play unconditionally.
+    </section>
+
+    <section>
+      <h2>Goals</h2>
+      <ul>
+        <li>Prevent unsupported SFZ conditions from changing the sound silently.</li>
+        <li>Make a packaged instrument reproduce the supported semantics of its source SFZ.</li>
+        <li>Provide safe, explicit behavior when an SFZ uses features DRS cannot yet reproduce.</li>
+        <li>Add route-level and rendered-audio parity qualification.</li>
+        <li>Preserve the qualified package, streaming, and real-time playback architecture.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Confirmed Failure Pattern</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>SFZ content</th>
+            <th>Regions</th>
+            <th>Expected default behavior</th>
+            <th>Current DRS behavior</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Normal piano layers</td>
+            <td>1,408</td>
+            <td>One velocity-matched region per note</td>
+            <td>Imported and played</td>
+          </tr>
+          <tr>
+            <td>Pseudo pedal resonance</td>
+            <td>135</td>
+            <td>Disabled unless its CC and sustain conditions are met</td>
+            <td>Imported as ordinary sustain zones; often two extra voices per note</td>
+          </tr>
+          <tr>
+            <td>Sampled release</td>
+            <td>69</td>
+            <td>Release-triggered and controller-gated</td>
+            <td>Only partially represented</td>
+          </tr>
+          <tr>
+            <td>Hammer noise</td>
+            <td>88</td>
+            <td>Release-triggered and controller-gated</td>
+            <td>Only partially represented</td>
+          </tr>
+          <tr>
+            <td>Pedal action</td>
+            <td>4</td>
+            <td>Pedal-event and random-policy controlled</td>
+            <td>Conditions are not reproduced completely</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>The immediate audible defect is the pseudo-resonance layer. The source describes it as a detune effect; making it permanently active creates the observed chorus character.</p>
+    </section>
+
+    <section>
+      <h2>Guiding Rules</h2>
+      <ul>
+        <li>Unsupported selection conditions must never degrade into unconditional playback.</li>
+        <li>Import success means the projected instrument is audibly safe, not merely that every region was retained.</li>
+        <li>Conditional regions are included only when DRS can represent their complete eligibility rule.</li>
+        <li>Lossy import decisions are explicit, summarized, and reversible before project mutation.</li>
+        <li>Package export preserves the approved native project; it does not reinterpret SFZ semantics.</li>
+        <li>Performance is qualified separately from semantic parity so neither can mask failures in the other.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Implementation Phases</h2>
+
+      <article class="phase">
+        <h3>Phase 1 — Establish semantic dependency analysis</h3>
+        <p><span class="label">Purpose:</span> determine whether each region can be projected safely before creating a native zone.</p>
+        <ul>
+          <li>Classify region eligibility dependencies, including CC ranges, pedal state, trigger event, random policy, switches, and controller defaults.</li>
+          <li>Distinguish harmless unsupported presentation metadata from sound-critical unsupported behavior.</li>
+          <li>Mark regions with incomplete sound-critical semantics as unsafe to project unconditionally.</li>
+          <li>Include inherited <code>&lt;global&gt;</code>, <code>&lt;master&gt;</code>, and <code>&lt;group&gt;</code> conditions in the classification.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 2 — Add a safe import policy</h3>
+        <p><span class="label">Purpose:</span> stop the chorus defect before broader SFZ controller support is complete.</p>
+        <ul>
+          <li>Do not create unconditional zones from conditionally gated regions when their conditions are unsupported.</li>
+          <li>Offer an explicit review choice to omit unsupported conditional regions or cancel the import.</li>
+          <li>Summarize omitted regions by feature and source section.</li>
+          <li>Default to the sound-safe option; never silently retain a behavior-changing approximation.</li>
+          <li>For the Salamander standard SFZ, initially omit the 296 optional auxiliary regions and retain the 1,408 normal piano regions.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 3 — Implement core sound-parity opcodes</h3>
+        <p><span class="label">Purpose:</span> close the most important differences between DRS and mature SFZ players.</p>
+        <ul>
+          <li>Support controller conditions such as <code>loccN</code>, <code>hiccN</code>, <code>on_loccN</code>, and <code>on_hiccN</code>.</li>
+          <li>Preserve controller defaults such as <code>set_ccN</code>.</li>
+          <li>Represent note-on, note-off/release, pedal-down, and pedal-up eligibility explicitly.</li>
+          <li>Support <code>group_volume</code> with correct scope inheritance.</li>
+          <li>Support <code>tune</code> in cents in addition to root-key transposition.</li>
+          <li>Implement or deliberately approximate <code>amp_veltrack</code> with a documented native control law.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 4 — Restore optional Salamander behavior</h3>
+        <p><span class="label">Purpose:</span> re-enable auxiliary layers only after their complete conditions are supported.</p>
+        <ul>
+          <li>Enable pseudo pedal resonance only when CC23 and sustain conditions are satisfied.</li>
+          <li>Apply its intended group attenuation and fine tuning.</li>
+          <li>Enable sampled release and hammer noise only on the correct release events and controller states.</li>
+          <li>Enable pedal-action samples only on matching pedal transitions.</li>
+          <li>Implement a supported random-region policy or keep the random pedal variants safely omitted.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 5 — Replace count-based qualification with semantic qualification</h3>
+        <p><span class="label">Purpose:</span> test what should sound, not just what was imported.</p>
+        <ul>
+          <li>Remove the assumption that retaining all 1,704 regions is automatically correct.</li>
+          <li>Assert eligible route counts for representative notes, velocities, controller states, and trigger events.</li>
+          <li>At the default controller state, assert exactly one middle-C note-on route.</li>
+          <li>With resonance enabled and sustain down, assert only the intended additional routes and gains.</li>
+          <li>Verify release and pedal routes remain silent until their required events and controllers occur.</li>
+          <li>Add deterministic offline renders and compare peak, RMS, duration, spectral profile, and sample-aligned error against approved references.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section>
+      <h2>Delivery Sequence</h2>
+      <ol>
+        <li><strong>Safety patch:</strong> dependency classification, omission of unsafe conditional regions, import review summary, and regression coverage for the confirmed chorus defect.</li>
+        <li><strong>Core parity patch:</strong> controller conditions, defaults, event eligibility, group gain, fine tuning, and velocity tracking.</li>
+        <li><strong>Auxiliary behavior patch:</strong> conditional resonance, release, hammer, and pedal-action playback.</li>
+        <li><strong>Qualification patch:</strong> route-state matrices, rendered-audio references, and updated large-instrument release gates.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Acceptance Gates</h2>
+      <ul>
+        <li>The standard and minimum Salamander imports sound equivalent under their shared default piano-only state.</li>
+        <li>Middle C at the default CC state starts exactly one ordinary piano route.</li>
+        <li>No unsupported conditional region becomes an unconditional native zone.</li>
+        <li>Enabling resonance produces the intended controlled layer rather than a permanently active chorus.</li>
+        <li>Fine tuning and group gain survive import, project persistence, preparation, package export, and package reopen.</li>
+        <li>Import review reports every omitted or approximated sound-critical feature.</li>
+        <li>Package export and import remain deterministic and performant.</li>
+        <li>Host MIDI, streaming, page-cache behavior, audio callback timing, and real-time safety remain within their existing qualified limits.</li>
+      </ul>
+    </section>
+
+    <section class="guardrail">
+      <strong>Primary guardrail:</strong> fix the SFZ-to-native semantic projection and qualification rules. Do not modify the working package streaming architecture to compensate for incorrectly projected zones.
+    </section>
+
+    <footer>
+      <p>Status: confirmed defect with proposed high-level remediation plan. The minimum Salamander SFZ remains the temporary parity-safe import option.</p>
+    </footer>
+  </main>
+</body>
+</html>

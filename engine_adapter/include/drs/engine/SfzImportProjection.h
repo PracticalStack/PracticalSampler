@@ -3,6 +3,7 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/SfzImportReport.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,9 @@ struct SfzImportProjectionResult
     bool playable = false;
     bool lossy = false;
     bool blocking = false;
+    std::size_t semanticAnalyzedRegionCount = 0;
+    std::size_t unsafeUnconditionalRegionCount = 0;
+    std::vector<std::size_t> unsafeUnconditionalRegionDocumentOrders;
     std::string state;
     std::vector<std::string> issues;
     std::vector<RuntimeProjectSampleSource> sampleSources;

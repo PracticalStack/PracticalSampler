@@ -8,6 +8,57 @@
 
 namespace drs::engine
 {
+enum class SfzImportSemanticDependencyKind : std::uint8_t
+{
+    none = 0,
+    controllerRange,
+    controllerTriggerRange,
+    sustainPedalState,
+    triggerEvent,
+    randomPolicy,
+    switchCondition,
+    controllerDefault,
+    controllerModulation,
+    presentationMetadata
+};
+
+enum class SfzImportSemanticImpact : std::uint8_t
+{
+    none = 0,
+    presentationOnly,
+    soundCritical
+};
+
+enum class SfzImportSemanticSupport : std::uint8_t
+{
+    native = 0,
+    partial,
+    unsupported
+};
+
+struct SfzImportSemanticDependency
+{
+    SfzImportSemanticDependencyKind kind = SfzImportSemanticDependencyKind::none;
+    SfzImportSemanticImpact impact = SfzImportSemanticImpact::none;
+    SfzImportSemanticSupport support = SfzImportSemanticSupport::native;
+    bool affectsRegionEligibility = false;
+    int controllerNumber = -1;
+    std::string opcodeName;
+    std::string opcodeValue;
+    bool inherited = false;
+    SfzImportSourceLocation location;
+};
+
+struct SfzImportRegionSemanticAnalysis
+{
+    std::size_t documentOrder = 0;
+    std::string sampleReference;
+    std::vector<SfzImportSemanticDependency> dependencies;
+    bool hasSoundCriticalDependencies = false;
+    bool hasIncompleteSoundCriticalDependencies = false;
+    bool safeToProjectUnconditionally = true;
+};
+
 struct SfzImportTraceEntry
 {
     std::size_t documentOrder = 0;
@@ -20,6 +71,11 @@ struct SfzImportTraceEntry
     SfzImportSupportDisposition disposition = SfzImportSupportDisposition::converted;
     std::string findingCode;
     SfzImportSourceLocation location;
+    SfzImportSemanticDependencyKind semanticDependencyKind
+        = SfzImportSemanticDependencyKind::none;
+    SfzImportSemanticImpact semanticImpact = SfzImportSemanticImpact::none;
+    SfzImportSemanticSupport semanticSupport = SfzImportSemanticSupport::native;
+    bool affectsRegionEligibility = false;
 };
 
 struct SfzImportOpcodeSupportSummary
@@ -45,6 +101,12 @@ struct SfzImportReportSummary
     std::size_t warningFindingCount = 0;
     std::size_t errorFindingCount = 0;
     std::size_t suppressedFindingCount = 0;
+    std::size_t semanticAnalyzedRegionCount = 0;
+    std::size_t semanticDependencyCount = 0;
+    std::size_t soundCriticalDependencyCount = 0;
+    std::size_t incompleteSoundCriticalDependencyCount = 0;
+    std::size_t presentationOnlyDependencyCount = 0;
+    std::size_t unsafeUnconditionalRegionCount = 0;
 };
 
 struct SfzImportReport
@@ -60,6 +122,7 @@ struct SfzImportReport
     std::vector<SfzImportFinding> findings;
     std::vector<SfzImportTraceEntry> traceEntries;
     std::vector<SfzImportOpcodeSupportSummary> opcodeSupport;
+    std::vector<SfzImportRegionSemanticAnalysis> regionSemanticAnalysis;
     SfzImportExecutionState execution;
 };
 

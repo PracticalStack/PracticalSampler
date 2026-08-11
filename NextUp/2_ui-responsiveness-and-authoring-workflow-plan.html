@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UI Responsiveness and Authoring Workflow Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f4ef;
+      --surface: #fffefb;
+      --ink: #222522;
+      --muted: #626862;
+      --rule: #d9d8d1;
+      --accent: #286b66;
+      --accent-soft: #e8f2f0;
+      --warning: #8a5a17;
+      --warning-soft: #faf0dd;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: clamp(24px, 5vw, 56px);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+    }
+
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.2rem); }
+    h2 { margin-top: 2.4rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--rule); }
+    h3 { margin: 1.6rem 0 0.4rem; }
+    p { max-width: 76ch; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: 0.45rem; }
+    code { font: 0.9em ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+    .meta { margin: 0 0 2rem; color: var(--muted); }
+    .summary, .guardrail {
+      margin: 1.5rem 0;
+      padding: 1rem 1.2rem;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+    }
+    .guardrail {
+      border-left-color: var(--warning);
+      background: var(--warning-soft);
+    }
+    .phase {
+      margin-top: 1rem;
+      padding: 1rem 1.2rem;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+    }
+    .phase h3 { margin-top: 0; }
+    .label { color: var(--accent); font-weight: 700; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>UI Responsiveness and Authoring Workflow Plan</h1>
+      <p class="meta">Decent Rhapsody Studio · High-level implementation and qualification plan</p>
+    </header>
+
+    <section class="summary">
+      <strong>Working diagnosis:</strong> the remaining problems are message-thread bottlenecks, not failures in the streaming or audio-rendering path. Host MIDI, playable-package export, and playable-package import are already performing well and must remain protected throughout this work.
+    </section>
+
+    <section>
+      <h2>Goals</h2>
+      <ul>
+        <li>Make the Performance tab immediately responsive to keyboard and control input.</li>
+        <li>Make zone selection and ordinary authoring navigation feel instantaneous at large-instrument scale.</li>
+        <li>Restore reliable Preview, Prepare Draft, and Publish workflows without blocking the UI.</li>
+        <li>Preserve the qualified package-loading, streaming, host-MIDI, and real-time behavior.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Guiding Design Rules</h2>
+      <ul>
+        <li>The message thread handles input, lightweight state changes, and presentation only.</li>
+        <li>Project validation, full-project copying, digests, serialization, and playback preparation must not run synchronously from routine UI interactions.</li>
+        <li>Selection is transient workspace state, not an authored-content edit.</li>
+        <li>UI refreshes are revision-aware and incremental rather than periodic full rebuilds.</li>
+        <li>Worker results are published as immutable snapshots and adopted without waiting.</li>
+        <li>Superseded preview and preparation requests are coalesced or canceled.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Implementation Phases</h2>
+
+      <article class="phase">
+        <h3>Phase 1 — Measure the message thread</h3>
+        <p><span class="label">Purpose:</span> confirm the cost and frequency of each suspected operation before changing ownership or scheduling.</p>
+        <ul>
+          <li>Add low-overhead timing around keyboard callbacks, editor timer work, Performance refresh, zone selection, Authoring refresh, host-state serialization, preview dispatch, and publish dispatch.</li>
+          <li>Report only slow spans above a small threshold so instrumentation does not create a new bottleneck.</li>
+          <li>Capture baseline results with the large Salamander instrument and a playable package.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 2 — Restore Performance-tab responsiveness</h3>
+        <p><span class="label">Purpose:</span> remove synchronous presentation work from the UI note path.</p>
+        <ul>
+          <li>Make Performance keyboard note-on and note-off callbacks queue-only.</li>
+          <li>Remove full surface refreshes from note callbacks.</li>
+          <li>Stop forcing complete Performance and Diagnostics refreshes on every editor timer tick.</li>
+          <li>Refresh only when relevant publication or presentation revisions change.</li>
+          <li>Update control values without rebuilding the control layout when its structure is unchanged.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 3 — Make authoring selection lightweight</h3>
+        <p><span class="label">Purpose:</span> prevent navigation from behaving like a complete project edit.</p>
+        <ul>
+          <li>Move selected zone and selected group into transient workspace-selection state.</li>
+          <li>Do not dirty the project, create an undo snapshot, increment the authored-content revision, invalidate playback, or rebuild host state when selection changes.</li>
+          <li>Create a selection-only presentation refresh for the inspector, summary, waveform request, and map highlight.</li>
+          <li>Reserve full list and zone-map reconstruction for actual structural project changes.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 4 — Make Preview, Prepare, and Publish asynchronous</h3>
+        <p><span class="label">Purpose:</span> ensure commands return immediately while preparation continues in the background.</p>
+        <ul>
+          <li>Remove message-thread polling and sleep loops from authoring audition.</li>
+          <li>Retain a pending audition event and emit it after the requested preview becomes active.</li>
+          <li>Move full playback-snapshot construction, digests, validation, and publish preflight to worker-owned immutable input.</li>
+          <li>Expose clear queued, preparing, ready, active, canceled, and failed states in the UI.</li>
+          <li>Guarantee that rapid selection or repeated commands activate only the newest eligible request.</li>
+        </ul>
+      </article>
+
+      <article class="phase">
+        <h3>Phase 5 — Decouple host-state publication</h3>
+        <p><span class="label">Purpose:</span> keep full-project serialization out of interactive authoring operations.</p>
+        <ul>
+          <li>Publish immutable project checkpoints to a background serializer.</li>
+          <li>Compute manifest digests and serialized host state away from the message thread.</li>
+          <li>Atomically replace the last completed serialized state.</li>
+          <li>Coalesce intermediate content revisions while preserving the newest valid state.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section>
+      <h2>Delivery Sequence</h2>
+      <ol>
+        <li><strong>Responsiveness patch:</strong> instrumentation, queue-only Performance notes, revision-aware refresh, and removal of the blocking audition wait.</li>
+        <li><strong>Authoring scaling patch:</strong> transient selection state and incremental Authoring refresh.</li>
+        <li><strong>Background publication patch:</strong> asynchronous snapshot construction, publish preflight, digests, and host-state serialization.</li>
+        <li><strong>Qualification pass:</strong> large-project interaction, command supersession, editor lifecycle, host-state restore, and streaming regression coverage.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Acceptance Gates</h2>
+      <ul>
+        <li>Performance keyboard callbacks complete in under 1 ms; notes are heard on the next audio block.</li>
+        <li>Zone selection completes within one 60 Hz frame and does not change the authored-content revision or dirty state.</li>
+        <li>Prepare and Publish handlers return within one frame and expose asynchronous progress.</li>
+        <li>No routine editor timer or interaction operation blocks the message thread for more than one frame.</li>
+        <li>Rapid selection churn activates only the newest preview request.</li>
+        <li>Editor open, close, and tab switching remain responsive with the large reference instrument.</li>
+        <li>Playable-package export and import remain correct and fast.</li>
+        <li>Host MIDI playback, page streaming, audio callback behavior, and real-time safety qualifications remain unchanged.</li>
+      </ul>
+    </section>
+
+    <section class="guardrail">
+      <strong>Primary guardrail:</strong> do not redesign the working streaming path to solve these UI problems. Changes should reduce message-thread work and improve state publication while leaving the qualified audio and streaming architecture intact.
+    </section>
+
+    <footer>
+      <p>Status: proposed high-level plan. Detailed implementation tasks and test cases should be recorded as each phase begins.</p>
+    </footer>
+  </main>
+</body>
+</html>

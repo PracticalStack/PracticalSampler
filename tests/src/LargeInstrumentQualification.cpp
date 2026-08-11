@@ -507,6 +507,10 @@ int main(int argc, char** argv)
                 "Salamander projection did not retain at least 641 sample sources.");
         require(projection.zones.size() >= 1704,
                 "Salamander projection did not retain at least 1,704 zones/routes.");
+        require(projection.semanticAnalyzedRegionCount == 1704,
+                "Salamander semantic analysis did not classify all 1,704 regions.");
+        require(projection.unsafeUnconditionalRegionCount == 296,
+                "Salamander semantic analysis did not identify the expected 296 unsafe auxiliary regions.");
 
         drs::engine::AuthoringSession session(blankProject);
         const auto applyStart = Clock::now();
@@ -581,6 +585,8 @@ int main(int argc, char** argv)
                << "- Corpus WAV bytes: " << corpusBytes << "\n"
                << "- Projected sources: " << projection.sampleSources.size() << "\n"
                << "- Projected zones/routes: " << projection.zones.size() << "\n"
+               << "- Semantically analyzed regions: " << projection.semanticAnalyzedRegionCount << "\n"
+               << "- Unsafe unconditional regions: " << projection.unsafeUnconditionalRegionCount << "\n"
                << "- Import analysis/projection: " << importMicros << " us\n"
                << "- Atomic authoring apply: " << applyMicros << " us\n"
                << "- Full snapshot: " << snapshotMicros << " us\n"

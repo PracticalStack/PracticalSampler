@@ -87,12 +87,55 @@ void requireTraceEquals(const drs::engine::SfzImportTraceEntry& expected,
                 && expected.sampleReference == actual.sampleReference
                 && expected.disposition == actual.disposition
                 && expected.findingCode == actual.findingCode
+                && expected.semanticDependencyKind == actual.semanticDependencyKind
+                && expected.semanticImpact == actual.semanticImpact
+                && expected.semanticSupport == actual.semanticSupport
+                && expected.affectsRegionEligibility == actual.affectsRegionEligibility
                 && expected.location.scope == actual.location.scope
                 && expected.location.sourcePath == actual.location.sourcePath
                 && expected.location.lineNumber == actual.location.lineNumber
                 && expected.location.columnNumber == actual.location.columnNumber
                 && expected.location.opcode == actual.location.opcode,
             context);
+}
+
+void requireSemanticDependencyEquals(const drs::engine::SfzImportSemanticDependency& expected,
+                                     const drs::engine::SfzImportSemanticDependency& actual,
+                                     const std::string& context)
+{
+    require(expected.kind == actual.kind
+                && expected.impact == actual.impact
+                && expected.support == actual.support
+                && expected.affectsRegionEligibility == actual.affectsRegionEligibility
+                && expected.controllerNumber == actual.controllerNumber
+                && expected.opcodeName == actual.opcodeName
+                && expected.opcodeValue == actual.opcodeValue
+                && expected.inherited == actual.inherited
+                && expected.location.scope == actual.location.scope
+                && expected.location.sourcePath == actual.location.sourcePath
+                && expected.location.lineNumber == actual.location.lineNumber
+                && expected.location.columnNumber == actual.location.columnNumber
+                && expected.location.opcode == actual.location.opcode,
+            context);
+}
+
+void requireRegionSemanticAnalysisEquals(const drs::engine::SfzImportRegionSemanticAnalysis& expected,
+                                         const drs::engine::SfzImportRegionSemanticAnalysis& actual,
+                                         const std::string& context)
+{
+    require(expected.documentOrder == actual.documentOrder
+                && expected.sampleReference == actual.sampleReference
+                && expected.hasSoundCriticalDependencies == actual.hasSoundCriticalDependencies
+                && expected.hasIncompleteSoundCriticalDependencies
+                    == actual.hasIncompleteSoundCriticalDependencies
+                && expected.safeToProjectUnconditionally == actual.safeToProjectUnconditionally
+                && expected.dependencies.size() == actual.dependencies.size(),
+            context);
+
+    for (std::size_t index = 0; index < expected.dependencies.size(); ++index)
+        requireSemanticDependencyEquals(expected.dependencies[index],
+                                        actual.dependencies[index],
+                                        context + " dependency mismatch at index " + std::to_string(index));
 }
 
 void requireSupportSummaryEquals(const drs::engine::SfzImportOpcodeSupportSummary& expected,
@@ -174,6 +217,10 @@ void requireProjectionEquals(const drs::engine::SfzImportProjectionResult& expec
                 && expected.blocking == actual.blocking
                 && expected.state == actual.state
                 && expected.issues == actual.issues
+                && expected.semanticAnalyzedRegionCount == actual.semanticAnalyzedRegionCount
+                && expected.unsafeUnconditionalRegionCount == actual.unsafeUnconditionalRegionCount
+                && expected.unsafeUnconditionalRegionDocumentOrders
+                    == actual.unsafeUnconditionalRegionDocumentOrders
                 && expected.masterGainDb == actual.masterGainDb
                 && expected.projectNotes == actual.projectNotes
                 && expected.authoringNotes == actual.authoringNotes
@@ -228,12 +275,25 @@ void requireAnalysisEquals(const drs::engine::SfzImportAnalysisResult& expected,
                 && expectedSummary.blockingOpcodeCount == actualSummary.blockingOpcodeCount
                 && expectedSummary.informationFindingCount == actualSummary.informationFindingCount
                 && expectedSummary.warningFindingCount == actualSummary.warningFindingCount
-                && expectedSummary.errorFindingCount == actualSummary.errorFindingCount,
+                && expectedSummary.errorFindingCount == actualSummary.errorFindingCount
+                && expectedSummary.semanticAnalyzedRegionCount
+                    == actualSummary.semanticAnalyzedRegionCount
+                && expectedSummary.semanticDependencyCount == actualSummary.semanticDependencyCount
+                && expectedSummary.soundCriticalDependencyCount
+                    == actualSummary.soundCriticalDependencyCount
+                && expectedSummary.incompleteSoundCriticalDependencyCount
+                    == actualSummary.incompleteSoundCriticalDependencyCount
+                && expectedSummary.presentationOnlyDependencyCount
+                    == actualSummary.presentationOnlyDependencyCount
+                && expectedSummary.unsafeUnconditionalRegionCount
+                    == actualSummary.unsafeUnconditionalRegionCount,
             context + " summary mismatch");
 
     require(expected.report.findings.size() == actual.report.findings.size()
                 && expected.report.traceEntries.size() == actual.report.traceEntries.size()
-                && expected.report.opcodeSupport.size() == actual.report.opcodeSupport.size(),
+                && expected.report.opcodeSupport.size() == actual.report.opcodeSupport.size()
+                && expected.report.regionSemanticAnalysis.size()
+                    == actual.report.regionSemanticAnalysis.size(),
             context + " vector size mismatch");
 
     for (std::size_t index = 0; index < expected.report.findings.size(); ++index)
@@ -250,6 +310,12 @@ void requireAnalysisEquals(const drs::engine::SfzImportAnalysisResult& expected,
         requireSupportSummaryEquals(expected.report.opcodeSupport[index],
                                     actual.report.opcodeSupport[index],
                                     context + " support-summary mismatch at index " + std::to_string(index));
+
+    for (std::size_t index = 0; index < expected.report.regionSemanticAnalysis.size(); ++index)
+        requireRegionSemanticAnalysisEquals(expected.report.regionSemanticAnalysis[index],
+                                            actual.report.regionSemanticAnalysis[index],
+                                            context + " region semantic mismatch at index "
+                                                + std::to_string(index));
 }
 } // namespace
 

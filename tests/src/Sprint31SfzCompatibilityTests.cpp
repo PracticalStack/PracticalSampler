@@ -16,11 +16,9 @@ void require(bool condition, const std::string& message)
         throw std::runtime_error(message);
 }
 
-std::filesystem::path resolveFirstFixturePath()
+std::filesystem::path resolveFixturePath(const std::filesystem::path& relativeFixturePath)
 {
     const auto sourceRoot = std::filesystem::path(DRS_SOURCE_ROOT);
-    const auto relativeFixturePath =
-        std::filesystem::path("DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz");
 
     const auto localFixturePath = sourceRoot / relativeFixturePath;
     if (std::filesystem::exists(localFixturePath))
@@ -31,6 +29,12 @@ std::filesystem::path resolveFirstFixturePath()
         return workspaceFixturePath;
 
     throw std::runtime_error("Could not locate " + relativeFixturePath.generic_string());
+}
+
+std::filesystem::path resolveFirstFixturePath()
+{
+    return resolveFixturePath(
+        "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz");
 }
 
 const drs::engine::SfzImportOpcodeSupportSummary* findSupportSummary(
@@ -57,6 +61,36 @@ std::size_t countFindingsWithCode(const drs::engine::SfzImportReport& report,
                       {
                           return finding.code == code;
                       }));
+}
+
+const drs::engine::SfzImportSemanticDependency* findSemanticDependency(
+    const drs::engine::SfzImportRegionSemanticAnalysis& region,
+    const drs::engine::SfzImportSemanticDependencyKind kind,
+    const int controllerNumber = -1)
+{
+    const auto iterator = std::find_if(
+        region.dependencies.begin(),
+        region.dependencies.end(),
+        [&](const drs::engine::SfzImportSemanticDependency& dependency)
+        {
+            return dependency.kind == kind
+                && (controllerNumber < 0 || dependency.controllerNumber == controllerNumber);
+        });
+    return iterator == region.dependencies.end() ? nullptr : &(*iterator);
+}
+
+std::size_t countRegionsWithSemanticDependency(
+    const drs::engine::SfzImportReport& report,
+    const drs::engine::SfzImportSemanticDependencyKind kind,
+    const int controllerNumber = -1)
+{
+    return static_cast<std::size_t>(std::count_if(
+        report.regionSemanticAnalysis.begin(),
+        report.regionSemanticAnalysis.end(),
+        [&](const drs::engine::SfzImportRegionSemanticAnalysis& region)
+        {
+            return findSemanticDependency(region, kind, controllerNumber) != nullptr;
+        }));
 }
 
 std::filesystem::path resolveFirstSamplePath(const std::filesystem::path& fixturePath)
@@ -335,6 +369,136 @@ int main()
                 "Unsupported random round-robin policy opcodes should stay review-only.");
         require(countFindingsWithCode(randomPolicyAnalysis.report, "sfz.round_robin.random_policy.reported") >= 1,
                 "Unsupported random round-robin policy opcodes should surface a typed review finding.");
+
+        const auto semanticFixturePath = invalidFixtureDirectory / "semantic-dependency-analysis.sfz";
+        writeTextFile(
+            semanticFixturePath,
+            "<control>\n"
+            "set_cc23=0\n"
+            "label_cc23=Resonance\n"
+            "<global>\n"
+            "amplitude_oncc7=100\n"
+            "<master>\n"
+            "locc23=1\n"
+            "<group>\n"
+            "locc64=22\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=60\n"
+            "lokey=60\n"
+            "hikey=60\n"
+            "<master>\n"
+            "<group>\n"
+            "trigger=attack\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=61\n"
+            "lokey=61\n"
+            "hikey=61\n"
+            "<group>\n"
+            "trigger=release\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=62\n"
+            "lokey=62\n"
+            "hikey=62\n"
+            "<group>\n"
+            "lorand=0\n"
+            "hirand=0.5\n"
+            "sw_lokey=36\n"
+            "<region>\n"
+            "sample=" + samplePath.generic_string() + "\n"
+            "pitch_keycenter=63\n"
+            "lokey=63\n"
+            "hikey=63\n");
+        const auto semanticAnalysis = analyzeSfzImportDocument(semanticFixturePath.generic_string());
+        require(semanticAnalysis.analyzed && semanticAnalysis.report.available,
+                "Semantic dependency fixture should produce an import report.");
+        require(semanticAnalysis.report.regionSemanticAnalysis.size() == 4
+                    && semanticAnalysis.report.summary.semanticAnalyzedRegionCount == 4,
+                "Semantic dependency analysis should publish one result per region.");
+        require(semanticAnalysis.report.summary.unsafeUnconditionalRegionCount == 3,
+                "Controller-gated, release-triggered, and random/switch regions should be unsafe to project unconditionally.");
+        require(semanticAnalysis.report.summary.presentationOnlyDependencyCount == 1,
+                "Presentation-only CC labels should be distinguished from sound-critical dependencies.");
+
+        const auto& controllerGatedRegion = semanticAnalysis.report.regionSemanticAnalysis.at(0);
+        require(!controllerGatedRegion.safeToProjectUnconditionally
+                    && controllerGatedRegion.hasIncompleteSoundCriticalDependencies,
+                "Inherited controller and pedal conditions should make the first region unsafe.");
+        const auto* cc23Condition = findSemanticDependency(
+            controllerGatedRegion, SfzImportSemanticDependencyKind::controllerRange, 23);
+        require(cc23Condition != nullptr && cc23Condition->inherited
+                    && cc23Condition->affectsRegionEligibility,
+                "Master-scope CC23 eligibility should be inherited into the region analysis.");
+        const auto* pedalCondition = findSemanticDependency(
+            controllerGatedRegion, SfzImportSemanticDependencyKind::sustainPedalState, 64);
+        require(pedalCondition != nullptr && pedalCondition->inherited
+                    && pedalCondition->affectsRegionEligibility,
+                "Group-scope sustain-pedal eligibility should be inherited into the region analysis.");
+        const auto* cc23Default = findSemanticDependency(
+            controllerGatedRegion, SfzImportSemanticDependencyKind::controllerDefault, 23);
+        require(cc23Default != nullptr && cc23Default->inherited,
+                "A relevant control-scope default should be linked into the gated region analysis.");
+
+        const auto& attackRegion = semanticAnalysis.report.regionSemanticAnalysis.at(1);
+        const auto* attackTrigger = findSemanticDependency(
+            attackRegion, SfzImportSemanticDependencyKind::triggerEvent);
+        require(attackRegion.safeToProjectUnconditionally
+                    && attackTrigger != nullptr
+                    && attackTrigger->support == SfzImportSemanticSupport::native,
+                "Native attack semantics should remain safe even when unrelated sound modulation needs review.");
+
+        const auto& releaseRegion = semanticAnalysis.report.regionSemanticAnalysis.at(2);
+        const auto* releaseTrigger = findSemanticDependency(
+            releaseRegion, SfzImportSemanticDependencyKind::triggerEvent);
+        require(!releaseRegion.safeToProjectUnconditionally
+                    && releaseTrigger != nullptr
+                    && releaseTrigger->support == SfzImportSemanticSupport::partial,
+                "Partially represented release semantics should be marked unsafe for unconditional playback.");
+
+        const auto& policyRegion = semanticAnalysis.report.regionSemanticAnalysis.at(3);
+        require(!policyRegion.safeToProjectUnconditionally
+                    && findSemanticDependency(policyRegion,
+                                              SfzImportSemanticDependencyKind::randomPolicy) != nullptr
+                    && findSemanticDependency(policyRegion,
+                                              SfzImportSemanticDependencyKind::switchCondition) != nullptr,
+                "Random and switch selection dependencies should both be sound-critical and unsafe.");
+
+        const auto labelTrace = std::find_if(
+            semanticAnalysis.report.traceEntries.begin(),
+            semanticAnalysis.report.traceEntries.end(),
+            [](const SfzImportTraceEntry& trace)
+            {
+                return trace.opcodeName == "label_cc23";
+            });
+        require(labelTrace != semanticAnalysis.report.traceEntries.end()
+                    && labelTrace->semanticImpact == SfzImportSemanticImpact::presentationOnly
+                    && !labelTrace->affectsRegionEligibility,
+                "The opcode trace should expose harmless presentation metadata separately.");
+
+        const auto salamanderPath = resolveFixturePath(
+            "DemoSFVInstruments/AccurateSalamanderGrandPianoV6.2beta2_48khz24bit/sfz_daw/Accurate-SalamanderGrandPiano_flat.Recommended.sfz");
+        const auto salamanderAnalysis = analyzeSfzImportDocument(salamanderPath.generic_string());
+        require(salamanderAnalysis.analyzed && salamanderAnalysis.report.available,
+                "The standard Accurate Salamander SFZ should produce semantic safety analysis.");
+        require(salamanderAnalysis.report.summary.semanticAnalyzedRegionCount == 1704,
+                "Accurate Salamander analysis should classify all 1,704 regions.");
+        require(salamanderAnalysis.report.summary.unsafeUnconditionalRegionCount == 296,
+                "Accurate Salamander analysis should identify all 296 unsafe auxiliary regions.");
+        require(countRegionsWithSemanticDependency(
+                    salamanderAnalysis.report,
+                    SfzImportSemanticDependencyKind::controllerRange,
+                    23) == 135,
+                "Accurate Salamander analysis should identify 135 CC23-gated resonance regions.");
+        require(countRegionsWithSemanticDependency(
+                    salamanderAnalysis.report,
+                    SfzImportSemanticDependencyKind::triggerEvent) == 157,
+                "Accurate Salamander analysis should identify 157 release-triggered regions.");
+        require(countRegionsWithSemanticDependency(
+                    salamanderAnalysis.report,
+                    SfzImportSemanticDependencyKind::randomPolicy) == 4,
+                "Accurate Salamander analysis should identify four random pedal-action regions.");
 
         std::cout << "Sprint 3.1.3 SFZ compatibility tests passed." << std::endl;
         return 0;

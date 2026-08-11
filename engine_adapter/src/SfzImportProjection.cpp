@@ -465,6 +465,15 @@ std::vector<std::string> buildProjectNotes(const SfzImportReport& report)
             << report.summary.blockingOpcodeCount << " blocking.";
     notes.push_back(summary.str());
 
+    if (report.summary.unsafeUnconditionalRegionCount > 0)
+    {
+        notes.push_back(
+            "SFZ semantic safety analysis: "
+            + std::to_string(report.summary.unsafeUnconditionalRegionCount)
+            + " of " + std::to_string(report.summary.semanticAnalyzedRegionCount)
+            + " regions contain incomplete sound-critical eligibility dependencies and are unsafe to treat as unconditional playback.");
+    }
+
     const auto hasConvertedScopedGain = std::any_of(
         report.opcodeSupport.begin(),
         report.opcodeSupport.end(),
@@ -746,6 +755,15 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         || analysis.report.blocking
         || analysis.report.reviewDisposition == SfzImportReviewDisposition::blocked;
     result.lossy = analysis.report.reviewDisposition == SfzImportReviewDisposition::confirmationRequired;
+    result.semanticAnalyzedRegionCount = analysis.report.summary.semanticAnalyzedRegionCount;
+    result.unsafeUnconditionalRegionCount = analysis.report.summary.unsafeUnconditionalRegionCount;
+    result.unsafeUnconditionalRegionDocumentOrders.reserve(
+        result.unsafeUnconditionalRegionCount);
+    for (const auto& region : analysis.report.regionSemanticAnalysis)
+    {
+        if (!region.safeToProjectUnconditionally)
+            result.unsafeUnconditionalRegionDocumentOrders.push_back(region.documentOrder);
+    }
 
     if (!analysis.analyzed)
     {

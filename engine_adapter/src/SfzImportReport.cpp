@@ -105,6 +105,223 @@ bool isSequentialRoundRobinOpcode(const std::string& opcodeName)
     return opcodeName == "seq_length" || opcodeName == "seq_position";
 }
 
+std::optional<int> parseControllerNumber(const std::string& opcodeName,
+                                         const std::string& prefix)
+{
+    if (opcodeName.size() <= prefix.size()
+        || opcodeName.compare(0, prefix.size(), prefix) != 0)
+    {
+        return std::nullopt;
+    }
+
+    const auto suffix = opcodeName.substr(prefix.size());
+    if (!std::all_of(suffix.begin(), suffix.end(), [](const unsigned char character)
+        {
+            return std::isdigit(character) != 0;
+        }))
+    {
+        return std::nullopt;
+    }
+
+    auto controllerNumber = -1;
+    try
+    {
+        controllerNumber = std::stoi(suffix);
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+    if (controllerNumber < 0 || controllerNumber > 127)
+        return std::nullopt;
+    return controllerNumber;
+}
+
+std::optional<int> parseEmbeddedControllerNumber(const std::string& opcodeName,
+                                                 const std::string& marker)
+{
+    const auto markerPosition = opcodeName.rfind(marker);
+    if (markerPosition == std::string::npos)
+        return std::nullopt;
+
+    return parseControllerNumber(opcodeName.substr(markerPosition), marker);
+}
+
+std::optional<SfzImportSemanticDependency> classifySemanticDependency(
+    const SfzResolvedOpcode& opcode)
+{
+    const auto opcodeName = toLowerAscii(opcode.name);
+    auto dependency = SfzImportSemanticDependency {};
+    dependency.opcodeName = opcodeName;
+    dependency.opcodeValue = opcode.value;
+    dependency.inherited = opcode.inherited;
+    dependency.location = opcode.location;
+
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "label_cc"))
+    {
+        dependency.kind = SfzImportSemanticDependencyKind::presentationMetadata;
+        dependency.impact = SfzImportSemanticImpact::presentationOnly;
+        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.controllerNumber = *controllerNumber;
+        return dependency;
+    }
+
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "set_cc"))
+    {
+        dependency.kind = SfzImportSemanticDependencyKind::controllerDefault;
+        dependency.impact = SfzImportSemanticImpact::soundCritical;
+        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.controllerNumber = *controllerNumber;
+        return dependency;
+    }
+
+    const auto makeControllerCondition = [&](const int controllerNumber,
+                                             const bool triggerRange)
+    {
+        dependency.kind = controllerNumber == 64
+            ? SfzImportSemanticDependencyKind::sustainPedalState
+            : (triggerRange
+                   ? SfzImportSemanticDependencyKind::controllerTriggerRange
+                   : SfzImportSemanticDependencyKind::controllerRange);
+        dependency.impact = SfzImportSemanticImpact::soundCritical;
+        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.affectsRegionEligibility = true;
+        dependency.controllerNumber = controllerNumber;
+        return dependency;
+    };
+
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "on_locc"))
+        return makeControllerCondition(*controllerNumber, true);
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "on_hicc"))
+        return makeControllerCondition(*controllerNumber, true);
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "locc"))
+        return makeControllerCondition(*controllerNumber, false);
+    if (const auto controllerNumber = parseControllerNumber(opcodeName, "hicc"))
+        return makeControllerCondition(*controllerNumber, false);
+
+    if (opcodeName == "trigger")
+    {
+        dependency.kind = SfzImportSemanticDependencyKind::triggerEvent;
+        dependency.impact = SfzImportSemanticImpact::soundCritical;
+        dependency.affectsRegionEligibility = true;
+        const auto triggerValue = toLowerAscii(opcode.value);
+        dependency.support = triggerValue == "attack"
+            ? SfzImportSemanticSupport::native
+            : ((triggerValue == "release" || triggerValue == "legato")
+                   ? SfzImportSemanticSupport::partial
+                   : SfzImportSemanticSupport::unsupported);
+        return dependency;
+    }
+
+    if (opcodeName == "lorand" || opcodeName == "hirand")
+    {
+        dependency.kind = SfzImportSemanticDependencyKind::randomPolicy;
+        dependency.impact = SfzImportSemanticImpact::soundCritical;
+        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.affectsRegionEligibility = true;
+        return dependency;
+    }
+
+    if (opcodeName.rfind("sw_", 0) == 0)
+    {
+        dependency.kind = SfzImportSemanticDependencyKind::switchCondition;
+        dependency.impact = SfzImportSemanticImpact::soundCritical;
+        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.affectsRegionEligibility = true;
+        return dependency;
+    }
+
+    auto modulationController = parseEmbeddedControllerNumber(opcodeName, "oncc");
+    if (!modulationController.has_value())
+        modulationController = parseEmbeddedControllerNumber(opcodeName, "curvecc");
+    if (modulationController.has_value())
+    {
+        dependency.kind = SfzImportSemanticDependencyKind::controllerModulation;
+        dependency.impact = SfzImportSemanticImpact::soundCritical;
+        dependency.support = SfzImportSemanticSupport::unsupported;
+        dependency.controllerNumber = *modulationController;
+        return dependency;
+    }
+
+    return std::nullopt;
+}
+
+std::string findEffectiveSampleReference(const SfzNormalizedSection& section);
+
+SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSection& section)
+{
+    SfzImportRegionSemanticAnalysis analysis;
+    analysis.documentOrder = section.documentOrder;
+    analysis.sampleReference = findEffectiveSampleReference(section);
+
+    std::vector<SfzImportSemanticDependency> candidates;
+    std::set<int> referencedControllers;
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        auto dependency = classifySemanticDependency(opcode);
+        if (!dependency.has_value()
+            || dependency->impact == SfzImportSemanticImpact::presentationOnly)
+        {
+            continue;
+        }
+
+        if (dependency->kind != SfzImportSemanticDependencyKind::controllerDefault
+            && dependency->controllerNumber >= 0)
+        {
+            referencedControllers.insert(dependency->controllerNumber);
+        }
+        candidates.push_back(std::move(*dependency));
+    }
+
+    for (auto& dependency : candidates)
+    {
+        if (dependency.kind == SfzImportSemanticDependencyKind::controllerDefault
+            && referencedControllers.count(dependency.controllerNumber) == 0)
+        {
+            continue;
+        }
+
+        analysis.hasSoundCriticalDependencies = true;
+        const auto incomplete = dependency.support != SfzImportSemanticSupport::native;
+        analysis.hasIncompleteSoundCriticalDependencies
+            = analysis.hasIncompleteSoundCriticalDependencies || incomplete;
+        if (dependency.affectsRegionEligibility && incomplete)
+            analysis.safeToProjectUnconditionally = false;
+        analysis.dependencies.push_back(std::move(dependency));
+    }
+
+    return analysis;
+}
+
+void publishRegionSemanticAnalysis(SfzImportReport& report,
+                                   const SfzNormalizedDocument& document)
+{
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+
+        auto analysis = analyzeRegionSemantics(section);
+        ++report.summary.semanticAnalyzedRegionCount;
+        if (!analysis.safeToProjectUnconditionally)
+            ++report.summary.unsafeUnconditionalRegionCount;
+
+        for (const auto& dependency : analysis.dependencies)
+        {
+            ++report.summary.semanticDependencyCount;
+            if (dependency.impact == SfzImportSemanticImpact::soundCritical)
+                ++report.summary.soundCriticalDependencyCount;
+            if (dependency.impact == SfzImportSemanticImpact::soundCritical
+                && dependency.support != SfzImportSemanticSupport::native)
+            {
+                ++report.summary.incompleteSoundCriticalDependencyCount;
+            }
+        }
+
+        report.regionSemanticAnalysis.push_back(std::move(analysis));
+    }
+}
+
 std::optional<int> parseIntValue(const std::string& text)
 {
     try
@@ -1222,23 +1439,40 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                                              result.report.summary.suppressedFindingCount);
                     updateSupportSummary(supportSummaries, opcode, classification);
 
-                    result.report.traceEntries.push_back(
-                        { section.documentOrder,
-                          section.scope,
-                          section.headerName,
-                          opcode.name,
-                          opcode.value,
-                          classification.nativeTarget,
-                          sampleReference,
-                          classification.disposition,
-                          classification.findingCode,
-                          opcode.location });
+                    SfzImportTraceEntry trace {
+                        section.documentOrder,
+                        section.scope,
+                        section.headerName,
+                        opcode.name,
+                        opcode.value,
+                        classification.nativeTarget,
+                        sampleReference,
+                        classification.disposition,
+                        classification.findingCode,
+                        opcode.location
+                    };
+                    if (const auto semantic = classifySemanticDependency(opcode))
+                    {
+                        trace.semanticDependencyKind = semantic->kind;
+                        trace.semanticImpact = semantic->impact;
+                        trace.semanticSupport = semantic->support;
+                        trace.affectsRegionEligibility = semantic->affectsRegionEligibility;
+                        if (semantic->impact == SfzImportSemanticImpact::presentationOnly)
+                        {
+                            ++result.report.summary.semanticDependencyCount;
+                            ++result.report.summary.presentationOnlyDependencyCount;
+                        }
+                    }
+                    result.report.traceEntries.push_back(std::move(trace));
                 }
             }
 
             result.report.opcodeSupport.reserve(supportSummaries.size());
             for (const auto& [_, summary] : supportSummaries)
                 result.report.opcodeSupport.push_back(summary);
+
+            publishRegionSemanticAnalysis(result.report,
+                                          result.normalizeResult.document);
         }
     }
 
