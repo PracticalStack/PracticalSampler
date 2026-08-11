@@ -262,7 +262,19 @@ void runProcessorTimingAndIsolation(const drs::engine::RuntimeProjectModel& proj
             "Selection-policy coverage requires a replacement selected zone.");
     processor.serviceMessageThreadWork();
     std::this_thread::sleep_for(std::chrono::milliseconds(15));
-    require(waitForPreviewReady(processor), "Replacement selected-zone Preview did not settle.");
+    if (!waitForPreviewReady(processor))
+    {
+        const auto controller = processor.getAuthoringPreviewControllerSnapshot();
+        const auto draft = processor.getEngineFacade().getDraftPlaybackStatus();
+        throw std::runtime_error(
+            "Replacement selected-zone Preview did not settle: controller="
+            + std::to_string(static_cast<int>(controller.preparationState))
+            + " activation=" + std::to_string(static_cast<int>(controller.activationState))
+            + " pending=" + std::to_string(draft.pendingPreview.active)
+            + " preview=" + draft.preview.state
+            + " event=" + draft.lastEvent
+            + " failure=" + controller.failureState);
+    }
     crossBlock(processor, buffer, midi);
     require(processor.getRealtimeSafetySnapshot().authoringPreviewActiveVoiceCount >= 1,
             "Selection/activation replacement must let old-model Preview voices continue.");

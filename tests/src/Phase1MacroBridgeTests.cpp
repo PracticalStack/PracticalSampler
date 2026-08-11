@@ -102,6 +102,9 @@ int main()
         require(standalonePreview.effectiveVelocity >= 96,
                 "High tone macro should drive an accent-range preview velocity.");
 
+        standalone.getProcessor().serviceMessageThreadWork();
+        require(standalone.getProcessor().waitForHostStatePublication(),
+                "Standalone macro state did not reach background host-state publication.");
         const auto standaloneState = standalone.exportStateJson();
         drs::standalone::MainComponent restoredStandalone(false);
         require(restoredStandalone.restoreStateJson(standaloneState).restored,
@@ -117,9 +120,9 @@ int main()
                 "Standalone shell motion macro effect did not persist across reload.");
 
         drs::plugin::Processor processor;
-        const auto pluginMacros = processor.getEngineFacade().getMacroDescriptors();
-        require(processor.getParameters().size() == pluginMacros.size(),
-                "Plugin parameter count should match the authored macro count.");
+        require(processor.getParameters().size()
+                    == drs::engine::publishedMacroHostTopology().size(),
+                "Plugin parameter count should preserve the permanent host macro topology.");
 
         auto* toneParameter = dynamic_cast<juce::RangedAudioParameter*>(
             processor.getParameterState().getParameter("macro.tone"));
@@ -151,6 +154,8 @@ int main()
 
         processor.serviceMessageThreadWork();
         juce::MemoryBlock stateBlock;
+        require(processor.waitForHostStatePublication(),
+                "Plugin macro state did not reach the background host-state publication.");
         processor.getStateInformation(stateBlock);
 
         drs::plugin::Processor restoredProcessor;

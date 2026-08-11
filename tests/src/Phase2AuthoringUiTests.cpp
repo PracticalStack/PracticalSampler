@@ -3057,7 +3057,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                             return zone.velocityLow == inspectorVelocityLow;
                         }),
             "Changing a velocity value in the Sample inspector should update every selected zone.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 3,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 1,
             "One multi-zone inspector velocity edit should create one undo transaction.");
 
     const auto inspectorVelocityHigh = 110;
@@ -3073,7 +3073,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                                 && zone.velocityHigh == inspectorVelocityHigh;
                         }),
             "Changing the high velocity in the Sample inspector should preserve the low value and update every selected zone.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 4,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 2,
             "Each multi-zone inspector velocity edit should remain a single undo transaction.");
 
     const auto selectedBeforeKeyExpansion = selectedAfterInspectorEdit;
@@ -3109,7 +3109,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
         require(edited.keyLow == expectedLow && edited.keyHigh == expectedHighBoundary - 1,
                 "Dragging a horizontal boundary should proportionally widen and reposition every selected zone.");
     }
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 5,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 3,
             "One horizontal multi-zone drag should create one undo transaction.");
 
     const auto selectedBeforeVelocityDrag = selectedAfterKeyExpansion;
@@ -3137,7 +3137,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
         require(edited.velocityLow == original.velocityLow + 4,
                 "Dragging a velocity boundary should adjust every selected zone by the same amount.");
     }
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 6,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 4,
             "One multi-zone velocity drag should create one undo transaction.");
 
     require(zoneMap.keyPressed(juce::KeyPress(juce::KeyPress::rightKey)),
@@ -3156,8 +3156,8 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
                                            "Sample source: "
                                                + juce::String::fromUTF8(session.getSelectedZone()->sampleSourceId.c_str())),
             "Summary strip should refresh after keyboard-driven map selection changes.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 7,
-            "Map selections, multi-zone edits, and keyboard selection should each create one expected transaction.");
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 4,
+            "Map and keyboard selection must remain outside authored undo history.");
 
     const auto selectedZoneBeforeDrag = makeZoneSummary(*session.getSelectedZone());
     const auto keyLowHandle = computeZoneMapHandlePoint(zoneMap,
@@ -3174,7 +3174,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
             "Zone map should finish a key-range gesture on release.");
     require(!zoneMap.isRangeGestureActive(),
             "Zone map should clear its active gesture state after commit.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 8,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 5,
             "Completing one map range drag should create exactly one additional undo transaction.");
     require(session.getSelectedZone()->keyLow == 72,
             "Zone map key-range drags should persist the committed low-key boundary.");
@@ -3196,7 +3196,7 @@ void exerciseMapSelectionBehavior(drs::app::AuthoringPanel& panel,
             "Zone map should cancel an in-flight drag without committing.");
     require(!zoneMap.isRangeGestureActive(),
             "Zone map should clear its active gesture state after cancel.");
-    require(session.getDocumentState().undoDepth == initialUndoDepth + 8,
+    require(session.getDocumentState().undoDepth == initialUndoDepth + 5,
             "Cancelling a map range drag should not create a new undo transaction.");
     require(session.getSelectedZone()->velocityLow == zoneBeforeCancel.velocityLow,
             "Cancelling a map range drag should preserve the original velocity range.");

@@ -3,6 +3,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
 #include "shared/ProjectStorage.h"
+#include "shared/MessageThreadMetrics.h"
 #include "shared/SfzImportWorkflow.h"
 #include "shared/WorkspaceMenuPolicy.h"
 #include "shared/WavImportWorkflow.h"
@@ -1556,6 +1557,8 @@ void Editor::confirmSafeToDiscardChanges(const juce::String& nextAction,
 
 void Editor::timerCallback()
 {
+    const drs::app::ScopedMessageThreadSpan timing(
+        drs::app::MessageThreadSpanKind::editorTimerWork);
     processor.serviceMessageThreadWork();
     if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
         resized();

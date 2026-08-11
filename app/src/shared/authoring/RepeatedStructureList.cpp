@@ -207,6 +207,23 @@ void RepeatedStructureList::setViewModel(RepeatedStructureListViewModel nextView
     repaint();
 }
 
+void RepeatedStructureList::setSelectedIndex(int nextIndex)
+{
+    if (viewModel.rows.empty())
+        return;
+
+    const auto normalizedIndex = std::clamp(nextIndex, 0, static_cast<int>(viewModel.rows.size()) - 1);
+    if (viewModel.selectedIndex == normalizedIndex && listBox.getSelectedRow() == normalizedIndex)
+        return;
+
+    suppressSelectionCallback = true;
+    viewModel.selectedIndex = normalizedIndex;
+    listBox.selectRow(normalizedIndex, false, true);
+    listBox.scrollToEnsureRowIsOnscreen(normalizedIndex);
+    suppressSelectionCallback = false;
+    listBox.repaint();
+}
+
 void RepeatedStructureList::setOnSelectionChanged(RepeatedStructureSelectionCallback nextCallback)
 {
     onSelectionChanged = std::move(nextCallback);

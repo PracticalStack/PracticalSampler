@@ -486,7 +486,7 @@ void generateReferencePackageCorpus(const fs::path& outputRoot)
 
     indexRoot["fixtures"] = ordered_json::array({
         appendFixture("valid", corpusPaths.valid, "loaded", "none", ""),
-        appendFixture("truncated", corpusPaths.truncated, "load-failed", "payload-corruption", "exceeded the package file bounds"),
+        appendFixture("truncated", corpusPaths.truncated, "load-failed", "payload-corruption", "exceeded file bounds"),
         appendFixture("tampered", corpusPaths.tampered, "read-failed", "decryption-failure", "authentication failed"),
         appendFixture("wrong-version", corpusPaths.wrongVersion, "read-failed", "package-format-failure", "requires reader schema version"),
         appendFixture("missing-payload", corpusPaths.missingPayload, "load-failed", "payload-corruption", "runtimeStreamIndex payload"),

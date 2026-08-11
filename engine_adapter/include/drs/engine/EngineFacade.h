@@ -6,6 +6,7 @@
 #include "drs/engine/SampleDataSource.h"
 #include "drs/engine/SamplerRenderModel.h"
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/PlaybackSnapshotWorker.h"
 #include "drs/engine/PerformancePublishController.h"
 #include "drs/engine/PerformancePublishPresentation.h"
 #include "drs/engine/PublishedMacroBinding.h"
@@ -456,6 +457,10 @@ public:
     bool reopenDraftPlaybackProject(std::size_t revision,
                                     bool preservePublishedPerformance = false);
     bool replaceDraftPlaybackAuthoringProject(RuntimeProjectModel project);
+    std::shared_ptr<const RuntimeProjectModel> getDraftPlaybackAuthoringProjectPublication() const
+    {
+        return authoringProjectPublication;
+    }
     bool restorePerformancePublishProjectGeneration(std::uint64_t projectGeneration);
     std::uint64_t getPerformancePublishProjectGeneration() const noexcept
     {
@@ -498,8 +503,10 @@ private:
     bool enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
                                       const PlaybackSnapshotBuildResult& snapshotResult,
                                       PreparedPlaybackWorkLane lane,
-                                      bool bootstrapPerformance = false);
+                                      bool bootstrapPerformance = false,
+                                      std::string precomputedMacroSchemaDigest = {});
     bool enqueuePerformancePackagePreparedBuild(const PlaybackSnapshotBuildResult& snapshotResult);
+    bool pumpPlaybackSnapshotWorkerCompletions();
     bool pumpPreparedPlaybackWorkerCompletions();
     void markStateChanged();
     void clearPendingPreparedCompletions();
@@ -514,6 +521,7 @@ private:
     RuntimeManifestLoadResult referenceManifest;
     RuntimeStreamLoadResult referenceStream;
     RuntimeProjectLoadResult authoringProject;
+    std::shared_ptr<const RuntimeProjectModel> authoringProjectPublication;
     bool referenceInstrumentActive = false;
     PlaybackActivationPayloadPtr packagePerformanceActivationPayload;
     SamplerRenderModelPtr packagePerformanceRenderModel;
@@ -526,6 +534,7 @@ private:
     DraftPlaybackContract draftPlaybackContract;
     PerformancePublishController performancePublishController;
     PlaybackSnapshotBuilder playbackSnapshotBuilder;
+    PlaybackSnapshotWorker playbackSnapshotWorker;
     PreparedPlaybackService preparedPlaybackService;
     std::unordered_map<std::uint64_t, PendingPreparedCompletion> pendingPreparedCompletions;
     std::uint64_t stateRevision = 0;

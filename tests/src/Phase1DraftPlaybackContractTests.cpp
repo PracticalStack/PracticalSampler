@@ -466,6 +466,8 @@ int main()
                                                                           { importedZone },
                                                                           "Import migrated contract zone");
         require(migratedImport.applied, "Migrated project should accept imported authoring content for contract coverage.");
+        require(migratedSession.selectZone(importedZone.id).applied,
+                "Migrated contract coverage should explicitly select the imported transient zone.");
         require(migratedContract.setDraftRevision(migratedImport.documentState.revision),
                 "Migrated contract should accept the imported draft revision.");
 

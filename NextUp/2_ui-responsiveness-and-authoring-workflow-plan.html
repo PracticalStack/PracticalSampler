@@ -64,6 +64,16 @@
     }
     .phase h3 { margin-top: 0; }
     .label { color: var(--accent); font-weight: 700; }
+    .status {
+      margin: 0.75rem 0;
+      padding: 0.65rem 0.8rem;
+      border-radius: 6px;
+      background: #f2f1ec;
+      color: var(--muted);
+    }
+    .status strong { color: var(--ink); }
+    .status.in-progress { background: var(--warning-soft); color: var(--warning); }
+    .status.complete { background: var(--accent-soft); color: var(--accent); }
     footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); }
   </style>
 </head>
@@ -76,6 +86,10 @@
 
     <section class="summary">
       <strong>Working diagnosis:</strong> the remaining problems are message-thread bottlenecks, not failures in the streaming or audio-rendering path. Host MIDI, playable-package export, and playable-package import are already performing well and must remain protected throughout this work.
+    </section>
+
+    <section class="status in-progress">
+      <strong>Overall status:</strong> Implementation complete. All five phases are complete and individually validated; final cross-phase qualification started 2026-08-11.
     </section>
 
     <section>
@@ -105,16 +119,20 @@
 
       <article class="phase">
         <h3>Phase 1 — Measure the message thread</h3>
+        <p class="status complete"><strong>Status:</strong> Complete and validated 2026-08-11.</p>
         <p><span class="label">Purpose:</span> confirm the cost and frequency of each suspected operation before changing ownership or scheduling.</p>
         <ul>
           <li>Add low-overhead timing around keyboard callbacks, editor timer work, Performance refresh, zone selection, Authoring refresh, host-state serialization, preview dispatch, and publish dispatch.</li>
           <li>Report only slow spans above a small threshold so instrumentation does not create a new bottleneck.</li>
           <li>Capture baseline results with the large Salamander instrument and a playable package.</li>
         </ul>
+        <p><span class="label">Implementation:</span> Added fixed-cost, allocation-free span recording for keyboard callbacks, editor timer work, Performance refresh, zone selection, Authoring refresh, host-state serialization, preview dispatch, and publish dispatch. Diagnostics reports only spans at or above the 1 ms threshold. Added deterministic coverage and a real-fixture baseline executable.</p>
+        <p><span class="label">Validation:</span> <code>drs.ui.message_thread_metrics</code> passed; Debug plug-in and standalone shells compiled; <code>drs.ui.responsiveness_baseline</code> passed against the licensed 1,700-zone/637-source Salamander project and checked-in valid playable package. Baseline: zone selection 263.618 ms, maximum Authoring refresh 216.392 ms, host-state serialization 2,010.112 ms, preview dispatch 2,455.729 ms, publish dispatch 824.378 ms, playable-package Performance refresh 3.516 ms, and combined note-on/off callbacks 0.175 ms (below the reporting threshold). Artifact: <code>build/vs2022-debug/tests/ui-responsiveness-baseline.json</code>.</p>
       </article>
 
       <article class="phase">
         <h3>Phase 2 — Restore Performance-tab responsiveness</h3>
+        <p class="status complete"><strong>Status:</strong> Complete and validated 2026-08-11.</p>
         <p><span class="label">Purpose:</span> remove synchronous presentation work from the UI note path.</p>
         <ul>
           <li>Make Performance keyboard note-on and note-off callbacks queue-only.</li>
@@ -123,10 +141,13 @@
           <li>Refresh only when relevant publication or presentation revisions change.</li>
           <li>Update control values without rebuilding the control layout when its structure is unchanged.</li>
         </ul>
+        <p><span class="label">Implementation:</span> Performance note callbacks now only normalize and enqueue note events. Shell and component timers use engine-state and publication-sequence revisions, with one initial reconciliation, instead of unconditional Performance and Diagnostics rebuilds. Published mixer value changes preserve lane identity and layout.</p>
+        <p><span class="label">Validation:</span> <code>drs.ui.performance_responsiveness</code>, <code>drs.performance_mixer.ui</code>, <code>drs.phase2.performance_ui</code>, <code>drs.phase1.performance_package_host_validation</code>, <code>drs.phase1.realtime_safety</code>, and <code>drs.ui.responsiveness_baseline</code> passed in Debug. On the real fixture baseline, an unchanged Performance refresh fell from 3.516 ms to below the report's 1 µs resolution; combined note-on/off callbacks measured 0.088 ms with zero callbacks at or above 1 ms; the queued note rendered on the next 512-sample block with peak 0.34669. The plug-in and standalone shells compiled successfully.</p>
       </article>
 
       <article class="phase">
         <h3>Phase 3 — Make authoring selection lightweight</h3>
+        <p class="status complete"><strong>Status:</strong> Complete and validated 2026-08-11.</p>
         <p><span class="label">Purpose:</span> prevent navigation from behaving like a complete project edit.</p>
         <ul>
           <li>Move selected zone and selected group into transient workspace-selection state.</li>
@@ -134,10 +155,13 @@
           <li>Create a selection-only presentation refresh for the inspector, summary, waveform request, and map highlight.</li>
           <li>Reserve full list and zone-map reconstruction for actual structural project changes.</li>
         </ul>
+        <p><span class="label">Implementation:</span> Zone and group focus now live in a transient workspace-selection state with an independent revision. Selection actions acknowledge navigation without committing project snapshots, changing dirty/history metadata, or mutating the persisted manifest fields. Authoring timers reconcile document and selection revisions independently; zone/group navigation updates only selector/list focus, inspector and summary models, waveform state, drawer context, and the existing map highlight. Full list and zone-map data reconstruction remains on the authored-document path.</p>
+        <p><span class="label">Validation:</span> <code>drs.phase2.authoring_foundation</code>, <code>drs.phase2.mapping_workspace</code>, <code>drs.phase2.zone_group_transactions</code>, <code>drs.sprint8.zone_group_hardening</code>, <code>drs.phase2.authoring_ui</code>, and <code>drs.ui.responsiveness_baseline</code> passed in Debug. The real 1,700-zone Salamander selection measured 7.539 ms, below one 60 Hz frame, with document revision delta 0, undo-depth delta 0, no dirty-state change, no persisted selection-field change, no full Authoring refresh, and no host-state serialization. Artifact: <code>build/vs2022-debug/tests/ui-responsiveness-baseline.json</code>.</p>
       </article>
 
       <article class="phase">
         <h3>Phase 4 — Make Preview, Prepare, and Publish asynchronous</h3>
+        <p class="status complete"><strong>Status:</strong> Complete and validated 2026-08-11.</p>
         <p><span class="label">Purpose:</span> ensure commands return immediately while preparation continues in the background.</p>
         <ul>
           <li>Remove message-thread polling and sleep loops from authoring audition.</li>
@@ -146,10 +170,13 @@
           <li>Expose clear queued, preparing, ready, active, canceled, and failed states in the UI.</li>
           <li>Guarantee that rapid selection or repeated commands activate only the newest eligible request.</li>
         </ul>
+        <p><span class="label">Implementation:</span> Authoring audition no longer services the message loop, polls, or sleeps inside the command handler. Scoped note events remain pending until the exact requested Preview identity is active; an early note-off is retained and emitted after a bounded audible interval, and project/package lifecycle resets discard pending audition state. A bounded playback-snapshot worker now owns immutable project input and performs snapshot construction, content and macro digests, validation, scoping, and Publish macro preflight. Preview and Publish requests queue immediately, coalesce queued work by lane, prioritize Publish work, cancel superseded queued work, and reject stale completions by contract request identity. Existing typed controllers and presentations continue to expose queued, preparing, ready, active, canceled, superseded, and failed states. Exact active Publish duplicates remain no-op requests.</p>
+        <p><span class="label">Validation:</span> All ten <code>drs.sprint5.*</code> Preview tests and all eleven <code>drs.sprint6.*</code> Publish tests passed in Debug, including rapid coalescing, cancellation/recovery, scoped preparation, pending audition, shell parity, editor/project closure, last-known-good activation, macro preflight, scheduler pressure, and integration hardening. <code>drs.ui.responsiveness_baseline</code> passed with the real 1,700-zone Salamander fixture: Preview dispatch measured 0.130 ms and Publish dispatch 0.133 ms, each enforced below the 16.667 ms frame budget; neither produced a slow-span observation at the 1 ms diagnostic threshold. The newest scoped request alone reached activation during churn, stale same-revision scoped payloads were rejected, and the tested audio/streaming paths reported no dropped events, callback-budget failures, or real-time guard violations. Artifact: <code>build/vs2022-debug/tests/ui-responsiveness-baseline.json</code>.</p>
       </article>
 
       <article class="phase">
         <h3>Phase 5 — Decouple host-state publication</h3>
+        <p class="status complete"><strong>Status:</strong> Complete and validated 2026-08-11.</p>
         <p><span class="label">Purpose:</span> keep full-project serialization out of interactive authoring operations.</p>
         <ul>
           <li>Publish immutable project checkpoints to a background serializer.</li>
@@ -157,6 +184,8 @@
           <li>Atomically replace the last completed serialized state.</li>
           <li>Coalesce intermediate content revisions while preserving the newest valid state.</li>
         </ul>
+        <p><span class="label">Implementation:</span> Added a processor-owned host-state publication worker that receives immutable authored-project checkpoints plus small preset, binding, revision, dirty-state, published-checkpoint, or playable-package metadata. Manifest digest computation and JSON serialization now run exclusively on the worker. Submission retains one active request and one newest pending request; its completion mailbox retains at most the newest success and newest failure. The processor atomically replaces the last completed serialized state by monotonic request identity, never replaces it with a failed or stale completion, and leaves <code>getStateInformation</code> as an immediate copy of the last-known-good publication. Project, package, and preset-only publication share the same service, and worker shutdown joins safely. Prepared-playback content identity was also made deterministic across processor instances by excluding runtime ownership tokens, build IDs, and data-source generations from the persisted digest while retaining them in diagnostic serialization.</p>
+        <p><span class="label">Validation:</span> <code>drs.host_state.background_publication</code> passed a 101-revision burst with at least 99 queued checkpoints coalesced, one pending request maximum, a one-result newest-success mailbox, exact revision 101/project round-trip, ten additional undrained sequential publications without mailbox growth, and safe active-worker destruction. <code>drs.host_state.project_recall</code>, <code>drs.phase1.state_recall</code>, <code>drs.phase1.macro_bridge</code>, the full five-test <code>drs.phase1.performance_package*</code> suite, <code>drs.performance_package.export_lifecycle</code>, mixer host-state round-trip, WAV lifecycle I/O audit, restore stress, streaming reader/service, Sprint 4 real-time guard, Phase 1 real-time safety, republish-churn real-time, and Performance responsiveness all passed in Debug. A 10-cycle WAV editor/import/close/reopen/restore/unload stress run passed. On the real 1,700-zone Salamander fixture, <code>drs.ui.responsiveness_baseline</code> passed with background host-state serialization taking 2,437.774 ms while concurrent zone interaction took 0.078 ms; the message-thread host-state span remained below the 1 ms reporting threshold, the completed chunk round-tripped all 1,700 zones, and Preview/Publish dispatch remained below one frame. Artifact: <code>build/vs2022-debug/tests/ui-responsiveness-baseline.json</code>.</p>
       </article>
     </section>
 
@@ -189,7 +218,7 @@
     </section>
 
     <footer>
-      <p>Status: proposed high-level plan. Detailed implementation tasks and test cases should be recorded as each phase begins.</p>
+      <p>Status: all five implementation phases complete and individually validated; final cross-phase qualification is in progress.</p>
     </footer>
   </main>
 </body>

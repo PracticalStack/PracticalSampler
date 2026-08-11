@@ -412,15 +412,19 @@ int main()
 
         drs::engine::AuthoringSession checkpointSourceSession(phase2Project.project);
         require(checkpointSourceSession.selectZone("pad-a3-high").applied,
-                "AuthoringSession checkpoint source must commit a distinct selection.");
+                "AuthoringSession checkpoint source must accept a distinct workspace selection.");
         checkpointSourceSession.markSaved();
         require(checkpointSourceSession.selectZone("lead-a4-sustain").applied,
-                "AuthoringSession checkpoint source must commit a dirty post-save selection.");
+                "AuthoringSession checkpoint source must accept a post-save workspace selection.");
         const auto sessionCheckpoint = checkpointSourceSession.exportCheckpoint();
-        require(sessionCheckpoint.revision == 2
-                    && sessionCheckpoint.savedRevision == 1
-                    && sessionCheckpoint.dirty,
-                "AuthoringSession export must forward exact document checkpoint metadata.");
+        require(sessionCheckpoint.revision == 0
+                    && sessionCheckpoint.savedRevision == 0
+                    && !sessionCheckpoint.dirty
+                    && sessionCheckpoint.project.authoring.selectedZoneId
+                        == phase2Project.project.authoring.selectedZoneId
+                    && checkpointSourceSession.getSelectedZone().has_value()
+                    && checkpointSourceSession.getSelectedZone()->id == "lead-a4-sustain",
+                "Workspace selection must remain transient and absent from document checkpoint metadata.");
 
         drs::engine::AuthoringSession checkpointDestinationSession(blankProject);
         const auto sessionRestore = checkpointDestinationSession.restoreCheckpoint(sessionCheckpoint);
@@ -429,11 +433,11 @@ int main()
         require(checkpointDestinationSession.getProject().projectId
                     == checkpointSourceSession.getProject().projectId
                     && checkpointDestinationSession.getProject().authoring.selectedZoneId
-                        == "lead-a4-sustain",
-                "AuthoringSession checkpoint restore must replace the full project and selection.");
-        require(checkpointDestinationSession.getDocumentState().revision == 2
-                    && checkpointDestinationSession.getDocumentState().savedRevision == 1
-                    && checkpointDestinationSession.getDocumentState().dirty
+                        == phase2Project.project.authoring.selectedZoneId,
+                "AuthoringSession checkpoint restore must replace the authored project without persisting workspace selection.");
+        require(checkpointDestinationSession.getDocumentState().revision == 0
+                    && checkpointDestinationSession.getDocumentState().savedRevision == 0
+                    && !checkpointDestinationSession.getDocumentState().dirty
                     && checkpointDestinationSession.getDocumentState().undoDepth == 0
                     && checkpointDestinationSession.getDocumentState().redoDepth == 0,
                 "AuthoringSession checkpoint restore must preserve metadata and reset history.");

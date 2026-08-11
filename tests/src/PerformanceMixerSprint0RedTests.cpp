@@ -12,6 +12,7 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -148,16 +149,32 @@ std::shared_ptr<const PerformancePublishPresentationSnapshot> waitForPublishSett
     drs::plugin::Processor& processor,
     const std::size_t revision)
 {
+    const auto expectedProjectGeneration
+        = processor.getEngineFacade().getPerformancePublishProjectGeneration();
+    std::optional<PerformancePublishRequestIdentity> requestedIdentity;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
     while (std::chrono::steady_clock::now() < deadline)
     {
         crossBoundary(processor);
         const auto presentation = processor.getPerformancePublishPresentationSnapshot();
+        const auto controller = processor.getPerformancePublishControllerSnapshot();
+        if (controller.hasRequest
+            && controller.currentRequest.identity.projectGeneration == expectedProjectGeneration
+            && controller.currentRequest.identity.draftRevision == revision)
+        {
+            requestedIdentity = controller.currentRequest.identity;
+        }
+        const auto matchingActive = requestedIdentity.has_value()
+            && controller.hasActiveRequest
+            && controller.activeRequestIdentity == *requestedIdentity;
+        const auto matchingFailure = requestedIdentity.has_value()
+            && controller.hasFailedRequest
+            && controller.failedRequestIdentity == *requestedIdentity;
         if (presentation != nullptr
-            && (presentation->state == PerformancePublishPresentationState::active
-                || presentation->state == PerformancePublishPresentationState::failed)
-            && (presentation->activePublishedRevision == revision
-                || presentation->failedRevision == revision))
+            && ((presentation->state == PerformancePublishPresentationState::active
+                    && matchingActive)
+                || (presentation->state == PerformancePublishPresentationState::failed
+                    && matchingFailure)))
         {
             return presentation;
         }
@@ -255,9 +272,9 @@ void requireOverflowFinding(const std::size_t authoredCount,
     requireFixedTopology(processor);
 
     const auto revision = processor.getAuthoringSession().getDocumentState().revision;
-    require(!processor.submitPerformancePublishCommand(
+    require(processor.submitPerformancePublishCommand(
                 {}, PerformancePublishCommandSource::externalApi),
-            "The overflow fixture must be rejected before worker preparation.");
+            "The overflow fixture must queue for background preflight.");
     const auto presentation = waitForPublishSettlement(processor, revision);
     require(presentation != nullptr
                 && presentation->state == PerformancePublishPresentationState::failed
@@ -278,9 +295,9 @@ void requireInvalidDspTargetFinding()
     require(processor.replaceAuthoringProject(project),
             "The invalid-target fixture must be accepted as a draft before preflight.");
     const auto revision = processor.getAuthoringSession().getDocumentState().revision;
-    require(!processor.submitPerformancePublishCommand(
+    require(processor.submitPerformancePublishCommand(
                 {}, PerformancePublishCommandSource::externalApi),
-            "A missing DSP control must be rejected before worker preparation.");
+            "A missing DSP control must queue for background preflight.");
     const auto presentation = waitForPublishSettlement(processor, revision);
     require(presentation != nullptr
                 && presentation->state == PerformancePublishPresentationState::failed
@@ -308,9 +325,9 @@ void requireFailureThenSuccessfulRecovery()
     require(processor.replaceAuthoringProject(rejectedProject),
             "The over-capacity replacement must load as a draft.");
     const auto rejectedRevision = processor.getAuthoringSession().getDocumentState().revision;
-    require(!processor.submitPerformancePublishCommand(
+    require(processor.submitPerformancePublishCommand(
                 {}, PerformancePublishCommandSource::externalApi),
-            "The over-capacity replacement must reject before preparation.");
+            "The over-capacity replacement must queue for background preflight.");
     const auto rejected = waitForPublishSettlement(processor, rejectedRevision);
     require(rejected != nullptr && rejected->state == PerformancePublishPresentationState::failed
                 && rejected->findingCode == "published-macro-exposed-capacity-exceeded"
@@ -381,9 +398,9 @@ void requireShellDiagnosticParity()
         processor.prepareToPlay(48000.0, 256);
         require(processor.replaceAuthoringProject(project), "The thirteen-control fixture must load as a draft.");
         const auto revision = processor.getAuthoringSession().getDocumentState().revision;
-        require(!processor.submitPerformancePublishCommand(
+        require(processor.submitPerformancePublishCommand(
                     {}, PerformancePublishCommandSource::externalApi),
-                "The thirteen-control fixture must reject before worker preparation.");
+                "The thirteen-control fixture must queue for background preflight.");
         const auto presentation = waitForPublishSettlement(processor, revision);
         const auto controller = processor.getPerformancePublishControllerSnapshot();
         require(presentation != nullptr
@@ -493,7 +510,12 @@ void requirePublishedPresentationRename()
                 && renamedBell->hostParameterId == firstHostId
                 && renamedBell->presentation.sectionLabel == "Bell Pad"
                 && std::abs(renamedBell->publishedValue - 0.23) < 0.001,
-            "A source rename must update only the next published presentation snapshot while preserving host identity and value.");
+            "A source rename must update only the next published presentation snapshot while preserving host identity and value"
+                " (host=" + (renamedBell != renamedBindings->bindings.end() ? renamedBell->hostParameterId : "missing")
+                + ", section=" + (renamedBell != renamedBindings->bindings.end()
+                                      ? renamedBell->presentation.sectionLabel : "missing")
+                + ", value=" + (renamedBell != renamedBindings->bindings.end()
+                                    ? std::to_string(renamedBell->publishedValue) : "missing") + ").");
 }
 
 void requireHostStateRoundTrip()
@@ -514,6 +536,8 @@ void requireHostStateRoundTrip()
     dspSource.serviceMessageThreadWork();
 
     juce::MemoryBlock dspState;
+    require(dspSource.waitForHostStatePublication(),
+            "The DSP mixer checkpoint did not reach the background host-state publication.");
     dspSource.getStateInformation(dspState);
     const auto parsedDspState = parseHostSessionState(std::string(
         static_cast<const char*>(dspState.getData()), dspState.getSize()));
@@ -542,6 +566,8 @@ void requireHostStateRoundTrip()
     source.serviceMessageThreadWork();
 
     juce::MemoryBlock state;
+    require(source.waitForHostStatePublication(),
+            "The active mixer checkpoint did not reach the background host-state publication.");
     source.getStateInformation(state);
     require(state.getSize() > 0, "An active published mixer must produce host state.");
 
@@ -572,6 +598,8 @@ void requireHostStateRoundTrip()
     crossBoundary(twelveSource);
     twelveSource.serviceMessageThreadWork();
     juce::MemoryBlock twelveState;
+    require(twelveSource.waitForHostStatePublication(),
+            "The twelve-control checkpoint did not reach the background host-state publication.");
     twelveSource.getStateInformation(twelveState);
     const auto parsedTwelveState = parseHostSessionState(std::string(
         static_cast<const char*>(twelveState.getData()), twelveState.getSize()));

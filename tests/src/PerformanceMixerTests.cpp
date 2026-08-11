@@ -107,6 +107,15 @@ int main()
         });
         mixer.setSize(1000, 330);
         mixer.setControls(makeControls(3));
+        auto* stableLane = findDescendantById(mixer, "performanceMixerControl.authored-2");
+        const auto stableLayout = mixer.getLayoutSnapshot();
+        auto updatedControls = makeControls(3);
+        updatedControls[2].value = 0.81;
+        mixer.setControls(std::move(updatedControls));
+        require(findDescendantById(mixer, "performanceMixerControl.authored-2") == stableLane
+                    && mixer.getLayoutSnapshot().columnCount == stableLayout.columnCount
+                    && mixer.getLayoutSnapshot().rowCount == stableLayout.rowCount,
+                "Value-only mixer updates must preserve lanes and layout.");
         require(findDescendantById(mixer, "performanceMixerValueLabel.authored-0")
                     ->getDescription().contains("0.0 dB"),
                 "Mixer faders must format their published normalized value through the shared mixer law.");

@@ -1,4 +1,5 @@
 #include "shared/PerformancePanel.h"
+#include "shared/MessageThreadMetrics.h"
 
 #include <algorithm>
 #include <cmath>
@@ -323,7 +324,18 @@ void PerformancePanel::resized()
 
 void PerformancePanel::refreshNow()
 {
-    refreshSurface();
+    const auto publishPresentation = publishPresentationProvider
+        ? publishPresentationProvider()
+        : engineFacade.getPerformancePublishPresentationSnapshot();
+    const auto publicationSequence = publishPresentation != nullptr
+        ? publishPresentation->publicationSequence : std::uint64_t { 0 };
+    if (initialRevisionCheckPending
+        || lastObservedStateRevision != engineFacade.getStateRevision()
+        || lastObservedPublicationSequence != publicationSequence)
+    {
+        refreshSurface();
+        initialRevisionCheckPending = false;
+    }
     diagnosticsPanel.refreshNow();
 }
 
@@ -335,22 +347,22 @@ void PerformancePanel::refreshArtworkNow()
 
 void PerformancePanel::timerCallback()
 {
-    if (lastObservedStateRevision != engineFacade.getStateRevision())
-        refreshSurface();
+    refreshNow();
 }
 
 void PerformancePanel::handleNoteOn(juce::MidiKeyboardState*, int, int midiNoteNumber, float velocity)
 {
+    const ScopedMessageThreadSpan timing(MessageThreadSpanKind::performanceKeyboardCallback);
     const auto clampedVelocity = std::clamp(static_cast<int>(std::round(velocity * 127.0f)), 1, 127);
 
     if (onPerformanceNoteOn)
         onPerformanceNoteOn(midiNoteNumber,
                             static_cast<float>(clampedVelocity) / 127.0f);
-    refreshSurface();
 }
 
 void PerformancePanel::handleNoteOff(juce::MidiKeyboardState*, int, int midiNoteNumber, float)
 {
+    const ScopedMessageThreadSpan timing(MessageThreadSpanKind::performanceKeyboardCallback);
     if (onPerformanceNoteOff)
         onPerformanceNoteOff(midiNoteNumber);
 }
@@ -464,6 +476,7 @@ void PerformancePanel::refreshArtwork()
 
 void PerformancePanel::refreshSurface()
 {
+    const ScopedMessageThreadSpan timing(MessageThreadSpanKind::performanceRefresh);
     performanceSnapshot = engineFacade.getPerformanceSnapshot();
     lastObservedStateRevision = engineFacade.getStateRevision();
     const auto allMacros = engineFacade.getMacroDescriptors();
@@ -471,6 +484,8 @@ void PerformancePanel::refreshSurface()
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
+    lastObservedPublicationSequence = publishPresentation != nullptr
+        ? publishPresentation->publicationSequence : std::uint64_t { 0 };
     refreshArtwork();
 
     hiddenPublishedMacroCount = macroSurface.hiddenPublishedMacroCount;

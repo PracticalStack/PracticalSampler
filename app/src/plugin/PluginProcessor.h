@@ -4,6 +4,7 @@
 #include "drs/engine/AuthoringPreviewCommandAdapter.h"
 #include "drs/engine/AuthoringPreviewController.h"
 #include "drs/engine/EngineFacade.h"
+#include "drs/engine/HostStatePublicationService.h"
 #include "drs/engine/HostSessionState.h"
 #include "drs/engine/PerformancePackage.h"
 #include "drs/engine/PerformancePublishCommandAdapter.h"
@@ -207,6 +208,11 @@ public:
 
     void getStateInformation(juce::MemoryBlock&) override;
     void setStateInformation(const void*, int) override;
+    drs::engine::HostStatePublicationServiceStatus getHostStatePublicationStatus() const
+    {
+        return hostStatePublicationService.getStatus();
+    }
+    bool waitForHostStatePublication(std::uint64_t timeoutMilliseconds = 10000);
 
     drs::engine::EngineFacade& getEngineFacade() { return engineFacade; }
     const drs::engine::EngineFacade& getEngineFacade() const { return engineFacade; }
@@ -395,6 +401,7 @@ private:
     void clearAuthoringWaveformPreviewCache();
     void initializeAuthoringImportMetrics();
     void initializeAuthoringSourceValidationSnapshot();
+    void clearPendingAuthoringPreviewAudition() noexcept;
     std::optional<drs::engine::HostProjectBinding> buildValidatedAuthoringProjectBinding(
         const juce::File& resolvedProjectFile,
         const drs::engine::RuntimeProjectModel& project) const;
@@ -411,6 +418,7 @@ private:
         const drs::engine::ProjectRestoreSnapshot& restore);
     bool serviceProjectRestore();
     void refreshSerializedHostStatePublication(bool force = false);
+    bool pumpSerializedHostStateCompletions();
     std::string buildHostStatePublicationKey() const;
     void setPendingRestoreAudioPolicy(bool pending) noexcept;
     void supersedeFailedProjectRestoreForManualAction();
@@ -541,6 +549,17 @@ private:
     };
     RealtimeNoteEventQueue authoringPreviewNoteQueue;
     RealtimeNoteEventQueue performanceSurfaceNoteQueue;
+    struct PendingAuthoringPreviewAudition
+    {
+        QueuedRealtimeNoteEvent event;
+        drs::engine::AuthoringPreviewScope scope = drs::engine::AuthoringPreviewScope::selectedZone;
+        std::string selectedZoneId;
+        std::string selectedGroupId;
+        bool releaseRequested = false;
+    };
+    std::optional<PendingAuthoringPreviewAudition> pendingAuthoringPreviewAudition;
+    std::optional<QueuedRealtimeNoteEvent> deferredAuthoringPreviewRelease;
+    std::uint64_t deferredAuthoringPreviewReleaseAtMicros = 0;
     juce::AudioProcessorValueTreeState parameterState;
     std::vector<juce::String> hostMacroParameterIds;
     std::vector<std::string> hostMacroStableIds;
@@ -561,9 +580,13 @@ private:
     drs::app::PerformancePackageExportService performancePackageExportService;
     drs::app::ProjectSourceValidationService projectSourceValidationService;
     drs::app::WaveformPreviewService waveformPreviewService;
+    drs::engine::HostStatePublicationService hostStatePublicationService;
     std::shared_ptr<const std::string> serializedHostStatePublication;
     std::shared_ptr<const std::string> latestSubmittedHostState;
     std::string hostStatePublicationKey;
+    std::string hostStateSubmittedKey;
+    std::uint64_t nextHostStatePublicationRequestId = 1;
+    std::uint64_t lastAppliedHostStatePublicationRequestId = 0;
     std::uint64_t handledRestoreGeneration = 0;
     std::uint64_t awaitingRestoreActivationGeneration = 0;
     std::optional<drs::engine::HostPublishedCheckpoint> expectedRestoredPublishedState;

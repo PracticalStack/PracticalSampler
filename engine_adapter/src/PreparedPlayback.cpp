@@ -177,22 +177,25 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         root["macroSchemaDigest"] = prepared.macroSchemaDigest;
     }
 
-    ordered_json ownershipRecords = ordered_json::array();
-    for (const auto& ownership : prepared.ownershipRecords)
+    if (includeDigest)
     {
-        ordered_json ownershipObject;
-        ownershipObject["ownershipToken"] = ownership.ownershipToken;
-        ownershipObject["retirementToken"] = ownership.retirementToken;
-        ownershipObject["cacheKey"] = ownership.cacheKey;
-        ownershipObject["sampleSourceId"] = ownership.sampleSourceId;
-        ownershipObject["streamSampleId"] = ownership.streamSampleId;
-        ownershipObject["lifetimeState"] = ownership.lifetimeState;
-        ownershipObject["retainedBytes"] = ownership.retainedBytes;
-        ownershipObject["preparedBuildId"] = ownership.preparedBuildId;
-        ownershipObject["retiredByBuildId"] = ownership.retiredByBuildId;
-        ownershipRecords.push_back(std::move(ownershipObject));
+        ordered_json ownershipRecords = ordered_json::array();
+        for (const auto& ownership : prepared.ownershipRecords)
+        {
+            ordered_json ownershipObject;
+            ownershipObject["ownershipToken"] = ownership.ownershipToken;
+            ownershipObject["retirementToken"] = ownership.retirementToken;
+            ownershipObject["cacheKey"] = ownership.cacheKey;
+            ownershipObject["sampleSourceId"] = ownership.sampleSourceId;
+            ownershipObject["streamSampleId"] = ownership.streamSampleId;
+            ownershipObject["lifetimeState"] = ownership.lifetimeState;
+            ownershipObject["retainedBytes"] = ownership.retainedBytes;
+            ownershipObject["preparedBuildId"] = ownership.preparedBuildId;
+            ownershipObject["retiredByBuildId"] = ownership.retiredByBuildId;
+            ownershipRecords.push_back(std::move(ownershipObject));
+        }
+        root["ownershipRecords"] = std::move(ownershipRecords);
     }
-    root["ownershipRecords"] = std::move(ownershipRecords);
 
     ordered_json samples = ordered_json::array();
     for (const auto& sample : prepared.samples)
@@ -215,14 +218,18 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         sampleObject["loopRangePresent"] = sample.loopRangePresent;
         sampleObject["loopStartFrame"] = sample.loopStartFrame;
         sampleObject["loopEndFrame"] = sample.loopEndFrame;
-        sampleObject["ownershipToken"] = sample.ownershipToken;
         sampleObject["cacheKey"] = sample.cacheKey;
-        sampleObject["ownershipRecordIndex"] = sample.ownershipRecordIndex;
+        if (includeDigest)
+        {
+            sampleObject["ownershipToken"] = sample.ownershipToken;
+            sampleObject["ownershipRecordIndex"] = sample.ownershipRecordIndex;
+        }
         if (sample.dataSource != nullptr)
         {
             const auto& descriptor = sample.dataSource->descriptor();
             sampleObject["dataSourceKind"] = static_cast<int>(descriptor.kind);
-            sampleObject["dataSourceGeneration"] = descriptor.generation;
+            if (includeDigest)
+                sampleObject["dataSourceGeneration"] = descriptor.generation;
             sampleObject["dataSourceCanonicalIdentity"] = descriptor.canonicalSourceIdentity;
             sampleObject["dataSourceProvenanceIdentity"] = descriptor.provenanceIdentity;
             sampleObject["dataSourceHeadSizeBytes"] = descriptor.headSizeBytes;
@@ -256,9 +263,12 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         streamObject["firstPageOffsetBytes"] = streamHandle.firstPageOffsetBytes;
         streamObject["lastPageOffsetBytes"] = streamHandle.lastPageOffsetBytes;
         streamObject["lastPageSizeBytes"] = streamHandle.lastPageSizeBytes;
-        streamObject["ownershipToken"] = streamHandle.ownershipToken;
         streamObject["cacheKey"] = streamHandle.cacheKey;
-        streamObject["ownershipRecordIndex"] = streamHandle.ownershipRecordIndex;
+        if (includeDigest)
+        {
+            streamObject["ownershipToken"] = streamHandle.ownershipToken;
+            streamObject["ownershipRecordIndex"] = streamHandle.ownershipRecordIndex;
+        }
 
         ordered_json pages = ordered_json::array();
         for (const auto& page : streamHandle.pages)
@@ -1860,6 +1870,13 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild
                                                         stepResult.result.requestToReadyMicros);
         if (stepResult.result.requestToReadyMicros > schedulerBudgets.maximumRequestToReadyMicros)
             ++workerStatus.requestToReadyBudgetViolationCount;
+        const auto retainedAtCompletion = workerStatus.retiredBytesAwaitingCleanup
+            + std::max(workerStatus.activeOwnershipBytes,
+                       stepResult.result.metrics.preparedBytes);
+        workerStatus.maxObservedRetainedPreparedBytes = std::max(
+            workerStatus.maxObservedRetainedPreparedBytes, retainedAtCompletion);
+        if (retainedAtCompletion > schedulerBudgets.maximumRetainedPreparedBytes)
+            ++workerStatus.retainedPreparedBytesBudgetViolationCount;
         workerStatus.lastEvent = stepResult.result.state;
         workerStatus.inFlightWorkCount = 0;
         workerStatus.inFlightBuildId = 0;
@@ -2096,6 +2113,13 @@ void PreparedPlaybackService::runBackgroundWorker()
                                                             stepResult.result.requestToReadyMicros);
             if (stepResult.result.requestToReadyMicros > schedulerBudgets.maximumRequestToReadyMicros)
                 ++workerStatus.requestToReadyBudgetViolationCount;
+            const auto retainedAtCompletion = workerStatus.retiredBytesAwaitingCleanup
+                + std::max(workerStatus.activeOwnershipBytes,
+                           stepResult.result.metrics.preparedBytes);
+            workerStatus.maxObservedRetainedPreparedBytes = std::max(
+                workerStatus.maxObservedRetainedPreparedBytes, retainedAtCompletion);
+            if (retainedAtCompletion > schedulerBudgets.maximumRetainedPreparedBytes)
+                ++workerStatus.retainedPreparedBytesBudgetViolationCount;
             workerStatus.inFlightWorkCount = 0;
             workerStatus.inFlightBuildId = 0;
             workerStatus.lastEvent = stepResult.result.state;

@@ -169,6 +169,8 @@ int main()
         const auto standaloneRestore = standaloneSource.restoreStateJson(leadPresetJson);
         require(standaloneRestore.restored, "Standalone shell must restore the lead/performance preset fixture.");
         serviceRestore(standaloneSource.getProcessor(), "Standalone legacy restore");
+        require(standaloneSource.getProcessor().waitForHostStatePublication(),
+                "Standalone legacy state did not reach background host-state publication.");
 
         const auto exportedStandaloneState = standaloneSource.exportStateJson();
         const auto parsedStandaloneState = drs::engine::parseHostSessionState(exportedStandaloneState);
@@ -200,6 +202,8 @@ int main()
                                             "Plugin processor source state");
 
         juce::MemoryBlock processorState;
+        require(sourceProcessor.waitForHostStatePublication(),
+                "Plugin legacy state did not reach the background host-state publication.");
         sourceProcessor.getStateInformation(processorState);
         const auto processorStateText = std::string(
             static_cast<const char*>(processorState.getData()), processorState.getSize());

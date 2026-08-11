@@ -166,6 +166,8 @@ int main()
                 "The lifecycle IO audit source must select a non-default zone.");
         sourceProcessor.serviceMessageThreadWork();
         juce::MemoryBlock dirtyState;
+        require(sourceProcessor.waitForHostStatePublication(),
+                "The lifecycle IO audit checkpoint did not reach background host-state publication.");
         sourceProcessor.getStateInformation(dirtyState);
         require(dirtyState.getSize() > 0,
                 "The lifecycle IO audit source must produce a host-state chunk.");

@@ -277,7 +277,15 @@ int main()
                     && pressureStatus.retainedPreparedBytesBudgetViolationCount > 0
                     && pressureStatus.requestToReadyBudgetViolationCount > 0
                     && pressureStatus.messageThreadServiceBudgetViolationCount == 1,
-                "Scheduler support budgets must be explicit, measured, and enforceable in tests.");
+                "Scheduler support budgets must be explicit, measured, and enforceable in tests: built="
+                    + std::to_string(pressureResult.result.built)
+                    + " retained=" + std::to_string(pressureStatus.maxObservedRetainedPreparedBytes)
+                    + " retainedViolations="
+                    + std::to_string(pressureStatus.retainedPreparedBytesBudgetViolationCount)
+                    + " readyViolations="
+                    + std::to_string(pressureStatus.requestToReadyBudgetViolationCount)
+                    + " serviceViolations="
+                    + std::to_string(pressureStatus.messageThreadServiceBudgetViolationCount));
 
         PerformancePublishController controller({ 8 });
         const auto initial = controller.request(7, 1, "authored:1", "macros:1", 10);

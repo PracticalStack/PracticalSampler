@@ -139,6 +139,7 @@ target_sources(drs_phase1_draft_playback_facade_tests
 target_link_libraries(drs_phase1_draft_playback_facade_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -1116,7 +1117,7 @@ target_sources(drs_sprint5_preview_coalescing_tests
 
 target_link_libraries(drs_sprint5_preview_coalescing_tests
     PRIVATE
-        drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -2276,6 +2277,7 @@ target_link_libraries(drs_phase3_round_robin_hardening_tests
     PRIVATE
         drs_app_shared
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -2670,6 +2672,9 @@ target_link_libraries(drs_phase1_realtime_safety_tests
 )
 
 target_compile_features(drs_phase1_realtime_safety_tests PRIVATE cxx_std_17)
+if(MSVC)
+    target_link_options(drs_phase1_realtime_safety_tests PRIVATE /STACK:8388608)
+endif()
 
 add_test(
     NAME drs.phase1.realtime_safety
@@ -2792,6 +2797,7 @@ target_sources(drs_host_state_recovery_ui_tests
 target_link_libraries(drs_host_state_recovery_ui_tests
     PRIVATE
         drs_app_shared
+        drs_sampler_core
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -2818,7 +2824,10 @@ target_compile_features(drs_host_state_restore_stress_tests PRIVATE cxx_std_17)
 
 target_link_libraries(drs_host_state_restore_stress_tests
     PRIVATE
+        drs_sample_import
+        drs_sampler_core
         drs_engine_adapter
+        juce::juce_audio_formats
 )
 
 add_test(
@@ -3073,6 +3082,7 @@ target_link_libraries(drs_phase2_performance_ui_tests
     PRIVATE
         drs_app_shared
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
         juce::juce_gui_extra
@@ -3232,6 +3242,7 @@ target_sources(drs_phase1_diagnostics_tests
 target_link_libraries(drs_phase1_diagnostics_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -3259,6 +3270,7 @@ target_sources(drs_phase1_failure_handling_tests
 target_link_libraries(drs_phase1_failure_handling_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -4323,5 +4335,138 @@ set_target_properties(drs_phase1_runtime_baseline_guard PROPERTIES
 )
 
 set_target_properties(drs_phase1_runtime_fixture_tool PROPERTIES
+    FOLDER "Tests"
+)
+
+juce_add_console_app(drs_ui_message_thread_metrics_tests
+    PRODUCT_NAME "Decent Rhapsody Studio UI Message Thread Metrics Tests"
+)
+
+target_sources(drs_ui_message_thread_metrics_tests
+    PRIVATE
+        src/MessageThreadMetricsTests.cpp
+)
+
+target_link_libraries(drs_ui_message_thread_metrics_tests
+    PRIVATE
+        drs_app_shared
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_ui_message_thread_metrics_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.ui.message_thread_metrics
+    COMMAND drs_ui_message_thread_metrics_tests
+)
+
+set_target_properties(drs_ui_message_thread_metrics_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+add_executable(drs_host_state_publication_service_tests
+    src/HostStatePublicationServiceTests.cpp
+)
+
+target_link_libraries(drs_host_state_publication_service_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_host_state_publication_service_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.host_state.background_publication
+    COMMAND drs_host_state_publication_service_tests
+)
+
+if(MSVC)
+    # These integration mains intentionally keep several large Processor instances alive
+    # at once. Processor-owned background workers make the default 1 MiB test stack too
+    # small even though production plug-in processors are host/heap-owned.
+    target_link_options(drs_phase1_state_recall_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase1_macro_bridge_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_performance_mixer_s0_red_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_wav_import_lifecycle_io_audit_tests PRIVATE /STACK:8388608)
+endif()
+
+set_tests_properties(drs.host_state.background_publication PROPERTIES
+    TIMEOUT 45
+)
+
+set_target_properties(drs_host_state_publication_service_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+juce_add_console_app(drs_ui_responsiveness_baseline
+    PRODUCT_NAME "Decent Rhapsody Studio UI Responsiveness Baseline"
+)
+
+target_sources(drs_ui_responsiveness_baseline
+    PRIVATE
+        src/UiResponsivenessBaseline.cpp
+)
+
+target_link_libraries(drs_ui_responsiveness_baseline
+    PRIVATE
+        drs_app_shared
+        drs_plugin_shell
+        drs_sample_import
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_ui_responsiveness_baseline PRIVATE cxx_std_17)
+target_compile_definitions(drs_ui_responsiveness_baseline PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1)
+
+add_test(
+    NAME drs.ui.responsiveness_baseline
+    COMMAND drs_ui_responsiveness_baseline
+        "${CMAKE_SOURCE_DIR}/../DemoSFVInstruments/AccurateSalamanderGrandPianoV6.2beta2_48khz24bit/sfz_daw/Accurate-SalamanderGrandPiano_flat.Recommended.sfz"
+        "${CMAKE_SOURCE_DIR}/content/runtime/phase1/reference-corpus/tiny-open-instrument/performance-package-corpus/valid.drpkg"
+        "${CMAKE_CURRENT_BINARY_DIR}/ui-responsiveness-baseline.json"
+)
+
+set_tests_properties(drs.ui.responsiveness_baseline PROPERTIES
+    RUN_SERIAL TRUE
+    TIMEOUT 300
+)
+
+set_target_properties(drs_ui_responsiveness_baseline PROPERTIES
+    FOLDER "Tests"
+)
+
+juce_add_console_app(drs_performance_responsiveness_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Performance Responsiveness Tests"
+)
+
+target_sources(drs_performance_responsiveness_tests
+    PRIVATE
+        src/PerformanceResponsivenessTests.cpp
+)
+
+target_link_libraries(drs_performance_responsiveness_tests
+    PRIVATE
+        drs_app_shared
+        drs_sampler_core
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_performance_responsiveness_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.ui.performance_responsiveness
+    COMMAND drs_performance_responsiveness_tests
+)
+
+set_target_properties(drs_performance_responsiveness_tests PROPERTIES
     FOLDER "Tests"
 )

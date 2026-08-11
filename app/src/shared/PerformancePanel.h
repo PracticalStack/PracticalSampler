@@ -81,6 +81,8 @@ private:
     juce::String publishedPerformanceFindingCode;
     drs::engine::EnginePerformanceSnapshot performanceSnapshot;
     std::uint64_t lastObservedStateRevision = 0;
+    std::uint64_t lastObservedPublicationSequence = 0;
+    bool initialRevisionCheckPending = true;
     bool showingPublishedMixer = false;
     std::size_t hiddenPublishedMacroCount = 0;
     std::vector<std::string> visibleMacroIds;

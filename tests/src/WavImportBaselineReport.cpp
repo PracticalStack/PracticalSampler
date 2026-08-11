@@ -239,6 +239,8 @@ int main(int argc, char* argv[])
         require(restoreSource.replaceAuthoringProject(projectLoad.project, juce::File(projectPath)),
                 "WAV baseline report source processor must bind the Phase 2 reference project.");
         juce::MemoryBlock stateBlock;
+        require(restoreSource.waitForHostStatePublication(),
+                "WAV baseline report checkpoint did not reach background host-state publication.");
         restoreSource.getStateInformation(stateBlock);
 
         drs::plugin::Processor restoreTarget;

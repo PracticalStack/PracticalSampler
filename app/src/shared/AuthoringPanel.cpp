@@ -1,5 +1,6 @@
 #include "shared/AuthoringPanel.h"
 
+#include "shared/MessageThreadMetrics.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 #include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
@@ -1469,7 +1470,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (applyZoneMapSelectionState(selectionState))
         {
             requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
-            refreshFromSession();
+            refreshSelectionFromSession();
         }
     });
     zoneMap.setOnZoneAuditionRequested([this](const std::string& zoneId,
@@ -1516,6 +1517,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     });
     groupList.setOnSelectionChanged([this](int nextIndex)
     {
+        const ScopedMessageThreadSpan timing(MessageThreadSpanKind::zoneSelection);
         if (isRefreshing)
             return;
 
@@ -1529,7 +1531,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         setActiveDrawerTab(authoring::DrawerTab::groups);
-        refreshFromSession();
+        requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
+        refreshSelectionFromSession();
     });
 
     groupCreateButton.setButtonText("New Group");
@@ -1628,6 +1631,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
     zoneSelector.onChange = [this]
     {
+        const ScopedMessageThreadSpan timing(MessageThreadSpanKind::zoneSelection);
         if (isRefreshing)
             return;
 
@@ -1638,7 +1642,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
         authoringSession.selectZone(zones[static_cast<std::size_t>(zoneIndex)].id);
         requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
-        refreshFromSession();
+        refreshSelectionFromSession();
     };
 
     previewEnabledToggle.onClick = [this]
@@ -3333,6 +3337,19 @@ void AuthoringPanel::reloadFromSession()
 
 void AuthoringPanel::refreshNow()
 {
+    const auto documentRevision = authoringSession.getDocumentState().revision;
+    const auto selectionRevision = authoringSession.getWorkspaceSelectionRevision();
+    if (!hasObservedSessionRevisions || documentRevision != observedDocumentRevision)
+    {
+        refreshFromSession();
+        return;
+    }
+    if (selectionRevision != observedWorkspaceSelectionRevision)
+    {
+        refreshSelectionFromSession();
+        return;
+    }
+
     selectionSummaryViewModel = buildSelectionSummaryViewModel();
     summaryStrip.setViewModel(selectionSummaryViewModel);
     refreshDraftPlaybackBanner();
@@ -3496,7 +3513,7 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
     authoring::ZoneFieldValuesViewModel viewModel;
     viewModel.emptyStateText = "Select a zone to edit mapping values.";
 
-    const auto project = authoringSession.getProject();
+    const auto& project = authoringSession.getProject();
     if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
     {
         viewModel.hasSelection = true;
@@ -5156,6 +5173,7 @@ void AuthoringPanel::updateSourceValidationAction()
 
 void AuthoringPanel::refreshFromSession()
 {
+    const ScopedMessageThreadSpan timing(MessageThreadSpanKind::authoringRefresh);
     const juce::ScopedValueSetter<bool> refreshGuard(isRefreshing, true);
 
     rebuildZoneSelector();
@@ -5848,6 +5866,81 @@ void AuthoringPanel::refreshFromSession()
 
     refreshWaveformDrawerContent();
     refreshInspectorVisibility();
+    observedDocumentRevision = authoringSession.getDocumentState().revision;
+    observedWorkspaceSelectionRevision = authoringSession.getWorkspaceSelectionRevision();
+    hasObservedSessionRevisions = true;
+}
+
+void AuthoringPanel::refreshSelectionFromSession()
+{
+    const juce::ScopedValueSetter<bool> refreshGuard(isRefreshing, true);
+    const auto& project = authoringSession.getProject();
+    const auto selectedZone = authoringSession.getSelectedZone();
+    auto selectedZoneIndex = -1;
+    if (selectedZone.has_value())
+    {
+        for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
+        {
+            if (project.authoring.zones[index].id == selectedZone->id)
+            {
+                selectedZoneIndex = static_cast<int>(index);
+                break;
+            }
+        }
+    }
+    zoneSelector.setSelectedId(selectedZoneIndex + 1, juce::dontSendNotification);
+
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    selectedGroupIndex = -1;
+    if (selectedGroup.has_value())
+    {
+        for (std::size_t index = 0; index < project.authoring.groups.size(); ++index)
+        {
+            if (project.authoring.groups[index].id == selectedGroup->id)
+            {
+                selectedGroupIndex = static_cast<int>(index);
+                break;
+            }
+        }
+    }
+    if (selectedGroupIndex >= 0)
+        groupList.setSelectedIndex(selectedGroupIndex);
+
+    syncZoneMapSelectionState();
+    zoneMap.setSelectionState({ zoneMapSelectedZoneIds,
+                                selectedZone.has_value() ? selectedZone->id : std::string {} });
+
+    selectionSummaryViewModel = buildSelectionSummaryViewModel();
+    zoneFieldValuesViewModel = buildZoneFieldValuesViewModel();
+    summaryStrip.setViewModel(selectionSummaryViewModel);
+    zoneMappingEditor.setViewModel(zoneFieldValuesViewModel);
+
+    if (selectedGroup.has_value())
+    {
+        groupNameEditor.setText(juce::String::fromUTF8(selectedGroup->displayName.c_str()),
+                                juce::dontSendNotification);
+        groupVisibilityToggle.setToggleState(selectedGroup->workspaceVisible, juce::dontSendNotification);
+        groupGainSlider.setValue(selectedGroup->gainDb, juce::dontSendNotification);
+        groupPanSlider.setValue(selectedGroup->pan, juce::dontSendNotification);
+        groupVisibilityButton.setButtonText(selectedGroup->workspaceVisible ? "Hide Group" : "Show Group");
+        groupVisibilityButton.setEnabled(true);
+        groupPreviewAnchorButton.setEnabled(!selectedGroup->auditionAnchorZoneId.empty());
+        groupMoveUpButton.setEnabled(selectedGroupIndex > 0);
+        groupMoveDownButton.setEnabled(selectedGroupIndex + 1 < static_cast<int>(project.authoring.groups.size()));
+        const auto memberCount = static_cast<int>(countZonesInGroup(project, selectedGroup->id));
+        groupDeleteButton.setEnabled(memberCount == 0);
+        groupSummaryLabel.setText(
+            "Master " + juce::String(project.authoring.masterGainDb, 1) + " dB"
+                + " | " + juce::String::fromUTF8(selectedGroup->displayName.c_str())
+                + " | " + juce::String(memberCount) + " zones",
+            juce::dontSendNotification);
+    }
+
+    refreshWaveformDrawerContent();
+    refreshDrawerContextLabels();
+    observedDocumentRevision = authoringSession.getDocumentState().revision;
+    observedWorkspaceSelectionRevision = authoringSession.getWorkspaceSelectionRevision();
+    hasObservedSessionRevisions = true;
 }
 
 void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values,
@@ -6333,6 +6426,7 @@ void AuthoringPanel::syncZoneMapSelectionState()
 
 bool AuthoringPanel::applyZoneMapSelectionState(const authoring::ZoneMapCanvas::SelectionState& selectionState)
 {
+    const ScopedMessageThreadSpan timing(MessageThreadSpanKind::zoneSelection);
     const auto& zones = authoringSession.getProject().authoring.zones;
     std::unordered_set<std::string> validZoneIds;
     validZoneIds.reserve(zones.size());

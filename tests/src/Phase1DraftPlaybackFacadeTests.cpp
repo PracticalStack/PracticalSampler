@@ -38,19 +38,7 @@ bool containsFinding(const std::vector<drs::engine::PlaybackSnapshotFinding>& fi
 bool waitForWorkerToSettle(drs::engine::EngineFacade& engineFacade,
                            std::chrono::milliseconds timeout = std::chrono::milliseconds(1000))
 {
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
-
-    while (std::chrono::steady_clock::now() <= deadline)
-    {
-        const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
-        if (workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0)
-            return true;
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
-    }
-
-    const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
-    return workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0;
+    return engineFacade.waitForPreparedPlaybackIdle(timeout);
 }
 
 bool waitForCondition(const std::function<bool()>& condition,
@@ -416,11 +404,6 @@ int main()
         require(waitForWorkerToSettle(engineFacade),
                 "Prepared-playback worker should finish the queued preview request.");
         snapshot = engineFacade.getPerformanceSnapshot();
-        require(snapshot.previewPending,
-                "Preview contract state should remain pending until message-thread background work is serviced.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Explicit background-work servicing should apply the completed preview build.");
-        snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.previewRevision == 1 && snapshot.previewRevisionState == "Ready",
                 "Preparing preview should advance the preview revision to the current draft.");
@@ -444,11 +427,6 @@ int main()
                 "Engine facade should publish the prepared current draft.");
         require(waitForWorkerToSettle(engineFacade),
                 "Prepared-playback worker should finish the queued publish request.");
-        snapshot = engineFacade.getPerformanceSnapshot();
-        require(snapshot.publishedPending,
-                "Publish contract state should remain pending until message-thread background work is serviced.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Explicit background-work servicing should apply the completed publish build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.publishedRevision == 1
@@ -623,8 +601,10 @@ int main()
                 "Migrated facade coverage should begin with an idle published state.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after reopen");
 
-        require(!engineFacade.refreshPreviewToCurrentDraft(),
-                "Migrated project without imported zones should fail preview preparation through the facade.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Migrated project without imported zones should queue preview validation through the facade.");
+        require(waitForWorkerToSettle(engineFacade),
+                "Migrated project preview validation should settle asynchronously.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.previewRevision == 0,
@@ -641,8 +621,10 @@ int main()
                 "Failed migrated preview should surface the structured no-playable-zones finding.");
         requireFacadeSnapshotConsistency(engineFacade, "Migrated facade state after rejected preview");
 
-        require(!engineFacade.publishCurrentDraft(),
-                "Migrated project without imported zones should fail publish preparation through the facade.");
+        require(engineFacade.publishCurrentDraft(),
+                "Migrated project without imported zones should queue publish validation through the facade.");
+        require(waitForWorkerToSettle(engineFacade),
+                "Migrated project publish validation should settle asynchronously.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(!snapshot.loaded,
@@ -682,6 +664,8 @@ int main()
                                                                           { importedZone },
                                                                           "Import migrated facade zone");
         require(migratedImport.applied, "Migrated facade coverage should accept imported authoring content.");
+        require(migratedSession.selectZone(importedZone.id).applied,
+                "Migrated facade coverage should explicitly select the imported transient zone.");
         require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
                 "Engine facade should accept the imported migrated authoring project update.");
         require(engineFacade.stageDraftRevision(migratedImport.documentState.revision),
@@ -694,11 +678,6 @@ int main()
                 "Imported migrated project should prepare preview successfully through the facade.");
         require(waitForWorkerToSettle(engineFacade),
                 "Imported migrated preview should settle through the prepared-playback worker.");
-        snapshot = engineFacade.getPerformanceSnapshot();
-        require(snapshot.previewPending,
-                "Imported migrated preview should remain pending until background work is serviced.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the imported migrated preview build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.previewRevision == 1 && snapshot.previewRevisionState == "Ready",
@@ -722,11 +701,6 @@ int main()
                 "Imported migrated project should publish successfully through the facade.");
         require(waitForWorkerToSettle(engineFacade),
                 "Imported migrated publish should settle through the prepared-playback worker.");
-        snapshot = engineFacade.getPerformanceSnapshot();
-        require(snapshot.publishedPending,
-                "Imported migrated publish should remain pending until background work is serviced.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the imported migrated publish build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.loaded,
@@ -775,8 +749,6 @@ int main()
                 "Edited migrated draft should prepare preview successfully through the facade.");
         require(waitForWorkerToSettle(engineFacade),
                 "Edited migrated preview should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the edited migrated preview build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.previewRevision == 2 && snapshot.previewRevisionState == "Ready",
@@ -795,8 +767,6 @@ int main()
                 "Edited migrated draft should publish successfully through the facade.");
         require(waitForWorkerToSettle(engineFacade),
                 "Edited migrated publish should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the edited migrated publish build.");
         snapshot = engineFacade.getPerformanceSnapshot();
         draftStatus = engineFacade.getDraftPlaybackStatus();
         require(snapshot.publishedRevision == 2
@@ -854,8 +824,6 @@ int main()
                 "Prepared-retirement facade coverage should prepare the baseline Phase 2 preview.");
         require(waitForWorkerToSettle(retirementFacade),
                 "Prepared-retirement facade coverage should let the baseline worker request settle.");
-        require(retirementFacade.serviceBackgroundWork(),
-                "Prepared-retirement facade coverage should apply the baseline preview build.");
 
         retirementProject.sampleSources[1].path = retirementProject.sampleSources[0].path;
 
@@ -867,8 +835,6 @@ int main()
                 "Prepared-retirement facade coverage should prepare the invalidating Phase 2 preview.");
         require(waitForWorkerToSettle(retirementFacade),
                 "Prepared-retirement facade coverage should let the invalidating worker request settle.");
-        require(retirementFacade.serviceBackgroundWork(),
-                "Prepared-retirement facade coverage should apply the invalidating preview build.");
         auto retirementSnapshot = retirementFacade.getPerformanceSnapshot();
         require(retirementSnapshot.previewRevision == 2 && retirementSnapshot.previewRevisionState == "Ready",
                 "Invalidating the Phase 2 preview should advance the facade preview revision.");

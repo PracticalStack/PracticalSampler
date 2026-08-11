@@ -74,8 +74,11 @@ int main()
         require(initialPreview.midiNote == 69, "Initial selected-zone preview note changed unexpectedly.");
 
         const auto selectionResult = session.selectZone("pad-a3-high");
-        require(selectionResult.applied, "Selecting a different zone should create an undoable project transaction.");
-        require(session.getDocumentState().revision == 1, "Zone selection should increment project revision.");
+        require(selectionResult.applied, "Selecting a different zone should update workspace selection.");
+        require(session.getDocumentState().revision == 0
+                    && session.getDocumentState().undoDepth == 0
+                    && !session.getDocumentState().dirty,
+                "Zone selection should not mutate authored document state.");
         require(session.getZoneSummaries()[1].selected, "Zone selection should move to the requested zone.");
 
         auto editedZone = session.getSelectedZone().value();
@@ -90,7 +93,7 @@ int main()
 
         const auto editResult = session.updateSelectedZone(editedZone, "Refine selected zone mapping");
         require(editResult.applied, "Editing the selected zone should commit successfully.");
-        require(session.getDocumentState().revision == 2, "Zone edit should increment project revision.");
+        require(session.getDocumentState().revision == 1, "Zone edit should increment project revision.");
 
         const auto selectedZone = session.getSelectedZone().value();
         require(selectedZone.rootKey == 58, "Selected zone root key edit did not persist.");
@@ -122,7 +125,7 @@ int main()
 
         const auto badSelection = session.selectZone("missing-zone-id");
         require(!badSelection.applied, "Unknown zone selection should be rejected.");
-        require(session.getDocumentState().revision == 2, "Rejected selection should not change project revision.");
+        require(session.getDocumentState().revision == 1, "Rejected selection should not change project revision.");
 
         drs::engine::AuthoringSession uniqueSourceDeletionSession(projectLoad.project);
         const auto uniqueSourceDeletion = uniqueSourceDeletionSession.deleteSelectedSample();

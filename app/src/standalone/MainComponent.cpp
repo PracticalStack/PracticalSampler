@@ -3,6 +3,7 @@
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
+#include "shared/MessageThreadMetrics.h"
 #include "shared/SfzImportWorkflow.h"
 #include "shared/WorkspaceMenuPolicy.h"
 #include "shared/WavImportWorkflow.h"
@@ -756,6 +757,8 @@ void MainComponent::menuItemSelected(int menuItemID, int)
 
 void MainComponent::timerCallback()
 {
+    const drs::app::ScopedMessageThreadSpan timing(
+        drs::app::MessageThreadSpanKind::editorTimerWork);
     processor.serviceMessageThreadWork();
     if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
         resized();

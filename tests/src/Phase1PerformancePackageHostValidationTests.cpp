@@ -243,6 +243,8 @@ int main(int argc, char** argv)
         }
 
         juce::MemoryBlock savedState;
+        require(processor->waitForHostStatePublication(),
+                "Package locator state did not reach background host-state publication.");
         processor->getStateInformation(savedState);
         const std::string savedStateText(
             static_cast<const char*>(savedState.getData()), savedState.getSize());

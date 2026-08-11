@@ -1129,6 +1129,7 @@ int main(int argc, char* argv[])
         pluginFixtureRestored = sessionMatchesLeadPerformance(sourceProcessor.getEngineFacade().getCurrentSessionState());
 
         juce::MemoryBlock pluginState;
+        sourceProcessor.waitForHostStatePublication();
         sourceProcessor.getStateInformation(pluginState);
         const auto pluginStateJson = std::string(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
         pluginExportMatchesFixture = legacyPresetMatchesLeadPerformance(pluginStateJson);

@@ -82,6 +82,7 @@ public:
 
     const RuntimeProjectModel& getProject() const;
     const RuntimeProjectDocumentState& getDocumentState() const;
+    std::size_t getWorkspaceSelectionRevision() const { return workspaceSelectionRevision; }
     RuntimeProjectDocumentCheckpoint exportCheckpoint() const;
     RuntimeProjectDocumentActionResult restoreCheckpoint(
         RuntimeProjectDocumentCheckpoint checkpoint,
@@ -278,9 +279,13 @@ private:
     std::optional<PendingDspParameterGesture> pendingDspParameterGesture;
     DspParameterGesturePreviewListener dspParameterGesturePreviewListener;
     AuthoringDspSelection dspSelection;
+    std::string selectedZoneId;
+    std::string selectedGroupId;
     std::string selectedMacroId;
+    std::size_t workspaceSelectionRevision = 0;
 
     void recoverDspSelection();
     void recoverMacroSelection();
+    void recoverWorkspaceSelection(bool initializeFromProject = false);
 };
 } // namespace drs::engine

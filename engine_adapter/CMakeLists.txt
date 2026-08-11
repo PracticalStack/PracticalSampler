@@ -192,7 +192,9 @@ add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HiseProjectContent.cpp
     src/HostSessionState.cpp
+    src/HostStatePublicationService.cpp
     src/PlaybackSnapshot.cpp
+    src/PlaybackSnapshotWorker.cpp
     src/PerformancePublishController.cpp
     src/PerformancePublishCommandAdapter.cpp
     src/PerformancePublishPreparation.cpp
@@ -241,7 +243,9 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/DspParameterControl.h
     include/drs/engine/DspRenderGeneration.h
     include/drs/engine/HostSessionState.h
+    include/drs/engine/HostStatePublicationService.h
     include/drs/engine/PlaybackSnapshot.h
+    include/drs/engine/PlaybackSnapshotWorker.h
     include/drs/engine/PerformancePublishContract.h
     include/drs/engine/PerformancePublishCommandAdapter.h
     include/drs/engine/PerformancePublishController.h
@@ -317,7 +321,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/HiseFrontendPluginProbe.cpp
     src/HiseProjectContent.cpp
     src/HostSessionState.cpp
+    src/HostStatePublicationService.cpp
     src/PlaybackSnapshot.cpp
+    src/PlaybackSnapshotWorker.cpp
     src/PerformancePublishController.cpp
     src/PerformancePublishCommandAdapter.cpp
     src/PerformancePublishPreparation.cpp
@@ -360,7 +366,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/HiseFrontendBridge.h
     include/drs/engine/HiseProjectContent.h
     include/drs/engine/HostSessionState.h
+    include/drs/engine/HostStatePublicationService.h
     include/drs/engine/PlaybackSnapshot.h
+    include/drs/engine/PlaybackSnapshotWorker.h
     include/drs/engine/PerformancePublishContract.h
     include/drs/engine/PerformancePublishController.h
     include/drs/engine/PerformancePublishPreparation.h

@@ -161,6 +161,8 @@ int main()
                 "The qualification source must render before its state is injected into VST3.");
 
         juce::MemoryBlock componentState;
+        require(source->waitForHostStatePublication(),
+                "The VST3 qualification checkpoint did not reach background host-state publication.");
         source->getStateInformation(componentState);
         const auto capturedText = std::string(
             static_cast<const char*>(componentState.getData()), componentState.getSize());

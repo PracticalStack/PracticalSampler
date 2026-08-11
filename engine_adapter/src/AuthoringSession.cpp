@@ -1199,7 +1199,8 @@ std::string allocateRoundRobinPoolId(const RuntimeProjectModel& project)
     }
 }
 
-std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& project)
+std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& project,
+                                                      const std::string& selectedZoneId)
 {
     std::vector<AuthoringZoneSummary> summaries;
     summaries.reserve(project.authoring.zones.size());
@@ -1224,20 +1225,21 @@ std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& 
         summary.roundRobinLength = zone.roundRobinLength;
         summary.roundRobinPosition = zone.roundRobinPosition;
         summary.triggerMode = zone.triggerMode;
-        summary.selected = zone.id == project.authoring.selectedZoneId;
+        summary.selected = zone.id == selectedZoneId;
         summaries.push_back(std::move(summary));
     }
 
     return summaries;
 }
 
-std::optional<std::size_t> findSelectedZoneIndex(const RuntimeProjectModel& project)
+std::optional<std::size_t> findSelectedZoneIndex(const RuntimeProjectModel& project,
+                                                 const std::string& selectedZoneId)
 {
     const auto iterator = std::find_if(project.authoring.zones.begin(),
                                        project.authoring.zones.end(),
                                        [&](const RuntimeProjectZoneDefinition& zone)
                                        {
-                                           return zone.id == project.authoring.selectedZoneId;
+                                           return zone.id == selectedZoneId;
                                        });
     if (iterator == project.authoring.zones.end())
         return std::nullopt;
@@ -1259,12 +1261,13 @@ std::optional<std::size_t> findSelectedPerformanceBankIndex(const RuntimeProject
     return static_cast<std::size_t>(std::distance(project.authoring.performanceBanks.begin(), iterator));
 }
 
-std::optional<std::size_t> findSelectedGroupPreviewAnchorIndex(const RuntimeProjectModel& project)
+std::optional<std::size_t> findSelectedGroupPreviewAnchorIndex(const RuntimeProjectModel& project,
+                                                               const std::string& selectedGroupId)
 {
     if (!usesExplicitZoneGroupsSchema(project))
         return std::nullopt;
 
-    const auto groupIndex = findGroupIndexById(project, project.authoring.selectedGroupId);
+    const auto groupIndex = findGroupIndexById(project, selectedGroupId);
     if (!groupIndex.has_value())
         return std::nullopt;
 
@@ -1380,6 +1383,7 @@ void addCompatibleZonesToAnchorRoundRobinPool(RuntimeProjectModel& project, std:
 AuthoringSession::AuthoringSession(RuntimeProjectModel project)
     : documentController(prepareAuthoringProject(std::move(project)))
 {
+    recoverWorkspaceSelection(true);
     recoverDspSelection();
     recoverMacroSelection();
 }
@@ -1406,6 +1410,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::restoreCheckpoint(
     auto result = documentController.restoreCheckpoint(std::move(checkpoint), std::move(constraints));
     if (result.applied)
     {
+        recoverWorkspaceSelection();
         recoverDspSelection();
         recoverMacroSelection();
     }
@@ -1415,18 +1420,19 @@ RuntimeProjectDocumentActionResult AuthoringSession::restoreCheckpoint(
 void AuthoringSession::replaceProject(RuntimeProjectModel project)
 {
     documentController = RuntimeProjectDocumentController(prepareAuthoringProject(std::move(project)));
+    recoverWorkspaceSelection(true);
     recoverDspSelection();
     recoverMacroSelection();
 }
 
 std::vector<AuthoringZoneSummary> AuthoringSession::getZoneSummaries() const
 {
-    return buildZoneSummaries(getProject());
+    return buildZoneSummaries(getProject(), selectedZoneId);
 }
 
 std::optional<RuntimeProjectZoneDefinition> AuthoringSession::getSelectedZone() const
 {
-    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);
     if (!selectedZoneIndex.has_value())
         return std::nullopt;
 
@@ -1443,7 +1449,7 @@ std::optional<RuntimeProjectGroupDefinition> AuthoringSession::getSelectedGroup(
     if (!usesExplicitZoneGroupsSchema(getProject()))
         return std::nullopt;
 
-    const auto groupIndex = findGroupIndexById(getProject(), getProject().authoring.selectedGroupId);
+    const auto groupIndex = findGroupIndexById(getProject(), selectedGroupId);
     if (!groupIndex.has_value())
         return std::nullopt;
 
@@ -1523,7 +1529,7 @@ AuthoringGroupPreviewRequest AuthoringSession::buildSelectedGroupPreviewRequest(
         return request;
     }
 
-    const auto anchorIndex = findSelectedGroupPreviewAnchorIndex(getProject());
+    const auto anchorIndex = findSelectedGroupPreviewAnchorIndex(getProject(), selectedGroupId);
     if (!anchorIndex.has_value())
     {
         request.groupId = group->id;
@@ -1543,7 +1549,7 @@ AuthoringGroupPreviewRequest AuthoringSession::buildSelectedGroupPreviewRequest(
 
 RuntimeProjectDocumentActionResult AuthoringSession::selectZone(const std::string& zoneId)
 {
-    auto project = getProject();
+    const auto& project = getProject();
     const auto iterator = std::find_if(project.authoring.zones.begin(),
                                        project.authoring.zones.end(),
                                        [&](const RuntimeProjectZoneDefinition& zone)
@@ -1555,14 +1561,25 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectZone(const std::strin
                                   "Zone selection rejected",
                                   "Zone '" + zoneId + "' does not exist in the current authoring project.");
 
-    project.authoring.selectedZoneId = zoneId;
-    alignSelectedGroupToSelectedZone(project);
+    const auto nextGroupId = usesExplicitZoneGroupsSchema(project) ? iterator->groupId : std::string {};
+    if (selectedZoneId == zoneId && selectedGroupId == nextGroupId)
+    {
+        RuntimeProjectDocumentActionResult result;
+        result.applied = true;
+        result.state = "Zone selection unchanged";
+        result.documentState = getDocumentState();
+        return result;
+    }
 
-    std::vector<std::string> changedPaths { "authoring.selectedZoneId" };
-    if (usesExplicitZoneGroupsSchema(project))
-        changedPaths.push_back("authoring.selectedGroupId");
+    selectedZoneId = zoneId;
+    selectedGroupId = nextGroupId;
+    ++workspaceSelectionRevision;
 
-    return documentController.commitSnapshot(project, "Select zone", changedPaths);
+    RuntimeProjectDocumentActionResult result;
+    result.applied = true;
+    result.state = "Zone selected";
+    result.documentState = getDocumentState();
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::selectPerformanceBank(const std::string& performanceBankId)
@@ -1603,7 +1620,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectDspSlot(const std::st
 RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const RuntimeProjectZoneDefinition& zone,
                                                                         const std::string& label)
 {
-    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);
     if (!selectedZoneIndex.has_value())
         return makeRejectedResult(getDocumentState(),
                                   "Zone edit rejected",
@@ -1630,7 +1647,14 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
     if (usesExplicitZoneGroupsSchema(project))
         changedPaths.push_back("authoring.selectedGroupId");
 
-    return documentController.commitSnapshot(project, label, changedPaths);
+    auto result = documentController.commitSnapshot(project, label, changedPaths);
+    if (result.applied)
+    {
+        selectedZoneId = zone.id;
+        selectedGroupId = usesExplicitZoneGroupsSchema(project) ? zone.groupId : std::string {};
+        ++workspaceSelectionRevision;
+    }
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::updateZoneRanges(
@@ -2053,30 +2077,43 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateMasterGain(double mas
 
 RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::string& groupId)
 {
-    auto project = getProject();
+    const auto& project = getProject();
     if (!usesExplicitZoneGroupsSchema(project))
         return makeRejectedResult(getDocumentState(),
                                   "Group selection rejected",
                                   "This project schema does not support explicit group selection.");
 
-    ensureExplicitZoneGroups(project);
     const auto groupIndex = findGroupIndexById(project, groupId);
     if (!groupIndex.has_value())
         return makeRejectedResult(getDocumentState(),
                                   "Group selection rejected",
                                   "Group '" + groupId + "' does not exist in the current authoring project.");
 
-    project.authoring.selectedGroupId = groupId;
-    std::vector<std::string> changedPaths { "authoring.selectedGroupId" };
-    if (const auto representativeZoneId = findRepresentativeZoneIdForGroup(project, groupId);
-        representativeZoneId.has_value()
-        && project.authoring.selectedZoneId != *representativeZoneId)
+    auto nextZoneId = selectedZoneId;
+    if (const auto selectedZoneIndex = findZoneIndexById(project, selectedZoneId);
+        !selectedZoneIndex.has_value() || project.authoring.zones[*selectedZoneIndex].groupId != groupId)
     {
-        project.authoring.selectedZoneId = *representativeZoneId;
-        changedPaths.push_back("authoring.selectedZoneId");
+        nextZoneId = findRepresentativeZoneIdForGroup(project, groupId).value_or(std::string {});
     }
 
-    return documentController.commitSnapshot(project, "Select group", changedPaths);
+    if (selectedGroupId == groupId && selectedZoneId == nextZoneId)
+    {
+        RuntimeProjectDocumentActionResult result;
+        result.applied = true;
+        result.state = "Group selection unchanged";
+        result.documentState = getDocumentState();
+        return result;
+    }
+
+    selectedGroupId = groupId;
+    selectedZoneId = std::move(nextZoneId);
+    ++workspaceSelectionRevision;
+
+    RuntimeProjectDocumentActionResult result;
+    result.applied = true;
+    result.state = "Group selected";
+    result.documentState = getDocumentState();
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::selectMacro(const std::string& macroId)
@@ -2130,10 +2167,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::createGroup(const RuntimePr
     normalizeGroupDisplayOrder(project);
     project.authoring.selectedGroupId = group.id;
 
-    return documentController.commitSnapshot(project,
-                                             label,
-                                             { "authoring.groups",
-                                               "authoring.selectedGroupId" });
+    auto result = documentController.commitSnapshot(project,
+                                                    label,
+                                                    { "authoring.groups",
+                                                      "authoring.selectedGroupId" });
+    if (result.applied)
+    {
+        selectedGroupId = group.id;
+        ++workspaceSelectionRevision;
+    }
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::updateGroup(std::size_t groupIndex,
@@ -2171,6 +2214,9 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateGroup(std::size_t gro
     std::vector<std::string> changedPaths {
         "authoring.groups[" + std::to_string(groupIndex) + "]"
     };
+    const auto hidesWorkspaceSelection = previousGroup.workspaceVisible
+        && !project.authoring.groups[groupIndex].workspaceVisible
+        && selectedGroupId == project.authoring.groups[groupIndex].id;
     if (previousGroup.workspaceVisible && !project.authoring.groups[groupIndex].workspaceVisible
         && project.authoring.selectedGroupId == project.authoring.groups[groupIndex].id)
     {
@@ -2179,7 +2225,18 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateGroup(std::size_t gro
         changedPaths.push_back("authoring.selectedZoneId");
     }
 
-    return documentController.commitSnapshot(project, label, changedPaths);
+    auto result = documentController.commitSnapshot(project, label, changedPaths);
+    if (result.applied && hidesWorkspaceSelection)
+    {
+        auto workspaceProject = project;
+        workspaceProject.authoring.selectedZoneId = selectedZoneId;
+        workspaceProject.authoring.selectedGroupId = selectedGroupId;
+        applyFallbackGroupSelection(workspaceProject);
+        selectedZoneId = workspaceProject.authoring.selectedZoneId;
+        selectedGroupId = workspaceProject.authoring.selectedGroupId;
+        ++workspaceSelectionRevision;
+    }
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::moveGroup(std::size_t groupIndex,
@@ -2250,7 +2307,14 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteGroup(const std::stri
         changedPaths.push_back("authoring.selectedZoneId");
     }
 
-    return documentController.commitSnapshot(project, label, changedPaths);
+    const auto deletesWorkspaceSelection = selectedGroupId == groupId;
+    auto result = documentController.commitSnapshot(project, label, changedPaths);
+    if (result.applied && deletesWorkspaceSelection)
+    {
+        selectedGroupId.clear();
+        recoverWorkspaceSelection();
+    }
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::reassignZoneToGroup(const std::string& zoneId,
@@ -2327,7 +2391,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignZonesToGroup(const 
 
         zone.groupId = groupId;
         anyChanged = true;
-        selectedZoneMoved = selectedZoneMoved || project.authoring.selectedZoneId == zone.id;
+        selectedZoneMoved = selectedZoneMoved || selectedZoneId == zone.id;
     }
 
     if (!anyChanged)
@@ -2367,12 +2431,18 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignZonesToGroup(const 
         }
     }
 
-    return documentController.commitSnapshot(project, label, changedPaths);
+    auto result = documentController.commitSnapshot(project, label, changedPaths);
+    if (result.applied && selectedZoneMoved && selectedGroupId != groupId)
+    {
+        selectedGroupId = groupId;
+        ++workspaceSelectionRevision;
+    }
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSelectedZone(const std::string& label)
 {
-    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);
     if (!selectedZoneIndex.has_value())
         return makeRejectedResult(getDocumentState(),
                                   "Round Robin pool creation rejected",
@@ -2386,7 +2456,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSele
 
 RuntimeProjectDocumentActionResult AuthoringSession::addCompatibleZonesToSelectedRoundRobinPool(const std::string& label)
 {
-    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);
     if (!selectedZoneIndex.has_value())
         return makeRejectedResult(getDocumentState(),
                                   "Round Robin grouping rejected",
@@ -2420,7 +2490,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::normalizeSelectedRoundRobin
 
 RuntimeProjectDocumentActionResult AuthoringSession::removeSelectedZoneFromRoundRobinPool(const std::string& label)
 {
-    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);
     if (!selectedZoneIndex.has_value())
         return makeRejectedResult(getDocumentState(),
                                   "Round Robin removal rejected",
@@ -2544,7 +2614,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::setSelectedGroupRoundRobinM
 
 RuntimeProjectDocumentActionResult AuthoringSession::deleteSelectedSample()
 {
-    const auto selectedZoneIndex = findSelectedZoneIndex(getProject());
+    const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);
     if (!selectedZoneIndex.has_value())
         return makeRejectedResult(getDocumentState(),
                                   "Sample deletion rejected",
@@ -2601,8 +2671,8 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteZones(const std::vect
             enabledGroups.push_back({ groupId, status.mode });
     }
 
-    const auto selectedZoneIndex = findSelectedZoneIndex(project);
-    const auto selectedZoneId = project.authoring.selectedZoneId;
+    const auto selectedZoneIndex = findSelectedZoneIndex(project, selectedZoneId);
+    const auto previousSelectedZoneId = selectedZoneId;
     std::vector<std::size_t> deletedZoneIndices;
     std::vector<RuntimeProjectZoneDefinition> deletedZones;
     deletedZoneIndices.reserve(normalizedZoneIds.size());
@@ -2733,14 +2803,14 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteZones(const std::vect
                        }),
         project.sampleSources.end());
 
-    const auto selectedZoneSurvived = !selectedZoneId.empty()
-        && std::find(normalizedZoneIds.begin(), normalizedZoneIds.end(), selectedZoneId)
+    const auto selectedZoneSurvived = !previousSelectedZoneId.empty()
+        && std::find(normalizedZoneIds.begin(), normalizedZoneIds.end(), previousSelectedZoneId)
             == normalizedZoneIds.end()
-        && findZoneIndexById(project, selectedZoneId).has_value();
+        && findZoneIndexById(project, previousSelectedZoneId).has_value();
 
     if (selectedZoneSurvived)
     {
-        project.authoring.selectedZoneId = selectedZoneId;
+        project.authoring.selectedZoneId = previousSelectedZoneId;
     }
     else if (project.authoring.zones.empty())
     {
@@ -2770,7 +2840,10 @@ RuntimeProjectDocumentActionResult AuthoringSession::deleteZones(const std::vect
     if (project.sampleSources.size() != sampleSourceCountBeforeCleanup)
         changedPaths.push_back("sampleSources");
 
-    return documentController.commitSnapshot(project, label, std::move(changedPaths));
+    auto result = documentController.commitSnapshot(project, label, std::move(changedPaths));
+    if (result.applied)
+        recoverWorkspaceSelection();
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
@@ -3490,6 +3563,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::undo()
     auto result = documentController.undo();
     if (result.applied)
     {
+        recoverWorkspaceSelection();
         recoverDspSelection();
         recoverMacroSelection();
     }
@@ -3501,6 +3575,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::redo()
     auto result = documentController.redo();
     if (result.applied)
     {
+        recoverWorkspaceSelection();
         recoverDspSelection();
         recoverMacroSelection();
     }
@@ -3516,6 +3591,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::applyProjectMigration(
         { "schemaVersion", "authoring.schemaVersion", "authoring.fxSlots", "authoring.routingBuses" });
     if (result.applied)
     {
+        recoverWorkspaceSelection();
         recoverDspSelection();
         recoverMacroSelection();
     }
@@ -3553,6 +3629,46 @@ void AuthoringSession::recoverDspSelection()
             return;
         }
     }
+}
+
+void AuthoringSession::recoverWorkspaceSelection(bool initializeFromProject)
+{
+    const auto& project = getProject();
+    const auto previousZoneId = selectedZoneId;
+    const auto previousGroupId = selectedGroupId;
+
+    if (initializeFromProject)
+    {
+        selectedZoneId = project.authoring.selectedZoneId;
+        selectedGroupId = project.authoring.selectedGroupId;
+    }
+
+    auto selectedZoneIndex = findZoneIndexById(project, selectedZoneId);
+    if (!selectedZoneIndex.has_value())
+    {
+        selectedZoneId = project.authoring.zones.empty()
+            ? std::string {}
+            : project.authoring.zones.front().id;
+        selectedZoneIndex = findZoneIndexById(project, selectedZoneId);
+    }
+
+    if (!usesExplicitZoneGroupsSchema(project))
+    {
+        selectedGroupId.clear();
+    }
+    else if (selectedZoneIndex.has_value())
+    {
+        selectedGroupId = project.authoring.zones[*selectedZoneIndex].groupId;
+    }
+    else if (!findGroupIndexById(project, selectedGroupId).has_value())
+    {
+        selectedGroupId = project.authoring.groups.empty()
+            ? std::string {}
+            : project.authoring.groups.front().id;
+    }
+
+    if (selectedZoneId != previousZoneId || selectedGroupId != previousGroupId)
+        ++workspaceSelectionRevision;
 }
 
 void AuthoringSession::recoverMacroSelection()

@@ -116,19 +116,7 @@ void refreshPanel(drs::app::PerformancePanel& panel)
 bool waitForWorkerToSettle(drs::engine::EngineFacade& engineFacade,
                            std::chrono::milliseconds timeout = std::chrono::milliseconds(1000))
 {
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
-
-    while (std::chrono::steady_clock::now() <= deadline)
-    {
-        const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
-        if (workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0)
-            return true;
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
-    }
-
-    const auto& workerStatus = engineFacade.getPreparedPlaybackWorkerStatus();
-    return workerStatus.pendingWorkCount == 0 && workerStatus.inFlightWorkCount == 0;
+    return engineFacade.waitForPreparedPlaybackIdle(timeout);
 }
 } // namespace
 
@@ -179,8 +167,8 @@ int main()
                                 "Performance panel should remove the old diagnostics toggle from the player surface.");
         requireLabelContains(panel,
                              "performanceLoadIndicatorLabel",
-                             "Publish Active r0",
-                             "Performance panel should keep the compact publish indicator visible.");
+                             "Publish Ready r0",
+                             "The facade-only UI fixture should show its prepared bootstrap revision before a host acknowledges activation.");
         requireLabelContains(panel,
                              "performanceMacroStripLabel",
                              "Instrument Controls",
@@ -198,10 +186,12 @@ int main()
                 "Engine facade should reopen against the migrated project for performance UI coverage.");
         refreshPanel(panel);
 
-        require(!engineFacade.refreshPreviewToCurrentDraft(),
-                "Migrated project without imported zones should fail preview preparation.");
-        require(!engineFacade.publishCurrentDraft(),
-                "Migrated project without imported zones should fail publish preparation.");
+        require(engineFacade.refreshPreviewToCurrentDraft(),
+                "Migrated project without imported zones should queue preview validation.");
+        require(engineFacade.publishCurrentDraft(),
+                "Migrated project without imported zones should queue publish validation.");
+        require(engineFacade.waitForPreparedPlaybackIdle(std::chrono::milliseconds(1500)),
+                "Migrated project Preview and Publish validation should settle asynchronously.");
         refreshPanel(panel);
 
         requireLabelContains(panel,
@@ -236,6 +226,8 @@ int main()
                                                                         { importedZone },
                                                                         "Import migrated performance UI zone");
         require(importResult.applied, "Migrated project should accept imported authoring content for performance UI coverage.");
+        require(migratedSession.selectZone(importedZone.id).applied,
+                "Migrated project should explicitly select its imported zone before editing it.");
         require(engineFacade.replaceDraftPlaybackAuthoringProject(migratedSession.getProject()),
                 "Engine facade should accept the imported migrated project.");
         require(engineFacade.stageDraftRevision(importResult.documentState.revision),
@@ -244,14 +236,12 @@ int main()
                 "Imported migrated project should prepare preview successfully.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Imported migrated preview should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the imported migrated preview.");
+        engineFacade.serviceBackgroundWork();
         require(engineFacade.publishCurrentDraft(),
                 "Imported migrated project should publish successfully.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Imported migrated publish should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the imported migrated publish.");
+        engineFacade.serviceBackgroundWork();
         refreshPanel(panel);
 
         requireLabelContains(panel,
@@ -275,14 +265,12 @@ int main()
                 "Edited migrated draft should prepare preview successfully.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Edited migrated preview should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the edited migrated preview.");
+        engineFacade.serviceBackgroundWork();
         require(engineFacade.publishCurrentDraft(),
                 "Edited migrated draft should publish successfully.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Edited migrated publish should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the edited migrated publish.");
+        engineFacade.serviceBackgroundWork();
         refreshPanel(panel);
 
         requireLabelContains(panel,
@@ -308,14 +296,12 @@ int main()
                 "Mixed-exposure project should prepare preview before publish.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Mixed-exposure preview should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the mixed-exposure preview.");
+        engineFacade.serviceBackgroundWork();
         require(engineFacade.publishCurrentDraft(),
                 "Mixed-exposure project should publish successfully.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Mixed-exposure publish should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the mixed-exposure publish.");
+        engineFacade.serviceBackgroundWork();
         const auto mixedActivation = engineFacade.authorizePerformanceActivation();
         require(mixedActivation != nullptr,
                 "Mixed-exposure publish should authorize an active performance binding.");
@@ -356,14 +342,12 @@ int main()
                 "Hidden-only helper project should prepare preview before publish.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Hidden-only helper preview should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the hidden-only helper preview.");
+        engineFacade.serviceBackgroundWork();
         require(engineFacade.publishCurrentDraft(),
                 "Hidden-only helper project should publish successfully.");
         require(waitForWorkerToSettle(engineFacade, std::chrono::milliseconds(1500)),
                 "Hidden-only helper publish should settle through the prepared-playback worker.");
-        require(engineFacade.serviceBackgroundWork(),
-                "Background work servicing should apply the hidden-only helper publish.");
+        engineFacade.serviceBackgroundWork();
         const auto hiddenOnlyActivation = engineFacade.authorizePerformanceActivation();
         require(hiddenOnlyActivation != nullptr,
                 "Hidden-only helper publish should authorize an active performance binding.");

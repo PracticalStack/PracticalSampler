@@ -256,6 +256,8 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     const auto pluginMagnitude = renderQueuedPerformanceSurfaceMagnitude(processor, 69, 0.8f);
     auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
     juce::MemoryBlock pluginState;
+    require(processor.waitForHostStatePublication(),
+            "Release-gate package state did not reach background host-state publication.");
     processor.getStateInformation(pluginState);
     const std::string serializedPluginState(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
     const bool pluginProjectBindingSuppressed = serializedPluginState.find("\"projectBinding\"") == std::string::npos;

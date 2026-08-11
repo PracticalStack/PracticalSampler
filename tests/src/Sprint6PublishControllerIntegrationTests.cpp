@@ -43,6 +43,24 @@ bool waitForActivePublish(drs::plugin::Processor& processor,
     }
     return false;
 }
+
+bool waitForPublishRequest(drs::plugin::Processor& processor,
+                           std::size_t expectedRevision)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        const auto controller = processor.getPerformancePublishControllerSnapshot();
+        if (controller.hasRequest
+            && controller.currentRequest.identity.draftRevision == expectedRevision
+            && !controller.currentRequest.identity.authoredContentDigest.empty()
+            && !controller.currentRequest.identity.macroSchemaDigest.empty())
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
 } // namespace
 
 int main()
@@ -61,13 +79,20 @@ int main()
         const auto draftRevision = processor.getAuthoringSession().getDocumentState().revision;
         require(processor.getEngineFacade().publishCurrentDraft(),
                 "The compatibility facade command must enter the typed Publish controller.");
+        const auto queued = processor.getEngineFacade().getDraftPlaybackStatus();
+        require(queued.pendingPerformance.active
+                    && queued.pendingPerformance.requestedRevision == draftRevision,
+                "Facade Publish must queue immutable snapshot work before controller identity exists.");
+        require(waitForPublishRequest(processor, draftRevision),
+                "The snapshot worker must deliver complete Publish identity to the controller.");
         const auto preparing = processor.getPerformancePublishControllerSnapshot();
         require(preparing.hasRequest
                     && preparing.currentRequest.identity.draftRevision == draftRevision
                     && !preparing.currentRequest.identity.authoredContentDigest.empty()
                     && !preparing.currentRequest.identity.macroSchemaDigest.empty()
-                    && preparing.preparationState == PerformancePublishPreparationState::preparing,
-                "Facade Publish must capture complete identity and launch through the controller.");
+                    && (preparing.preparationState == PerformancePublishPreparationState::preparing
+                        || preparing.preparationState == PerformancePublishPreparationState::ready),
+                "Worker completion must capture complete identity and launch through the controller.");
 
         require(waitForActivePublish(processor, draftRevision),
                 "Worker completion and existing block-boundary activation must reconcile to Active.");
@@ -101,6 +126,12 @@ int main()
         require(editedRevision > draftRevision
                     && processor.getEngineFacade().publishCurrentDraft(),
                 "A changed captured draft must create a newer explicit Publish request.");
+        const auto newerQueued = processor.getEngineFacade().getDraftPlaybackStatus();
+        require(newerQueued.pendingPerformance.active
+                    && newerQueued.pendingPerformance.requestedRevision == editedRevision,
+                "A changed draft Publish must queue the newest immutable revision.");
+        require(waitForPublishRequest(processor, editedRevision),
+                "The newer snapshot worker completion must reach the Publish controller.");
         const auto newerPreparing = processor.getPerformancePublishControllerSnapshot();
         require(newerPreparing.currentRequest.identity.requestId
                     > firstActive.activeRequestIdentity.requestId

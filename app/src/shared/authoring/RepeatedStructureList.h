@@ -18,6 +18,7 @@ public:
     void resized() override;
 
     void setViewModel(RepeatedStructureListViewModel nextViewModel);
+    void setSelectedIndex(int nextIndex);
     const RepeatedStructureListViewModel& getViewModel() const { return viewModel; }
 
     void setOnSelectionChanged(RepeatedStructureSelectionCallback nextCallback);

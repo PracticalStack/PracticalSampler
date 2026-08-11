@@ -4,6 +4,7 @@
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -52,6 +53,32 @@ float renderPerformance(drs::plugin::Processor& processor, int midiNote)
     return buffer.getMagnitude(0, buffer.getNumSamples());
 }
 
+void settleAuthoringPreview(drs::plugin::Processor& processor,
+                            const std::string& shellLabel)
+{
+    processor.requestAuthoringPreview(drs::engine::AuthoringPreviewScope::selectedZone);
+    for (int attempt = 0; attempt < 80; ++attempt)
+    {
+        processor.serviceMessageThreadWork();
+        processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::milliseconds(50));
+
+        auto controller = processor.getAuthoringPreviewControllerSnapshot();
+        if (controller.activationState == drs::engine::AuthoringPreviewActivationState::pending)
+        {
+            juce::AudioBuffer<float> activationBuffer(2, 64);
+            juce::MidiBuffer emptyMidi;
+            processor.processBlock(activationBuffer, emptyMidi);
+            processor.serviceMessageThreadWork();
+            controller = processor.getAuthoringPreviewControllerSnapshot();
+        }
+
+        if (controller.activationState == drs::engine::AuthoringPreviewActivationState::active)
+            return;
+    }
+
+    require(false, shellLabel + " should activate the requested authored Preview.");
+}
+
 ShellGateResult runPreviewPublishScenario(drs::plugin::Processor& processor,
                                           const drs::engine::RuntimeProjectModel& project,
                                           const std::string& shellLabel)
@@ -66,12 +93,7 @@ ShellGateResult runPreviewPublishScenario(drs::plugin::Processor& processor,
     require(selectedZone.has_value(), shellLabel + " should retain the selected authored zone.");
     const auto revision = processor.getAuthoringSession().getDocumentState().revision;
 
-    require(processor.getEngineFacade().refreshPreviewToCurrentDraft(),
-            shellLabel + " should accept Preview preparation.");
-    require(processor.getEngineFacade().waitForPreparedPlaybackIdle(),
-            shellLabel + " should settle Preview preparation on the worker.");
-    require(processor.serviceMessageThreadWork(),
-            shellLabel + " should apply the Preview completion and stage activation.");
+    settleAuthoringPreview(processor, shellLabel);
 
     const auto previewPayload = processor.getEngineFacade().getPreviewActivationPayload();
     require(previewPayload != nullptr && previewPayload->activationEligible,

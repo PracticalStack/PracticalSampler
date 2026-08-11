@@ -126,6 +126,8 @@ int main()
                     "The requested host-state capture project must render before capture.");
 
             juce::MemoryBlock captureState;
+            require(captureProcessor->waitForHostStatePublication(),
+                    "The host-state serializer did not publish the requested capture checkpoint.");
             captureProcessor->getStateInformation(captureState);
             const auto captureText = std::string(
                 static_cast<const char*>(captureState.getData()), captureState.getSize());
@@ -181,6 +183,8 @@ int main()
         const auto sourcePublish = source.getPerformancePublishControllerSnapshot();
 
         juce::MemoryBlock state;
+        require(source.waitForHostStatePublication(),
+                "The source host-state serializer did not publish the active checkpoint.");
         source.getStateInformation(state);
         require(state.getSize() > 0, "The source processor must produce a host-state chunk.");
         require(state.getSize() <= drs::engine::hostSessionStateMaxBytes,
@@ -289,6 +293,8 @@ int main()
         waitForPublishedPerformance(*contextualSource, "Contextual-articulation source publish");
 
         juce::MemoryBlock contextualStateBlock;
+        require(contextualSource->waitForHostStatePublication(),
+                "The contextual host-state serializer did not publish the active checkpoint.");
         contextualSource->getStateInformation(contextualStateBlock);
         const auto contextualStateText = std::string(
             static_cast<const char*>(contextualStateBlock.getData()), contextualStateBlock.getSize());
@@ -360,9 +366,16 @@ int main()
         require(dirtySource.replaceAuthoringProject(projectLoad.project, juce::File(projectPath)),
                 "The dirty-checkpoint source must accept the authored project binding.");
         require(dirtySource.getAuthoringSession().selectZone("pad-a3-high").applied,
-                "The dirty-checkpoint source must commit a distinct selected zone.");
+                "The dirty-checkpoint source must select the zone that will be edited.");
+        auto dirtyEditedZone = *dirtySource.getAuthoringSession().getSelectedZone();
+        dirtyEditedZone.gainDb += 0.5;
+        require(dirtySource.getAuthoringSession().updateSelectedZone(
+                    dirtyEditedZone, "Create dirty host-recall checkpoint").applied,
+                "The dirty-checkpoint source must commit an authored zone edit.");
         dirtySource.serviceMessageThreadWork();
         juce::MemoryBlock dirtyStateBlock;
+        require(dirtySource.waitForHostStatePublication(),
+                "The dirty host-state serializer did not publish the newest authored checkpoint.");
         dirtySource.getStateInformation(dirtyStateBlock);
         const auto dirtyStateText = std::string(
             static_cast<const char*>(dirtyStateBlock.getData()), dirtyStateBlock.getSize());

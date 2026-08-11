@@ -1,4 +1,5 @@
 #include "shared/StatusPanel.h"
+#include "shared/MessageThreadMetrics.h"
 
 #include "drs/engine/RuntimeLoader.h"
 
@@ -341,13 +342,21 @@ void StatusPanel::resized()
 
 void StatusPanel::refreshNow()
 {
-    refreshSnapshot();
+    const auto nextPresentation = publishPresentationProvider
+        ? publishPresentationProvider()
+        : engineFacade.getPerformancePublishPresentationSnapshot();
+    const auto publicationSequence = nextPresentation != nullptr
+        ? nextPresentation->publicationSequence : std::uint64_t { 0 };
+    if (lastObservedStateRevision != engineFacade.getStateRevision()
+        || lastObservedPublicationSequence != publicationSequence)
+    {
+        refreshSnapshot();
+    }
 }
 
 void StatusPanel::timerCallback()
 {
-    if (lastObservedStateRevision != engineFacade.getStateRevision())
-        refreshSnapshot();
+    refreshNow();
 }
 
 void StatusPanel::rebuildMacroControls()
@@ -395,6 +404,8 @@ void StatusPanel::refreshSnapshot()
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
     lastObservedStateRevision = engineFacade.getStateRevision();
+    lastObservedPublicationSequence = publishPresentation != nullptr
+        ? publishPresentation->publicationSequence : std::uint64_t { 0 };
     const auto& diagnostics = snapshot.diagnostics;
     const auto macros = engineFacade.getMacroDescriptors();
 
@@ -459,12 +470,28 @@ void StatusPanel::refreshSnapshot()
             + " | digests p=" + summarizeDigest(diagnostics.previewContentDigest)
             + " pub=" + summarizeDigest(diagnostics.publishedContentDigest),
         juce::dontSendNotification);
-    latencyLabel.setText(
+    auto latencyText =
         "Latency: avg=" + juce::String(static_cast<juce::int64>(diagnostics.averageReadLatencyMicros))
             + " us | max=" + juce::String(static_cast<juce::int64>(diagnostics.maxReadLatencyMicros))
             + " us | purgePasses=" + juce::String(static_cast<int>(diagnostics.purgePassCount))
-            + " | dormantPurges=" + juce::String(static_cast<int>(diagnostics.dormantPurgeCount)),
-        juce::dontSendNotification);
+            + " | dormantPurges=" + juce::String(static_cast<int>(diagnostics.dormantPurgeCount));
+    const auto slowMessageThreadSpans = MessageThreadMetrics::getSlowSpanStatistics();
+    if (!slowMessageThreadSpans.empty())
+    {
+        latencyText << " | UI slow (>="
+                    << juce::String(MessageThreadMetrics::slowSpanThresholdMilliseconds, 1)
+                    << " ms): ";
+        for (std::size_t index = 0; index < slowMessageThreadSpans.size(); ++index)
+        {
+            if (index > 0)
+                latencyText << ", ";
+            const auto& span = slowMessageThreadSpans[index];
+            latencyText << span.name << " " << juce::String(span.lastSlowMilliseconds, 2)
+                        << "/" << juce::String(span.maximumMilliseconds, 2)
+                        << " ms (" << static_cast<juce::int64>(span.slowCount) << ")";
+        }
+    }
+    latencyLabel.setText(latencyText, juce::dontSendNotification);
 
     if (publishPresentation == nullptr || !publishPresentation->hasFailure)
     {

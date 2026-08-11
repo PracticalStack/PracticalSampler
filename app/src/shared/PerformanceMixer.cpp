@@ -166,7 +166,6 @@ public:
             slider.setTooltip(description);
         }
         syncing = false;
-        resized();
     }
 
     void paint(juce::Graphics& graphics) override
@@ -244,11 +243,15 @@ void PerformanceMixer::setControls(std::vector<PerformanceMixerControlView> next
         });
     controls = std::move(nextControls);
     if (!sameIdentity)
+    {
         rebuildLanes();
+        updateLayout();
+    }
     else
+    {
         for (std::size_t index = 0; index < lanes.size(); ++index)
             lanes[index]->applyView(controls[index]);
-    updateLayout();
+    }
 }
 
 std::size_t PerformanceMixer::getControlCount() const noexcept

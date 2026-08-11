@@ -118,6 +118,7 @@ private:
     void requestWaveformPreviewLoad(bool refreshImmediately = false);
     void refreshDraftPlaybackBanner();
     void refreshFromSession();
+    void refreshSelectionFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
     void applyProjectMasterGainEdit(const juce::String& label);
     void applySelectedGroupNameEdit();
@@ -218,6 +219,9 @@ private:
     };
     CrossfadeAuditionSequence crossfadeAuditionSequence;
     bool isRefreshing = false;
+    bool hasObservedSessionRevisions = false;
+    std::size_t observedDocumentRevision = 0;
+    std::size_t observedWorkspaceSelectionRevision = 0;
     int selectedGroupIndex = 0;
     int selectedMacroIndex = 0;
     int selectedFxSlotIndex = 0;

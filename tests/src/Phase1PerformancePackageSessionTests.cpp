@@ -282,6 +282,8 @@ int main()
         require(findDescendantById(*editor, "authoringZoneSelector") == nullptr,
                 "Plugin package sessions should not expose authoring descendants.");
         juce::MemoryBlock pluginState;
+        require(processor.waitForHostStatePublication(),
+                "Package session state did not reach background host-state publication.");
         processor.getStateInformation(pluginState);
         const std::string serializedState(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
         require(serializedState.find("\"projectBinding\"") == std::string::npos,

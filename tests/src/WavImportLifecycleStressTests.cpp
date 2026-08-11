@@ -482,6 +482,9 @@ int main()
                     "Restore stress source could not dirty the project before host-state capture.");
             require(processor.getAuthoringSession().getDocumentState().dirty,
                     "Restore stress source did not produce a dirty project before host-state capture.");
+            processor.serviceMessageThreadWork();
+            require(processor.waitForHostStatePublication(),
+                    "Restore stress source checkpoint did not reach background host-state publication.");
             processor.getStateInformation(stateBlock);
             require(stateBlock.getSize() > 0,
                     "Restore stress source produced an empty host-state chunk.");

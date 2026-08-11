@@ -5,6 +5,7 @@
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -41,8 +42,33 @@ void settleWorker(drs::plugin::Processor& processor, const std::string& shellLab
 {
     require(processor.getEngineFacade().waitForPreparedPlaybackIdle(),
             shellLabel + " should settle prepared playback work off the audio thread.");
-    require(processor.serviceMessageThreadWork(),
-            shellLabel + " should apply worker completion and stage its normalized render model.");
+    processor.serviceMessageThreadWork();
+}
+
+void settleAuthoringPreview(drs::plugin::Processor& processor,
+                            const std::string& shellLabel)
+{
+    processor.requestAuthoringPreview(drs::engine::AuthoringPreviewScope::selectedZone);
+    for (int attempt = 0; attempt < 80; ++attempt)
+    {
+        processor.serviceMessageThreadWork();
+        processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::milliseconds(50));
+
+        auto controller = processor.getAuthoringPreviewControllerSnapshot();
+        if (controller.activationState == drs::engine::AuthoringPreviewActivationState::pending)
+        {
+            juce::AudioBuffer<float> activationBuffer(2, 64);
+            juce::MidiBuffer emptyMidi;
+            processor.processBlock(activationBuffer, emptyMidi);
+            processor.serviceMessageThreadWork();
+            controller = processor.getAuthoringPreviewControllerSnapshot();
+        }
+
+        if (controller.activationState == drs::engine::AuthoringPreviewActivationState::active)
+            return;
+    }
+
+    require(false, shellLabel + " should activate the requested authored Preview.");
 }
 
 float magnitude(const juce::AudioBuffer<float>& buffer, int start, int length)
@@ -103,9 +129,7 @@ ShellResult runShell(drs::plugin::Processor& processor,
     const auto selectedZone = processor.getAuthoringSession().getSelectedZone();
     require(selectedZone.has_value(), shellLabel + " should retain the selected authored zone.");
 
-    require(processor.getEngineFacade().refreshPreviewToCurrentDraft(),
-            shellLabel + " should accept Preview preparation.");
-    settleWorker(processor, shellLabel);
+    settleAuthoringPreview(processor, shellLabel);
     const auto previewPayload = processor.getEngineFacade().getPreviewActivationPayload();
     require(previewPayload != nullptr
                 && previewPayload->lane == drs::engine::PlaybackActivationLane::preview
