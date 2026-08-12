@@ -1168,13 +1168,13 @@ std::string buildCurrentDraftPreviewFingerprint(const drs::engine::RuntimeProjec
 }
 
 std::string buildSelectedGroupPreviewFingerprint(
-    const drs::engine::RuntimeProjectModel& project,
-    const std::optional<drs::engine::RuntimeProjectGroupDefinition>& selectedGroup)
+    const std::optional<drs::engine::RuntimeProjectGroupDefinition>& selectedGroup,
+    const std::string& currentDraftFingerprint)
 {
     if (!selectedGroup.has_value())
         return "no-group";
 
-    return selectedGroup->id + "|" + buildCurrentDraftPreviewFingerprint(project);
+    return selectedGroup->id + "|" + currentDraftFingerprint;
 }
 
 int computeToneRenderVelocity(const drs::engine::RuntimeSessionStateSnapshot& sessionState)
@@ -2406,6 +2406,7 @@ PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePack
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     authoringSession.replaceProject(buildSuppressedAuthoringProjectState());
+    invalidateCurrentDraftPreviewFingerprintCache();
     authoringProjectBinding = {};
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
@@ -2458,6 +2459,7 @@ PerformancePackageWorkspaceLoadResult Processor::activateOpenedPerformancePackag
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     authoringSession.replaceProject(buildSuppressedAuthoringProjectState());
+    invalidateCurrentDraftPreviewFingerprintCache();
     authoringProjectBinding = {};
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
@@ -2657,6 +2659,7 @@ void Processor::closePerformancePackageWorkspace(drs::engine::RuntimeProjectMode
     performancePlaybackContext.cancelPendingActivation();
     pendingPerformanceActivation.reset();
     authoringSession.replaceProject(std::move(unloadedProject));
+    invalidateCurrentDraftPreviewFingerprintCache();
     authoringProjectBinding = {};
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
@@ -2709,6 +2712,7 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
         return false;
 
     authoringSession.replaceProject(std::move(project));
+    invalidateCurrentDraftPreviewFingerprintCache();
     projectSourceValidationService.cancel("Authoring project replaced");
     authoringProjectBinding = replacementBinding.value_or(drs::engine::HostProjectBinding {});
     performancePlaybackContext.cancelPendingActivation();
@@ -2756,6 +2760,8 @@ bool Processor::applyAuthoringProjectMigration(drs::engine::RuntimeProjectModel 
     if (!migration.applied)
         return false;
 
+    invalidateCurrentDraftPreviewFingerprintCache();
+
     projectSourceValidationService.cancel("Authoring project migrated");
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
@@ -2775,6 +2781,7 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
     pendingPerformanceActivation.reset();
     engineFacade.closeDraftPlaybackProject();
     authoringSession.replaceProject(std::move(unloadedProject));
+    invalidateCurrentDraftPreviewFingerprintCache();
     clearAuthoringProjectFileBinding();
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
@@ -2799,6 +2806,26 @@ void Processor::closeAuthoringProject(drs::engine::RuntimeProjectModel unloadedP
 void Processor::refreshWorkspaceDocumentStateFromAuthoringProject()
 {
     workspaceDocumentState = buildAuthoringWorkspaceDocumentState(authoringSession, authoringProjectBinding);
+}
+
+void Processor::invalidateCurrentDraftPreviewFingerprintCache() noexcept
+{
+    currentDraftPreviewFingerprintRevision = std::numeric_limits<std::size_t>::max();
+    currentDraftPreviewFingerprint.clear();
+}
+
+const std::string& Processor::getCurrentDraftPreviewFingerprint(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::size_t documentRevision)
+{
+    if (currentDraftPreviewFingerprintRevision != documentRevision)
+    {
+        currentDraftPreviewFingerprint = buildCurrentDraftPreviewFingerprint(project);
+        currentDraftPreviewFingerprintRevision = documentRevision;
+        ++currentDraftPreviewFingerprintComputationCount;
+    }
+
+    return currentDraftPreviewFingerprint;
 }
 
 void Processor::queuePerformanceSurfaceNoteOn(int midiNoteNumber, float velocity)
@@ -3527,12 +3554,14 @@ bool Processor::serviceMessageThreadWork()
         : controllerBeforeRequest.currentRequest.invalidationCategory);
     const auto authoredContentFingerprint
         = requestedScope == drs::engine::AuthoringPreviewScope::currentDraft
-        ? buildCurrentDraftPreviewFingerprint(authoredProject)
+        ? getCurrentDraftPreviewFingerprint(authoredProject, authoringRevision)
         : (requestedScope == drs::engine::AuthoringPreviewScope::selectedGroup
-               ? buildSelectedGroupPreviewFingerprint(authoredProject, selectedGroup)
+               ? buildSelectedGroupPreviewFingerprint(
+                     selectedGroup,
+                     getCurrentDraftPreviewFingerprint(authoredProject, authoringRevision))
                : buildSelectedZonePreviewFingerprint(authoredProject,
-                                                    findProjectZone(authoredProject,
-                                                                    requestSelectedZoneId)));
+                                                      findProjectZone(authoredProject,
+                                                                      requestSelectedZoneId)));
     const auto requestSignature = drs::engine::buildAuthoringPreviewRequestSignature(
         requestedScope,
         requestSelectedZoneId,

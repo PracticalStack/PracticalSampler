@@ -313,6 +313,10 @@ public:
     void queuePerformanceSurfaceNoteOff(int midiNoteNumber);
     bool hasRecentAudioCallback(std::uint64_t maximumAgeMicros = 750000) const noexcept;
     bool serviceMessageThreadWork();
+    std::uint64_t getCurrentDraftPreviewFingerprintComputationCount() const noexcept
+    {
+        return currentDraftPreviewFingerprintComputationCount;
+    }
     ProcessorRealtimeSafetySnapshot getRealtimeSafetySnapshot() const;
     void setRealtimeGuardTestInjection(RealtimeGuardOperation operation);
     static constexpr RealtimeCallbackBudgetProfile getRealtimeCallbackBudgetProfile() { return {}; }
@@ -348,6 +352,10 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout();
     void resetAuthoringPreviewPreparationAuthorization() noexcept;
     void resetAuthoringWaveformPreviewAuthorization() noexcept;
+    void invalidateCurrentDraftPreviewFingerprintCache() noexcept;
+    const std::string& getCurrentDraftPreviewFingerprint(
+        const drs::engine::RuntimeProjectModel& project,
+        std::size_t documentRevision);
     void initializePublishedMacroRealtimeState();
     void installPublishedMacroBindings(
         const drs::engine::ImmutablePublishedMacroBindingTable& bindings) noexcept;
@@ -628,6 +636,9 @@ private:
     std::int64_t previousHostTransportTimeInSamples = 0;
     int previousHostTransportBlockSize = 0;
     std::size_t observedDraftPlaybackProjectRevision = std::numeric_limits<std::size_t>::max();
+    std::size_t currentDraftPreviewFingerprintRevision = std::numeric_limits<std::size_t>::max();
+    std::string currentDraftPreviewFingerprint;
+    std::uint64_t currentDraftPreviewFingerprintComputationCount = 0;
     std::uint64_t observedEngineStateRevision = 0;
     bool authoringPreviewDirectAuditionRequested = false;
     drs::engine::AuthoringPreviewScope authoringPreviewRequestedScope

@@ -168,6 +168,8 @@ int main(int argc, char** argv)
                 "The background serializer did not publish the newest valid Salamander checkpoint.");
 
         const auto previewDispatchStarted = Clock::now();
+        const auto fingerprintComputationsBeforePreview
+            = processor.getCurrentDraftPreviewFingerprintComputationCount();
         processor.requestAuthoringPreview(drs::engine::AuthoringPreviewScope::currentDraft);
         const auto previewDispatchMicros = elapsedMicros(previewDispatchStarted);
         processor.prepareToPlay(44100.0, 512);
@@ -197,6 +199,15 @@ int main(int argc, char** argv)
         require(previewReady, "Salamander full-draft Preview did not reach Ready.");
         require(observedSourceProgress,
                 "Salamander full-draft Preview exposed no per-source preparation progress.");
+        const auto fingerprintComputationsAfterPreview
+            = processor.getCurrentDraftPreviewFingerprintComputationCount();
+        require(fingerprintComputationsAfterPreview == fingerprintComputationsBeforePreview + 1,
+                "Salamander full-draft Preview recomputed its serialized project fingerprint while the authored revision was unchanged.");
+        for (auto tick = 0; tick < 8; ++tick)
+            processor.serviceMessageThreadWork();
+        require(processor.getCurrentDraftPreviewFingerprintComputationCount()
+                    == fingerprintComputationsAfterPreview,
+                "Repeated message-thread service ticks recomputed the unchanged full-draft project fingerprint.");
 
         const auto publishDispatchStarted = Clock::now();
         const auto publishAccepted = processor.submitPerformancePublishCommand(
@@ -244,6 +255,22 @@ int main(int argc, char** argv)
         processor.queuePerformanceSurfaceNoteOff(60);
         require(authoredNextBlockMagnitude > 0.0001f,
                 "The published Salamander keyboard note was not heard on the next audio block.");
+
+        const auto fingerprintComputationsBeforeEdit
+            = processor.getCurrentDraftPreviewFingerprintComputationCount();
+        const auto currentMasterGain = processor.getAuthoringSession().getProject().authoring.masterGainDb;
+        require(processor.getAuthoringSession().updateMasterGain(
+                    currentMasterGain + 0.125, "Exercise full-draft fingerprint invalidation").applied,
+                "Salamander fingerprint coverage could not advance the authored revision.");
+        processor.serviceMessageThreadWork();
+        require(processor.getCurrentDraftPreviewFingerprintComputationCount()
+                    == fingerprintComputationsBeforeEdit + 1,
+                "An authored revision change did not recompute the full-draft project fingerprint exactly once.");
+        for (auto tick = 0; tick < 4; ++tick)
+            processor.serviceMessageThreadWork();
+        require(processor.getCurrentDraftPreviewFingerprintComputationCount()
+                    == fingerprintComputationsBeforeEdit + 1,
+                "Message-thread service recomputed the revised full-draft fingerprint more than once.");
 
         const auto packageLoadStarted = Clock::now();
         const auto packageLoad = processor.loadPerformancePackageWorkspace(
