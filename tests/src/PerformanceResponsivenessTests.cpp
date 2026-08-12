@@ -6,7 +6,6 @@
 
 #include <array>
 #include <iostream>
-#include <memory>
 #include <stdexcept>
 
 namespace
@@ -35,7 +34,6 @@ int main()
         drs::engine::EngineFacade facade;
         facade.resetSessionStateToDefault();
 
-        auto presentation = std::make_shared<drs::engine::PerformancePublishPresentationSnapshot>();
         std::array<int, 128> queuedNotes {};
         std::size_t queuedCount = 0;
         drs::app::PerformancePanel panel(
@@ -47,10 +45,6 @@ int main()
             [&](const int note)
             {
                 if (queuedCount < queuedNotes.size()) queuedNotes[queuedCount++] = -note;
-            }, {},
-            [&]() -> std::shared_ptr<const drs::engine::PerformancePublishPresentationSnapshot>
-            {
-                return presentation;
             });
         panel.setSize(1280, 900);
 
@@ -79,19 +73,34 @@ int main()
                     .observationCount == 0,
                 "Performance note callbacks must not refresh the surface.");
 
-        presentation = std::make_shared<drs::engine::PerformancePublishPresentationSnapshot>(
-            *presentation);
-        presentation->publicationSequence = 1;
+        const auto topologyBeforeMacro
+            = facade.getPerformanceMacroTopologyRevision();
+        const auto valueBeforeMacro = facade.getPerformanceMacroValueRevision();
+        const auto macros = facade.getMacroDescriptors();
+        require(!macros.empty(), "Reference instrument exposes no macro for value-only coverage.");
+        panel.getKeyboardState().noteOn(1, 64, 0.75f);
+        require(facade.setMacroValue(macros.front().id,
+                                     macros.front().currentValue == macros.front().minValue
+                                         ? macros.front().maxValue : macros.front().minValue),
+                "Macro value-only coverage could not change the reference macro.");
+        panel.refreshNow();
+        panel.getKeyboardState().noteOff(1, 64, 0.75f);
+        metrics = drs::app::MessageThreadMetrics::getStatistics();
+        require(facade.getPerformanceMacroTopologyRevision() == topologyBeforeMacro
+                    && facade.getPerformanceMacroValueRevision() == valueBeforeMacro + 1,
+                "A macro value edit did not remain isolated to the value revision.");
+        require(statisticsFor(metrics, drs::app::MessageThreadSpanKind::performanceRefresh)
+                    .observationCount == 0,
+                "A macro value edit rebuilt the Performance surface.");
+
+        const auto draftRevision = facade.getDraftPlaybackStatus().draftRevision;
+        require(facade.stageDraftRevision(draftRevision + 1),
+                "Lifecycle coverage could not stage the next draft revision.");
         panel.refreshNow();
         metrics = drs::app::MessageThreadMetrics::getStatistics();
         require(statisticsFor(metrics, drs::app::MessageThreadSpanKind::performanceRefresh)
                     .observationCount == 1,
-                "A changed publication sequence must refresh the Performance surface once.");
-        panel.refreshNow();
-        metrics = drs::app::MessageThreadMetrics::getStatistics();
-        require(statisticsFor(metrics, drs::app::MessageThreadSpanKind::performanceRefresh)
-                    .observationCount == 1,
-                "A consumed publication sequence must not trigger another refresh.");
+                "A Publish lifecycle change did not refresh the Performance surface once.");
 
         std::cout << "Performance responsiveness tests passed; callbacks="
                   << keyboard.observationCount << " slowCallbacks=" << keyboard.slowCount

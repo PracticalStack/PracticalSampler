@@ -53,8 +53,10 @@ private:
     PublishPresentationProvider publishPresentationProvider;
     std::shared_ptr<const drs::engine::PerformancePublishPresentationSnapshot> publishPresentation;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
-    std::uint64_t lastObservedStateRevision = 0;
-    std::uint64_t lastObservedPublicationSequence = 0;
+    std::uint64_t lastObservedPublishLifecycleRevision = 0;
+    std::uint64_t lastObservedMacroTopologyRevision = 0;
+    std::uint64_t lastObservedMacroValueRevision = 0;
+    std::uint64_t lastObservedTelemetryRevision = 0;
 
     juce::Label titleLabel;
     juce::Label modeLabel;

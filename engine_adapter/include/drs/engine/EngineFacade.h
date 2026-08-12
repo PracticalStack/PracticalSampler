@@ -385,6 +385,22 @@ public:
     std::vector<HiseFrontendExportProfile> getFrontendExportProfiles() const;
     bool serviceBackgroundWork();
     std::uint64_t getStateRevision() const { return stateRevision; }
+    std::uint64_t getPerformancePublishLifecycleRevision() const noexcept
+    {
+        return performancePublishLifecycleRevision;
+    }
+    std::uint64_t getPerformanceMacroTopologyRevision() const noexcept
+    {
+        return performanceMacroTopologyRevision;
+    }
+    std::uint64_t getPerformanceMacroValueRevision() const noexcept
+    {
+        return performanceMacroValueRevision;
+    }
+    std::uint64_t getPerformanceTelemetryRevision() const noexcept
+    {
+        return performanceTelemetryRevision;
+    }
     EngineStatusSnapshot getStatusSnapshot() const;
     RuntimeManifestLoadResult loadPhase1ReferenceInstrument() const;
     RuntimeStreamLoadResult loadPhase1ReferenceStream() const;
@@ -530,6 +546,7 @@ private:
     void initializeDraftPlaybackContract(bool activatePerformanceRevision,
                                          bool bootstrapPreparedPlayback = true);
     void refreshDiagnosticsSnapshot();
+    void refreshPerformanceMacroRevisions();
 
     RuntimeManifestLoadResult bundledReferenceManifest;
     RuntimeStreamLoadResult bundledReferenceStream;
@@ -560,6 +577,11 @@ private:
     std::uint64_t nextPerformanceActivationToken = 1;
     std::shared_ptr<const PerformancePublishPresentationSnapshot> performancePublishPresentation;
     std::uint64_t nextPerformancePublishPresentationSequence = 1;
+    std::uint64_t performancePublishLifecycleRevision = 0;
+    std::uint64_t performanceMacroTopologyRevision = 0;
+    std::uint64_t performanceMacroValueRevision = 0;
+    std::uint64_t performanceTelemetryRevision = 0;
+    std::vector<EngineMacroDescriptor> lastPerformanceMacroDescriptors;
 };
 
 PreparedPerformancePackageActivationResult preparePerformancePackageActivation(

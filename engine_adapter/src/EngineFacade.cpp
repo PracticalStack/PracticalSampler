@@ -29,6 +29,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -164,6 +165,82 @@ double normalizeMacroValue(double value)
 {
     constexpr auto precisionScale = 1000000.0;
     return std::round(value * precisionScale) / precisionScale;
+}
+
+bool sameCompiledControlLaw(const CompiledControlLaw& left,
+                            const CompiledControlLaw& right) noexcept
+{
+    if (left.kind != right.kind || left.version != right.version
+        || left.pointCount != right.pointCount)
+        return false;
+
+    for (std::size_t index = 0; index < left.points.size(); ++index)
+    {
+        if (left.points[index].normalized != right.points[index].normalized
+            || left.points[index].physical != right.points[index].physical)
+            return false;
+    }
+    return true;
+}
+
+bool sameMacroTopology(const EngineMacroDescriptor& left,
+                       const EngineMacroDescriptor& right) noexcept
+{
+    return std::tie(left.id, left.name, left.minValue, left.maxValue,
+                    left.defaultValue, left.ownershipKey, left.soundIntent,
+                    left.publishedControl, left.exposedInPerformance,
+                    left.sectionLabel, left.parameterLabel, left.valueUnit,
+                    left.controlKind, left.authoredOrder,
+                    left.accessibilityDescription, left.displayMinimum,
+                    left.displayMaximum, left.authoredId)
+        == std::tie(right.id, right.name, right.minValue, right.maxValue,
+                    right.defaultValue, right.ownershipKey, right.soundIntent,
+                    right.publishedControl, right.exposedInPerformance,
+                    right.sectionLabel, right.parameterLabel, right.valueUnit,
+                    right.controlKind, right.authoredOrder,
+                    right.accessibilityDescription, right.displayMinimum,
+                    right.displayMaximum, right.authoredId)
+        && sameCompiledControlLaw(left.controlLaw, right.controlLaw);
+}
+
+bool sameMacroValuePresentation(const EngineMacroDescriptor& left,
+                                const EngineMacroDescriptor& right) noexcept
+{
+    return left.id == right.id
+        && left.currentValue == right.currentValue
+        && left.currentEffect == right.currentEffect;
+}
+
+bool hasSamePublishLifecycle(
+    const PerformancePublishPresentationSnapshot& left,
+    const PerformancePublishPresentationSnapshot& right) noexcept
+{
+    return std::tie(
+        left.projectOpen, left.canPublish, left.dirty,
+        left.hasRequestedPublish, left.hasActivePublished,
+        left.hasLastKnownGood, left.hasFailure, left.state,
+        left.stateLabel, left.guidance, left.progressLabel, left.progress,
+        left.draftRevision, left.draftContentDigest,
+        left.previewRevision, left.previewContentDigest,
+        left.requestedPublishRevision, left.requestedPublishDigest,
+        left.activePublishedRevision, left.activePublishedDigest,
+        left.failedRevision, left.failedDigest,
+        left.lastKnownGoodRevision, left.lastKnownGoodDigest,
+        left.findingCode, left.findingPath, left.findingMessage,
+        left.preparedBuildId)
+        == std::tie(
+        right.projectOpen, right.canPublish, right.dirty,
+        right.hasRequestedPublish, right.hasActivePublished,
+        right.hasLastKnownGood, right.hasFailure, right.state,
+        right.stateLabel, right.guidance, right.progressLabel, right.progress,
+        right.draftRevision, right.draftContentDigest,
+        right.previewRevision, right.previewContentDigest,
+        right.requestedPublishRevision, right.requestedPublishDigest,
+        right.activePublishedRevision, right.activePublishedDigest,
+        right.failedRevision, right.failedDigest,
+        right.lastKnownGoodRevision, right.lastKnownGoodDigest,
+        right.findingCode, right.findingPath, right.findingMessage,
+        right.preparedBuildId);
 }
 
 double computePreparationCacheHitRate(const std::size_t hits, const std::size_t misses)
@@ -2339,6 +2416,7 @@ bool EngineFacade::setSelectedArticulation(const std::string& articulationId)
     syncPreviewSnapshotFromDraftPlayback();
     previewPlaybackSnapshot.articulationId = articulationId;
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    refreshPerformanceMacroRevisions();
     markStateChanged();
     return true;
 }
@@ -2403,6 +2481,7 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
     }
 
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    refreshPerformanceMacroRevisions();
     markStateChanged();
     return true;
 }
@@ -3410,7 +3489,27 @@ bool EngineFacade::completePendingPreviewReusePublish()
 
 void EngineFacade::markStateChanged()
 {
+    refreshPerformanceMacroRevisions();
     ++stateRevision;
+}
+
+void EngineFacade::refreshPerformanceMacroRevisions()
+{
+    auto nextDescriptors = getMacroDescriptors();
+    const auto sameTopology = lastPerformanceMacroDescriptors.size() == nextDescriptors.size()
+        && std::equal(lastPerformanceMacroDescriptors.begin(),
+                      lastPerformanceMacroDescriptors.end(),
+                      nextDescriptors.begin(), sameMacroTopology);
+    const auto sameValues = sameTopology
+        && std::equal(lastPerformanceMacroDescriptors.begin(),
+                      lastPerformanceMacroDescriptors.end(),
+                      nextDescriptors.begin(), sameMacroValuePresentation);
+
+    if (!sameTopology)
+        ++performanceMacroTopologyRevision;
+    if (!sameValues)
+        ++performanceMacroValueRevision;
+    lastPerformanceMacroDescriptors = std::move(nextDescriptors);
 }
 
 void EngineFacade::clearPendingPreparedCompletions()
@@ -4037,19 +4136,34 @@ void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevis
 
 void EngineFacade::refreshDiagnosticsSnapshot()
 {
+    ++performanceTelemetryRevision;
+    refreshPerformanceMacroRevisions();
     diagnosticsSnapshot = {};
     syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
     syncDraftPlaybackIntoDiagnostics(draftPlaybackContract.getStatus(), diagnosticsSnapshot);
     syncPreparedPlaybackWorkerIntoDiagnostics(preparedPlaybackService.getWorkerStatus(), diagnosticsSnapshot);
-    auto publishPresentation = std::make_shared<const PerformancePublishPresentationSnapshot>(
-        buildPerformancePublishPresentationSnapshot(
-            draftPlaybackContract.getStatus(),
-            performancePublishController.getSnapshot(),
-            preparedPlaybackService.getWorkerStatus(),
-            nextPerformancePublishPresentationSequence++));
-    std::atomic_store_explicit(&performancePublishPresentation,
-                               std::move(publishPresentation),
-                               std::memory_order_release);
+    auto nextPresentation = buildPerformancePublishPresentationSnapshot(
+        draftPlaybackContract.getStatus(),
+        performancePublishController.getSnapshot(),
+        preparedPlaybackService.getWorkerStatus(), 0);
+    const auto previousPresentation = getPerformancePublishPresentationSnapshot();
+    if (previousPresentation == nullptr
+        || !hasSamePublishLifecycle(*previousPresentation, nextPresentation))
+    {
+        ++performancePublishLifecycleRevision;
+    }
+    if (previousPresentation == nullptr
+        || !hasSamePerformancePublishPresentationSemantics(
+            *previousPresentation, nextPresentation))
+    {
+        nextPresentation.publicationSequence
+            = nextPerformancePublishPresentationSequence++;
+        std::atomic_store_explicit(
+            &performancePublishPresentation,
+            std::make_shared<const PerformancePublishPresentationSnapshot>(
+                std::move(nextPresentation)),
+            std::memory_order_release);
+    }
     if (const auto presentation = getPerformancePublishPresentationSnapshot())
         diagnosticsSnapshot.publishedPresentationState = presentation->state;
     applyPreparedCachePressurePolicy(diagnosticsSnapshot);

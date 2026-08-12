@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -59,6 +60,19 @@ juce::Component* findById(juce::Component& root, const juce::String& id)
     return nullptr;
 }
 
+template <typename ComponentType>
+ComponentType* findByType(juce::Component& root)
+{
+    if (auto* match = dynamic_cast<ComponentType*>(&root))
+        return match;
+    for (int index = 0; index < root.getNumChildComponents(); ++index)
+    {
+        if (auto* match = findByType<ComponentType>(*root.getChildComponent(index)))
+            return match;
+    }
+    return nullptr;
+}
+
 double maximumFor(const std::vector<drs::app::MessageThreadSpanStatistics>& statistics,
                   const drs::app::MessageThreadSpanKind kind)
 {
@@ -68,6 +82,18 @@ double maximumFor(const std::vector<drs::app::MessageThreadSpanStatistics>& stat
             return span.maximumMilliseconds;
     }
     return 0.0;
+}
+
+std::uint64_t observationsFor(
+    const std::vector<drs::app::MessageThreadSpanStatistics>& statistics,
+    const drs::app::MessageThreadSpanKind kind)
+{
+    for (const auto& span : statistics)
+    {
+        if (span.kind == kind)
+            return span.observationCount;
+    }
+    return 0;
 }
 } // namespace
 
@@ -245,6 +271,96 @@ int main(int argc, char** argv)
                         == authoredPlaybackStatus.preview.preparedBuildId,
                 "Salamander Publish did not preserve the exact Preview build identities.");
 
+        std::unique_ptr<juce::AudioProcessorEditor> authoredEditor(processor.createEditor());
+        require(authoredEditor != nullptr, "Could not create the real 4 Hz plug-in editor.");
+        auto* authoredPerformancePanel
+            = findByType<drs::app::PerformancePanel>(*authoredEditor);
+        require(authoredPerformancePanel != nullptr,
+                "The plug-in editor did not expose its Performance surface.");
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(300);
+        drs::app::MessageThreadMetrics::resetForTests();
+
+        authoredPerformancePanel->getKeyboardState().noteOn(1, 60, 0.8f);
+        juce::AudioBuffer<float> authoredOnScreenBlock(2, 512);
+        authoredOnScreenBlock.clear();
+        juce::MidiBuffer authoredOnScreenMidi;
+        processor.processBlock(authoredOnScreenBlock, authoredOnScreenMidi);
+        const auto authoredOnScreenMagnitude = authoredOnScreenBlock.getMagnitude(
+            0, authoredOnScreenBlock.getNumSamples());
+        authoredPerformancePanel->getKeyboardState().noteOff(1, 60, 0.8f);
+        juce::AudioBuffer<float> authoredReleaseBlock(2, 512);
+        authoredReleaseBlock.clear();
+        juce::MidiBuffer authoredReleaseMidi;
+        processor.processBlock(authoredReleaseBlock, authoredReleaseMidi);
+
+        juce::AudioBuffer<float> authoredHostBlock(2, 512);
+        authoredHostBlock.clear();
+        juce::MidiBuffer authoredHostMidi;
+        authoredHostMidi.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
+        processor.processBlock(authoredHostBlock, authoredHostMidi);
+        const auto authoredHostMagnitude = authoredHostBlock.getMagnitude(
+            0, authoredHostBlock.getNumSamples());
+        require(authoredOnScreenMagnitude > 0.0001f && authoredHostMagnitude > 0.0001f,
+                "Host and on-screen MIDI did not both render the large published piano.");
+        juce::AudioBuffer<float> authoredHostReleaseBlock(2, 512);
+        authoredHostReleaseBlock.clear();
+        juce::MidiBuffer authoredHostReleaseMidi;
+        authoredHostReleaseMidi.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+        processor.processBlock(authoredHostReleaseBlock, authoredHostReleaseMidi);
+
+        const auto fingerprintComputationsBeforeContinuousPlaying
+            = processor.getCurrentDraftPreviewFingerprintComputationCount();
+        constexpr auto continuousPlaybackSeconds = 180;
+        const auto continuousBlockCount = static_cast<int>(
+            (continuousPlaybackSeconds * 44100 + 511) / 512);
+        for (int blockIndex = 0; blockIndex < continuousBlockCount; ++blockIndex)
+        {
+            if ((blockIndex % 384) == 0)
+            {
+                for (const auto note : { 48, 52, 55, 60 })
+                    authoredPerformancePanel->getKeyboardState().noteOn(1, note, 0.72f);
+            }
+            if ((blockIndex % 384) == 96)
+            {
+                for (const auto note : { 48, 52, 55, 60 })
+                    authoredPerformancePanel->getKeyboardState().noteOff(1, note, 0.72f);
+            }
+
+            juce::AudioBuffer<float> playbackBlock(2, 512);
+            playbackBlock.clear();
+            juce::MidiBuffer playbackMidi;
+            if (blockIndex == 0)
+                playbackMidi.addEvent(juce::MidiMessage::controllerEvent(1, 64, 127), 0);
+            if (blockIndex == continuousBlockCount - 1)
+                playbackMidi.addEvent(juce::MidiMessage::controllerEvent(1, 64, 0), 0);
+            processor.processBlock(playbackBlock, playbackMidi);
+
+            // Dispatch the actual editor timer while advancing three minutes of
+            // audio faster than realtime. The editor owns the production 4 Hz loop.
+            if ((blockIndex % 8) == 0)
+                juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
+        }
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(300);
+        const auto continuousMetrics = drs::app::MessageThreadMetrics::getStatistics();
+        require(maximumFor(continuousMetrics,
+                           drs::app::MessageThreadSpanKind::performanceRefresh) == 0.0,
+                "Notes, chords, sustain, releases, or timer ticks rebuilt the large-piano Performance surface.");
+        require(maximumFor(continuousMetrics,
+                           drs::app::MessageThreadSpanKind::performanceKeyboardCallback) < 1.0,
+                "A large-piano keyboard callback exceeded the 1 ms queue-only budget.");
+        require(observationsFor(continuousMetrics,
+                                drs::app::MessageThreadSpanKind::editorTimerWork) >= 4,
+                "Continuous-playing coverage did not exercise the real 4 Hz editor loop.");
+        require(processor.getCurrentDraftPreviewFingerprintComputationCount()
+                    == fingerprintComputationsBeforeContinuousPlaying,
+                "Continuous playing fingerprinted or resolved the unchanged authored project on the message thread.");
+        const auto continuousRealtimeSafety = processor.getRealtimeSafetySnapshot();
+        require(continuousRealtimeSafety.samplePathResolutionsOnAudioThread == 0
+                    && continuousRealtimeSafety.sampleDecodeEntriesOnAudioThread == 0
+                    && continuousRealtimeSafety.authoringSampleLoadsOnAudioThread == 0,
+                "Continuous playing opened, resolved, or decoded sample files from the realtime path.");
+        authoredEditor.reset();
+
         processor.queuePerformanceSurfaceNoteOn(60, 0.8f);
         juce::AudioBuffer<float> authoredNoteBlock(2, 512);
         authoredNoteBlock.clear();
@@ -280,36 +396,55 @@ int main(int argc, char** argv)
         processor.prepareToPlay(44100.0, 512);
         processor.serviceMessageThreadWork();
 
-        drs::app::PerformancePanel performancePanel(
-            processor.getEngineFacade(),
-            {},
-            [&processor](const int note, const float velocity)
-            {
-                processor.queuePerformanceSurfaceNoteOn(note, velocity);
-            },
-            [&processor](const int note)
-            {
-                processor.queuePerformanceSurfaceNoteOff(note);
-            });
-        performancePanel.setSize(1280, 900);
-        performancePanel.refreshNow();
+        std::unique_ptr<juce::AudioProcessorEditor> packageEditor(processor.createEditor());
+        require(packageEditor != nullptr, "Could not create the package Performance editor.");
+        auto* performancePanel = findByType<drs::app::PerformancePanel>(*packageEditor);
+        require(performancePanel != nullptr,
+                "The package editor did not expose its Performance surface.");
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(300);
 
         const auto performanceRefreshStarted = Clock::now();
-        performancePanel.refreshNow();
+        performancePanel->refreshNow();
         const auto performanceRefreshMicros = elapsedMicros(performanceRefreshStarted);
 
+        drs::app::MessageThreadMetrics::resetForTests();
+        const auto presentationBeforeTimer
+            = processor.getPerformancePublishPresentationSnapshot();
+        const auto lifecycleBeforeTimer = processor.getEngineFacade()
+            .getPerformancePublishLifecycleRevision();
+        const auto telemetryBeforeTimer = processor.getEngineFacade()
+            .getPerformanceTelemetryRevision();
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(1300);
+        const auto presentationAfterTimer
+            = processor.getPerformancePublishPresentationSnapshot();
+        const auto timerMetrics = drs::app::MessageThreadMetrics::getStatistics();
+        require(presentationBeforeTimer == presentationAfterTimer,
+                "The 4 Hz service loop republished an unchanged Publish presentation snapshot.");
+        require(processor.getEngineFacade().getPerformancePublishLifecycleRevision()
+                    == lifecycleBeforeTimer,
+                "Package telemetry advanced the Publish lifecycle revision.");
+        require(processor.getEngineFacade().getPerformanceTelemetryRevision()
+                    > telemetryBeforeTimer,
+                "The 4 Hz package loop did not advance Diagnostics telemetry.");
+        require(maximumFor(timerMetrics,
+                           drs::app::MessageThreadSpanKind::performanceRefresh) == 0.0,
+                "Package telemetry rebuilt the Performance surface.");
+        require(observationsFor(timerMetrics,
+                                drs::app::MessageThreadSpanKind::editorTimerWork) >= 4,
+                "Package telemetry coverage did not exercise the real 4 Hz editor loop.");
+
         const auto keyboardStarted = Clock::now();
-        performancePanel.getKeyboardState().noteOn(1, 60, 0.8f);
-        performancePanel.getKeyboardState().noteOff(1, 60, 0.8f);
+        performancePanel->getKeyboardState().noteOn(1, 60, 0.8f);
+        performancePanel->getKeyboardState().noteOff(1, 60, 0.8f);
         const auto keyboardCallbacksMicros = elapsedMicros(keyboardStarted);
 
-        performancePanel.getKeyboardState().noteOn(1, 69, 0.8f);
+        performancePanel->getKeyboardState().noteOn(1, 69, 0.8f);
         juce::AudioBuffer<float> firstAudioBlock(2, 512);
         firstAudioBlock.clear();
         juce::MidiBuffer emptyMidi;
         processor.processBlock(firstAudioBlock, emptyMidi);
         const auto nextBlockMagnitude = firstAudioBlock.getMagnitude(0, firstAudioBlock.getNumSamples());
-        performancePanel.getKeyboardState().noteOff(1, 69, 0.8f);
+        performancePanel->getKeyboardState().noteOff(1, 69, 0.8f);
         require(nextBlockMagnitude > 0.0001f,
                 "A queued Performance keyboard note was not heard on the next audio block.");
 
@@ -340,6 +475,9 @@ int main(int argc, char** argv)
                << "  \"publishReusedPreviewPayload\": "
                << (authoredPlaybackStatus.performance.reusedPreviewPayload ? "true" : "false") << ",\n"
                << "  \"authoredNextBlockMagnitude\": " << authoredNextBlockMagnitude << ",\n"
+               << "  \"continuousPlaybackSeconds\": " << continuousPlaybackSeconds << ",\n"
+               << "  \"authoredOnScreenMagnitude\": " << authoredOnScreenMagnitude << ",\n"
+               << "  \"authoredHostMagnitude\": " << authoredHostMagnitude << ",\n"
                << "  \"packageLoadMicros\": " << packageLoadMicros << ",\n"
                << "  \"performanceRefreshMicros\": " << performanceRefreshMicros << ",\n"
                << "  \"keyboardCallbacksMicros\": " << keyboardCallbacksMicros << ",\n"

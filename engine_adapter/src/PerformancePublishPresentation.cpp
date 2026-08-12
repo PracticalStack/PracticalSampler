@@ -1,7 +1,38 @@
 #include "drs/engine/PerformancePublishPresentation.h"
 
+#include <tuple>
+
 namespace drs::engine
 {
+bool hasSamePerformancePublishPresentationSemantics(
+    const PerformancePublishPresentationSnapshot& left,
+    const PerformancePublishPresentationSnapshot& right) noexcept
+{
+    const auto semanticFields = [](const PerformancePublishPresentationSnapshot& value)
+    {
+        return std::tie(
+            value.projectOpen, value.canPublish, value.dirty,
+            value.hasRequestedPublish, value.hasActivePublished,
+            value.hasLastKnownGood, value.hasFailure, value.state,
+            value.stateLabel, value.guidance, value.progressLabel, value.progress,
+            value.draftRevision, value.draftContentDigest,
+            value.previewRevision, value.previewContentDigest,
+            value.requestedPublishRevision, value.requestedPublishDigest,
+            value.activePublishedRevision, value.activePublishedDigest,
+            value.failedRevision, value.failedDigest,
+            value.lastKnownGoodRevision, value.lastKnownGoodDigest,
+            value.activeMacroSchemaDigest, value.findingCode, value.findingPath,
+            value.findingMessage, value.exposedMacroCount, value.hiddenMacroCount,
+            value.assignedMacroCount, value.unassignedMacroCount,
+            value.availableHostSlotCount, value.activeHostSlotCount,
+            value.preparedBuildId, value.activePayloadBytes,
+            value.pendingWorkCount, value.inFlightWorkCount,
+            value.lastPreparationMicros, value.lastRequestToReadyMicros,
+            value.lastRequestToActiveMicros);
+    };
+    return semanticFields(left) == semanticFields(right);
+}
+
 const char* toString(PerformancePublishPresentationState state) noexcept
 {
     switch (state)

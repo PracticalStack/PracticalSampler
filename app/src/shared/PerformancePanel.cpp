@@ -324,17 +324,19 @@ void PerformancePanel::resized()
 
 void PerformancePanel::refreshNow()
 {
-    const auto publishPresentation = publishPresentationProvider
-        ? publishPresentationProvider()
-        : engineFacade.getPerformancePublishPresentationSnapshot();
-    const auto publicationSequence = publishPresentation != nullptr
-        ? publishPresentation->publicationSequence : std::uint64_t { 0 };
     if (initialRevisionCheckPending
-        || lastObservedStateRevision != engineFacade.getStateRevision()
-        || lastObservedPublicationSequence != publicationSequence)
+        || lastObservedPublishLifecycleRevision
+            != engineFacade.getPerformancePublishLifecycleRevision()
+        || lastObservedMacroTopologyRevision
+            != engineFacade.getPerformanceMacroTopologyRevision())
     {
         refreshSurface();
         initialRevisionCheckPending = false;
+    }
+    else if (lastObservedMacroValueRevision
+             != engineFacade.getPerformanceMacroValueRevision())
+    {
+        refreshMacroValues();
     }
     diagnosticsPanel.refreshNow();
 }
@@ -378,6 +380,9 @@ void PerformancePanel::rebuildMacroControls(
 
     if (mixerControl)
     {
+        visibleMacroIds.reserve(macros.size());
+        for (const auto& macro : macros)
+            visibleMacroIds.push_back(macro.id);
         publishedMixer.setControls(buildPublishedMixerControls(macros));
         return;
     }
@@ -478,14 +483,17 @@ void PerformancePanel::refreshSurface()
 {
     const ScopedMessageThreadSpan timing(MessageThreadSpanKind::performanceRefresh);
     performanceSnapshot = engineFacade.getPerformanceSnapshot();
-    lastObservedStateRevision = engineFacade.getStateRevision();
+    lastObservedPublishLifecycleRevision
+        = engineFacade.getPerformancePublishLifecycleRevision();
+    lastObservedMacroTopologyRevision
+        = engineFacade.getPerformanceMacroTopologyRevision();
+    lastObservedMacroValueRevision
+        = engineFacade.getPerformanceMacroValueRevision();
     const auto allMacros = engineFacade.getMacroDescriptors();
     const auto macroSurface = buildPerformanceMacroSurfaceModel(allMacros);
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
-    lastObservedPublicationSequence = publishPresentation != nullptr
-        ? publishPresentation->publicationSequence : std::uint64_t { 0 };
     refreshArtwork();
 
     hiddenPublishedMacroCount = macroSurface.hiddenPublishedMacroCount;
@@ -496,10 +504,6 @@ void PerformancePanel::refreshSurface()
     {
         rebuildMacroControls(macroSurface.displayedMacros, macroSurface.showingPublishedMixer);
         resized();
-    }
-    else if (macroSurface.showingPublishedMixer)
-    {
-        publishedMixer.setControls(buildPublishedMixerControls(macroSurface.displayedMacros));
     }
 
     juce::String loadIndicatorText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
@@ -550,16 +554,49 @@ void PerformancePanel::refreshSurface()
     mixerEmptyStateLabel.setDescription(mixerEmptyText);
     syncKeyboardPlayableRange();
 
-    for (std::size_t index = 0;
-         index < std::min(macroSurface.displayedMacros.size(), macroControls.size());
-         ++index)
+    updateMacroValues(macroSurface.displayedMacros);
+
+    diagnosticsPanel.repaint();
+}
+
+void PerformancePanel::refreshMacroValues()
+{
+    const auto macroSurface = buildPerformanceMacroSurfaceModel(
+        engineFacade.getMacroDescriptors());
+    if (!sameMacroLayout(visibleMacroIds, macroSurface.displayedMacros,
+                         showingPublishedMixer,
+                         macroSurface.showingPublishedMixer))
     {
-        auto& control = macroControls[index];
-        const auto& macro = macroSurface.displayedMacros[index];
+        refreshSurface();
+        return;
+    }
+
+    updateMacroValues(macroSurface.displayedMacros);
+    lastObservedMacroValueRevision
+        = engineFacade.getPerformanceMacroValueRevision();
+}
+
+void PerformancePanel::updateMacroValues(
+    const std::vector<drs::engine::EngineMacroDescriptor>& macros)
+{
+    if (showingPublishedMixer)
+    {
+        publishedMixer.updateControlValues(buildPublishedMixerControls(macros));
+        return;
+    }
+
+    for (auto& control : macroControls)
+    {
+        const auto found = std::find_if(macros.begin(), macros.end(), [&](const auto& macro)
+        {
+            return macro.id == control->id;
+        });
+        if (found == macros.end())
+            continue;
+
+        const auto& macro = *found;
         const auto currentEffect = juce::String::fromUTF8(macro.currentEffect.c_str());
         const auto currentValueText = juce::String(macro.currentValue, 3);
-        control->nameLabel.setText(juce::String::fromUTF8(macro.name.c_str()), juce::dontSendNotification);
-        control->slider.setRange(macro.minValue, macro.maxValue, 0.001);
         control->slider.setValue(macro.currentValue, juce::dontSendNotification);
         control->valueLabel.setText(
             currentEffect.isNotEmpty() ? currentValueText + " | " + currentEffect : currentValueText,
@@ -572,8 +609,6 @@ void PerformancePanel::refreshSurface()
         control->nameLabel.setTooltip(controlDescription);
         control->valueLabel.setTooltip(controlDescription);
     }
-
-    diagnosticsPanel.repaint();
 }
 
 void PerformancePanel::syncKeyboardPlayableRange()

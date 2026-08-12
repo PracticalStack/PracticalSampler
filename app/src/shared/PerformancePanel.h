@@ -67,6 +67,8 @@ private:
                               bool mixerControl);
     void refreshArtwork();
     void refreshSurface();
+    void refreshMacroValues();
+    void updateMacroValues(const std::vector<drs::engine::EngineMacroDescriptor>& macros);
     void syncKeyboardPlayableRange();
 
     drs::engine::EngineFacade& engineFacade;
@@ -80,8 +82,9 @@ private:
     juce::String publishedPerformanceGuidance;
     juce::String publishedPerformanceFindingCode;
     drs::engine::EnginePerformanceSnapshot performanceSnapshot;
-    std::uint64_t lastObservedStateRevision = 0;
-    std::uint64_t lastObservedPublicationSequence = 0;
+    std::uint64_t lastObservedPublishLifecycleRevision = 0;
+    std::uint64_t lastObservedMacroTopologyRevision = 0;
+    std::uint64_t lastObservedMacroValueRevision = 0;
     bool initialRevisionCheckPending = true;
     bool showingPublishedMixer = false;
     std::size_t hiddenPublishedMacroCount = 0;

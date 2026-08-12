@@ -168,6 +168,42 @@ public:
         syncing = false;
     }
 
+    void updateValue(const double value)
+    {
+        if (view.value == value)
+            return;
+
+        view.value = value;
+        const auto description = laneDescription(view);
+        setDescription(description);
+        valueLabel.setText(formatValue(view), juce::dontSendNotification);
+        valueLabel.setTooltip(valueLabel.getText());
+        valueLabel.setDescription(description);
+        nameLabel.setDescription(description);
+
+        syncing = true;
+        if (view.controlKind == drs::engine::PublishedMacroControlKind::toggle)
+        {
+            toggle.setButtonText(view.value >= 0.5 ? "On" : "Off");
+            toggle.setToggleState(view.value >= 0.5, juce::dontSendNotification);
+            toggle.setDescription(description);
+            toggle.setTooltip(description);
+        }
+        else
+        {
+            slider.setValue(view.value, juce::dontSendNotification);
+            auto sliderDescription = description;
+            if (view.controlKind == drs::engine::PublishedMacroControlKind::fader
+                && view.controlLaw.kind == drs::engine::ControlLawKind::mixerGainV1)
+            {
+                sliderDescription += " Double-click returns to unity gain; the minimum value is minus infinity.";
+            }
+            slider.setDescription(sliderDescription);
+            slider.setTooltip(description);
+        }
+        syncing = false;
+    }
+
     void paint(juce::Graphics& graphics) override
     {
         graphics.setColour(mixerCardColour);
@@ -251,6 +287,24 @@ void PerformanceMixer::setControls(std::vector<PerformanceMixerControlView> next
     {
         for (std::size_t index = 0; index < lanes.size(); ++index)
             lanes[index]->applyView(controls[index]);
+    }
+}
+
+void PerformanceMixer::updateControlValues(
+    const std::vector<PerformanceMixerControlView>& nextControls)
+{
+    for (std::size_t index = 0; index < controls.size() && index < lanes.size(); ++index)
+    {
+        const auto next = std::find_if(nextControls.begin(), nextControls.end(),
+                                       [&](const auto& candidate)
+                                       {
+                                           return candidate.runtimeId == controls[index].runtimeId;
+                                       });
+        if (next == nextControls.end())
+            continue;
+
+        controls[index].value = next->value;
+        lanes[index]->updateValue(next->value);
     }
 }
 

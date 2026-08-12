@@ -342,13 +342,14 @@ void StatusPanel::resized()
 
 void StatusPanel::refreshNow()
 {
-    const auto nextPresentation = publishPresentationProvider
-        ? publishPresentationProvider()
-        : engineFacade.getPerformancePublishPresentationSnapshot();
-    const auto publicationSequence = nextPresentation != nullptr
-        ? nextPresentation->publicationSequence : std::uint64_t { 0 };
-    if (lastObservedStateRevision != engineFacade.getStateRevision()
-        || lastObservedPublicationSequence != publicationSequence)
+    if (lastObservedPublishLifecycleRevision
+            != engineFacade.getPerformancePublishLifecycleRevision()
+        || lastObservedMacroTopologyRevision
+            != engineFacade.getPerformanceMacroTopologyRevision()
+        || lastObservedMacroValueRevision
+            != engineFacade.getPerformanceMacroValueRevision()
+        || lastObservedTelemetryRevision
+            != engineFacade.getPerformanceTelemetryRevision())
     {
         refreshSnapshot();
     }
@@ -403,9 +404,14 @@ void StatusPanel::refreshSnapshot()
     publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
-    lastObservedStateRevision = engineFacade.getStateRevision();
-    lastObservedPublicationSequence = publishPresentation != nullptr
-        ? publishPresentation->publicationSequence : std::uint64_t { 0 };
+    lastObservedPublishLifecycleRevision
+        = engineFacade.getPerformancePublishLifecycleRevision();
+    lastObservedMacroTopologyRevision
+        = engineFacade.getPerformanceMacroTopologyRevision();
+    lastObservedMacroValueRevision
+        = engineFacade.getPerformanceMacroValueRevision();
+    lastObservedTelemetryRevision
+        = engineFacade.getPerformanceTelemetryRevision();
     const auto& diagnostics = snapshot.diagnostics;
     const auto macros = engineFacade.getMacroDescriptors();
 

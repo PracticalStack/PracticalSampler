@@ -48,6 +48,7 @@ public:
     ~PerformanceMixer() override;
 
     void setControls(std::vector<PerformanceMixerControlView> controls);
+    void updateControlValues(const std::vector<PerformanceMixerControlView>& controls);
     std::size_t getControlCount() const noexcept;
     LayoutSnapshot getLayoutSnapshot() const noexcept;
     void resized() override;

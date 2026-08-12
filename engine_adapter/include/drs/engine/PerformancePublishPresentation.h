@@ -64,5 +64,12 @@ PerformancePublishPresentationSnapshot buildPerformancePublishPresentationSnapsh
     const PreparedPlaybackWorkerStatus& worker,
     std::uint64_t publicationSequence);
 
+// publicationSequence is transport identity, not presentation content. This
+// comparison lets the publisher retain the current immutable snapshot when a
+// service tick produces the same observable presentation.
+bool hasSamePerformancePublishPresentationSemantics(
+    const PerformancePublishPresentationSnapshot& left,
+    const PerformancePublishPresentationSnapshot& right) noexcept;
+
 const char* toString(PerformancePublishPresentationState state) noexcept;
 } // namespace drs::engine
