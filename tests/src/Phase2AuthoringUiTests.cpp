@@ -815,6 +815,38 @@ void exerciseDraftPlaybackFailureVisibility()
             "A failed draft build should retain an enabled retry action after the project is corrected.");
 }
 
+void exerciseDraftPlaybackProgressVisibility()
+{
+    const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
+    require(projectLoad.loaded,
+            "Draft playback progress visibility requires the reference authoring project.");
+    drs::engine::AuthoringSession session(projectLoad.project);
+    auto playbackStatus = makeDraftPlaybackStatusFixture();
+    playbackStatus.pendingPreview.active = true;
+    playbackStatus.pendingPreview.progressPhase = "Preparing sources";
+    playbackStatus.pendingPreview.progressOrdinal = 187;
+    playbackStatus.pendingPreview.progressTotal = 637;
+
+    drs::app::AuthoringPanel panel(
+        session,
+        {},
+        {},
+        {},
+        drs::app::AuthoringPanel::LayoutMode::expanded,
+        {},
+        [&playbackStatus]() { return playbackStatus; });
+    panel.setSize(1200, 760);
+    panel.setVisible(true);
+    panel.resized();
+    panel.reloadFromSession();
+
+    const auto expectedProgress = "playback busy: Preparing sources 187/637.";
+    require(requireLabel(panel, "authoringSummaryStatusLabel").getText().contains(expectedProgress),
+            "The summary strip must expose per-source draft preparation progress.");
+    require(requireLabel(panel, "authoringPlaybackBannerLabel").getText().contains(expectedProgress),
+            "The workspace banner must expose per-source draft preparation progress.");
+}
+
 void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 {
     drs::app::authoring::ZoneMappingEditor editor;
@@ -3593,6 +3625,7 @@ int main()
 
         exerciseSummaryStripLeaf(outputDirectory);
         exerciseDraftPlaybackFailureVisibility();
+        exerciseDraftPlaybackProgressVisibility();
         exerciseZoneMappingEditorLeaf(outputDirectory);
         exerciseCrossfadeDebugVisibility();
         exerciseRepeatedStructureListComponent();

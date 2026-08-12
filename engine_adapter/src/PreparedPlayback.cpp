@@ -949,12 +949,27 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     const auto resolvedRequest = request.sampleResolutionReady
         ? request
         : resolveBuildRequest(request, snapshotResult, streamResult);
+    const auto publishSourceProgress = [this, &request](std::string phase,
+                                                        const std::size_t ordinal,
+                                                        const std::size_t total)
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        if (workerStatus.inFlightBuildId != request.buildId)
+            return;
+        workerStatus.inFlightProgressPhase = std::move(phase);
+        workerStatus.inFlightSourceOrdinal = ordinal;
+        workerStatus.inFlightSourceCount = total;
+    };
 
     std::vector<ResidentPreparationSampleMetadata> residentMetadata;
     residentMetadata.reserve(resolvedRequest.sampleResolutions.size());
     auto residentMetadataComplete = !resolvedRequest.sampleResolutions.empty();
+    std::size_t inspectedSourceOrdinal = 0;
     for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
     {
+        publishSourceProgress("Inspecting sources",
+                              ++inspectedSourceOrdinal,
+                              resolvedRequest.sampleResolutions.size());
         if (isCancellationRequested(request))
             return finishCanceled();
         const auto* candidateStreamSample = !streamResult.loaded
@@ -1050,8 +1065,12 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.groupRoutes.reserve(snapshotResult.snapshot.groupRoutes.size());
     result.prepared.zones.reserve(snapshotResult.snapshot.zones.size());
 
+    std::size_t preparedSourceOrdinal = 0;
     for (const auto& sampleResolution : resolvedRequest.sampleResolutions)
     {
+        publishSourceProgress("Preparing sources",
+                              ++preparedSourceOrdinal,
+                              resolvedRequest.sampleResolutions.size());
         if (isCancellationRequested(request))
             return finishCanceled();
         const auto path = "sampleIdentities[" + std::to_string(sampleResolution.snapshotSampleIndex) + "]";
@@ -1094,8 +1113,10 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             sampleHandle.sampleSourceId = sampleResolution.sampleSourceId;
             sampleHandle.streamSampleId = sampleResolution.sampleSourceId;
             sampleHandle.sourcePath = sampleResolution.normalizedSourcePath;
-            sampleHandle.canonicalSourcePath = descriptor.canonicalSourceIdentity;
-            sampleHandle.canonicalSourceIdentity = descriptor.canonicalSourceIdentity;
+            sampleHandle.canonicalSourcePath = sampleResolution.normalizedSourcePath;
+            sampleHandle.canonicalSourceIdentity = buildCanonicalSourceIdentity(
+                sampleResolution.sampleSourceId,
+                sampleResolution.normalizedSourcePath);
             sampleHandle.sourceFingerprintHex = descriptor.provenanceIdentity;
             sampleHandle.formatName = descriptor.formatName;
             sampleHandle.role = snapshotResult.snapshot.sampleIdentities[
@@ -1842,6 +1863,9 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild
         workerStatus.inFlightWorkCount = 1;
         workerStatus.inFlightBuildId = job.request.buildId;
         workerStatus.inFlightLane = job.lane;
+        workerStatus.inFlightSourceOrdinal = 0;
+        workerStatus.inFlightSourceCount = 0;
+        workerStatus.inFlightProgressPhase.clear();
         if (job.lane == PreparedPlaybackWorkLane::performance)
         {
             ++workerStatus.performanceDispatchCount;
@@ -1880,6 +1904,9 @@ PreparedPlaybackWorkerStepResult PreparedPlaybackService::processNextQueuedBuild
         workerStatus.lastEvent = stepResult.result.state;
         workerStatus.inFlightWorkCount = 0;
         workerStatus.inFlightBuildId = 0;
+        workerStatus.inFlightSourceOrdinal = 0;
+        workerStatus.inFlightSourceCount = 0;
+        workerStatus.inFlightProgressPhase.clear();
         refreshWorkerStatus();
     }
 
@@ -2076,6 +2103,9 @@ void PreparedPlaybackService::runBackgroundWorker()
                 workerStatus.inFlightWorkCount = 1;
                 workerStatus.inFlightBuildId = job.request.buildId;
                 workerStatus.inFlightLane = job.lane;
+                workerStatus.inFlightSourceOrdinal = 0;
+                workerStatus.inFlightSourceCount = 0;
+                workerStatus.inFlightProgressPhase.clear();
                 if (job.lane == PreparedPlaybackWorkLane::performance)
                 {
                     ++workerStatus.performanceDispatchCount;
@@ -2122,6 +2152,9 @@ void PreparedPlaybackService::runBackgroundWorker()
                 ++workerStatus.retainedPreparedBytesBudgetViolationCount;
             workerStatus.inFlightWorkCount = 0;
             workerStatus.inFlightBuildId = 0;
+            workerStatus.inFlightSourceOrdinal = 0;
+            workerStatus.inFlightSourceCount = 0;
+            workerStatus.inFlightProgressPhase.clear();
             workerStatus.lastEvent = stepResult.result.state;
             refreshWorkerStatus();
         }

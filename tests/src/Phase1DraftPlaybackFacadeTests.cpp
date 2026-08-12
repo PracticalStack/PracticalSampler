@@ -441,6 +441,14 @@ int main()
                 "Publishing the current draft should surface matching prepared digests.");
         require(draftStatus.preview.contentDigest == draftStatus.performance.contentDigest,
                 "Publishing the current preview should preserve digest identity across both paths.");
+        require(draftStatus.performance.reusedPreviewPayload
+                    && draftStatus.performance.buildId == draftStatus.preview.buildId
+                    && draftStatus.performance.preparedBuildId == draftStatus.preview.preparedBuildId,
+                "Publishing an exact current full-draft Preview should reuse its immutable payload and build identities.");
+        require(draftStatus.performance.preparationCacheHitCount
+                    == draftStatus.performance.preparedSampleCount
+                    && draftStatus.performance.preparationCacheMissCount == 0,
+                "Exact Preview reuse should report every prepared source as reused without a Publish miss.");
         require(snapshot.publishedBuildId != initialPublishedBuildId,
                 "Publishing a newer draft should replace the published snapshot build identity.");
         require(snapshot.publishedPreparedBuildId != initialPublishedPreparedBuildId,

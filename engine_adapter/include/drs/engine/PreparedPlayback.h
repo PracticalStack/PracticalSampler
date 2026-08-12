@@ -367,6 +367,9 @@ struct PreparedPlaybackWorkerStatus
     std::size_t performanceDispatchCount = 0;
     std::uint64_t inFlightBuildId = 0;
     PreparedPlaybackWorkLane inFlightLane = PreparedPlaybackWorkLane::preview;
+    std::size_t inFlightSourceOrdinal = 0;
+    std::size_t inFlightSourceCount = 0;
+    std::string inFlightProgressPhase;
     std::uint64_t maxCommandToQueuedMicros = 0;
     std::uint64_t maxQueueWaitMicros = 0;
     std::uint64_t maxRequestToReadyMicros = 0;

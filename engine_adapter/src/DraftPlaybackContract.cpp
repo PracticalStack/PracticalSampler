@@ -194,6 +194,64 @@ bool DraftPlaybackContract::completePerformanceBuild(std::uint64_t requestId,
                          PlaybackActivationLane::performance, "Active");
 }
 
+bool DraftPlaybackContract::completePerformanceBuildFromCurrentPreview(
+    const std::uint64_t requestId)
+{
+    if (!status.pendingPerformance.active
+        || status.pendingPerformance.requestId != requestId
+        || !status.preview.available
+        || !status.preview.activationEligible
+        || status.preview.revision != status.draftRevision
+        || status.preview.activationPayload == nullptr
+        || status.preview.activationPayload->preparationScope
+            != PlaybackPreparationScope::currentDraft)
+    {
+        return false;
+    }
+
+    auto performancePayload = std::make_shared<PlaybackActivationPayload>(
+        *status.preview.activationPayload);
+    performancePayload->lane = PlaybackActivationLane::performance;
+    performancePayload->lifecycleState = PlaybackSnapshotLifecycleState::active;
+
+    status.performance = status.preview;
+    status.performance.lifecycleState = PlaybackSnapshotLifecycleState::active;
+    status.performance.state = "Active";
+    status.performance.activationPayload = std::move(performancePayload);
+    status.performance.preparationCacheHitCount = status.performance.preparedSampleCount;
+    status.performance.preparationCacheMissCount = 0;
+    status.performance.preparedBuildDurationMicros = 0;
+    status.performance.reusedPreviewPayload = true;
+    status.pendingPerformance = {};
+    status.lastEvent = "Build completed";
+    refreshPreparedStates();
+    return true;
+}
+
+bool DraftPlaybackContract::updatePendingBuildProgress(const PlaybackActivationLane lane,
+                                                       const std::size_t ordinal,
+                                                       const std::size_t total,
+                                                       std::string phase)
+{
+    auto& pending = lane == PlaybackActivationLane::preview
+        ? status.pendingPreview : status.pendingPerformance;
+    if (!pending.active)
+        return false;
+
+    const auto boundedOrdinal = std::min(ordinal, total);
+    if (pending.progressOrdinal == boundedOrdinal
+        && pending.progressTotal == total
+        && pending.progressPhase == phase)
+    {
+        return false;
+    }
+
+    pending.progressOrdinal = boundedOrdinal;
+    pending.progressTotal = total;
+    pending.progressPhase = std::move(phase);
+    return true;
+}
+
 bool DraftPlaybackContract::failPreviewBuild(std::uint64_t requestId,
                                              const std::vector<std::string>& issues,
                                              const std::string& state)
@@ -398,6 +456,7 @@ bool DraftPlaybackContract::completeBuild(DraftPlaybackPendingRequest& pending,
     }
 
     prepared.available = true;
+    prepared.reusedPreviewPayload = false;
     prepared.revision = pending.requestedRevision;
     prepared.buildId = buildResult != nullptr ? buildResult->buildId : pending.requestId;
     prepared.preparedAssetsAvailable = preparedBuildResult != nullptr ? preparedBuildResult->built : false;

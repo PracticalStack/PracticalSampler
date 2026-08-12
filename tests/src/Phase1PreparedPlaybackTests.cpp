@@ -264,7 +264,6 @@ int main()
                     || firstPreparedRequest.sampleResolutions[0].matchedBySampleSourceId,
                 "Prepared playback sample-resolution entries should record how the worker request matched the stream sample.");
         const auto firstPrepared = preparedService.prepare(firstPreparedRequest, firstSnapshot, referenceStream);
-        std::cerr << "prepared trace 1\n";
         require(firstPrepared.built, "Prepared playback should build from the reference snapshot.");
         require(firstPrepared.activationEligible, "Prepared playback should remain activation-eligible for valid content.");
         require(firstPrepared.buildId == firstPreparedRequest.buildId,
@@ -485,7 +484,6 @@ int main()
         const auto secondSnapshot = snapshotBuilder.buildSnapshot(secondSnapshotRequest, phase2Project.project);
         const auto secondPreparedRequest = preparedService.requestBuild(secondSnapshot, referenceStream);
         const auto secondPrepared = preparedService.prepare(secondPreparedRequest, secondSnapshot, referenceStream);
-        std::cerr << "prepared trace 2\n";
         require(secondPrepared.built, "Repeated prepared playback build should still succeed.");
         require(secondPrepared.prepared.preparedContentDigest == firstPrepared.prepared.preparedContentDigest,
                 "Repeated preparation of the same snapshot should produce the same prepared digest.");
@@ -636,7 +634,6 @@ int main()
         require(zoneOnlyPreparedRequest.accepted,
                 "Zone-only prepared playback coverage should accept the rebuilt immutable snapshot.");
         const auto zoneOnlyPrepared = preparedService.prepare(zoneOnlyPreparedRequest, zoneOnlySnapshot, referenceStream);
-        std::cerr << "prepared trace 3\n";
         require(zoneOnlyPrepared.built && zoneOnlyPrepared.activationEligible,
                 "Zone-only authoring edits should still prepare successfully.");
         require(zoneOnlyPrepared.prepared.preparedContentDigest != firstPrepared.prepared.preparedContentDigest,
@@ -686,7 +683,6 @@ int main()
         require(editedSnapshot.built, "Edited snapshot should still build successfully.");
         const auto editedPreparedRequest = preparedService.requestBuild(editedSnapshot, referenceStream);
         const auto editedPrepared = preparedService.prepare(editedPreparedRequest, editedSnapshot, referenceStream);
-        std::cerr << "prepared trace 4\n";
         require(editedPrepared.built, "Edited prepared playback should still succeed.");
         require(editedPrepared.prepared.preparedContentDigest != firstPrepared.prepared.preparedContentDigest,
                 "Changing a sample source path should invalidate the prepared digest.");
@@ -740,7 +736,6 @@ int main()
         require(rejectedPreparedRequest.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed,
                 "Rejected prepared playback request should surface the failed lifecycle state.");
         const auto rejectedPrepared = preparedService.prepare(rejectedPreparedRequest, invalidSnapshot, referenceStream);
-        std::cerr << "prepared trace invalid\n";
         require(!rejectedPrepared.built && !rejectedPrepared.activationEligible,
                 "Rejected prepared playback result must not become activation-eligible.");
         require(rejectedPrepared.lifecycleState == drs::engine::PlaybackSnapshotLifecycleState::failed,
@@ -770,7 +765,6 @@ int main()
         const auto missingPreparedResult = missingPreparedService.prepare(missingPreparedRequest,
                                                                          missingPreparedSnapshot,
                                                                           referenceStream);
-        std::cerr << "prepared trace missing\n";
         require(!missingPreparedResult.built && !missingPreparedResult.activationEligible,
                 "Prepared playback should fail when the worker can no longer access the resolved source asset.");
         const auto* missingPreparedFinding = findFinding(missingPreparedResult,
@@ -809,7 +803,6 @@ int main()
         const auto unsupportedPreparedResult = unsupportedPreparedService.prepare(unsupportedPreparedRequest,
                                                                                   unsupportedPreparedSnapshot,
                                                                                   referenceStream);
-        std::cerr << "prepared trace unsupported\n";
         require(!unsupportedPreparedResult.built && !unsupportedPreparedResult.activationEligible,
                 "Prepared playback should fail when the worker sees an unsupported source format.");
         const auto* unsupportedPreparedFinding = findFinding(unsupportedPreparedResult,
@@ -848,7 +841,6 @@ int main()
         const auto rejectedDecodeResult = rejectedDecodeService.prepare(rejectedDecodeRequest,
                                                                         rejectedDecodeSnapshot,
                                                                         referenceStream);
-        std::cerr << "prepared trace rejected decode\n";
         if (rejectedDecodeResult.built || rejectedDecodeResult.activationEligible)
         {
             std::cerr << "Rejected decode diagnostics: state=" << rejectedDecodeResult.state
@@ -879,7 +871,6 @@ int main()
         const auto policyShiftPrepared = policyShiftPreparedService.prepare(policyShiftPreparedRequest,
                                                                            firstSnapshot,
                                                                            policyShiftStream);
-        std::cerr << "prepared trace policy\n";
         require(policyShiftPrepared.built,
                 "Prepared playback should still build when only the prepared decode policy fingerprint changes.");
         require(policyShiftPrepared.prepared.samples[0].canonicalSourceIdentity
@@ -900,7 +891,6 @@ int main()
         const auto compilerSaltPrepared = compilerSaltPreparedService.prepare(compilerSaltPreparedRequest,
                                                                              firstSnapshot,
                                                                              referenceStream);
-        std::cerr << "prepared trace compiler\n";
         require(compilerSaltPrepared.built,
                 "Prepared playback should still build when only the compiler salt changes.");
         require(compilerSaltPrepared.prepared.samples[0].canonicalSourceIdentity
@@ -940,7 +930,6 @@ int main()
         const auto replaceBaselinePrepared = replaceSamplePreparedService.prepare(replaceBaselinePreparedRequest,
                                                                                   firstSnapshot,
                                                                                   referenceStream);
-        std::cerr << "prepared trace replace baseline\n";
         require(replaceBaselinePrepared.built,
                 "Replace-sample cache-correctness coverage should build the baseline prepared state.");
         const auto replaceSampleSnapshotRequest = snapshotBuilder.requestBuild(8, true);
@@ -955,7 +944,6 @@ int main()
         const auto replaceSamplePrepared = replaceSamplePreparedService.prepare(replaceSamplePreparedRequest,
                                                                                replaceSampleSnapshot,
                                                                                replaceSampleStream);
-        std::cerr << "prepared trace replace sample\n";
         require(replaceSamplePrepared.built,
                 "Replace-sample cache-correctness coverage should still prepare successfully.");
         require(replaceSamplePrepared.metrics.cacheHitCount == 1,
@@ -1007,7 +995,6 @@ int main()
         const auto checksumBaselinePrepared = checksumPreparedService.prepare(checksumBaselinePreparedRequest,
                                                                              checksumBaselineSnapshot,
                                                                              checksumBaselineStream);
-        std::cerr << "prepared trace checksum baseline\n";
         require(checksumBaselinePrepared.built,
                 "Checksum invalidation baseline should prepare successfully.");
 
@@ -1033,7 +1020,6 @@ int main()
         const auto checksumChangedPrepared = checksumPreparedService.prepare(checksumChangedPreparedRequest,
                                                                             checksumChangedSnapshot,
                                                                             checksumChangedStream);
-        std::cerr << "prepared trace checksum changed\n";
         require(checksumChangedPrepared.built,
                 "Checksum invalidation coverage should still prepare successfully after content changes.");
         require(checksumChangedPrepared.metrics.cacheHitCount == 1,
@@ -1066,7 +1052,6 @@ int main()
         const auto loopPolicyShiftPrepared = checksumPreparedService.prepare(loopPolicyShiftPreparedRequest,
                                                                              checksumChangedSnapshot,
                                                                              loopPolicyShiftStream);
-        std::cerr << "prepared trace loop policy\n";
         require(loopPolicyShiftPrepared.built,
                 "Loop-policy invalidation coverage should still prepare successfully.");
         require(loopPolicyShiftPrepared.metrics.cacheHitCount == 1,

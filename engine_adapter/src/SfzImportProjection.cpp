@@ -979,6 +979,18 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     for (const auto& zone : baseProject.authoring.zones)
         usedZoneIds.insert(zone.id);
 
+    std::set<std::string> usedGroupIds;
+    for (const auto& group : baseProject.authoring.groups)
+    {
+        if (!group.id.empty())
+            usedGroupIds.insert(group.id);
+    }
+    for (const auto& zone : baseProject.authoring.zones)
+    {
+        if (!zone.groupId.empty())
+            usedGroupIds.insert(zone.groupId);
+    }
+
     std::set<std::string> usedRoundRobinPoolIds;
     for (const auto& zone : baseProject.authoring.zones)
     {
@@ -993,6 +1005,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
 
     const auto unsupportedCrossfadeOpcodes = collectUnsupportedVelocityCrossfadeOpcodes(analysis);
     std::map<std::string, std::string> roundRobinPoolIdsBySignature;
+    std::map<std::string, std::string> projectedGroupIdsByCandidate;
     std::map<std::string, ProjectedGroupState> projectedGroupStates;
     ScopedGainState scopedGainState;
 
@@ -1210,10 +1223,20 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                                     : "0")
                                       .value_or(0);
         zone.articulationId = buildArticulationId(section);
-        zone.groupId = buildGroupId(section,
-                                    zone.articulationId,
-                                    zone.keyLow,
-                                    zone.keyHigh);
+        const auto groupIdCandidate = buildGroupId(section,
+                                                   zone.articulationId,
+                                                   zone.keyLow,
+                                                   zone.keyHigh);
+        const auto existingProjectedGroupId = projectedGroupIdsByCandidate.find(groupIdCandidate);
+        if (existingProjectedGroupId != projectedGroupIdsByCandidate.end())
+        {
+            zone.groupId = existingProjectedGroupId->second;
+        }
+        else
+        {
+            zone.groupId = makeUniqueId(usedGroupIds, groupIdCandidate);
+            projectedGroupIdsByCandidate.emplace(groupIdCandidate, zone.groupId);
+        }
         zone.roundRobin = buildSequentialRoundRobinDescriptor(zone,
                                                               usedRoundRobinPoolIds,
                                                               roundRobinPoolIdsBySignature);

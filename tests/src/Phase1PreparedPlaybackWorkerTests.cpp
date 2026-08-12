@@ -1,5 +1,6 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/PerformancePublishPreparation.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/ProjectDocument.h"
 #include "drs/engine/RuntimeLoader.h"
@@ -437,6 +438,21 @@ int main()
                                                == drs::engine::SampleFrameViewStatus::ready;
                                    }),
                 "Over-budget WAV preparation must become head-ready without full PCM decoding.");
+        drs::engine::PerformancePublishRequestIdentity streamingPublishIdentity;
+        streamingPublishIdentity.requestId = 1;
+        streamingPublishIdentity.cancellationGeneration = 1;
+        streamingPublishIdentity.projectGeneration = 1;
+        streamingPublishIdentity.draftRevision = overBudgetSnapshot.snapshot.draftRevision;
+        streamingPublishIdentity.authoredContentDigest = overBudgetSnapshot.snapshot.contentDigest;
+        streamingPublishIdentity.macroSchemaDigest
+            = drs::engine::computePlaybackSnapshotMacroSchemaDigest(overBudgetSnapshot.snapshot);
+        const auto streamingPublishConformance
+            = drs::engine::validatePerformancePublishPreparation(
+                streamingPublishIdentity, overBudgetSnapshot, streamingResult.result);
+        require(streamingPublishConformance.completeProject
+                    && streamingPublishConformance.activationEligible
+                    && streamingPublishConformance.findings.empty(),
+                "Head-ready WAV streaming preparation must preserve authored source identity for Publish conformance.");
         const auto streamingPayload = drs::engine::buildPlaybackActivationPayload(
             drs::engine::PlaybackActivationLane::preview,
             overBudgetSnapshot.requestedDraftRevision,

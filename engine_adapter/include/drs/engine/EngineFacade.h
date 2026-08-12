@@ -20,6 +20,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -498,6 +499,18 @@ private:
         PerformancePublishRequestIdentity publishIdentity;
     };
 
+    struct ReusablePreviewPreparation
+    {
+        PlaybackSnapshotBuildResult snapshotResult;
+        PreparedPlaybackBuildResult preparedResult;
+    };
+
+    struct PendingPreviewReusePublish
+    {
+        std::uint64_t contractRequestId = 0;
+        PerformancePublishRequestIdentity publishIdentity;
+    };
+
     PlaybackSnapshotBuildResult buildCurrentPlaybackSnapshot(bool activationRequested);
     PreparedPlaybackBuildResult buildRejectedPreparedPlayback(const PlaybackSnapshotBuildResult& snapshotResult);
     bool enqueuePreparedPlaybackBuild(std::uint64_t contractRequestId,
@@ -508,6 +521,8 @@ private:
     bool enqueuePerformancePackagePreparedBuild(const PlaybackSnapshotBuildResult& snapshotResult);
     bool pumpPlaybackSnapshotWorkerCompletions();
     bool pumpPreparedPlaybackWorkerCompletions();
+    bool completePendingPreviewReusePublish();
+    bool canReuseCurrentFullDraftPreview() const;
     void markStateChanged();
     void clearPendingPreparedCompletions();
     void discardSupersededPreviewPendingPreparedCompletions(std::uint64_t newestBuildId);
@@ -537,6 +552,8 @@ private:
     PlaybackSnapshotWorker playbackSnapshotWorker;
     PreparedPlaybackService preparedPlaybackService;
     std::unordered_map<std::uint64_t, PendingPreparedCompletion> pendingPreparedCompletions;
+    std::optional<ReusablePreviewPreparation> reusablePreviewPreparation;
+    std::optional<PendingPreviewReusePublish> pendingPreviewReusePublish;
     std::uint64_t stateRevision = 0;
     std::uint64_t nextPreviewVoiceId = 4000;
     std::uint64_t performancePublishProjectGeneration = 1;

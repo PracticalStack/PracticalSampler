@@ -4,6 +4,8 @@
 #include <cmath>
 #include <sstream>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace drs::engine
@@ -30,42 +32,6 @@ void addError(SamplerRenderModelBuildResult& result,
                                 std::move(code),
                                 std::move(path),
                                 std::move(message) });
-}
-
-const PlaybackSnapshotZone* findSnapshotZone(const ImmutablePlaybackSnapshot& snapshot,
-                                             const std::string& zoneId)
-{
-    const auto iterator = std::find_if(snapshot.zones.begin(),
-                                       snapshot.zones.end(),
-                                       [&](const PlaybackSnapshotZone& zone)
-                                       {
-                                           return zone.id == zoneId;
-                                       });
-    return iterator == snapshot.zones.end() ? nullptr : &(*iterator);
-}
-
-const PlaybackSnapshotGroupRoute* findSnapshotGroupRoute(const ImmutablePlaybackSnapshot& snapshot,
-                                                         const std::string& groupId)
-{
-    const auto iterator = std::find_if(snapshot.groupRoutes.begin(),
-                                       snapshot.groupRoutes.end(),
-                                       [&](const PlaybackSnapshotGroupRoute& route)
-                                       {
-                                           return route.groupId == groupId;
-                                       });
-    return iterator == snapshot.groupRoutes.end() ? nullptr : &(*iterator);
-}
-
-const PreparedPlaybackGroupRoute* findPreparedGroupRoute(const ImmutablePreparedPlayback& prepared,
-                                                         const std::string& groupId)
-{
-    const auto iterator = std::find_if(prepared.groupRoutes.begin(),
-                                       prepared.groupRoutes.end(),
-                                       [&](const PreparedPlaybackGroupRoute& route)
-                                       {
-                                           return route.groupId == groupId;
-                                       });
-    return iterator == prepared.groupRoutes.end() ? nullptr : &(*iterator);
 }
 
 bool containsZoneId(const std::vector<std::string>& zoneIds, const std::string& zoneId)
@@ -200,23 +166,6 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.triggerMode == preparedZone.triggerMode;
 }
 
-bool hasDuplicateSnapshotZoneId(const ImmutablePlaybackSnapshot& snapshot,
-                                std::size_t index)
-{
-    for (std::size_t other = 0; other < index; ++other)
-        if (snapshot.zones[other].id == snapshot.zones[index].id)
-            return true;
-    return false;
-}
-
-bool hasDuplicatePreparedZoneId(const ImmutablePreparedPlayback& prepared,
-                                std::size_t index)
-{
-    for (std::size_t other = 0; other < index; ++other)
-        if (prepared.zones[other].zoneId == prepared.zones[index].zoneId)
-            return true;
-    return false;
-}
 } // namespace
 
 bool SamplerAudioBufferView::isValid() const noexcept
@@ -336,6 +285,8 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         }
     }
 
+    std::unordered_map<std::string, const PlaybackSnapshotZone*> snapshotZonesById;
+    snapshotZonesById.reserve(snapshot.zones.size());
     for (std::size_t index = 0; index < snapshot.zones.size(); ++index)
     {
         const auto& zone = snapshot.zones[index];
@@ -343,7 +294,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             addError(result, "render-model-snapshot-zone-id-missing",
                      "payload.snapshot.zones[" + std::to_string(index) + "].id",
                      "Every snapshot route requires a stable zone identity.");
-        else if (hasDuplicateSnapshotZoneId(snapshot, index))
+        else if (!snapshotZonesById.emplace(zone.id, &zone).second)
             addError(result, "render-model-snapshot-zone-id-duplicate",
                      "payload.snapshot.zones[" + std::to_string(index) + "].id",
                      "Snapshot route identities must be unique.");
@@ -394,6 +345,31 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         }
     }
 
+    std::unordered_map<std::string, const PlaybackSnapshotGroupRoute*> snapshotGroupsById;
+    std::unordered_map<std::string, std::unordered_set<std::string>> snapshotGroupZoneIds;
+    snapshotGroupsById.reserve(snapshot.groupRoutes.size());
+    snapshotGroupZoneIds.reserve(snapshot.groupRoutes.size());
+    for (const auto& group : snapshot.groupRoutes)
+    {
+        snapshotGroupsById.emplace(group.groupId, &group);
+        snapshotGroupZoneIds.emplace(
+            group.groupId,
+            std::unordered_set<std::string>(group.zoneIds.begin(), group.zoneIds.end()));
+    }
+    std::unordered_map<std::string, const PreparedPlaybackGroupRoute*> preparedGroupsById;
+    std::unordered_map<std::string, std::unordered_set<std::string>> preparedGroupZoneIds;
+    preparedGroupsById.reserve(prepared.groupRoutes.size());
+    preparedGroupZoneIds.reserve(prepared.groupRoutes.size());
+    for (const auto& group : prepared.groupRoutes)
+    {
+        preparedGroupsById.emplace(group.groupId, &group);
+        preparedGroupZoneIds.emplace(
+            group.groupId,
+            std::unordered_set<std::string>(group.zoneIds.begin(), group.zoneIds.end()));
+    }
+
+    std::unordered_set<std::string> preparedZoneIds;
+    preparedZoneIds.reserve(prepared.zones.size());
     for (std::size_t index = 0; index < prepared.zones.size(); ++index)
     {
         const auto& zone = prepared.zones[index];
@@ -401,7 +377,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         if (zone.zoneId.empty())
             addError(result, "render-model-zone-id-missing", path + ".zoneId",
                      "Every prepared route requires a stable zone identity.");
-        else if (hasDuplicatePreparedZoneId(prepared, index))
+        else if (!preparedZoneIds.insert(zone.zoneId).second)
             addError(result, "render-model-zone-id-duplicate", path + ".zoneId",
                      "Prepared route identities must be unique.");
 
@@ -442,7 +418,9 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             addError(result, "render-model-loop-range-invalid", path + ".loopStartFrame",
                      "Enabled loops require an ordered half-open range inside retained PCM.");
 
-        const auto* snapshotZone = findSnapshotZone(snapshot, zone.zoneId);
+        const auto snapshotZoneEntry = snapshotZonesById.find(zone.zoneId);
+        const auto* snapshotZone = snapshotZoneEntry == snapshotZonesById.end()
+            ? nullptr : snapshotZoneEntry->second;
         if (snapshotZone == nullptr)
             addError(result, "render-model-snapshot-route-missing", path + ".zoneId",
                      "Prepared route has no matching immutable snapshot route.");
@@ -451,7 +429,9 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                      "Snapshot and prepared route topology must agree before rendering.");
         else
         {
-            const auto* snapshotGroupRoute = findSnapshotGroupRoute(snapshot, snapshotZone->groupId);
+            const auto snapshotGroupEntry = snapshotGroupsById.find(snapshotZone->groupId);
+            const auto* snapshotGroupRoute = snapshotGroupEntry == snapshotGroupsById.end()
+                ? nullptr : snapshotGroupEntry->second;
             if (snapshotGroupRoute == nullptr)
             {
                 addError(result, "render-model-group-route-missing", path + ".zoneId",
@@ -459,19 +439,23 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             }
             else
             {
-                if (!containsZoneId(snapshotGroupRoute->zoneIds, zone.zoneId))
+                const auto snapshotMembers = snapshotGroupZoneIds.find(snapshotGroupRoute->groupId);
+                if (snapshotMembers == snapshotGroupZoneIds.end()
+                    || !snapshotMembers->second.count(zone.zoneId))
                 {
                     addError(result, "render-model-group-membership-invalid", path + ".zoneId",
                              "Authored group routes must contain each routed zone exactly where its groupId points.");
                 }
 
-                const auto* preparedGroupRoute = findPreparedGroupRoute(prepared, snapshotGroupRoute->groupId);
+                const auto preparedGroupEntry = preparedGroupsById.find(snapshotGroupRoute->groupId);
+                const auto* preparedGroupRoute = preparedGroupEntry == preparedGroupsById.end()
+                    ? nullptr : preparedGroupEntry->second;
                 if (preparedGroupRoute == nullptr)
                 {
                     addError(result, "render-model-prepared-group-route-missing", path + ".zoneId",
                              "Prepared content must retain the immutable group route for every rendered zone.");
                 }
-                else if (!containsZoneId(preparedGroupRoute->zoneIds, zone.zoneId)
+                else if (!preparedGroupZoneIds[preparedGroupRoute->groupId].count(zone.zoneId)
                          || preparedGroupRoute->gainDb != snapshotGroupRoute->gainDb
                          || preparedGroupRoute->pan != snapshotGroupRoute->pan
                          || preparedGroupRoute->routingBusId != snapshotGroupRoute->routingBusId
@@ -525,7 +509,9 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
 
     const auto routeSelected = [&](const PreparedPlaybackZoneHandle& zone)
     {
-        const auto* snapshotZone = findSnapshotZone(snapshot, zone.zoneId);
+        const auto snapshotZoneEntry = snapshotZonesById.find(zone.zoneId);
+        const auto* snapshotZone = snapshotZoneEntry == snapshotZonesById.end()
+            ? nullptr : snapshotZoneEntry->second;
         return snapshotZone != nullptr
             && (options.selectedZoneId.empty()
                 || (!options.retainedZoneIds.empty()
@@ -607,27 +593,30 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     }
 
     model->routes.reserve(selectedRouteCount);
+    std::vector<const CompiledPerformanceTriggerRoute*> triggerRoutesByZone(
+        prepared.zones.size(), nullptr);
+    for (const auto& triggerRoute : prepared.performanceProgram.triggerRoutes)
+        if (triggerRoute.zoneIndex < triggerRoutesByZone.size())
+            triggerRoutesByZone[triggerRoute.zoneIndex] = &triggerRoute;
     for (std::size_t index = 0; index < prepared.zones.size(); ++index)
     {
         const auto& zone = prepared.zones[index];
         if (!routeSelected(zone))
             continue;
-        const auto* snapshotZone = findSnapshotZone(snapshot, zone.zoneId);
-        const auto* snapshotGroupRoute = snapshotZone == nullptr
-            ? nullptr
-            : findSnapshotGroupRoute(snapshot, snapshotZone->groupId);
+        const auto snapshotZoneEntry = snapshotZonesById.find(zone.zoneId);
+        const auto* snapshotZone = snapshotZoneEntry == snapshotZonesById.end()
+            ? nullptr : snapshotZoneEntry->second;
+        const auto snapshotGroupEntry = snapshotZone == nullptr
+            ? snapshotGroupsById.end() : snapshotGroupsById.find(snapshotZone->groupId);
+        const auto* snapshotGroupRoute = snapshotGroupEntry == snapshotGroupsById.end()
+            ? nullptr : snapshotGroupEntry->second;
         const auto gainDb = combineRouteGainDb(zone.gainDb,
                                                snapshotGroupRoute == nullptr ? 0.0 : snapshotGroupRoute->gainDb,
                                                snapshot.masterGainDb);
         const auto pan = snapshotGroupRoute == nullptr
             ? zone.pan
             : combineGroupPan(zone.pan, snapshotGroupRoute->pan);
-        const auto triggerRoute = std::find_if(prepared.performanceProgram.triggerRoutes.begin(),
-                                               prepared.performanceProgram.triggerRoutes.end(),
-                                               [index](const auto& route)
-                                               {
-                                                   return route.zoneIndex == index;
-                                               });
+        const auto* triggerRoute = triggerRoutesByZone[index];
         model->routes.push_back({ index,
                                   zone.preparedSampleIndex,
                                   zone.zoneId,
@@ -655,18 +644,18 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   index < prepared.performanceProgram.zoneArticulationIndices.size()
                                       ? prepared.performanceProgram.zoneArticulationIndices[index]
                                       : kInvalidPerformanceProgramIndex,
-                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                  triggerRoute == nullptr
                                       ? PerformanceEventKind::noteOn : triggerRoute->event,
-                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                  triggerRoute == nullptr
                                       ? PerformanceSustainCondition::any : triggerRoute->sustain,
-                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                  triggerRoute == nullptr
                                       ? PerformancePitchSource::eventNote : triggerRoute->pitchSource,
-                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                  triggerRoute == nullptr
                                       || triggerRoute->exclusiveGroupIndex >= prepared.performanceProgram.exclusiveGroupStableIds.size()
                                       ? 0 : prepared.performanceProgram.exclusiveGroupStableIds[triggerRoute->exclusiveGroupIndex],
-                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                  triggerRoute == nullptr
                                       ? 0 : triggerRoute->chokeTargetMask,
-                                  triggerRoute == prepared.performanceProgram.triggerRoutes.end()
+                                  triggerRoute == nullptr
                                       ? 0.0f : triggerRoute->chokeReleaseSeconds,
                                   zone.fineTuneCents,
                                   zone.amplitudeVelocityTracking,

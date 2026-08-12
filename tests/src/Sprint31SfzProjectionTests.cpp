@@ -246,6 +246,34 @@ int main()
                 "Schema 6 SFZ projection should produce the same zone and sample counts as the legacy authoring baseline.");
         require(phase6Projection.issues.empty(),
                 "Schema 6 SFZ projection should synthesize any required articulation metadata.");
+
+        auto groupCollisionProject = blankPhase6Project;
+        RuntimeProjectGroupDefinition existingGroup;
+        existingGroup.id = phase6Projection.groups.front().id;
+        existingGroup.displayName = "Existing Project Group";
+        existingGroup.displayOrder = 0;
+        existingGroup.workspaceVisible = true;
+        groupCollisionProject.authoring.groups.push_back(existingGroup);
+        const auto groupCollisionProjection = projectSfzImportAnalysis(groupCollisionProject, analysis);
+        require(groupCollisionProjection.projected && groupCollisionProjection.playable,
+                "SFZ projection should allocate imported group ids around ids already owned by the project. Issues: "
+                    + joinIssues(groupCollisionProjection.issues));
+        require(!groupCollisionProjection.groups.empty()
+                    && groupCollisionProjection.groups.front().id != existingGroup.id,
+                "An imported SFZ group id collision should receive a distinct project-safe id.");
+        require(!groupCollisionProjection.zones.empty()
+                    && groupCollisionProjection.zones.front().groupId
+                        == groupCollisionProjection.groups.front().id,
+                "Every imported zone should follow its remapped SFZ group id.");
+
+        AuthoringSession groupCollisionSession(groupCollisionProject);
+        const auto groupCollisionApply = applySfzImportProjection(
+            groupCollisionSession, groupCollisionProjection, "Import SFZ with an existing group id collision");
+        require(groupCollisionApply.applied,
+                "An SFZ projection with a remapped group id should apply atomically.");
+        require(groupCollisionSession.getProject().authoring.groups.size()
+                    == groupCollisionProjection.groups.size() + 1,
+                "Applying a remapped SFZ projection should preserve the existing group and every imported group.");
         require(projection.masterGainDb == 6.0,
                 "Stage 1 should surface the SFZ master volume on the projection contract.");
         require(projection.groups.size() == countDistinctGroupIds(projection.zones),

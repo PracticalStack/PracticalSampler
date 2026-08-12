@@ -20,4 +20,12 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     const PerformancePublishRequestIdentity& identity,
     const PlaybackSnapshotBuildResult& snapshotResult,
     const PreparedPlaybackBuildResult& preparedResult);
+
+// The exact Preview-reuse path receives worker-produced objects that are already
+// retained behind const activation-payload ownership. It verifies their stored
+// identities and complete topology without recomputing the large JSON digests.
+PerformancePublishPreparationResult validateExactPreviewReuseForPerformance(
+    const PerformancePublishRequestIdentity& identity,
+    const PlaybackSnapshotBuildResult& snapshotResult,
+    const PreparedPlaybackBuildResult& preparedResult);
 } // namespace drs::engine

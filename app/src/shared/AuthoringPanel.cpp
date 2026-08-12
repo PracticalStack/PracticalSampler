@@ -845,7 +845,22 @@ DraftPlaybackGuidance buildDraftPlaybackGuidance(const drs::engine::AuthoringSes
 
     if (playbackStatus.pendingPreview.active || playbackStatus.pendingPerformance.active)
     {
-        guidance.statusText = "playback busy: Wait for the current playback build to finish applying.";
+        const auto& pending = playbackStatus.pendingPerformance.active
+            ? playbackStatus.pendingPerformance : playbackStatus.pendingPreview;
+        if (!pending.progressPhase.empty() && pending.progressTotal != 0)
+        {
+            guidance.statusText = "playback busy: " + pending.progressPhase + " "
+                + std::to_string(pending.progressOrdinal) + "/"
+                + std::to_string(pending.progressTotal) + ".";
+        }
+        else if (!pending.progressPhase.empty())
+        {
+            guidance.statusText = "playback busy: " + pending.progressPhase + ".";
+        }
+        else
+        {
+            guidance.statusText = "playback busy: Wait for the current playback build to finish applying.";
+        }
         return guidance;
     }
 

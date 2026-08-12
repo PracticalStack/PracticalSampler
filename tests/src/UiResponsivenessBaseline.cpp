@@ -14,6 +14,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -169,6 +170,33 @@ int main(int argc, char** argv)
         const auto previewDispatchStarted = Clock::now();
         processor.requestAuthoringPreview(drs::engine::AuthoringPreviewScope::currentDraft);
         const auto previewDispatchMicros = elapsedMicros(previewDispatchStarted);
+        processor.prepareToPlay(44100.0, 512);
+
+        const auto previewReadyStarted = Clock::now();
+        auto observedSourceProgress = false;
+        auto previewReady = false;
+        while (elapsedMicros(previewReadyStarted) < 30000000)
+        {
+            processor.serviceMessageThreadWork();
+            juce::AudioBuffer<float> activationBlock(2, 512);
+            activationBlock.clear();
+            juce::MidiBuffer activationMidi;
+            processor.processBlock(activationBlock, activationMidi);
+            const auto status = processor.getEngineFacade().getDraftPlaybackStatus();
+            observedSourceProgress = observedSourceProgress
+                || (status.pendingPreview.progressTotal == projection.sampleSources.size()
+                    && status.pendingPreview.progressOrdinal > 0
+                    && !status.pendingPreview.progressPhase.empty());
+            previewReady = status.preview.revision == status.draftRevision
+                && status.preview.state == "Ready";
+            if (previewReady)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        const auto previewReadyMicros = elapsedMicros(previewReadyStarted);
+        require(previewReady, "Salamander full-draft Preview did not reach Ready.");
+        require(observedSourceProgress,
+                "Salamander full-draft Preview exposed no per-source preparation progress.");
 
         const auto publishDispatchStarted = Clock::now();
         const auto publishAccepted = processor.submitPerformancePublishCommand(
@@ -179,6 +207,43 @@ int main(int argc, char** argv)
                 "Salamander Preview dispatch exceeded one 60 Hz frame.");
         require(publishDispatchMicros < 16667,
                 "Salamander Publish dispatch exceeded one 60 Hz frame.");
+
+        const auto publishReadyStarted = Clock::now();
+        auto publishReady = false;
+        while (elapsedMicros(publishReadyStarted) < 5000000)
+        {
+            processor.serviceMessageThreadWork();
+            juce::AudioBuffer<float> activationBlock(2, 512);
+            activationBlock.clear();
+            juce::MidiBuffer activationMidi;
+            processor.processBlock(activationBlock, activationMidi);
+            const auto status = processor.getEngineFacade().getDraftPlaybackStatus();
+            publishReady = status.performance.revision == status.draftRevision
+                && status.performance.state == "Active";
+            if (publishReady)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        const auto publishReadyMicros = elapsedMicros(publishReadyStarted);
+        const auto authoredPlaybackStatus = processor.getEngineFacade().getDraftPlaybackStatus();
+        require(publishReady, "Salamander Publish did not reach Active.");
+        require(authoredPlaybackStatus.performance.reusedPreviewPayload,
+                "Salamander Publish did not reuse the exact full-draft Preview payload.");
+        require(authoredPlaybackStatus.performance.buildId == authoredPlaybackStatus.preview.buildId
+                    && authoredPlaybackStatus.performance.preparedBuildId
+                        == authoredPlaybackStatus.preview.preparedBuildId,
+                "Salamander Publish did not preserve the exact Preview build identities.");
+
+        processor.queuePerformanceSurfaceNoteOn(60, 0.8f);
+        juce::AudioBuffer<float> authoredNoteBlock(2, 512);
+        authoredNoteBlock.clear();
+        juce::MidiBuffer authoredNoteMidi;
+        processor.processBlock(authoredNoteBlock, authoredNoteMidi);
+        const auto authoredNextBlockMagnitude = authoredNoteBlock.getMagnitude(
+            0, authoredNoteBlock.getNumSamples());
+        processor.queuePerformanceSurfaceNoteOff(60);
+        require(authoredNextBlockMagnitude > 0.0001f,
+                "The published Salamander keyboard note was not heard on the next audio block.");
 
         const auto packageLoadStarted = Clock::now();
         const auto packageLoad = processor.loadPerformancePackageWorkspace(
@@ -240,7 +305,14 @@ int main(int argc, char** argv)
                << "  \"hostStateWorkerMicros\": " << hostStateStatus.lastDurationMicros << ",\n"
                << "  \"hostStateCoalescedCount\": " << hostStateStatus.coalescedCount << ",\n"
                << "  \"previewDispatchMicros\": " << previewDispatchMicros << ",\n"
+               << "  \"previewReadyMicros\": " << previewReadyMicros << ",\n"
+               << "  \"observedSourceProgress\": "
+               << (observedSourceProgress ? "true" : "false") << ",\n"
                << "  \"publishDispatchMicros\": " << publishDispatchMicros << ",\n"
+               << "  \"publishReadyMicros\": " << publishReadyMicros << ",\n"
+               << "  \"publishReusedPreviewPayload\": "
+               << (authoredPlaybackStatus.performance.reusedPreviewPayload ? "true" : "false") << ",\n"
+               << "  \"authoredNextBlockMagnitude\": " << authoredNextBlockMagnitude << ",\n"
                << "  \"packageLoadMicros\": " << packageLoadMicros << ",\n"
                << "  \"performanceRefreshMicros\": " << performanceRefreshMicros << ",\n"
                << "  \"keyboardCallbacksMicros\": " << keyboardCallbacksMicros << ",\n"
@@ -272,7 +344,9 @@ int main(int argc, char** argv)
                   << " hostStateInteractionUs=" << hostStateInteractionMicros
                   << " hostStateWorkerUs=" << hostStateStatus.lastDurationMicros
                   << " previewDispatchUs=" << previewDispatchMicros
+                  << " previewReadyUs=" << previewReadyMicros
                   << " publishDispatchUs=" << publishDispatchMicros
+                  << " publishReadyUs=" << publishReadyMicros
                   << " packageLoadUs=" << packageLoadMicros
                   << " performanceRefreshUs=" << performanceRefreshMicros
                   << " keyboardCallbacksUs=" << keyboardCallbacksMicros << std::endl;

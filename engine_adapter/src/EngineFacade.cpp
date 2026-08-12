@@ -1706,13 +1706,26 @@ bool EngineFacade::serviceBackgroundWork()
     const auto retiredCacheEntries = preparedPlaybackService.serviceRetiredCacheCleanup(1);
     const auto queuedPreparedWork = pumpPlaybackSnapshotWorkerCompletions();
     const auto appliedCompletions = pumpPreparedPlaybackWorkerCompletions();
+    const auto reusedPreviewPublish = completePendingPreviewReusePublish();
+    const auto workerStatus = preparedPlaybackService.getWorkerStatus();
+    auto progressChanged = false;
+    if (workerStatus.inFlightWorkCount != 0)
+    {
+        progressChanged = draftPlaybackContract.updatePendingBuildProgress(
+            workerStatus.inFlightLane == PreparedPlaybackWorkLane::preview
+                ? PlaybackActivationLane::preview : PlaybackActivationLane::performance,
+            workerStatus.inFlightSourceOrdinal,
+            workerStatus.inFlightSourceCount,
+            workerStatus.inFlightProgressPhase);
+    }
     preparedPlaybackService.recordMessageThreadServiceDuration(
         monotonicMicros() - serviceStartedAtMicros);
 
     if (retiredCacheEntries != 0 || packagePerformanceActivationPayload != nullptr)
         refreshDiagnosticsSnapshot();
 
-    return retiredCacheEntries != 0 || queuedPreparedWork || appliedCompletions;
+    return retiredCacheEntries != 0 || queuedPreparedWork || appliedCompletions
+        || reusedPreviewPublish || progressChanged;
 }
 
 EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
@@ -2404,6 +2417,8 @@ bool EngineFacade::stageDraftRevision(std::size_t revision)
     if (!draftPlaybackContract.setDraftRevision(revision))
         return false;
 
+    reusablePreviewPreparation.reset();
+
     currentSessionState.transientMetrics.integrationState = "Draft revision staged";
     previewPlaybackSnapshot = {};
     syncPreviewSnapshotFromDraftPlayback();
@@ -2535,6 +2550,43 @@ bool EngineFacade::publishCurrentDraft()
     const auto request = draftPlaybackContract.requestPerformanceBuild();
     if (!request.accepted)
         return false;
+
+    if (canReuseCurrentFullDraftPreview())
+    {
+        const auto& reusable = *reusablePreviewPreparation;
+        const auto publishRequest = performancePublishController.request(
+            performancePublishProjectGeneration,
+            reusable.snapshotResult.snapshot.draftRevision,
+            reusable.snapshotResult.snapshot.contentDigest,
+            reusable.preparedResult.prepared.macroSchemaDigest,
+            monotonicMicros(),
+            PerformancePublishRequestOrigin::explicitCommand);
+        if (!publishRequest.accepted
+            || !performancePublishController.markPreparing(
+                publishRequest.request.identity, monotonicMicros()))
+        {
+            draftPlaybackContract.failPerformanceBuild(
+                request.requestId,
+                { "The exact Preview payload could not enter Performance conformance." });
+            return false;
+        }
+
+        pendingPreviewReusePublish = PendingPreviewReusePublish {
+            request.requestId,
+            publishRequest.request.identity
+        };
+        draftPlaybackContract.updatePendingBuildProgress(
+            PlaybackActivationLane::performance, 0, 0, "Reusing prepared draft");
+        preparedPlaybackService.recordCommandToQueuedDuration(
+            monotonicMicros() - commandReceivedAtMicros);
+        currentSessionState.transientMetrics.integrationState
+            = "Publish reusing exact Preview payload";
+        currentSessionState.transientMetrics.lastFailure.clear();
+        previewPlaybackSnapshot = {};
+        syncPreviewSnapshotFromDraftPlayback();
+        markStateChanged();
+        return true;
+    }
 
     const auto snapshotRequest = playbackSnapshotBuilder.requestBuild(status.draftRevision, true);
     if (!playbackSnapshotWorker.submit({ PlaybackSnapshotWorkLane::performance,
@@ -3133,6 +3185,14 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
             {
                 if (stepResult.result.built && stepResult.result.activationEligible)
                 {
+                    if (pendingCompletion.snapshotResult.preparationScope
+                            == PlaybackPreparationScope::currentDraft)
+                    {
+                        reusablePreviewPreparation = ReusablePreviewPreparation {
+                            pendingCompletion.snapshotResult,
+                            stepResult.result
+                        };
+                    }
                     currentSessionState.transientMetrics.integrationState = "Preview revision prepared";
                     currentSessionState.transientMetrics.lastFailure.clear();
                 }
@@ -3212,6 +3272,142 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
     return appliedCompletion;
 }
 
+bool EngineFacade::canReuseCurrentFullDraftPreview() const
+{
+    if (!reusablePreviewPreparation.has_value())
+        return false;
+
+    const auto& status = draftPlaybackContract.getStatus();
+    const auto& reusable = *reusablePreviewPreparation;
+    const auto& payload = status.preview.activationPayload;
+    return status.preview.available
+        && status.preview.activationEligible
+        && status.preview.revision == status.draftRevision
+        && payload != nullptr
+        && payload->lane == PlaybackActivationLane::preview
+        && payload->preparationScope == PlaybackPreparationScope::currentDraft
+        && payload->preparationSelectedZoneId.empty()
+        && payload->preparationSelectedGroupId.empty()
+        && payload->retainedZoneCount == payload->unscopedZoneCount
+        && payload->retainedSampleCount == payload->unscopedSampleCount
+        && reusable.snapshotResult.built
+        && reusable.snapshotResult.activationEligible
+        && reusable.snapshotResult.preparationScope == PlaybackPreparationScope::currentDraft
+        && reusable.snapshotResult.snapshot.draftRevision == status.draftRevision
+        && reusable.snapshotResult.snapshot.contentDigest == status.preview.contentDigest
+        && reusable.preparedResult.built
+        && reusable.preparedResult.activationEligible
+        && reusable.preparedResult.snapshotBuildId == reusable.snapshotResult.buildId
+        && reusable.preparedResult.prepared.preparedContentDigest
+            == status.preview.preparedContentDigest
+        && reusable.preparedResult.prepared.macroSchemaDigest
+            == status.preview.macroSchemaDigest
+        && payload->snapshotBuildId == reusable.snapshotResult.buildId
+        && payload->preparedBuildId == reusable.preparedResult.buildId;
+}
+
+bool EngineFacade::completePendingPreviewReusePublish()
+{
+    if (!pendingPreviewReusePublish.has_value())
+        return false;
+
+    const auto pending = *pendingPreviewReusePublish;
+    pendingPreviewReusePublish.reset();
+    const auto& status = draftPlaybackContract.getStatus();
+    if (!status.pendingPerformance.active
+        || status.pendingPerformance.requestId != pending.contractRequestId)
+    {
+        return false;
+    }
+
+    if (!canReuseCurrentFullDraftPreview())
+    {
+        const auto snapshotRequest = playbackSnapshotBuilder.requestBuild(
+            status.draftRevision, true);
+        if (playbackSnapshotWorker.submit({ PlaybackSnapshotWorkLane::performance,
+                                            pending.contractRequestId,
+                                            snapshotRequest,
+                                            {},
+                                            authoringProjectPublication }))
+        {
+            currentSessionState.transientMetrics.integrationState
+                = "Preview reuse became stale; Publish snapshot queued";
+            return true;
+        }
+
+        draftPlaybackContract.failPerformanceBuild(
+            pending.contractRequestId,
+            { "Preview reuse became stale and the Publish snapshot worker rejected fallback preparation." });
+        performancePublishController.fail(
+            pending.publishIdentity,
+            makePerformancePublishFailure(
+                "publish-preview-reuse-fallback-rejected",
+                "playbackSnapshot",
+                "The exact Preview payload became stale and fallback preparation could not start."));
+        return true;
+    }
+
+    const auto& reusable = *reusablePreviewPreparation;
+    const auto preparation = validateExactPreviewReuseForPerformance(
+        pending.publishIdentity,
+        reusable.snapshotResult,
+        reusable.preparedResult);
+    auto applied = false;
+    if (preparation.activationEligible)
+    {
+        applied = draftPlaybackContract.completePerformanceBuildFromCurrentPreview(
+            pending.contractRequestId);
+    }
+    else
+    {
+        auto contractResult = reusable.preparedResult;
+        contractResult.built = false;
+        contractResult.activationEligible = false;
+        contractResult.lifecycleState = PlaybackSnapshotLifecycleState::failed;
+        contractResult.state = "Reused Preview payload failed Performance conformance";
+        contractResult.findings = preparation.findings;
+        contractResult.metrics.failureCount = 1;
+        applied = draftPlaybackContract.completePerformanceBuild(
+            pending.contractRequestId,
+            reusable.snapshotResult,
+            contractResult);
+    }
+
+    const auto& publishResult = preparation.publishResult;
+    const auto preparedAccepted = applied && publishResult.activationEligible
+        && performancePublishController.acceptPrepared(publishResult, monotonicMicros());
+    if (!preparedAccepted && performancePublishController.isCurrent(publishResult.identity))
+    {
+        const auto finding = !preparation.findings.empty()
+            ? makePerformancePublishFinding(preparation.findings.front())
+            : makePerformancePublishFailure(
+                "publish-preview-reuse-failed",
+                "preparedPreview",
+                "The exact Preview payload could not be accepted for Performance activation.");
+        performancePublishController.fail(publishResult.identity, finding);
+    }
+
+    if (applied && preparation.completeProject && preparation.activationEligible)
+    {
+        currentSessionState.transientMetrics.integrationState
+            = "Published revision reused exact Preview payload";
+        currentSessionState.transientMetrics.lastFailure.clear();
+    }
+    else
+    {
+        currentSessionState.transientMetrics.integrationState
+            = "Reused Preview Publish conformance failed";
+        currentSessionState.transientMetrics.lastFailure = summarizeSnapshotFindings(
+            draftPlaybackContract.getStatus().performance.findings);
+    }
+
+    previewPlaybackSnapshot = {};
+    syncPreviewSnapshotFromDraftPlayback();
+    refreshDiagnosticsSnapshot();
+    markStateChanged();
+    return true;
+}
+
 void EngineFacade::markStateChanged()
 {
     ++stateRevision;
@@ -3233,6 +3429,8 @@ void EngineFacade::clearPendingPreparedCompletions()
         pendingPreparedCompletions.erase(result.buildId);
 
     pendingPreparedCompletions.clear();
+    pendingPreviewReusePublish.reset();
+    reusablePreviewPreparation.reset();
     preparedPlaybackService.drainCompletedBuilds();
 }
 

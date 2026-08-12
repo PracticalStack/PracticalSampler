@@ -80,6 +80,7 @@ struct DraftPlaybackPreparedRevision
     int highestPlayableNote = 127;
     std::size_t preparationCacheHitCount = 0;
     std::size_t preparationCacheMissCount = 0;
+    bool reusedPreviewPayload = false;
     std::vector<PlaybackSnapshotFinding> findings;
     PlaybackActivationPayloadPtr activationPayload;
 };
@@ -92,6 +93,9 @@ struct DraftPlaybackPendingRequest
     std::size_t requestedRevision = 0;
     PlaybackSnapshotLifecycleState lifecycleState = PlaybackSnapshotLifecycleState::idle;
     std::string state;
+    std::size_t progressOrdinal = 0;
+    std::size_t progressTotal = 0;
+    std::string progressPhase;
 };
 
 struct DraftPlaybackBuildRequest
@@ -138,6 +142,11 @@ public:
     bool completePerformanceBuild(std::uint64_t requestId,
                                   const PlaybackSnapshotBuildResult& snapshotResult,
                                   const PreparedPlaybackBuildResult& preparedResult);
+    bool completePerformanceBuildFromCurrentPreview(std::uint64_t requestId);
+    bool updatePendingBuildProgress(PlaybackActivationLane lane,
+                                    std::size_t ordinal,
+                                    std::size_t total,
+                                    std::string phase);
 
     bool failPreviewBuild(std::uint64_t requestId,
                           const std::vector<std::string>& issues,

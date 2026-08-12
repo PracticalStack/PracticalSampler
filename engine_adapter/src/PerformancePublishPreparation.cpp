@@ -76,10 +76,11 @@ std::string extractGroupIdFromRoutingSourceId(std::string_view sourceId)
 }
 } // namespace
 
-PerformancePublishPreparationResult validatePerformancePublishPreparation(
+PerformancePublishPreparationResult validatePerformancePublishPreparationImpl(
     const PerformancePublishRequestIdentity& identity,
     const PlaybackSnapshotBuildResult& snapshotResult,
-    const PreparedPlaybackBuildResult& preparedResult)
+    const PreparedPlaybackBuildResult& preparedResult,
+    const bool recomputeDigests)
 {
     PerformancePublishPreparationResult result;
     result.publishResult.identity = identity;
@@ -119,7 +120,8 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
         addError(result, "publish-snapshot-build-mismatch", "prepared.snapshotBuildId",
                  "Prepared content is not linked to the exact immutable snapshot build.");
 
-    const auto authoredDigest = computePlaybackSnapshotContentDigest(snapshot);
+    const auto authoredDigest = recomputeDigests
+        ? computePlaybackSnapshotContentDigest(snapshot) : snapshot.contentDigest;
     if (snapshot.contentDigest.empty() || identity.authoredContentDigest != snapshot.contentDigest
         || authoredDigest != snapshot.contentDigest)
         addError(result, "publish-authored-digest-mismatch", "snapshot.contentDigest",
@@ -127,7 +129,8 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     if (prepared.snapshotContentDigest != snapshot.contentDigest)
         addError(result, "publish-prepared-snapshot-digest-mismatch", "prepared.snapshotContentDigest",
                  "Prepared content was produced from a different authored snapshot.");
-    const auto dspGraphDigest = computePlaybackSnapshotDspGraphDigest(snapshot);
+    const auto dspGraphDigest = recomputeDigests
+        ? computePlaybackSnapshotDspGraphDigest(snapshot) : snapshot.dspGraphDigest;
     if (snapshot.dspGraphDigest.empty() || snapshot.dspGraphDigest != dspGraphDigest
         || prepared.snapshotDspGraphDigest != dspGraphDigest || prepared.dspGraphDigest != dspGraphDigest)
     {
@@ -135,21 +138,25 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
                  "Prepared content was not produced from the exact immutable DSP graph identity.");
     }
     if (prepared.preparedContentDigest.empty()
-        || prepared.preparedContentDigest != computePreparedPlaybackContentDigest(prepared))
+        || (recomputeDigests
+            && prepared.preparedContentDigest != computePreparedPlaybackContentDigest(prepared)))
         addError(result, "publish-prepared-digest-mismatch", "prepared.preparedContentDigest",
                  "Prepared content digest is missing or does not describe the worker result.");
 
-    const auto macroDigest = computePlaybackSnapshotMacroSchemaDigest(snapshot);
+    const auto macroDigest = recomputeDigests
+        ? computePlaybackSnapshotMacroSchemaDigest(snapshot) : prepared.macroSchemaDigest;
     if (identity.macroSchemaDigest.empty() || prepared.macroSchemaDigest != macroDigest
         || prepared.macroSchemaDigest != identity.macroSchemaDigest)
         addError(result, "publish-macro-schema-digest-mismatch", "prepared.macroSchemaDigest",
                  "Prepared macro schema does not match the requested immutable macro schema.");
     if (prepared.routeDigest.empty()
-        || prepared.routeDigest != computePreparedPlaybackRouteDigest(snapshot, prepared))
+        || (recomputeDigests
+            && prepared.routeDigest != computePreparedPlaybackRouteDigest(snapshot, prepared)))
         addError(result, "publish-route-digest-mismatch", "prepared.routeDigest",
                  "Prepared routing topology digest is missing or inconsistent.");
     if (prepared.sourceProvenanceDigest.empty()
-        || prepared.sourceProvenanceDigest != computePreparedPlaybackSourceProvenanceDigest(prepared))
+        || (recomputeDigests
+            && prepared.sourceProvenanceDigest != computePreparedPlaybackSourceProvenanceDigest(prepared)))
         addError(result, "publish-source-provenance-digest-mismatch", "prepared.sourceProvenanceDigest",
                  "Prepared source provenance digest is missing or inconsistent.");
 
@@ -219,8 +226,13 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
     }
 
     std::unordered_set<std::string> authoredZoneIds;
+    std::unordered_map<std::string, const PlaybackSnapshotZone*> authoredZones;
+    authoredZones.reserve(snapshot.zones.size());
     for (const auto& zone : snapshot.zones)
+    {
         authoredZoneIds.insert(zone.id);
+        authoredZones.emplace(zone.id, &zone);
+    }
     std::unordered_set<std::string> routedArticulationZones;
     std::unordered_set<std::string> articulationIds;
     for (std::size_t index = 0; index < snapshot.articulationRoutes.size(); ++index)
@@ -232,11 +244,9 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
                      "Articulation route ids must be non-empty and unique.");
         for (const auto& zoneId : route.zoneIds)
         {
-            const auto authored = std::find_if(snapshot.zones.begin(), snapshot.zones.end(), [&](const auto& zone)
-            {
-                return zone.id == zoneId;
-            });
-            if (authored == snapshot.zones.end() || authored->articulationId != route.articulationId
+            const auto authored = authoredZones.find(zoneId);
+            if (authored == authoredZones.end()
+                || authored->second->articulationId != route.articulationId
                 || !routedArticulationZones.insert(zoneId).second)
                 addError(result, "publish-articulation-route-invalid", path + ".zoneIds",
                          "Every zone must occur once under its authored articulation route.");
@@ -257,11 +267,9 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
                      "Group route ids must be non-empty and unique.");
         for (const auto& zoneId : route.zoneIds)
         {
-            const auto authored = std::find_if(snapshot.zones.begin(), snapshot.zones.end(), [&](const auto& zone)
-            {
-                return zone.id == zoneId;
-            });
-            if (authored == snapshot.zones.end() || authored->groupId != route.groupId
+            const auto authored = authoredZones.find(zoneId);
+            if (authored == authoredZones.end()
+                || authored->second->groupId != route.groupId
                 || !routedGroupZones.insert(zoneId).second)
                 addError(result, "publish-group-route-invalid", path + ".zoneIds",
                          "Every zone must occur once under its authored group route.");
@@ -419,5 +427,23 @@ PerformancePublishPreparationResult validatePerformancePublishPreparation(
         result.publishResult.findings.push_back({ severity, finding.code, finding.path, finding.message });
     }
     return result;
+}
+
+PerformancePublishPreparationResult validatePerformancePublishPreparation(
+    const PerformancePublishRequestIdentity& identity,
+    const PlaybackSnapshotBuildResult& snapshotResult,
+    const PreparedPlaybackBuildResult& preparedResult)
+{
+    return validatePerformancePublishPreparationImpl(
+        identity, snapshotResult, preparedResult, true);
+}
+
+PerformancePublishPreparationResult validateExactPreviewReuseForPerformance(
+    const PerformancePublishRequestIdentity& identity,
+    const PlaybackSnapshotBuildResult& snapshotResult,
+    const PreparedPlaybackBuildResult& preparedResult)
+{
+    return validatePerformancePublishPreparationImpl(
+        identity, snapshotResult, preparedResult, false);
 }
 } // namespace drs::engine
