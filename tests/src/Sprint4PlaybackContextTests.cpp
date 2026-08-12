@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -581,8 +582,15 @@ void runBlockBoundaryAndLifetimeMatrix()
             "Only the old activation's matching note should finish its release.");
     require(!oldLifetime.payload.expired(),
             "Audio completion must return only a retirement token, not release the payload.");
-    require(context.serviceRetirements() == 1 && oldLifetime.payload.expired(),
-            "Message-owned retirement drain must perform the final old payload release.");
+    require(context.serviceRetirements() == 1
+                && context.waitForBackgroundReclamation()
+                && oldLifetime.payload.expired(),
+            "Message-owned retirement drain must hand the final old payload release to the background reclaimer.");
+    require(context.getSnapshot().lastBackgroundReclaimerThreadHash != 0
+                && context.getSnapshot().lastBackgroundReclaimerThreadHash
+                    != static_cast<std::uint64_t>(std::hash<std::thread::id> {}(
+                        std::this_thread::get_id())),
+            "Activation ownership was not destroyed on the background reclaimer thread.");
     require(context.getSnapshot().counters.reclaimedActivationCount == 1,
             "Retirement diagnostics should count message-owned reclamation.");
 }
@@ -615,8 +623,10 @@ void runRestartCloseAndDrainMatrix()
                 && snapshot.activeVoiceCount == 0
                 && !lifetime.payload.expired(),
             "Close must detach audio state while deferring final payload reclamation.");
-    require(context.serviceRetirements() == 1 && lifetime.payload.expired(),
-            "Close retirement should drain exactly once on the message-owned path.");
+    require(context.serviceRetirements() == 1
+                && context.waitForBackgroundReclamation()
+                && lifetime.payload.expired(),
+            "Close retirement should drain exactly once through the background reclaimer.");
     require(context.serviceRetirements() == 0,
             "Repeated retirement drain must be idempotent.");
 }

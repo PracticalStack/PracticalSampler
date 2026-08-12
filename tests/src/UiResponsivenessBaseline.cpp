@@ -7,6 +7,7 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -313,33 +314,82 @@ int main(int argc, char** argv)
         constexpr auto continuousPlaybackSeconds = 180;
         const auto continuousBlockCount = static_cast<int>(
             (continuousPlaybackSeconds * 44100 + 511) / 512);
-        for (int blockIndex = 0; blockIndex < continuousBlockCount; ++blockIndex)
+        std::atomic<int> concurrentAudioBlockCount {0};
+        std::atomic<bool> stopConcurrentAudio {false};
+        std::atomic<bool> concurrentAudioFailed {false};
+        std::thread concurrentAudioThread([&]
         {
-            if ((blockIndex % 384) == 0)
+            try
+            {
+                juce::AudioBuffer<float> playbackBlock(2, 512);
+                for (int blockIndex = 0;
+                     blockIndex < continuousBlockCount
+                        && !stopConcurrentAudio.load(std::memory_order_acquire);
+                     ++blockIndex)
+                {
+                    playbackBlock.clear();
+                    juce::MidiBuffer playbackMidi;
+                    if (blockIndex == 0)
+                        playbackMidi.addEvent(
+                            juce::MidiMessage::controllerEvent(1, 64, 127), 0);
+                    if (blockIndex == continuousBlockCount - 1)
+                        playbackMidi.addEvent(
+                            juce::MidiMessage::controllerEvent(1, 64, 0), 0);
+                    processor.processBlock(playbackBlock, playbackMidi);
+                    concurrentAudioBlockCount.store(blockIndex + 1,
+                                                    std::memory_order_release);
+                    std::this_thread::sleep_for(std::chrono::microseconds(250));
+                }
+            }
+            catch (...)
+            {
+                concurrentAudioFailed.store(true, std::memory_order_release);
+            }
+        });
+
+        auto nextGestureBlock = 0;
+        auto notesHeld = false;
+        std::uint64_t maximumConcurrentDispatchMicros = 0;
+        const auto concurrentDeadline = Clock::now() + std::chrono::seconds(60);
+        while (concurrentAudioBlockCount.load(std::memory_order_acquire)
+                   < continuousBlockCount
+               && Clock::now() < concurrentDeadline)
+        {
+            const auto currentBlock
+                = concurrentAudioBlockCount.load(std::memory_order_acquire);
+            if (currentBlock >= nextGestureBlock)
             {
                 for (const auto note : { 48, 52, 55, 60 })
-                    authoredPerformancePanel->getKeyboardState().noteOn(1, note, 0.72f);
-            }
-            if ((blockIndex % 384) == 96)
-            {
-                for (const auto note : { 48, 52, 55, 60 })
-                    authoredPerformancePanel->getKeyboardState().noteOff(1, note, 0.72f);
+                {
+                    if (notesHeld)
+                        authoredPerformancePanel->getKeyboardState().noteOff(
+                            1, note, 0.72f);
+                    else
+                        authoredPerformancePanel->getKeyboardState().noteOn(
+                            1, note, 0.72f);
+                }
+                notesHeld = !notesHeld;
+                nextGestureBlock = currentBlock + (notesHeld ? 96 : 288);
             }
 
-            juce::AudioBuffer<float> playbackBlock(2, 512);
-            playbackBlock.clear();
-            juce::MidiBuffer playbackMidi;
-            if (blockIndex == 0)
-                playbackMidi.addEvent(juce::MidiMessage::controllerEvent(1, 64, 127), 0);
-            if (blockIndex == continuousBlockCount - 1)
-                playbackMidi.addEvent(juce::MidiMessage::controllerEvent(1, 64, 0), 0);
-            processor.processBlock(playbackBlock, playbackMidi);
-
-            // Dispatch the actual editor timer while advancing three minutes of
-            // audio faster than realtime. The editor owns the production 4 Hz loop.
-            if ((blockIndex % 8) == 0)
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
+            const auto dispatchStartedAt = Clock::now();
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
+            maximumConcurrentDispatchMicros = std::max(
+                maximumConcurrentDispatchMicros, elapsedMicros(dispatchStartedAt));
         }
+        if (notesHeld)
+            for (const auto note : { 48, 52, 55, 60 })
+                authoredPerformancePanel->getKeyboardState().noteOff(1, note, 0.72f);
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(20);
+        stopConcurrentAudio.store(true, std::memory_order_release);
+        concurrentAudioThread.join();
+        require(!concurrentAudioFailed.load(std::memory_order_acquire),
+                "The concurrent large-piano audio thread failed.");
+        require(concurrentAudioBlockCount.load(std::memory_order_acquire)
+                    == continuousBlockCount,
+                "The concurrent large-piano audio thread did not advance three minutes of blocks.");
+        require(maximumConcurrentDispatchMicros < 100000,
+                "The message thread stalled for more than 100 ms while concurrent piano audio was running.");
         juce::MessageManager::getInstance()->runDispatchLoopUntil(300);
         const auto continuousMetrics = drs::app::MessageThreadMetrics::getStatistics();
         require(maximumFor(continuousMetrics,
@@ -351,6 +401,20 @@ int main(int argc, char** argv)
         require(observationsFor(continuousMetrics,
                                 drs::app::MessageThreadSpanKind::editorTimerWork) >= 4,
                 "Continuous-playing coverage did not exercise the real 4 Hz editor loop.");
+        require(observationsFor(continuousMetrics,
+                                drs::app::MessageThreadSpanKind::editorServiceWork) >= 4
+                    && observationsFor(continuousMetrics,
+                                       drs::app::MessageThreadSpanKind::editorPerformanceWork) >= 4
+                    && observationsFor(continuousMetrics,
+                                       drs::app::MessageThreadSpanKind::editorAuthoringWork) >= 4,
+                "Concurrent coverage did not instrument each active 4 Hz editor section.");
+        require(maximumFor(continuousMetrics,
+                           drs::app::MessageThreadSpanKind::editorServiceWork) < 100.0
+                    && maximumFor(continuousMetrics,
+                                  drs::app::MessageThreadSpanKind::editorPerformanceWork) < 100.0
+                    && maximumFor(continuousMetrics,
+                                  drs::app::MessageThreadSpanKind::editorAuthoringWork) < 100.0,
+                "An instrumented 4 Hz editor section exceeded the 100 ms responsiveness gate.");
         require(processor.getCurrentDraftPreviewFingerprintComputationCount()
                     == fingerprintComputationsBeforeContinuousPlaying,
                 "Continuous playing fingerprinted or resolved the unchanged authored project on the message thread.");
@@ -448,6 +512,60 @@ int main(int argc, char** argv)
         require(nextBlockMagnitude > 0.0001f,
                 "A queued Performance keyboard note was not heard on the next audio block.");
 
+        std::atomic<bool> stopPackageAudio {false};
+        std::atomic<bool> packageAudioFailed {false};
+        std::atomic<std::uint64_t> maximumPackageAudioBlockMicros {0};
+        std::thread packageAudioThread([&]
+        {
+            try
+            {
+                juce::AudioBuffer<float> packageBlock(2, 512);
+                while (!stopPackageAudio.load(std::memory_order_acquire))
+                {
+                    packageBlock.clear();
+                    juce::MidiBuffer packageMidi;
+                    const auto blockStartedAt = Clock::now();
+                    processor.processBlock(packageBlock, packageMidi);
+                    const auto blockMicros = elapsedMicros(blockStartedAt);
+                    auto maximum = maximumPackageAudioBlockMicros.load(std::memory_order_relaxed);
+                    while (maximum < blockMicros
+                           && !maximumPackageAudioBlockMicros.compare_exchange_weak(
+                               maximum, blockMicros, std::memory_order_relaxed))
+                    {
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+            catch (...)
+            {
+                packageAudioFailed.store(true, std::memory_order_release);
+            }
+        });
+
+        std::uint64_t maximumPackageDispatchMicros = 0;
+        const auto packagePlayStartedAt = Clock::now();
+        auto sentSecondPackageNote = false;
+        performancePanel->getKeyboardState().noteOn(1, 60, 0.8f);
+        while (Clock::now() - packagePlayStartedAt < std::chrono::seconds(18))
+        {
+            if (!sentSecondPackageNote
+                && Clock::now() - packagePlayStartedAt > std::chrono::milliseconds(50))
+            {
+                performancePanel->getKeyboardState().noteOn(1, 64, 0.8f);
+                sentSecondPackageNote = true;
+            }
+            const auto dispatchStartedAt = Clock::now();
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
+            maximumPackageDispatchMicros = std::max(
+                maximumPackageDispatchMicros, elapsedMicros(dispatchStartedAt));
+        }
+        performancePanel->getKeyboardState().noteOff(1, 60, 0.8f);
+        performancePanel->getKeyboardState().noteOff(1, 64, 0.8f);
+        stopPackageAudio.store(true, std::memory_order_release);
+        packageAudioThread.join();
+        require(!packageAudioFailed.load(std::memory_order_acquire),
+                "The sustained package audio thread failed.");
+
         const auto slowSpans = drs::app::MessageThreadMetrics::getSlowSpanStatistics();
         fs::create_directories(reportPath.parent_path());
         std::ofstream report(reportPath, std::ios::binary | std::ios::trunc);
@@ -476,11 +594,17 @@ int main(int argc, char** argv)
                << (authoredPlaybackStatus.performance.reusedPreviewPayload ? "true" : "false") << ",\n"
                << "  \"authoredNextBlockMagnitude\": " << authoredNextBlockMagnitude << ",\n"
                << "  \"continuousPlaybackSeconds\": " << continuousPlaybackSeconds << ",\n"
+               << "  \"maximumConcurrentDispatchMicros\": "
+               << maximumConcurrentDispatchMicros << ",\n"
                << "  \"authoredOnScreenMagnitude\": " << authoredOnScreenMagnitude << ",\n"
                << "  \"authoredHostMagnitude\": " << authoredHostMagnitude << ",\n"
                << "  \"packageLoadMicros\": " << packageLoadMicros << ",\n"
                << "  \"performanceRefreshMicros\": " << performanceRefreshMicros << ",\n"
                << "  \"keyboardCallbacksMicros\": " << keyboardCallbacksMicros << ",\n"
+               << "  \"maximumPackageDispatchMicros\": "
+               << maximumPackageDispatchMicros << ",\n"
+               << "  \"maximumPackageAudioBlockMicros\": "
+               << maximumPackageAudioBlockMicros.load(std::memory_order_relaxed) << ",\n"
                << "  \"nextBlockMagnitude\": " << nextBlockMagnitude << ",\n"
                << std::fixed << std::setprecision(3)
                << "  \"maxInstrumentedAuthoringRefreshMs\": "
@@ -493,6 +617,12 @@ int main(int argc, char** argv)
                << maximumFor(slowSpans, drs::app::MessageThreadSpanKind::performanceKeyboardCallback) << ",\n"
                << "  \"maxInstrumentedEditorTimerMs\": "
                << maximumFor(slowSpans, drs::app::MessageThreadSpanKind::editorTimerWork) << ",\n"
+               << "  \"maxInstrumentedEngineServiceMs\": "
+               << maximumFor(slowSpans, drs::app::MessageThreadSpanKind::editorServiceWork) << ",\n"
+               << "  \"maxInstrumentedPerformanceSectionMs\": "
+               << maximumFor(slowSpans, drs::app::MessageThreadSpanKind::editorPerformanceWork) << ",\n"
+               << "  \"maxInstrumentedAuthoringSectionMs\": "
+               << maximumFor(slowSpans, drs::app::MessageThreadSpanKind::editorAuthoringWork) << ",\n"
                << "  \"maxInstrumentedHostStateSerializationMs\": "
                << maximumFor(slowSpans, drs::app::MessageThreadSpanKind::hostStateSerialization) << ",\n"
                << "  \"maxInstrumentedPreviewDispatchMs\": "

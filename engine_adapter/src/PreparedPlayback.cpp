@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -749,6 +750,8 @@ PreparedPlaybackService::PreparedPlaybackService(std::string compilerVersionIn,
         std::max<std::size_t>(1, schedulerBudgets.maximumConsecutivePerformanceJobs);
     refreshWorkerStatus();
 
+    reclaimerThread = std::thread([this] { runBackgroundReclaimer(); });
+
     if (backgroundWorkerEnabled)
         workerThread = std::thread([this] { runBackgroundWorker(); });
 }
@@ -767,6 +770,38 @@ PreparedPlaybackService::~PreparedPlaybackService()
 
     if (workerThread.joinable())
         workerThread.join();
+
+    // With the producer worker stopped, transfer every remaining cache owner to
+    // the background reclaimer. Shutdown may wait, but no large ownership graph
+    // is destroyed by this caller thread.
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        for (auto& active : cacheEntries)
+        {
+            workerStatus.retiredBytesAwaitingCleanup += active.second.retainedBytes;
+            retiredCacheEntries.push_back(std::move(active));
+        }
+        cacheEntries.clear();
+        refreshWorkerStatus();
+    }
+    for (;;)
+    {
+        if (serviceRetiredCacheCleanup() == 0)
+        {
+            std::lock_guard<std::mutex> lock(workerMutex);
+            if (retiredCacheEntries.empty())
+                break;
+        }
+        waitForBackgroundReclamation(std::chrono::seconds(30));
+    }
+    waitForBackgroundReclamation(std::chrono::seconds(30));
+    {
+        std::lock_guard<std::mutex> lock(reclaimerMutex);
+        stopReclaimerRequested = true;
+    }
+    reclaimerCondition.notify_all();
+    if (reclaimerThread.joinable())
+        reclaimerThread.join();
 }
 
 PreparedPlaybackBuildRequest PreparedPlaybackService::requestBuild(const PlaybackSnapshotBuildResult& snapshotResult)
@@ -1972,25 +2007,47 @@ std::vector<PreparedPlaybackBuildResult> PreparedPlaybackService::cancelQueuedBu
 std::size_t PreparedPlaybackService::serviceRetiredCacheCleanup(std::size_t maxEntries)
 {
     std::size_t retiredCount = 0;
-    std::lock_guard<std::mutex> lock(workerMutex);
-    while (!retiredCacheEntries.empty() && retiredCount < maxEntries)
     {
-        const auto& entry = retiredCacheEntries.back();
-        if (workerStatus.retiredBytesAwaitingCleanup >= entry.second.retainedBytes)
-            workerStatus.retiredBytesAwaitingCleanup -= entry.second.retainedBytes;
-        else
-            workerStatus.retiredBytesAwaitingCleanup = 0;
+        std::lock_guard<std::mutex> workerLock(workerMutex);
+        std::lock_guard<std::mutex> reclaimerLock(reclaimerMutex);
+        while (!retiredCacheEntries.empty() && retiredCount < maxEntries
+               && reclamationCount < reclamationQueue.size())
+        {
+            auto& target = reclamationQueue[reclamationWriteIndex];
+            target.key = std::move(retiredCacheEntries.back().first);
+            target.entry = std::move(retiredCacheEntries.back().second);
+            retiredCacheEntries.pop_back();
+            reclamationWriteIndex = (reclamationWriteIndex + 1) % reclamationQueue.size();
+            ++reclamationCount;
+            ++retiredCount;
 
-        retiredCacheEntries.pop_back();
-        ++retiredCount;
+            if (workerStatus.retiredBytesAwaitingCleanup >= target.entry.retainedBytes)
+                workerStatus.retiredBytesAwaitingCleanup -= target.entry.retainedBytes;
+            else
+                workerStatus.retiredBytesAwaitingCleanup = 0;
+        }
+
+        if (retiredCount != 0)
+            workerStatus.lastEvent = "Queued " + std::to_string(retiredCount)
+                + " stale prepared cache entr"
+                + (retiredCount == 1 ? "y" : "ies") + " for background reclamation";
+
+        refreshWorkerStatus();
     }
 
     if (retiredCount != 0)
-        workerStatus.lastEvent = "Retired " + std::to_string(retiredCount) + " stale prepared cache entr"
-            + (retiredCount == 1 ? "y" : "ies");
-
-    refreshWorkerStatus();
+        reclaimerCondition.notify_one();
     return retiredCount;
+}
+
+bool PreparedPlaybackService::waitForBackgroundReclamation(
+    const std::chrono::milliseconds timeout)
+{
+    std::unique_lock<std::mutex> lock(reclaimerMutex);
+    return reclaimerCondition.wait_for(lock, timeout, [this]
+    {
+        return reclamationCount == 0 && !reclamationInFlight;
+    });
 }
 
 std::size_t PreparedPlaybackService::retireStaleCacheEntries(std::size_t maxEntries)
@@ -2012,8 +2069,25 @@ std::vector<PreparedPlaybackOwnershipRecord> PreparedPlaybackService::snapshotRe
 
 PreparedPlaybackWorkerStatus PreparedPlaybackService::getWorkerStatus() const
 {
-    std::lock_guard<std::mutex> lock(workerMutex);
-    return workerStatus;
+    PreparedPlaybackWorkerStatus result;
+    {
+        std::lock_guard<std::mutex> lock(workerMutex);
+        result = workerStatus;
+    }
+    {
+        std::lock_guard<std::mutex> lock(reclaimerMutex);
+        result.pendingBackgroundReclamationCount
+            = reclamationCount + (reclamationInFlight ? 1u : 0u);
+    }
+    result.completedBackgroundReclamationCount
+        = completedBackgroundReclamationCount.load(std::memory_order_relaxed);
+    result.lastBackgroundReclamationMicros
+        = lastBackgroundReclamationMicros.load(std::memory_order_relaxed);
+    result.maxBackgroundReclamationMicros
+        = maxBackgroundReclamationMicros.load(std::memory_order_relaxed);
+    result.lastBackgroundReclaimerThreadHash
+        = lastBackgroundReclaimerThreadHash.load(std::memory_order_relaxed);
+    return result;
 }
 
 void PreparedPlaybackService::recordCommandToQueuedDuration(std::uint64_t durationMicros)
@@ -2160,6 +2234,57 @@ void PreparedPlaybackService::runBackgroundWorker()
         }
 
         workerIdleCondition.notify_all();
+    }
+}
+
+void PreparedPlaybackService::runBackgroundReclaimer()
+{
+    for (;;)
+    {
+        CacheReclamationEntry entry;
+        {
+            std::unique_lock<std::mutex> lock(reclaimerMutex);
+            reclaimerCondition.wait(lock, [this]
+            {
+                return stopReclaimerRequested || reclamationCount != 0;
+            });
+            if (reclamationCount == 0 && stopReclaimerRequested)
+                break;
+
+            auto& queued = reclamationQueue[reclamationReadIndex];
+            entry.key = std::move(queued.key);
+            entry.entry = std::move(queued.entry);
+            reclamationReadIndex = (reclamationReadIndex + 1) % reclamationQueue.size();
+            --reclamationCount;
+            reclamationInFlight = true;
+        }
+
+        const auto startedAt = Clock::now();
+        entry.entry.sample = {};
+        entry.entry.stream = {};
+        entry.entry.ownership = {};
+        entry.key.clear();
+        const auto elapsedMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                Clock::now() - startedAt).count());
+        lastBackgroundReclamationMicros.store(elapsedMicros, std::memory_order_relaxed);
+        lastBackgroundReclaimerThreadHash.store(
+            static_cast<std::uint64_t>(std::hash<std::thread::id> {}(
+                std::this_thread::get_id())),
+            std::memory_order_relaxed);
+        completedBackgroundReclamationCount.fetch_add(1, std::memory_order_relaxed);
+        auto maximum = maxBackgroundReclamationMicros.load(std::memory_order_relaxed);
+        while (maximum < elapsedMicros
+               && !maxBackgroundReclamationMicros.compare_exchange_weak(
+                   maximum, elapsedMicros, std::memory_order_relaxed))
+        {
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(reclaimerMutex);
+            reclamationInFlight = false;
+        }
+        reclaimerCondition.notify_all();
     }
 }
 

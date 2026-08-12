@@ -759,18 +759,54 @@ void MainComponent::timerCallback()
 {
     const drs::app::ScopedMessageThreadSpan timing(
         drs::app::MessageThreadSpanKind::editorTimerWork);
-    processor.serviceMessageThreadWork();
-    if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
-        resized();
-    pollPerformancePackageOpenTask();
-    performancePanel.refreshNow();
-    if (processor.getWorkspaceDocumentState().authoringAvailable)
-        authoringPanel.refreshNow();
-    updateWorkspaceStatusLabel();
-    updateWindowTitle();
-    pollPerformancePackageExportService();
-    pollWavImportService();
-    pollSfzImportReviewService();
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorServiceWork);
+        processor.serviceMessageThreadWork();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorRestoreWork);
+        if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
+            resized();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorPackageOpenWork);
+        pollPerformancePackageOpenTask();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorPerformanceWork);
+        performancePanel.refreshNow();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorAuthoringWork);
+        if (processor.getWorkspaceDocumentState().authoringAvailable)
+            authoringPanel.refreshNow();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorStatusWork);
+        updateWorkspaceStatusLabel();
+        updateWindowTitle();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorExportWork);
+        pollPerformancePackageExportService();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorWavImportWork);
+        pollWavImportService();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorSfzImportWork);
+        pollSfzImportReviewService();
+    }
 }
 
 void MainComponent::locateProjectForRestore()

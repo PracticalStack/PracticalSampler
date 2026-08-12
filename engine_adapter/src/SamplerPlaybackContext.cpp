@@ -1,6 +1,7 @@
 #include "drs/engine/SamplerPlaybackContext.h"
 
 #include <cmath>
+#include <functional>
 #include <utility>
 
 namespace drs::engine
@@ -13,9 +14,33 @@ namespace
 const CompiledPerformanceProgram emptyPerformanceProgram;
 }
 
-SamplerPlaybackContext::SamplerPlaybackContext(PlaybackActivationLane lane) noexcept
+SamplerPlaybackContext::SamplerPlaybackContext(PlaybackActivationLane lane)
     : contextLane(lane)
 {
+    reclaimerThread = std::thread([this] { runBackgroundReclaimer(); });
+}
+
+SamplerPlaybackContext::~SamplerPlaybackContext()
+{
+    // Processor shutdown has already stopped audio. Detach every remaining
+    // ownership graph before stopping the reclaimer so final destruction never
+    // falls back to the caller/message thread.
+    for (auto& slot : activationSlots)
+    {
+        if (slot.model == nullptr)
+            continue;
+        while (!enqueueBackgroundReclamation(slot))
+            waitForBackgroundReclamation(std::chrono::milliseconds(100));
+        slot.serial = 0;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(reclaimerMutex);
+        stopReclaimerRequested = true;
+    }
+    reclaimerCondition.notify_all();
+    if (reclaimerThread.joinable())
+        reclaimerThread.join();
 }
 
 bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
@@ -71,7 +96,23 @@ bool SamplerPlaybackContext::stageActivation(SamplerRenderModelPtr model,
     if (superseded >= 0)
     {
         const auto& slot = activationSlots[static_cast<std::size_t>(superseded)];
-        releaseSlotOnMessageThread({ superseded, slot.serial });
+        if (!releaseSlotOnMessageThread({ superseded, slot.serial }))
+        {
+            const auto payload = slot.model != nullptr
+                ? slot.model->getRetainedActivationPayload()
+                : PlaybackActivationPayloadPtr {};
+            diagnosticPendingRevision.store(
+                slot.model != nullptr ? slot.model->getRevision() : 0,
+                std::memory_order_relaxed);
+            diagnosticPendingPreparedBuildId.store(
+                slot.model != nullptr ? slot.model->getPreparedBuildId() : 0,
+                std::memory_order_relaxed);
+            diagnosticPendingPayloadBytes.store(
+                payload != nullptr ? payload->retainedPreparedBytes : 0,
+                std::memory_order_relaxed);
+            pendingActivationSlot.store(superseded, std::memory_order_release);
+            return false;
+        }
     }
 
     const auto slotIndex = acquireFreeSlot();
@@ -183,8 +224,23 @@ bool SamplerPlaybackContext::cancelPendingActivation()
     if (pending < 0)
         return false;
     const auto& slot = activationSlots[static_cast<std::size_t>(pending)];
-    releaseSlotOnMessageThread({ pending, slot.serial });
-    return true;
+    if (releaseSlotOnMessageThread({ pending, slot.serial }))
+        return true;
+
+    const auto payload = slot.model != nullptr
+        ? slot.model->getRetainedActivationPayload()
+        : PlaybackActivationPayloadPtr {};
+    diagnosticPendingRevision.store(
+        slot.model != nullptr ? slot.model->getRevision() : 0,
+        std::memory_order_relaxed);
+    diagnosticPendingPreparedBuildId.store(
+        slot.model != nullptr ? slot.model->getPreparedBuildId() : 0,
+        std::memory_order_relaxed);
+    diagnosticPendingPayloadBytes.store(
+        payload != nullptr ? payload->retainedPreparedBytes : 0,
+        std::memory_order_relaxed);
+    pendingActivationSlot.store(pending, std::memory_order_release);
+    return false;
 }
 
 bool SamplerPlaybackContext::activatePendingForPreparation() noexcept
@@ -200,6 +256,15 @@ std::size_t SamplerPlaybackContext::serviceRetirements()
 {
     std::size_t reclaimed = 0;
     RetirementToken token;
+    if (hasDeferredMessageRetirement)
+    {
+        token = deferredMessageRetirement;
+        if (!releaseSlotOnMessageThread(token))
+            return 0;
+        hasDeferredMessageRetirement = false;
+        diagnosticRetiredBacklog.fetch_sub(1, std::memory_order_relaxed);
+        ++reclaimed;
+    }
     while (dequeueRetirement(token))
     {
         const auto renderedBlocks = diagnosticRenderedBlockCount.load(std::memory_order_acquire);
@@ -218,13 +283,28 @@ std::size_t SamplerPlaybackContext::serviceRetirements()
             ? slot.model->getRetainedActivationPayload()
             : PlaybackActivationPayloadPtr {};
         const auto payloadBytes = payload != nullptr ? payload->retainedPreparedBytes : 0;
-        releaseSlotOnMessageThread(token);
+        if (!releaseSlotOnMessageThread(token))
+        {
+            deferredMessageRetirement = token;
+            hasDeferredMessageRetirement = true;
+            break;
+        }
         diagnosticRetiredBacklog.fetch_sub(1, std::memory_order_relaxed);
         diagnosticRetiredPayloadBytes.fetch_sub(payloadBytes, std::memory_order_relaxed);
         ++reclaimed;
     }
     reclaimedActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
     return reclaimed;
+}
+
+bool SamplerPlaybackContext::waitForBackgroundReclamation(
+    const std::chrono::milliseconds timeout)
+{
+    std::unique_lock<std::mutex> lock(reclaimerMutex);
+    return reclaimerCondition.wait_for(lock, timeout, [this]
+    {
+        return reclamationCount == 0 && !reclamationInFlight;
+    });
 }
 
 SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
@@ -425,6 +505,16 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
         = diagnosticRetiredPayloadBytes.load(std::memory_order_acquire);
     snapshot.retiredActivationBacklog
         = diagnosticRetiredBacklog.load(std::memory_order_acquire);
+    snapshot.pendingBackgroundReclamationCount
+        = diagnosticPendingBackgroundReclamationCount.load(std::memory_order_relaxed);
+    snapshot.completedBackgroundReclamationCount
+        = completedBackgroundReclamationCount.load(std::memory_order_relaxed);
+    snapshot.lastBackgroundReclamationMicros
+        = lastBackgroundReclamationMicros.load(std::memory_order_relaxed);
+    snapshot.maxBackgroundReclamationMicros
+        = maxBackgroundReclamationMicros.load(std::memory_order_relaxed);
+    snapshot.lastBackgroundReclaimerThreadHash
+        = lastBackgroundReclaimerThreadHash.load(std::memory_order_relaxed);
     snapshot.counters.reclaimedActivationCount
         = reclaimedActivationCount.load(std::memory_order_relaxed);
     snapshot.counters.lastReclamationLatencyBlocks
@@ -545,22 +635,96 @@ int SamplerPlaybackContext::acquireFreeSlot() noexcept
     return freeActivationSlots[--freeActivationSlotCount];
 }
 
-void SamplerPlaybackContext::releaseSlotOnMessageThread(RetirementToken token)
+bool SamplerPlaybackContext::releaseSlotOnMessageThread(RetirementToken token)
 {
     if (token.slotIndex < 0
         || static_cast<std::size_t>(token.slotIndex) >= activationSlots.size())
     {
-        return;
+        return false;
     }
 
     auto& slot = activationSlots[static_cast<std::size_t>(token.slotIndex)];
     if (slot.serial != token.serial || slot.model == nullptr)
-        return;
-    slot.model.reset();
-    slot.dspGeneration.reset();
+        return false;
+    if (!enqueueBackgroundReclamation(slot))
+        return false;
     slot.serial = 0;
     if (freeActivationSlotCount < freeActivationSlots.size())
         freeActivationSlots[freeActivationSlotCount++] = token.slotIndex;
+    return true;
+}
+
+bool SamplerPlaybackContext::enqueueBackgroundReclamation(ActivationSlot& slot)
+{
+    std::lock_guard<std::mutex> lock(reclaimerMutex);
+    if (reclamationCount >= reclamationQueue.size())
+        return false;
+
+    auto& target = reclamationQueue[reclamationWriteIndex];
+    target.model = std::move(slot.model);
+    target.dspGeneration = std::move(slot.dspGeneration);
+    reclamationWriteIndex = (reclamationWriteIndex + 1) % reclamationQueue.size();
+    ++reclamationCount;
+    diagnosticPendingBackgroundReclamationCount.store(
+        reclamationCount + (reclamationInFlight ? 1u : 0u),
+        std::memory_order_relaxed);
+    reclaimerCondition.notify_one();
+    return true;
+}
+
+void SamplerPlaybackContext::runBackgroundReclaimer()
+{
+    for (;;)
+    {
+        ReclamationEntry entry;
+        {
+            std::unique_lock<std::mutex> lock(reclaimerMutex);
+            reclaimerCondition.wait(lock, [this]
+            {
+                return stopReclaimerRequested || reclamationCount != 0;
+            });
+            if (reclamationCount == 0 && stopReclaimerRequested)
+                break;
+
+            auto& queued = reclamationQueue[reclamationReadIndex];
+            entry.model = std::move(queued.model);
+            entry.dspGeneration = std::move(queued.dspGeneration);
+            reclamationReadIndex = (reclamationReadIndex + 1) % reclamationQueue.size();
+            --reclamationCount;
+            reclamationInFlight = true;
+            diagnosticPendingBackgroundReclamationCount.store(
+                reclamationCount + 1u, std::memory_order_relaxed);
+        }
+
+        // These resets may recursively release hundreds of sample/data-source
+        // owners. They deliberately execute only on this reclaimer thread.
+        const auto startedAt = std::chrono::steady_clock::now();
+        entry.dspGeneration.reset();
+        entry.model.reset();
+        const auto elapsedMicros = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - startedAt).count());
+        lastBackgroundReclamationMicros.store(elapsedMicros, std::memory_order_relaxed);
+        completedBackgroundReclamationCount.fetch_add(1, std::memory_order_relaxed);
+        lastBackgroundReclaimerThreadHash.store(
+            static_cast<std::uint64_t>(std::hash<std::thread::id> {}(
+                std::this_thread::get_id())),
+            std::memory_order_relaxed);
+        auto maximum = maxBackgroundReclamationMicros.load(std::memory_order_relaxed);
+        while (maximum < elapsedMicros
+               && !maxBackgroundReclamationMicros.compare_exchange_weak(
+                   maximum, elapsedMicros, std::memory_order_relaxed))
+        {
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(reclaimerMutex);
+            reclamationInFlight = false;
+            diagnosticPendingBackgroundReclamationCount.store(
+                reclamationCount, std::memory_order_relaxed);
+        }
+        reclaimerCondition.notify_all();
+    }
 }
 
 void SamplerPlaybackContext::accumulate(const SamplerVoicePoolRenderResult& result) noexcept

@@ -1080,6 +1080,13 @@ int main()
                 "Repeated invalidating edits before cleanup should expose both retired ownership records.");
         require(preparedService.serviceRetiredCacheCleanup(1) == 1,
                 "Partial stale-cache cleanup should retire only one accumulated record at a time.");
+        require(preparedService.waitForBackgroundReclamation(),
+                "Partial stale-cache cleanup did not finish on the background reclaimer.");
+        require(preparedService.getWorkerStatus().lastBackgroundReclaimerThreadHash != 0
+                    && preparedService.getWorkerStatus().lastBackgroundReclaimerThreadHash
+                        != static_cast<std::uint64_t>(std::hash<std::thread::id> {}(
+                            std::this_thread::get_id())),
+                "Prepared cache ownership was not destroyed on the background reclaimer thread.");
         require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 1,
                 "Partial stale-cache cleanup should leave one retired ownership record behind.");
         const auto retiredBytesAfterPartialCleanup = preparedService.getWorkerStatus().retiredBytesAwaitingCleanup;
@@ -1087,6 +1094,8 @@ int main()
                 "Partial stale-cache cleanup should leave retained bytes awaiting the remaining cleanup pass.");
         require(preparedService.serviceRetiredCacheCleanup() == 1,
                 "A second stale-cache cleanup pass should drain the final accumulated retirement record.");
+        require(preparedService.waitForBackgroundReclamation(),
+                "The final stale-cache cleanup did not finish on the background reclaimer.");
         require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 0,
                 "Draining stale prepared cache entries should clear the retired ownership-record count.");
         require(preparedService.getWorkerStatus().retiredBytesAwaitingCleanup == 0,
@@ -1125,6 +1134,8 @@ int main()
                 "Post-cleanup invalidation coverage should begin a fresh retirement backlog for the newly replaced key.");
         require(preparedService.serviceRetiredCacheCleanup() == 1,
                 "Post-cleanup invalidation coverage should drain the new retirement backlog cleanly.");
+        require(preparedService.waitForBackgroundReclamation(),
+                "Post-cleanup invalidation did not finish on the background reclaimer.");
         require(preparedService.getWorkerStatus().retiredOwnershipRecordCount == 0,
                 "Post-cleanup invalidation coverage should leave no retired backlog after servicing cleanup.");
 

@@ -4,8 +4,10 @@
 #include "drs/engine/RuntimeStream.h"
 
 #include <cstddef>
+#include <array>
 #include <atomic>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -386,6 +388,11 @@ struct PreparedPlaybackWorkerStatus
     std::uint64_t pagePrepareFailureCount = 0;
     std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
+    std::size_t pendingBackgroundReclamationCount = 0;
+    std::uint64_t completedBackgroundReclamationCount = 0;
+    std::uint64_t lastBackgroundReclamationMicros = 0;
+    std::uint64_t maxBackgroundReclamationMicros = 0;
+    std::uint64_t lastBackgroundReclaimerThreadHash = 0;
     std::string lastEvent;
     std::string lastCancellationLane;
     std::string lastCancellationReason;
@@ -439,6 +446,8 @@ public:
         const std::string& state = "Prepared playback build canceled before worker execution");
     std::size_t serviceRetiredCacheCleanup(std::size_t maxEntries = static_cast<std::size_t>(-1));
     std::size_t retireStaleCacheEntries(std::size_t maxEntries = static_cast<std::size_t>(-1));
+    bool waitForBackgroundReclamation(
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
     std::vector<PreparedPlaybackOwnershipRecord> snapshotRetiredOwnershipRecords() const;
     PreparedPlaybackWorkerStatus getWorkerStatus() const;
     void recordCommandToQueuedDuration(std::uint64_t durationMicros);
@@ -454,6 +463,12 @@ private:
         PreparedPlaybackSampleHandle sample;
         PreparedPlaybackStreamHandle stream;
         std::uint64_t retainedBytes = 0;
+    };
+
+    struct CacheReclamationEntry
+    {
+        std::string key;
+        CacheEntry entry;
     };
 
     struct QueuedJob
@@ -480,6 +495,7 @@ private:
         PreparedPlaybackWorkLane lane,
         const std::string& state);
     void runBackgroundWorker();
+    void runBackgroundReclaimer();
     bool serviceStreamPageRequests();
     void refreshWorkerStatus();
     bool isCancellationRequested(const PreparedPlaybackBuildRequest& request) const noexcept;
@@ -508,6 +524,20 @@ private:
     PreparedPlaybackWorkerStatus workerStatus;
     RuntimeStreamLoadResult workerStreamResult;
     std::thread workerThread;
+    static constexpr std::size_t reclamationQueueCapacity = 64;
+    std::array<CacheReclamationEntry, reclamationQueueCapacity> reclamationQueue {};
+    std::size_t reclamationReadIndex = 0;
+    std::size_t reclamationWriteIndex = 0;
+    std::size_t reclamationCount = 0;
+    bool reclamationInFlight = false;
+    bool stopReclaimerRequested = false;
+    std::thread reclaimerThread;
+    mutable std::mutex reclaimerMutex;
+    std::condition_variable reclaimerCondition;
+    std::atomic<std::uint64_t> completedBackgroundReclamationCount {0};
+    std::atomic<std::uint64_t> lastBackgroundReclamationMicros {0};
+    std::atomic<std::uint64_t> maxBackgroundReclamationMicros {0};
+    std::atomic<std::uint64_t> lastBackgroundReclaimerThreadHash {0};
     mutable std::mutex workerMutex;
     std::condition_variable workerCondition;
     std::condition_variable workerIdleCondition;

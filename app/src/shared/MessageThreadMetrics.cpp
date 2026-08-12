@@ -108,6 +108,15 @@ const char* MessageThreadMetrics::name(const MessageThreadSpanKind kind) noexcep
     {
         case MessageThreadSpanKind::performanceKeyboardCallback: return "keyboard callbacks";
         case MessageThreadSpanKind::editorTimerWork: return "editor timer";
+        case MessageThreadSpanKind::editorServiceWork: return "4 Hz engine service";
+        case MessageThreadSpanKind::editorRestoreWork: return "4 Hz restore presentation";
+        case MessageThreadSpanKind::editorPerformanceWork: return "4 Hz Performance presentation";
+        case MessageThreadSpanKind::editorAuthoringWork: return "4 Hz Authoring presentation";
+        case MessageThreadSpanKind::editorPackageOpenWork: return "4 Hz package-open poll";
+        case MessageThreadSpanKind::editorStatusWork: return "4 Hz shell status";
+        case MessageThreadSpanKind::editorExportWork: return "4 Hz export poll";
+        case MessageThreadSpanKind::editorWavImportWork: return "4 Hz WAV-import poll";
+        case MessageThreadSpanKind::editorSfzImportWork: return "4 Hz SFZ-import poll";
         case MessageThreadSpanKind::performanceRefresh: return "Performance refresh";
         case MessageThreadSpanKind::zoneSelection: return "zone selection";
         case MessageThreadSpanKind::authoringRefresh: return "Authoring refresh";

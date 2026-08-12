@@ -8,6 +8,10 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <condition_variable>
+#include <chrono>
+#include <mutex>
+#include <thread>
 
 namespace drs::engine
 {
@@ -68,6 +72,11 @@ struct SamplerPlaybackContextSnapshot
     std::uint64_t actionOverflowCount = 0;
     std::array<std::uint64_t, kPerformanceEventKindCount> semanticEventCounts {};
     std::size_t retiredActivationBacklog = 0;
+    std::size_t pendingBackgroundReclamationCount = 0;
+    std::uint64_t completedBackgroundReclamationCount = 0;
+    std::uint64_t lastBackgroundReclamationMicros = 0;
+    std::uint64_t maxBackgroundReclamationMicros = 0;
+    std::uint64_t lastBackgroundReclaimerThreadHash = 0;
     SamplerPlaybackContextCounters counters;
 };
 
@@ -85,9 +94,10 @@ class SamplerPlaybackContext final
 public:
     static constexpr std::size_t activationSlotCapacity = 4;
     static constexpr std::size_t retirementQueueCapacity = 8;
+    static constexpr std::size_t backgroundReclamationQueueCapacity = 32;
 
-    explicit SamplerPlaybackContext(PlaybackActivationLane lane) noexcept;
-    ~SamplerPlaybackContext() = default;
+    explicit SamplerPlaybackContext(PlaybackActivationLane lane);
+    ~SamplerPlaybackContext();
 
     SamplerPlaybackContext(const SamplerPlaybackContext&) = delete;
     SamplerPlaybackContext& operator=(const SamplerPlaybackContext&) = delete;
@@ -120,6 +130,8 @@ public:
     bool cancelPendingActivation();
     bool activatePendingForPreparation() noexcept;
     std::size_t serviceRetirements();
+    bool waitForBackgroundReclamation(
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
 
     // Audio-owned callback API. Pending activation is consumed before the first rendered frame.
     SamplerPlaybackContextRenderResult renderBlock(SamplerAudioBufferView output,
@@ -148,6 +160,12 @@ private:
         std::uint64_t enqueuedAtRenderedBlockCount = 0;
     };
 
+    struct ReclamationEntry
+    {
+        SamplerRenderModelPtr model;
+        std::shared_ptr<DspRenderGeneration> dspGeneration;
+    };
+
     bool applyPendingActivationAtBlockBoundary() noexcept;
     void addRetiredActivation(int slotIndex) noexcept;
     void renderRetiredDspTails(SamplerAudioBufferView output) noexcept;
@@ -155,7 +173,9 @@ private:
     bool enqueueRetirement(RetirementToken token) noexcept;
     bool dequeueRetirement(RetirementToken& token) noexcept;
     int acquireFreeSlot() noexcept;
-    void releaseSlotOnMessageThread(RetirementToken token);
+    bool releaseSlotOnMessageThread(RetirementToken token);
+    void runBackgroundReclaimer();
+    bool enqueueBackgroundReclamation(ActivationSlot& slot);
     void accumulate(const SamplerVoicePoolRenderResult& result) noexcept;
     void publishRealtimeDiagnostics() noexcept;
 
@@ -229,6 +249,22 @@ private:
     std::atomic<std::uint32_t> retirementWriteIndex { 0 };
     std::atomic<std::uint32_t> retirementReadIndex { 0 };
     std::atomic<std::uint64_t> reclaimedActivationCount { 0 };
+    std::atomic<std::uint64_t> completedBackgroundReclamationCount { 0 };
+    std::atomic<std::uint64_t> lastBackgroundReclamationMicros { 0 };
+    std::atomic<std::uint64_t> maxBackgroundReclamationMicros { 0 };
+    std::atomic<std::uint64_t> lastBackgroundReclaimerThreadHash { 0 };
+    std::atomic<std::size_t> diagnosticPendingBackgroundReclamationCount { 0 };
+    RetirementToken deferredMessageRetirement {};
+    bool hasDeferredMessageRetirement = false;
+    std::array<ReclamationEntry, backgroundReclamationQueueCapacity> reclamationQueue {};
+    std::size_t reclamationReadIndex = 0;
+    std::size_t reclamationWriteIndex = 0;
+    std::size_t reclamationCount = 0;
+    bool reclamationInFlight = false;
+    bool stopReclaimerRequested = false;
+    std::thread reclaimerThread;
+    std::mutex reclaimerMutex;
+    std::condition_variable reclaimerCondition;
     std::atomic<std::uint64_t> lastReclamationLatencyBlocks { 0 };
     std::atomic<std::uint64_t> maxReclamationLatencyBlocks { 0 };
     SamplerPlaybackContextCounters counters;

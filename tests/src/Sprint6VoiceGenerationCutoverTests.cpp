@@ -251,6 +251,7 @@ void runHeldVoiceAndSustainMatrix()
     StereoOutput releaseTail(SamplerVoice::compatibilityReleaseSampleCount);
     context.renderBlock(releaseTail.view(), view(noEvents));
     require(!oldModel.decodedLifetime.expired() && context.serviceRetirements() == 1
+                && context.waitForBackgroundReclamation()
                 && oldModel.decodedLifetime.expired(),
             "Old route/sample ownership must reclaim only after its release tail, off audio.");
 
