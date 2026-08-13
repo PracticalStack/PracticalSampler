@@ -324,11 +324,12 @@ void PerformancePanel::resized()
 
 void PerformancePanel::refreshNow()
 {
-    if (initialRevisionCheckPending
+    const auto structuralRefresh = initialRevisionCheckPending
         || lastObservedPublishLifecycleRevision
             != engineFacade.getPerformancePublishLifecycleRevision()
         || lastObservedMacroTopologyRevision
-            != engineFacade.getPerformanceMacroTopologyRevision())
+            != engineFacade.getPerformanceMacroTopologyRevision();
+    if (structuralRefresh)
     {
         refreshSurface();
         initialRevisionCheckPending = false;
@@ -338,7 +339,8 @@ void PerformancePanel::refreshNow()
     {
         refreshMacroValues();
     }
-    diagnosticsPanel.refreshNow();
+    if (structuralRefresh || diagnosticsPanel.isVisible())
+        diagnosticsPanel.refreshNow();
 }
 
 void PerformancePanel::refreshArtworkNow()

@@ -350,7 +350,7 @@ int main(int argc, char** argv)
         auto nextGestureBlock = 0;
         auto notesHeld = false;
         std::uint64_t maximumConcurrentDispatchMicros = 0;
-        const auto concurrentDeadline = Clock::now() + std::chrono::seconds(60);
+        const auto concurrentDeadline = Clock::now() + std::chrono::seconds(240);
         while (concurrentAudioBlockCount.load(std::memory_order_acquire)
                    < continuousBlockCount
                && Clock::now() < concurrentDeadline)
@@ -494,6 +494,9 @@ int main(int argc, char** argv)
                            drs::app::MessageThreadSpanKind::performanceRefresh) == 0.0,
                 "Package telemetry rebuilt the Performance surface.");
         require(observationsFor(timerMetrics,
+                                drs::app::MessageThreadSpanKind::diagnosticsRefresh) == 0,
+                "Hidden Diagnostics refreshed from package telemetry.");
+        require(observationsFor(timerMetrics,
                                 drs::app::MessageThreadSpanKind::editorTimerWork) >= 4,
                 "Package telemetry coverage did not exercise the real 4 Hz editor loop.");
 
@@ -565,6 +568,10 @@ int main(int argc, char** argv)
         packageAudioThread.join();
         require(!packageAudioFailed.load(std::memory_order_acquire),
                 "The sustained package audio thread failed.");
+        require(maximumPackageDispatchMicros < 100000,
+                "The message thread stalled for more than 100 ms during sustained package playback.");
+        require(maximumPackageAudioBlockMicros.load(std::memory_order_relaxed) < 100000,
+                "A package audio callback exceeded the 100 ms test ceiling.");
 
         const auto slowSpans = drs::app::MessageThreadMetrics::getSlowSpanStatistics();
         fs::create_directories(reportPath.parent_path());

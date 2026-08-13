@@ -19,6 +19,7 @@ enum class MessageThreadSpanKind : std::uint8_t
     editorExportWork,
     editorWavImportWork,
     editorSfzImportWork,
+    diagnosticsRefresh,
     performanceRefresh,
     zoneSelection,
     authoringRefresh,

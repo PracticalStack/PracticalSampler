@@ -250,7 +250,6 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
 
     rebuildMacroControls();
     refreshSnapshot();
-    startTimerHz(2);
 }
 
 void StatusPanel::paint(juce::Graphics& g)
@@ -400,6 +399,7 @@ void StatusPanel::rebuildMacroControls()
 
 void StatusPanel::refreshSnapshot()
 {
+    const ScopedMessageThreadSpan timing(MessageThreadSpanKind::diagnosticsRefresh);
     snapshot = engineFacade.getStatusSnapshot();
     publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()

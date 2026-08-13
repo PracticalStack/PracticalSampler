@@ -721,7 +721,50 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
                     PerformancePackageExportStage::writingStream,
                     streamStartProgress,
                     "Writing compiled stream assets",
-                    "Building bounded package record plan");
+                    "Decoding source samples into the package stream");
+
+    const auto streamWrite = drs::engine::writeCompiledStreamAssets(
+        compileResult,
+        drs::engine::RuntimeStreamWriteOptions {
+            [options](const drs::engine::RuntimeStreamWriteProgress& progress)
+            {
+                publishProgress(options,
+                                PerformancePackageExportStage::writingStream,
+                                mapPhaseProgress(streamStartProgress,
+                                                 streamEndProgress,
+                                                 ratio(progress.bytesProcessed,
+                                                       progress.totalBytes)),
+                                "Writing compiled stream assets",
+                                progress.status,
+                                progress.bytesProcessed,
+                                progress.totalBytes,
+                                progress.sampleId);
+            },
+            options.cancellationProbe
+        });
+    if (!streamWrite.written)
+    {
+        result.state = streamWrite.state;
+        result.issues = streamWrite.issues;
+        if (isCancellationRequested(options))
+        {
+            result.canceled = true;
+            result.state = "Playable package export canceled";
+        }
+        else if (result.issues.empty())
+        {
+            result.issues.push_back("The compiled sample stream could not be written.");
+        }
+        return cleanupAndReturn(std::move(result));
+    }
+
+    publishProgress(options,
+                    PerformancePackageExportStage::writingStream,
+                    streamEndProgress,
+                    "Writing compiled stream assets",
+                    "Building bounded package record plan",
+                    streamWrite.alignedPayloadBytes,
+                    streamWrite.alignedPayloadBytes);
 
     auto packagePlan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
         preparation.manifest,

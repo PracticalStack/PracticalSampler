@@ -2597,6 +2597,17 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
         return result;
     }
 
+    const auto streamWrite = drs::engine::writeCompiledStreamAssets(compileResult);
+    if (!streamWrite.written)
+    {
+        cleanupStagingDirectory();
+        result.state = streamWrite.state;
+        result.issues = streamWrite.issues;
+        if (result.issues.empty())
+            result.issues.push_back("The compiled sample stream could not be written.");
+        return result;
+    }
+
     auto packagePlan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
         preparation.manifest,
         compileResult,

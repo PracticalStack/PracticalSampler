@@ -361,17 +361,18 @@ PackageV2StreamingExportBuildResult buildPerformancePackageV2StreamingExportPlan
         }
     }
 
-    std::vector<PackageV2WavSampleInput> samples;
+    std::vector<PackageV2CompiledSampleInput> samples;
     samples.reserve(compiledRuntime.streamSamples.size());
     for (const auto& sample : compiledRuntime.streamSamples)
     {
-        samples.push_back({ sample.sampleId, 0, sample.sourcePath,
+        samples.push_back({ sample.sampleId, 1, compiledRuntime.payloadFilePath,
+                            sample.payloadOffsetBytes, sample.payloadSizeBytes,
                             sample.prefetchBytes == 0 ? defaultSampleHeadBytes
                                                       : sample.prefetchBytes,
                             compiledRuntime.pageSizeBytes == 0 ? defaultSamplePageBytes
                                                                 : compiledRuntime.pageSizeBytes });
     }
-    auto result = buildPackageV2WavStreamingExportPlan(
+    auto result = buildPackageV2StreamingExportPlan(
         manifest.packageId, outputPath, metadata, samples);
     result.manifest = std::move(manifest);
     return result;

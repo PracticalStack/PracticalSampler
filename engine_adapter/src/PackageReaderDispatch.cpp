@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include <limits>
 
 namespace drs::engine
 {
@@ -77,12 +78,26 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     result.package = opened;
     const auto openChunks = [&](const std::string& sourceId,
                                 const PackageV2RecordKind kind,
-                                std::vector<std::uint8_t>& output)
+                                std::vector<std::uint8_t>& output,
+                                const std::uint64_t maximumBytes
+                                    = std::numeric_limits<std::uint64_t>::max())
     {
         std::vector<PackageV2RecordDescriptor> chunks;
+        std::uint64_t totalBytes = 0;
         for (const auto& record : opened->records)
+        {
             if (record.identity.sourceId == sourceId && record.identity.kind == kind)
+            {
+                if (record.plaintextSizeBytes > maximumBytes - totalBytes)
+                {
+                    result.issues.push_back("Package v2 metadata record exceeds its size limit: "
+                                            + sourceId + ".");
+                    return false;
+                }
+                totalBytes += record.plaintextSizeBytes;
                 chunks.push_back(record);
+            }
+        }
         std::sort(chunks.begin(), chunks.end(), [](const auto& left, const auto& right)
         {
             return left.identity.pageIndex < right.identity.pageIndex;
@@ -127,6 +142,34 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     {
         result.issues = manifest.issues;
         return result;
+    }
+    if (!manifest.manifest.backgroundImage.payloadId.empty())
+    {
+        constexpr std::uint64_t maximumBackgroundImageBytes = 16ull * 1024ull * 1024ull;
+        std::vector<std::uint8_t> backgroundImageBytes;
+        if (!openChunks(manifest.manifest.backgroundImage.payloadId,
+                        PackageV2RecordKind::backgroundImage,
+                        backgroundImageBytes,
+                        maximumBackgroundImageBytes))
+        {
+            result.issues.push_back("Required package v2 background image could not be opened.");
+            return result;
+        }
+
+        result.metadata.backgroundImage.found = true;
+        result.metadata.backgroundImage.loaded = true;
+        result.metadata.backgroundImage.failureCategory
+            = PerformancePackageFailureCategory::none;
+        result.metadata.backgroundImage.state = "Performance package v2 background image loaded";
+        result.metadata.backgroundImage.payload.payloadId
+            = manifest.manifest.backgroundImage.payloadId;
+        result.metadata.backgroundImage.payload.payloadKind = "backgroundImage";
+        result.metadata.backgroundImage.payload.logicalPath = "images/background.jpg";
+        result.metadata.backgroundImage.payload.mediaType = "image/jpeg";
+        result.metadata.backgroundImage.payload.plaintextSizeBytes
+            = backgroundImageBytes.size();
+        result.metadata.backgroundImage.payload.plaintextBytes
+            = std::move(backgroundImageBytes);
     }
     result.metadata.packageFound = true;
     result.metadata.packagePath = packagePath;

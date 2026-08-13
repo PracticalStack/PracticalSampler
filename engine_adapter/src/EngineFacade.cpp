@@ -1813,8 +1813,12 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
     const auto profiles = getFrontendExportProfiles();
     const auto linkedFrontend = getLinkedHiseFrontendSnapshot();
     const auto contentSnapshot = getHiseProjectContentSnapshot();
-    const auto runtimeManifest = loadPhase1ReferenceInstrument();
-    const auto runtimeStream = loadPhase1ReferenceStream();
+    static const RuntimeManifestLoadResult inactiveRuntimeManifest;
+    static const RuntimeStreamLoadResult inactiveRuntimeStream;
+    const auto& runtimeManifest = referenceInstrumentActive
+        ? referenceManifest : inactiveRuntimeManifest;
+    const auto& runtimeStream = referenceInstrumentActive
+        ? referenceStream : inactiveRuntimeStream;
     const auto diagnostics = getDiagnosticsSnapshot();
 
     detail << "HISE root: " << hiseVendorRoot << "\n";

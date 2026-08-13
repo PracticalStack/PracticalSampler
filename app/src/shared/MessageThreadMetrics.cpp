@@ -117,6 +117,7 @@ const char* MessageThreadMetrics::name(const MessageThreadSpanKind kind) noexcep
         case MessageThreadSpanKind::editorExportWork: return "4 Hz export poll";
         case MessageThreadSpanKind::editorWavImportWork: return "4 Hz WAV-import poll";
         case MessageThreadSpanKind::editorSfzImportWork: return "4 Hz SFZ-import poll";
+        case MessageThreadSpanKind::diagnosticsRefresh: return "Diagnostics refresh";
         case MessageThreadSpanKind::performanceRefresh: return "Performance refresh";
         case MessageThreadSpanKind::zoneSelection: return "zone selection";
         case MessageThreadSpanKind::authoringRefresh: return "Authoring refresh";
