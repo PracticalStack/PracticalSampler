@@ -164,6 +164,58 @@ std::optional<int> parseIntValue(const std::string& text)
     }
 }
 
+struct SequentialRoundRobinSlot
+{
+    int length = 0;
+    int position = 0;
+};
+
+SequentialRoundRobinSlot parseSequentialRoundRobinSlot(const SfzNormalizedSection& section)
+{
+    const auto* lengthOpcode = findEffectiveOpcode(section, "seq_length");
+    const auto* positionOpcode = findEffectiveOpcode(section, "seq_position");
+    if (lengthOpcode == nullptr && positionOpcode == nullptr)
+        return {};
+
+    // SFZ v1 defines both sequence opcodes with a default value of 1. In
+    // particular, libraries commonly specify seq_length on the first group
+    // and omit seq_position to represent slot 1.
+    return {
+        parseIntValue(lengthOpcode != nullptr ? lengthOpcode->value : "1").value_or(0),
+        parseIntValue(positionOpcode != nullptr ? positionOpcode->value : "1").value_or(0)
+    };
+}
+
+int parseEffectiveKeyValue(const SfzNormalizedSection& section,
+                           const char* specializedOpcode,
+                           int fallback)
+{
+    const auto* opcode = findEffectiveOpcode(section, specializedOpcode);
+    const auto* keyOpcode = findEffectiveOpcode(section, "key");
+    const auto scopeRank = [](const SfzOpcodeScope scope)
+    {
+        switch (scope)
+        {
+            case SfzOpcodeScope::region: return 5;
+            case SfzOpcodeScope::group: return 4;
+            case SfzOpcodeScope::master: return 3;
+            case SfzOpcodeScope::global: return 2;
+            case SfzOpcodeScope::control: return 1;
+            default: return 0;
+        }
+    };
+
+    if (keyOpcode != nullptr
+        && (opcode == nullptr
+            || scopeRank(keyOpcode->location.scope) > scopeRank(opcode->location.scope)))
+    {
+        return parseMidiNoteValue(keyOpcode->value).value_or(fallback);
+    }
+    if (opcode != nullptr)
+        return parseMidiNoteValue(opcode->value).value_or(fallback);
+    return fallback;
+}
+
 std::optional<int> parseControllerOpcodeNumber(const std::string& opcodeName,
                                                const std::string& prefix)
 {
@@ -432,19 +484,37 @@ bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
 fs::path resolveSamplePath(const SfzNormalizedSection& section,
                            const SfzResolvedOpcode& sampleOpcode)
 {
+    const auto normalizeSeparators = [](std::string value)
+    {
+        std::replace(value.begin(), value.end(), '\\', '/');
+        return value;
+    };
+
+    auto sampleReference = normalizeSeparators(sampleOpcode.value);
+    auto samplePath = fs::path(sampleReference);
+    if (!samplePath.is_absolute())
+    {
+        if (const auto* defaultPath = findEffectiveOpcode(section, "default_path");
+            defaultPath != nullptr && !defaultPath->value.empty())
+        {
+            sampleReference = normalizeSeparators(defaultPath->value) + sampleReference;
+            samplePath = fs::path(sampleReference);
+        }
+    }
+
+    if (samplePath.is_absolute())
+        return samplePath.lexically_normal();
+
     fs::path resolvedBase = sampleOpcode.resolutionBasePath.empty()
         ? fs::path(sampleOpcode.location.sourcePath).parent_path()
         : fs::path(sampleOpcode.resolutionBasePath);
     if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
         prefix != nullptr && !prefix->value.empty())
     {
-        resolvedBase /= fs::path(prefix->value);
+        resolvedBase /= fs::path(normalizeSeparators(prefix->value));
     }
 
-    const fs::path samplePath(sampleOpcode.value);
-    return samplePath.is_absolute()
-        ? samplePath.lexically_normal()
-        : (resolvedBase / samplePath).lexically_normal();
+    return (resolvedBase / samplePath).lexically_normal();
 }
 
 CrossfadeOpcodeKey makeCrossfadeOpcodeKey(const SfzImportTraceEntry& trace)
@@ -1132,18 +1202,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         zone.id = makeUniqueId(usedZoneIds, "sfz-zone-" + std::to_string(section.documentOrder));
         zone.sampleSourceId = sampleSourceId;
         zone.displayName = buildDisplayName(samplePath);
-        zone.rootKey = parseMidiNoteValue(findEffectiveOpcode(section, "pitch_keycenter") != nullptr
-                                              ? findEffectiveOpcode(section, "pitch_keycenter")->value
-                                              : "60")
-                           .value_or(60);
-        zone.keyLow = parseMidiNoteValue(findEffectiveOpcode(section, "lokey") != nullptr
-                                             ? findEffectiveOpcode(section, "lokey")->value
-                                             : std::to_string(zone.rootKey))
-                          .value_or(zone.rootKey);
-        zone.keyHigh = parseMidiNoteValue(findEffectiveOpcode(section, "hikey") != nullptr
-                                              ? findEffectiveOpcode(section, "hikey")->value
-                                              : std::to_string(zone.rootKey))
-                           .value_or(zone.rootKey);
+        zone.rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
+        zone.keyLow = parseEffectiveKeyValue(section, "lokey", zone.rootKey);
+        zone.keyHigh = parseEffectiveKeyValue(section, "hikey", zone.rootKey);
         zone.velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
                                              ? findEffectiveOpcode(section, "lovel")->value
                                              : "1")
@@ -1214,14 +1275,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                                 ? findEffectiveOpcode(section, "loop_end")->value
                                                 : "0")
                                 .value_or(0);
-        zone.roundRobinLength = parseIntValue(findEffectiveOpcode(section, "seq_length") != nullptr
-                                                  ? findEffectiveOpcode(section, "seq_length")->value
-                                                  : "0")
-                                    .value_or(0);
-        zone.roundRobinPosition = parseIntValue(findEffectiveOpcode(section, "seq_position") != nullptr
-                                                    ? findEffectiveOpcode(section, "seq_position")->value
-                                                    : "0")
-                                      .value_or(0);
+        const auto sequentialRoundRobin = parseSequentialRoundRobinSlot(section);
+        zone.roundRobinLength = sequentialRoundRobin.length;
+        zone.roundRobinPosition = sequentialRoundRobin.position;
         zone.articulationId = buildArticulationId(section);
         const auto groupIdCandidate = buildGroupId(section,
                                                    zone.articulationId,

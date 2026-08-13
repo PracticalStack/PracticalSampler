@@ -334,6 +334,25 @@ std::optional<int> parseIntValue(const std::string& text)
     }
 }
 
+struct SequentialRoundRobinSlot
+{
+    int length = 0;
+    int position = 0;
+};
+
+SequentialRoundRobinSlot parseSequentialRoundRobinSlot(const SfzNormalizedSection& section)
+{
+    const auto* lengthOpcode = findEffectiveOpcode(section, "seq_length");
+    const auto* positionOpcode = findEffectiveOpcode(section, "seq_position");
+    if (lengthOpcode == nullptr && positionOpcode == nullptr)
+        return {};
+
+    return {
+        parseIntValue(lengthOpcode != nullptr ? lengthOpcode->value : "1").value_or(0),
+        parseIntValue(positionOpcode != nullptr ? positionOpcode->value : "1").value_or(0)
+    };
+}
+
 std::optional<int> parseMidiNoteValue(const std::string& text)
 {
     if (text.empty())
@@ -392,6 +411,36 @@ std::optional<int> parseMidiNoteValue(const std::string& text)
         return midiNote;
 
     return std::nullopt;
+}
+
+int parseEffectiveKeyValue(const SfzNormalizedSection& section,
+                           const char* specializedOpcode,
+                           int fallback)
+{
+    const auto* opcode = findEffectiveOpcode(section, specializedOpcode);
+    const auto* keyOpcode = findEffectiveOpcode(section, "key");
+    const auto scopeRank = [](const SfzOpcodeScope scope)
+    {
+        switch (scope)
+        {
+            case SfzOpcodeScope::region: return 5;
+            case SfzOpcodeScope::group: return 4;
+            case SfzOpcodeScope::master: return 3;
+            case SfzOpcodeScope::global: return 2;
+            case SfzOpcodeScope::control: return 1;
+            default: return 0;
+        }
+    };
+
+    if (keyOpcode != nullptr
+        && (opcode == nullptr
+            || scopeRank(keyOpcode->location.scope) > scopeRank(opcode->location.scope)))
+    {
+        return parseMidiNoteValue(keyOpcode->value).value_or(fallback);
+    }
+    if (opcode != nullptr)
+        return parseMidiNoteValue(opcode->value).value_or(fallback);
+    return fallback;
 }
 
 std::uint64_t computeFnv1a64(const std::string& text) noexcept
@@ -493,43 +542,55 @@ std::size_t countParsedOpcodes(const SfzParsedDocument& document) noexcept
     return count;
 }
 
+fs::path resolveEffectiveSamplePath(const SfzNormalizedSection& section,
+                                    const SfzResolvedOpcode& sampleOpcode)
+{
+    const auto normalizeSeparators = [](std::string value)
+    {
+        std::replace(value.begin(), value.end(), '\\', '/');
+        return value;
+    };
+
+    auto sampleReference = normalizeSeparators(sampleOpcode.value);
+    auto samplePath = fs::path(sampleReference);
+    if (!samplePath.is_absolute())
+    {
+        if (const auto* defaultPath = findEffectiveOpcode(section, "default_path");
+            defaultPath != nullptr && !defaultPath->value.empty())
+        {
+            sampleReference = normalizeSeparators(defaultPath->value) + sampleReference;
+            samplePath = fs::path(sampleReference);
+        }
+    }
+
+    if (samplePath.is_absolute())
+        return samplePath.lexically_normal();
+
+    fs::path resolvedBase = sampleOpcode.resolutionBasePath.empty()
+        ? fs::path(sampleOpcode.location.sourcePath).parent_path()
+        : fs::path(sampleOpcode.resolutionBasePath);
+    if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
+        prefix != nullptr && !prefix->value.empty())
+    {
+        resolvedBase /= fs::path(normalizeSeparators(prefix->value));
+    }
+
+    return (resolvedBase / samplePath).lexically_normal();
+}
+
 std::string findEffectiveSampleReference(const SfzNormalizedSection& section)
 {
     const auto* sample = findEffectiveOpcode(section, "sample");
     if (sample == nullptr)
         return {};
 
-    fs::path resolvedBase = sample->resolutionBasePath.empty()
-        ? fs::path(sample->location.sourcePath).parent_path()
-        : fs::path(sample->resolutionBasePath);
-    if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
-        prefix != nullptr && !prefix->value.empty())
-    {
-        resolvedBase /= fs::path(prefix->value);
-    }
-
-    const fs::path samplePath(sample->value);
-    return samplePath.is_absolute()
-        ? samplePath.lexically_normal().generic_string()
-        : (resolvedBase / samplePath).lexically_normal().generic_string();
+    return resolveEffectiveSamplePath(section, *sample).generic_string();
 }
 
 std::string resolveSamplePathForSection(const SfzNormalizedSection& section,
                                         const SfzResolvedOpcode& opcode)
 {
-    fs::path resolvedBase = opcode.resolutionBasePath.empty()
-        ? fs::path(opcode.location.sourcePath).parent_path()
-        : fs::path(opcode.resolutionBasePath);
-    if (const auto* prefix = findEffectiveOpcode(section, "prefix_sfz_path");
-        prefix != nullptr && !prefix->value.empty())
-    {
-        resolvedBase /= fs::path(prefix->value);
-    }
-
-    const fs::path samplePath(opcode.value);
-    return samplePath.is_absolute()
-        ? samplePath.lexically_normal().generic_string()
-        : (resolvedBase / samplePath).lexically_normal().generic_string();
+    return resolveEffectiveSamplePath(section, opcode).generic_string();
 }
 
 OpcodeClassification classifySampleOpcode(const SfzNormalizedSection& section,
@@ -710,18 +771,9 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildSequentialRoundRobinOpco
         if (ownerKeys.empty())
             continue;
 
-        const auto rootKey = parseMidiNoteValue(findEffectiveOpcode(section, "pitch_keycenter") != nullptr
-                                                    ? findEffectiveOpcode(section, "pitch_keycenter")->value
-                                                    : "60")
-                                 .value_or(60);
-        const auto keyLow = parseMidiNoteValue(findEffectiveOpcode(section, "lokey") != nullptr
-                                                   ? findEffectiveOpcode(section, "lokey")->value
-                                                   : std::to_string(rootKey))
-                                .value_or(rootKey);
-        const auto keyHigh = parseMidiNoteValue(findEffectiveOpcode(section, "hikey") != nullptr
-                                                    ? findEffectiveOpcode(section, "hikey")->value
-                                                    : std::to_string(rootKey))
-                                 .value_or(rootKey);
+        const auto rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
+        const auto keyLow = parseEffectiveKeyValue(section, "lokey", rootKey);
+        const auto keyHigh = parseEffectiveKeyValue(section, "hikey", rootKey);
         auto velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
                                              ? findEffectiveOpcode(section, "lovel")->value
                                              : "1")
@@ -746,14 +798,9 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildSequentialRoundRobinOpco
         }
 
         SequentialRoundRobinRegion region;
-        region.roundRobinLength = parseIntValue(findEffectiveOpcode(section, "seq_length") != nullptr
-                                                    ? findEffectiveOpcode(section, "seq_length")->value
-                                                    : "0")
-                                      .value_or(0);
-        region.roundRobinPosition = parseIntValue(findEffectiveOpcode(section, "seq_position") != nullptr
-                                                      ? findEffectiveOpcode(section, "seq_position")->value
-                                                      : "0")
-                                        .value_or(0);
+        const auto sequentialRoundRobin = parseSequentialRoundRobinSlot(section);
+        region.roundRobinLength = sequentialRoundRobin.length;
+        region.roundRobinPosition = sequentialRoundRobin.position;
         region.poolSignature = buildRoundRobinPoolSignature(section,
                                                             rootKey,
                                                             keyLow,
@@ -893,18 +940,9 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeC
                               : "0")
                 .value_or(0);
 
-        const auto rootKey = parseMidiNoteValue(findEffectiveOpcode(section, "pitch_keycenter") != nullptr
-                                                    ? findEffectiveOpcode(section, "pitch_keycenter")->value
-                                                    : "60")
-                                 .value_or(60);
-        const auto keyLow = parseMidiNoteValue(findEffectiveOpcode(section, "lokey") != nullptr
-                                                   ? findEffectiveOpcode(section, "lokey")->value
-                                                   : std::to_string(rootKey))
-                                .value_or(rootKey);
-        const auto keyHigh = parseMidiNoteValue(findEffectiveOpcode(section, "hikey") != nullptr
-                                                    ? findEffectiveOpcode(section, "hikey")->value
-                                                    : std::to_string(rootKey))
-                                 .value_or(rootKey);
+        const auto rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
+        const auto keyLow = parseEffectiveKeyValue(section, "lokey", rootKey);
+        const auto keyHigh = parseEffectiveKeyValue(section, "hikey", rootKey);
         auto velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
                                              ? findEffectiveOpcode(section, "lovel")->value
                                              : "1")
@@ -920,14 +958,9 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeC
 
         region.topologyZone.velocityLow = velocityLow;
         region.topologyZone.velocityHigh = velocityHigh;
-        region.topologyZone.roundRobinLength = parseIntValue(findEffectiveOpcode(section, "seq_length") != nullptr
-                                                                 ? findEffectiveOpcode(section, "seq_length")->value
-                                                                 : "0")
-                                                   .value_or(0);
-        region.topologyZone.roundRobinPosition = parseIntValue(findEffectiveOpcode(section, "seq_position") != nullptr
-                                                                   ? findEffectiveOpcode(section, "seq_position")->value
-                                                                   : "0")
-                                                     .value_or(0);
+        const auto sequentialRoundRobin = parseSequentialRoundRobinSlot(section);
+        region.topologyZone.roundRobinLength = sequentialRoundRobin.length;
+        region.topologyZone.roundRobinPosition = sequentialRoundRobin.position;
         if (region.topologyZone.roundRobinLength > 0 && region.topologyZone.roundRobinPosition > 0)
         {
             region.topologyZone.roundRobinPoolId = buildCrossfadeRoundRobinPoolSignature(section,
@@ -1121,6 +1154,20 @@ void updateSupportSummary(std::map<SupportKey, SfzImportOpcodeSupportSummary>& s
 OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
 {
     const auto opcodeName = toLowerAscii(opcode.name);
+
+    if (opcodeName == "default_path")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.samplePath",
+                 "The control-level default sample path is applied while resolving native sample sources." };
+    }
+
+    if (opcodeName == "key")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.keyRange + zone.rootKey",
+                 "The SFZ key shorthand maps to identical native low, high, and root keys." };
+    }
 
     if (opcodeName == "lokey")
     {

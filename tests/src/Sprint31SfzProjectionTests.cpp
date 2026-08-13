@@ -247,6 +247,91 @@ int main()
         require(phase6Projection.issues.empty(),
                 "Schema 6 SFZ projection should synthesize any required articulation metadata.");
 
+        const auto smDrumsPath = resolveFixturePath(
+            "DemoSFVInstruments/SMDrums_Sforzando_1.2/Programs/SM_Drums_kit.sfz");
+        const auto smDrumsProjection = projectSfzImportDocument(
+            makeBlankPhase6Project(smDrumsPath), smDrumsPath.generic_string());
+        require(smDrumsProjection.projected && smDrumsProjection.playable,
+                "The Sforzando SM Drums kit should project omitted seq_position values using the SFZ default of 1. Issues: "
+                    + joinIssues(smDrumsProjection.issues));
+        require(std::all_of(smDrumsProjection.zones.begin(),
+                            smDrumsProjection.zones.end(),
+                            [](const RuntimeProjectZoneDefinition& zone)
+                            {
+                                if (zone.roundRobinLength == 0 && zone.roundRobinPosition == 0)
+                                    return !zone.roundRobin.has_value();
+                                return zone.roundRobin.has_value()
+                                    && zone.roundRobinLength == zone.roundRobin->slotCount
+                                    && zone.roundRobinPosition == zone.roundRobin->slotIndex
+                                    && zone.roundRobinPosition >= 1
+                                    && zone.roundRobinPosition <= zone.roundRobinLength;
+                            }),
+                "Every projected SM Drums round-robin zone should use a valid explicit descriptor.");
+        const auto findSmDrumsZone = [&](const std::string& samplePathFragment)
+        {
+            return std::find_if(smDrumsProjection.zones.begin(),
+                                smDrumsProjection.zones.end(),
+                                [&](const RuntimeProjectZoneDefinition& zone)
+                                {
+                                    const auto source = std::find_if(
+                                        smDrumsProjection.sampleSources.begin(),
+                                        smDrumsProjection.sampleSources.end(),
+                                        [&](const RuntimeProjectSampleSource& sampleSource)
+                                        {
+                                            return sampleSource.id == zone.sampleSourceId;
+                                        });
+                                    return source != smDrumsProjection.sampleSources.end()
+                                        && source->path.find(samplePathFragment) != std::string::npos;
+                                });
+        };
+        const auto smDrumsFirstSlot = findSmDrumsZone("Snare65_NR_Stereo/RR1/01_");
+        const auto smDrumsSecondSlot = findSmDrumsZone("Snare65_NR_Stereo/RR2/01_");
+        require(smDrumsFirstSlot != smDrumsProjection.zones.end()
+                    && smDrumsSecondSlot != smDrumsProjection.zones.end()
+                    && smDrumsFirstSlot->roundRobinPosition == 1
+                    && smDrumsSecondSlot->roundRobinPosition == 2
+                    && smDrumsFirstSlot->roundRobinLength == 2
+                    && smDrumsSecondSlot->roundRobinLength == 2
+                    && smDrumsFirstSlot->rootKey == 52
+                    && smDrumsFirstSlot->keyLow == 52
+                    && smDrumsFirstSlot->keyHigh == 52,
+                "SM Drums RR1/RR2 groups should project as sequential slots 1 and 2 on their authored drum key.");
+
+        const auto vscoViolaPath = resolveFixturePath(
+            "DemoSFVInstruments/VSCO-2-CE-1.1.0/VSCO-2-CE-1.1.0/ViolaEnsSusVib.sfz");
+        const auto vscoViolaAnalysis = analyzeSfzImportDocument(vscoViolaPath.generic_string());
+        require(vscoViolaAnalysis.analyzed
+                    && std::none_of(vscoViolaAnalysis.report.findings.begin(),
+                                    vscoViolaAnalysis.report.findings.end(),
+                                    [](const SfzImportFinding& finding)
+                                    {
+                                        return finding.code == "sfz.sample.missing";
+                                    }),
+                "VSCO viola samples should resolve through its control-level default_path.");
+        const auto defaultPathSupport = std::find_if(
+            vscoViolaAnalysis.report.opcodeSupport.begin(),
+            vscoViolaAnalysis.report.opcodeSupport.end(),
+            [](const SfzImportOpcodeSupportSummary& support)
+            {
+                return support.opcodeName == "default_path";
+            });
+        require(defaultPathSupport != vscoViolaAnalysis.report.opcodeSupport.end()
+                    && defaultPathSupport->disposition == SfzImportSupportDisposition::converted,
+                "default_path should be reported as converted sample-path metadata.");
+        const auto vscoViolaProjection = projectSfzImportAnalysis(
+            makeBlankPhase6Project(vscoViolaPath), vscoViolaAnalysis);
+        require(vscoViolaProjection.projected && vscoViolaProjection.playable,
+                "The VSCO viola sustain-vibrato instrument should project as playable content. Issues: "
+                    + joinIssues(vscoViolaProjection.issues));
+        require(std::all_of(vscoViolaProjection.sampleSources.begin(),
+                            vscoViolaProjection.sampleSources.end(),
+                            [](const RuntimeProjectSampleSource& sampleSource)
+                            {
+                                return sampleSource.path.find("Strings/Viola Section/susvib/")
+                                    != std::string::npos;
+                            }),
+                "VSCO viola projected samples should retain the resolved default_path directory.");
+
         auto groupCollisionProject = blankPhase6Project;
         RuntimeProjectGroupDefinition existingGroup;
         existingGroup.id = phase6Projection.groups.front().id;
