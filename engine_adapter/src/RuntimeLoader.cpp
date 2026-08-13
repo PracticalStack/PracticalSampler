@@ -2071,8 +2071,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             if (zone.keyLow > zone.keyHigh)
                 addIssue(result, "Project zone '" + zone.id + "' has keyLow greater than keyHigh.");
 
-            if (zone.velocityLow > zone.velocityHigh)
-                addIssue(result, "Project zone '" + zone.id + "' has velocityLow greater than velocityHigh.");
+            if (zone.velocityLow < 1 || zone.velocityHigh > 127 || zone.velocityLow > zone.velocityHigh)
+                addIssue(result, "Project zone '" + zone.id + "' must keep velocityLow/velocityHigh within 1-127 and ordered low-to-high.");
 
             if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
             {
@@ -3136,8 +3136,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                                          instrument.schemaVersion >= 2,
                                          instrument.schemaVersion >= 2);
 
-            if (zone.velocityLow > zone.velocityHigh)
-                addIssue(result, context + " has velocityLow greater than velocityHigh.");
+            if (zone.velocityLow < 1 || zone.velocityHigh > 127 || zone.velocityLow > zone.velocityHigh)
+                addIssue(result, context + " must keep velocityLow/velocityHigh within 1-127 and ordered low-to-high.");
 
             if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
             {

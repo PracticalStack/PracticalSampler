@@ -164,6 +164,13 @@ std::optional<int> parseIntValue(const std::string& text)
     }
 }
 
+int normalizePlayableVelocityLowerBound(const int velocity) noexcept
+{
+    // MIDI note-on velocity zero is a note-off encoding. Some SFZ libraries nevertheless use
+    // lovel=0 (and zero-valued crossfade lower bounds) to mean the bottom playable layer.
+    return velocity == 0 ? 1 : velocity;
+}
+
 struct SequentialRoundRobinSlot
 {
     int length = 0;
@@ -1205,10 +1212,11 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         zone.rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
         zone.keyLow = parseEffectiveKeyValue(section, "lokey", zone.rootKey);
         zone.keyHigh = parseEffectiveKeyValue(section, "hikey", zone.rootKey);
-        zone.velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
-                                             ? findEffectiveOpcode(section, "lovel")->value
-                                             : "1")
-                               .value_or(1);
+        zone.velocityLow = normalizePlayableVelocityLowerBound(
+            parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
+                              ? findEffectiveOpcode(section, "lovel")->value
+                              : "1")
+                .value_or(1));
         zone.velocityHigh = parseIntValue(findEffectiveOpcode(section, "hivel") != nullptr
                                               ? findEffectiveOpcode(section, "hivel")->value
                                               : "127")
@@ -1234,6 +1242,10 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                               ? findEffectiveOpcode(section, "xfout_hivel")->value
                               : "0")
                 .value_or(0);
+        if (crossfade.fadeInLowVelocity == 0 && crossfade.fadeInHighVelocity > 0)
+            crossfade.fadeInLowVelocity = 1;
+        if (crossfade.fadeOutLowVelocity == 0 && crossfade.fadeOutHighVelocity > 0)
+            crossfade.fadeOutLowVelocity = 1;
         if (drs::engine::hasCompleteFadeIn(crossfade))
             zone.velocityLow = crossfade.fadeInLowVelocity;
         if (drs::engine::hasCompleteFadeOut(crossfade))

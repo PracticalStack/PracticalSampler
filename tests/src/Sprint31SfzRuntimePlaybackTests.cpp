@@ -10,6 +10,7 @@
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 #include <juce_core/juce_core.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -130,11 +131,9 @@ std::string buildFirstDifferingLineSummary(const std::string& left, const std::s
     return "no differing line found";
 }
 
-fs::path resolveFixturePath()
+fs::path resolveFixturePath(const fs::path& relativeFixturePath)
 {
     const auto sourceRoot = fs::path(DRS_SOURCE_ROOT);
-    const auto relativeFixturePath =
-        fs::path("DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz");
 
     const auto localFixturePath = sourceRoot / relativeFixturePath;
     if (fs::exists(localFixturePath))
@@ -145,6 +144,12 @@ fs::path resolveFixturePath()
         return workspaceFixturePath;
 
     throw std::runtime_error("Could not locate " + relativeFixturePath.generic_string());
+}
+
+fs::path resolveFixturePath()
+{
+    return resolveFixturePath(
+        "DemoSFVInstruments/jlearman.jRhodes3d-master-rr/jRhodes3d-mono/_jRhodes3d-mono-flac.sfz");
 }
 
 drs::engine::RuntimeProjectModel makeBlankProject(const fs::path& fixturePath)
@@ -510,6 +515,45 @@ int main()
         const auto performancePeak = measurePeakOverBlocks(processor, true, 8);
         require(std::isfinite(performancePeak) && performancePeak > 0.0f,
                 "Imported SFZ published performance must produce finite nonzero audio.");
+
+        {
+            const auto violaFixturePath = resolveFixturePath(
+                "DemoSFVInstruments/VSCO-2-CE-1.1.0/VSCO-2-CE-1.1.0/ViolaEnsSusVib.sfz");
+            const auto violaBlankProject = makeBlankProject(violaFixturePath);
+            const auto violaProjection = drs::engine::projectSfzImportDocument(
+                violaBlankProject,
+                violaFixturePath.generic_string());
+            require(violaProjection.projected,
+                    "VSCO viola publish regression requires a projectable fixture. state="
+                        + violaProjection.state + " issues=" + joinIssues(violaProjection.issues));
+
+            drs::engine::AuthoringSession violaSession(violaBlankProject);
+            const auto violaApplyResult = drs::engine::applySfzImportProjection(
+                violaSession,
+                violaProjection,
+                "Import VSCO viola publish regression fixture");
+            require(violaApplyResult.applied,
+                    "VSCO viola publish regression fixture must apply to the authoring project.");
+            require(std::all_of(violaSession.getProject().authoring.zones.begin(),
+                                violaSession.getProject().authoring.zones.end(),
+                                [](const drs::engine::RuntimeProjectZoneDefinition& zone)
+                                {
+                                    return zone.velocityLow >= 1 && zone.velocityHigh <= 127;
+                                }),
+                    "VSCO viola imported velocity ranges must be renderer eligible.");
+
+            drs::plugin::Processor violaProcessor;
+            violaProcessor.prepareToPlay(44100.0, 256);
+            require(violaProcessor.replaceAuthoringProject(violaSession.getProject()),
+                    "VSCO viola publish regression must replace the processor authoring project.");
+            require(violaProcessor.submitPerformancePublishCommand(),
+                    "VSCO viola fixture must submit a Performance publish request.");
+            waitForPublishedPerformance(violaProcessor, "VSCO viola published performance");
+
+            const auto violaPeak = measurePeakOverBlocks(violaProcessor, true, 8);
+            require(std::isfinite(violaPeak) && violaPeak > 0.0f,
+                    "VSCO viola published performance must produce finite nonzero audio.");
+        }
 
         auto editedZone = *selectedZone;
         editedZone.gainDb += 1.0;

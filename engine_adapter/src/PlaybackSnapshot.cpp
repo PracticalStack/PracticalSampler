@@ -1193,9 +1193,9 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-key-range", path,
                        "Zone keyLow must not exceed keyHigh.");
 
-        if (zone.velocityLow > zone.velocityHigh)
+        if (zone.velocityLow < 1 || zone.velocityHigh > 127 || zone.velocityLow > zone.velocityHigh)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-velocity-range", path,
-                       "Zone velocityLow must not exceed velocityHigh.");
+                       "Zone velocityLow/velocityHigh must remain within 1-127 and ordered low-to-high.");
         if (hasAnyVelocityCrossfadeValue(zone.velocityCrossfade))
         {
             const VelocityCrossfadeZoneDefinition crossfadeZone {

@@ -323,6 +323,20 @@ int main()
         require(vscoViolaProjection.projected && vscoViolaProjection.playable,
                 "The VSCO viola sustain-vibrato instrument should project as playable content. Issues: "
                     + joinIssues(vscoViolaProjection.issues));
+        require(std::all_of(vscoViolaProjection.zones.begin(),
+                            vscoViolaProjection.zones.end(),
+                            [](const RuntimeProjectZoneDefinition& zone)
+                            {
+                                return zone.velocityLow >= 1 && zone.velocityHigh <= 127;
+                            }),
+                "VSCO viola lovel=0 regions should normalize to the native playable velocity range.");
+        require(std::any_of(vscoViolaAnalysis.report.findings.begin(),
+                            vscoViolaAnalysis.report.findings.end(),
+                            [](const SfzImportFinding& finding)
+                            {
+                                return finding.code == "sfz.velocity.lovel_zero.normalized";
+                            }),
+                "VSCO viola analysis should disclose lovel=0 normalization for creator review.");
         require(std::all_of(vscoViolaProjection.sampleSources.begin(),
                             vscoViolaProjection.sampleSources.end(),
                             [](const RuntimeProjectSampleSource& sampleSource)

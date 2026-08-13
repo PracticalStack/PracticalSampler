@@ -334,6 +334,11 @@ std::optional<int> parseIntValue(const std::string& text)
     }
 }
 
+int normalizePlayableVelocityLowerBound(const int velocity) noexcept
+{
+    return velocity == 0 ? 1 : velocity;
+}
+
 struct SequentialRoundRobinSlot
 {
     int length = 0;
@@ -774,10 +779,11 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildSequentialRoundRobinOpco
         const auto rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
         const auto keyLow = parseEffectiveKeyValue(section, "lokey", rootKey);
         const auto keyHigh = parseEffectiveKeyValue(section, "hikey", rootKey);
-        auto velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
-                                             ? findEffectiveOpcode(section, "lovel")->value
-                                             : "1")
-                               .value_or(1);
+        auto velocityLow = normalizePlayableVelocityLowerBound(
+            parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
+                              ? findEffectiveOpcode(section, "lovel")->value
+                              : "1")
+                .value_or(1));
         auto velocityHigh = parseIntValue(findEffectiveOpcode(section, "hivel") != nullptr
                                               ? findEffectiveOpcode(section, "hivel")->value
                                               : "127")
@@ -939,14 +945,25 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeC
                               ? findEffectiveOpcode(section, "xfout_hivel")->value
                               : "0")
                 .value_or(0);
+        if (region.topologyZone.crossfade.fadeInLowVelocity == 0
+            && region.topologyZone.crossfade.fadeInHighVelocity > 0)
+        {
+            region.topologyZone.crossfade.fadeInLowVelocity = 1;
+        }
+        if (region.topologyZone.crossfade.fadeOutLowVelocity == 0
+            && region.topologyZone.crossfade.fadeOutHighVelocity > 0)
+        {
+            region.topologyZone.crossfade.fadeOutLowVelocity = 1;
+        }
 
         const auto rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
         const auto keyLow = parseEffectiveKeyValue(section, "lokey", rootKey);
         const auto keyHigh = parseEffectiveKeyValue(section, "hikey", rootKey);
-        auto velocityLow = parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
-                                             ? findEffectiveOpcode(section, "lovel")->value
-                                             : "1")
-                               .value_or(1);
+        auto velocityLow = normalizePlayableVelocityLowerBound(
+            parseIntValue(findEffectiveOpcode(section, "lovel") != nullptr
+                              ? findEffectiveOpcode(section, "lovel")->value
+                              : "1")
+                .value_or(1));
         auto velocityHigh = parseIntValue(findEffectiveOpcode(section, "hivel") != nullptr
                                               ? findEffectiveOpcode(section, "hivel")->value
                                               : "127")
@@ -1220,6 +1237,15 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
 
     if (opcodeName == "lovel")
     {
+        if (parseIntValue(opcode.value).value_or(1) == 0)
+        {
+            return { SfzImportSupportDisposition::approximated,
+                     "zone.velocityRange.lowVelocity",
+                     "A zero lower bound is normalized to MIDI's lowest playable note-on velocity, 1.",
+                     "sfz.velocity.lovel_zero.normalized",
+                     "Zero lower velocity will be normalized",
+                     "SFZ lovel=0 is treated as the bottom playable layer and converted to native velocityLow=1 because MIDI note-on velocity zero represents note-off." };
+        }
         return { SfzImportSupportDisposition::converted,
                  "zone.velocityRange.lowVelocity",
                  "Lower velocity bounds map directly into native velocity ranges." };
