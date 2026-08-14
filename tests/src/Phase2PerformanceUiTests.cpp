@@ -175,20 +175,24 @@ int main()
                              "Performance panel should label the control area as instrument controls.");
         auto& instrumentControlsToggle = requireButton(
             panel, "performanceMacroStripToggleButton");
-        require(instrumentControlsToggle.getButtonText() == "Hide Controls",
-                "Instrument Controls should start expanded with an explicit collapse action.");
+        require(instrumentControlsToggle.getButtonText() == "Show Controls",
+                "Instrument Controls should start collapsed with an explicit expansion action.");
         auto* referenceMacroSlider = findDescendantById(panel, "performanceMacroSlider.tone");
-        require(referenceMacroSlider != nullptr && referenceMacroSlider->isVisible(),
-                "Reference Instrument Controls should be visible while the panel is expanded.");
+        require(referenceMacroSlider != nullptr && !referenceMacroSlider->isVisible(),
+                "Reference Instrument Controls should remain hidden on initial plug-in presentation.");
+        instrumentControlsToggle.onClick();
+        require(instrumentControlsToggle.getButtonText() == "Hide Controls"
+                    && referenceMacroSlider->isVisible(),
+                "Explicitly showing Instrument Controls should reveal its player-facing controls. button="
+                    + instrumentControlsToggle.getButtonText().toStdString()
+                    + " visible=" + std::to_string(referenceMacroSlider->isVisible())
+                    + " bounds=" + referenceMacroSlider->getBounds().toString().toStdString());
         referenceMacroSlider->grabKeyboardFocus();
         instrumentControlsToggle.onClick();
         require(instrumentControlsToggle.getButtonText() == "Show Controls"
                     && !referenceMacroSlider->isVisible()
                     && referenceMacroSlider->getBounds().isEmpty(),
-                "Collapsing Instrument Controls should hide and release the control content area. button="
-                    + instrumentControlsToggle.getButtonText().toStdString()
-                    + " visible=" + std::to_string(referenceMacroSlider->isVisible())
-                    + " bounds=" + referenceMacroSlider->getBounds().toString().toStdString());
+                "Collapsing Instrument Controls should hide and release the control content area.");
         require(juce::Component::getCurrentlyFocusedComponent() == &instrumentControlsToggle,
                 "Collapsing focused Instrument Controls should return keyboard focus to the disclosure button.");
         panel.refreshNow();

@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace drs::app
@@ -23,6 +24,8 @@ public:
     using PublishCommandCallback = StatusPanel::PublishCommandCallback;
     using PublishPresentationProvider = StatusPanel::PublishPresentationProvider;
     using AudioCallbackActiveProvider = std::function<bool()>;
+    using InstrumentControlsExpandedProvider = std::function<std::optional<bool>()>;
+    using InstrumentControlsExpandedChangedCallback = std::function<void(bool)>;
 
     explicit PerformancePanel(drs::engine::EngineFacade& engineFacade,
                               MacroValueChangedCallback onMacroValueChanged = {},
@@ -30,7 +33,9 @@ public:
                               PerformanceNoteOffCallback onPerformanceNoteOff = {},
                               PublishCommandCallback onPublishCommand = {},
                               PublishPresentationProvider publishPresentationProvider = {},
-                              AudioCallbackActiveProvider audioCallbackActiveProvider = {});
+                              AudioCallbackActiveProvider audioCallbackActiveProvider = {},
+                              InstrumentControlsExpandedProvider instrumentControlsExpandedProvider = {},
+                              InstrumentControlsExpandedChangedCallback onInstrumentControlsExpandedChanged = {});
     ~PerformancePanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -79,6 +84,8 @@ private:
     PerformanceNoteOffCallback onPerformanceNoteOff;
     PublishPresentationProvider publishPresentationProvider;
     AudioCallbackActiveProvider audioCallbackActiveProvider;
+    InstrumentControlsExpandedProvider instrumentControlsExpandedProvider;
+    InstrumentControlsExpandedChangedCallback onInstrumentControlsExpandedChanged;
     bool hasActivePublishedPerformance = false;
     juce::String publishedPerformanceStateLabel { "Idle" };
     juce::String publishedPerformanceGuidance;
@@ -89,7 +96,8 @@ private:
     std::uint64_t lastObservedMacroValueRevision = 0;
     bool initialRevisionCheckPending = true;
     bool showingPublishedMixer = false;
-    bool instrumentControlsCollapsed = false;
+    bool instrumentControlsCollapsed = true;
+    std::optional<bool> userInstrumentControlsExpandedChoice;
     std::size_t hiddenPublishedMacroCount = 0;
     std::vector<std::string> visibleMacroIds;
     std::vector<std::unique_ptr<MacroControl>> macroControls;

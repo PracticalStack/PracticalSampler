@@ -287,6 +287,14 @@ public:
     bool retryProjectRestore();
     bool retryProjectRestoreWithFile(const juce::File& locatedProjectFile);
     void setMacroValueFromShell(const std::string& macroId, double value);
+    std::optional<bool> getInstrumentControlsExpandedChoice() const noexcept
+    {
+        return instrumentControlsExpandedChoice;
+    }
+    void setInstrumentControlsExpandedChoice(bool expanded) noexcept
+    {
+        instrumentControlsExpandedChoice = expanded;
+    }
     void requestAuthoringPreview(drs::engine::AuthoringPreviewScope scope);
     bool submitAuthoringPreviewCommand(const drs::engine::AuthoringPreviewCommand& command);
     bool submitPerformancePublishCommand(
@@ -582,6 +590,7 @@ private:
     drs::app::AuthoringSourceValidationSnapshot authoringSourceValidationSnapshot;
     drs::engine::HostProjectBinding authoringProjectBinding;
     drs::engine::WorkspaceDocumentState workspaceDocumentState;
+    std::optional<bool> instrumentControlsExpandedChoice;
     drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
     drs::app::SfzImportReviewService sfzImportReviewService;
     drs::app::WavImportService wavImportService;

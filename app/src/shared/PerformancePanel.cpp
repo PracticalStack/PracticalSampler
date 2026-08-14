@@ -174,13 +174,17 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
                                    PerformanceNoteOffCallback performanceNoteOff,
                                    PublishCommandCallback publishCommand,
                                    PublishPresentationProvider presentationProvider,
-                                   AudioCallbackActiveProvider callbackActiveProvider)
+                                   AudioCallbackActiveProvider callbackActiveProvider,
+                                   InstrumentControlsExpandedProvider controlsExpandedProvider,
+                                   InstrumentControlsExpandedChangedCallback controlsExpandedChanged)
     : engineFacade(facade),
       onMacroValueChanged(std::move(macroValueChanged)),
       onPerformanceNoteOn(std::move(performanceNoteOn)),
       onPerformanceNoteOff(std::move(performanceNoteOff)),
       publishPresentationProvider(std::move(presentationProvider)),
       audioCallbackActiveProvider(std::move(callbackActiveProvider)),
+      instrumentControlsExpandedProvider(std::move(controlsExpandedProvider)),
+      onInstrumentControlsExpandedChanged(std::move(controlsExpandedChanged)),
       publishedMixer([this](const std::string& macroId, const double value)
       {
           if (onMacroValueChanged)
@@ -192,12 +196,20 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
       diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
                        publishPresentationProvider)
 {
+    if (instrumentControlsExpandedProvider)
+        userInstrumentControlsExpandedChoice = instrumentControlsExpandedProvider();
+    if (userInstrumentControlsExpandedChoice.has_value())
+        instrumentControlsCollapsed = !*userInstrumentControlsExpandedChoice;
+
     macroStripLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     macroStripLabel.setComponentID("performanceMacroStripLabel");
     macroStripToggleButton.setComponentID("performanceMacroStripToggleButton");
     macroStripToggleButton.setWantsKeyboardFocus(true);
     macroStripToggleButton.onClick = [this]
     {
+        userInstrumentControlsExpandedChoice = instrumentControlsCollapsed;
+        if (onInstrumentControlsExpandedChanged)
+            onInstrumentControlsExpandedChanged(*userInstrumentControlsExpandedChoice);
         setInstrumentControlsCollapsed(!instrumentControlsCollapsed);
     };
     mixerEmptyStateLabel.setFont(juce::FontOptions(15.0f));
@@ -565,18 +577,31 @@ void PerformancePanel::refreshSurface()
         = engineFacade.getPerformanceMacroValueRevision();
     const auto allMacros = engineFacade.getMacroDescriptors();
     const auto macroSurface = buildPerformanceMacroSurfaceModel(allMacros);
+    const auto controlsWereCollapsed = instrumentControlsCollapsed;
+    if (!userInstrumentControlsExpandedChoice.has_value())
+    {
+        const auto packageHasExposedControls
+            = engineFacade.getPerformancePackageActivationPayload() != nullptr
+                && macroSurface.showingPublishedMixer
+                && !macroSurface.displayedMacros.empty();
+        instrumentControlsCollapsed = !packageHasExposedControls;
+    }
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
     refreshArtwork();
 
     hiddenPublishedMacroCount = macroSurface.hiddenPublishedMacroCount;
-    if (!sameMacroLayout(visibleMacroIds,
-                         macroSurface.displayedMacros,
-                         showingPublishedMixer,
-                         macroSurface.showingPublishedMixer))
+    const auto macroLayoutChanged = !sameMacroLayout(
+        visibleMacroIds, macroSurface.displayedMacros,
+        showingPublishedMixer, macroSurface.showingPublishedMixer);
+    if (macroLayoutChanged)
     {
         rebuildMacroControls(macroSurface.displayedMacros, macroSurface.showingPublishedMixer);
+        resized();
+    }
+    else if (controlsWereCollapsed != instrumentControlsCollapsed)
+    {
         resized();
     }
 

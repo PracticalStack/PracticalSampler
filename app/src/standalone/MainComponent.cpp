@@ -466,6 +466,14 @@ MainComponent::MainComponent(bool enableAudioOutput)
                        [this]()
                        {
                            return processor.hasRecentAudioCallback();
+                       },
+                       [this]()
+                       {
+                           return processor.getInstrumentControlsExpandedChoice();
+                       },
+                       [this](const bool expanded)
+                       {
+                           processor.setInstrumentControlsExpandedChoice(expanded);
                        }),
       authoringPanel(processor.getAuthoringSession(),
                      [this]()

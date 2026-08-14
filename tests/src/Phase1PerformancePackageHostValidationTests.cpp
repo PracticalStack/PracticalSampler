@@ -27,6 +27,31 @@ void require(bool condition, const std::string& message)
         throw std::runtime_error(message);
 }
 
+template <typename ComponentType>
+ComponentType* findDescendantByType(juce::Component& root)
+{
+    if (auto* match = dynamic_cast<ComponentType*>(&root))
+        return match;
+
+    for (int index = 0; index < root.getNumChildComponents(); ++index)
+        if (auto* match = findDescendantByType<ComponentType>(*root.getChildComponent(index)))
+            return match;
+
+    return nullptr;
+}
+
+juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
+{
+    if (root.getComponentID() == componentId)
+        return &root;
+
+    for (int index = 0; index < root.getNumChildComponents(); ++index)
+        if (auto* match = findDescendantById(*root.getChildComponent(index), componentId))
+            return match;
+
+    return nullptr;
+}
+
 std::string summarizeIssues(const std::vector<std::string>& issues)
 {
     if (issues.empty())
@@ -246,6 +271,15 @@ int main(int argc, char** argv)
         auto processor = std::make_unique<drs::plugin::Processor>();
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditor());
         require(editor != nullptr, "Plugin editor should construct for package host validation.");
+        auto* initialPerformancePanel
+            = findDescendantByType<drs::app::PerformancePanel>(*editor);
+        auto* initialControlsToggle = dynamic_cast<juce::Button*>(
+            findDescendantById(*editor, "performanceMacroStripToggleButton"));
+        require(initialPerformancePanel != nullptr && initialControlsToggle != nullptr,
+                "Plugin editor should expose the Instrument Controls disclosure.");
+        initialPerformancePanel->refreshNow();
+        require(initialControlsToggle->getButtonText() == "Show Controls",
+                "A newly opened plugin should default Instrument Controls to hidden.");
 
         std::chrono::microseconds pluginPreparationElapsed {};
         std::chrono::microseconds pluginActivationElapsed {};
@@ -262,6 +296,34 @@ int main(int argc, char** argv)
                                         "Plugin host validation");
         processor->prepareToPlay(44100.0, 512);
         processor->serviceMessageThreadWork();
+        initialPerformancePanel->refreshNow();
+        auto* packageMixer = findDescendantByType<drs::app::PerformanceMixer>(
+            *initialPerformancePanel);
+        require(initialControlsToggle->getButtonText() == "Hide Controls"
+                    && packageMixer != nullptr && packageMixer->isVisible(),
+                "Loading a package with exposed controls should automatically show Instrument Controls.");
+        initialControlsToggle->onClick();
+        require(initialControlsToggle->getButtonText() == "Show Controls"
+                    && !packageMixer->isVisible(),
+                "The user should be able to hide automatically shown package controls.");
+        editor.reset();
+        editor.reset(processor->createEditor());
+        require(editor != nullptr,
+                "Plugin editor should reopen after choosing to hide Instrument Controls.");
+        auto* reopenedPerformancePanel
+            = findDescendantByType<drs::app::PerformancePanel>(*editor);
+        auto* reopenedControlsToggle = dynamic_cast<juce::Button*>(
+            findDescendantById(*editor, "performanceMacroStripToggleButton"));
+        auto* reopenedPackageMixer = reopenedPerformancePanel != nullptr
+            ? findDescendantByType<drs::app::PerformanceMixer>(*reopenedPerformancePanel)
+            : nullptr;
+        require(reopenedPerformancePanel != nullptr && reopenedControlsToggle != nullptr
+                    && reopenedPackageMixer != nullptr,
+                "Reopened plugin editor should restore the package Performance UI.");
+        reopenedPerformancePanel->refreshNow();
+        require(reopenedControlsToggle->getButtonText() == "Show Controls"
+                    && !reopenedPackageMixer->isVisible(),
+                "Instrument Controls should retain the user's hidden choice while the plugin session remains active.");
         const auto pluginPayload
             = processor->getEngineFacade().getPerformancePackageActivationPayload();
         require(pluginPayload != nullptr && pluginPayload->snapshot != nullptr,

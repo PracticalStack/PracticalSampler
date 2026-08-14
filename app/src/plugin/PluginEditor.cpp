@@ -474,6 +474,14 @@ Editor::Editor(Processor& owner)
                        [&owner]()
                        {
                            return owner.hasRecentAudioCallback();
+                       },
+                       [&owner]()
+                       {
+                           return owner.getInstrumentControlsExpandedChoice();
+                       },
+                       [&owner](const bool expanded)
+                       {
+                           owner.setInstrumentControlsExpandedChoice(expanded);
                        }),
       authoringPanel(owner.getAuthoringSession(),
                      [&owner]()
