@@ -52,17 +52,17 @@ void qualifyLayoutState()
             "Workbench state must begin as a collapsed tab rail.");
 
     state.setOpen(true);
-    state.suggestHeightForTab(DrawerTab::waveform);
+    state.suggestHeightForTab(WorkbenchTab::waveform);
     require(state.getSizeMode() == WorkbenchSizeMode::standard
                 && state.getRememberedHeight() == WorkbenchLayoutState::standardDefaultHeight,
             "Waveform must suggest the standard workbench height.");
-    state.suggestHeightForTab(DrawerTab::macros);
+    state.suggestHeightForTab(WorkbenchTab::macros);
     require(state.getSizeMode() == WorkbenchSizeMode::focused
                 && state.getRememberedHeight() == WorkbenchLayoutState::focusedDefaultHeight,
             "Macro editing must suggest the focused workbench height before user sizing.");
 
     state.setUserHeight(236);
-    state.suggestHeightForTab(DrawerTab::routing);
+    state.suggestHeightForTab(WorkbenchTab::routing);
     require(state.getRememberedHeight() == 236 && state.hasUserHeight(),
             "Tab suggestions must not override a direct user height.");
     require(state.resolveHeight(390, 160, 8) == 222,
@@ -91,7 +91,7 @@ void qualifyExpandedWorkbench()
     panel.resized();
     panel.reloadFromSession();
 
-    auto& region = requireComponent(panel, "authoringDrawer");
+    auto& region = requireComponent(panel, "authoringWorkbench");
     auto& map = requireComponent(panel, "authoringZoneMap");
     auto& splitter = dynamic_cast<drs::app::authoring::WorkbenchSplitter&>(
         requireComponent(panel, "authoringWorkbenchSplitter"));
@@ -104,7 +104,7 @@ void qualifyExpandedWorkbench()
             "Standard workbench must preserve the protected map height.");
 
     const auto initialUndoDepth = session.getDocumentState().undoDepth;
-    requireButton(panel, "authoringDrawerMacrosTab").onClick();
+    requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
     require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::focusedDefaultHeight,
             "Macros must suggest the 340 px Focused state.");
     auto& macroList = requireComponent(panel, "authoringMacroList");
@@ -118,7 +118,7 @@ void qualifyExpandedWorkbench()
     splitter.requestHeight(240);
     require(region.getHeight() == 240 && session.getDocumentState().undoDepth == initialUndoDepth,
             "Direct splitter sizing must be stable and create no authoring transaction.");
-    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     require(region.getHeight() == 240,
             "Switching tabs must retain a user-set workbench height.");
 
@@ -127,7 +127,7 @@ void qualifyExpandedWorkbench()
         session.selectZone(loaded.project.authoring.zones[1].id);
         panel.refreshNow();
     }
-    require(requireButton(panel, "authoringDrawerRoutingTab").getToggleState()
+    require(requireButton(panel, "authoringWorkbenchRoutingTab").getToggleState()
                 && region.getHeight() == 240,
             "Zone selection refresh must preserve the active workbench tab and height.");
 
@@ -156,11 +156,11 @@ void qualifyExpandedWorkbench()
     require(session.getDocumentState().undoDepth == initialUndoDepth,
             "Workbench navigation and sizing must stay outside authored undo history.");
 
-    requireButton(panel, "authoringDrawerToggleButton").onClick();
+    requireButton(panel, "authoringWorkbenchToggleButton").onClick();
     require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::collapsedHeight
                 && !splitter.isVisible(),
             "Collapse must leave only the approximately 38 px tab rail.");
-    requireButton(panel, "authoringDrawerToggleButton").onClick();
+    requireButton(panel, "authoringWorkbenchToggleButton").onClick();
     require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::focusedDefaultHeight,
             "Re-expanding must restore the last expanded height.");
 
@@ -177,17 +177,17 @@ void qualifyCompactShortHost()
     panel.resized();
     panel.reloadFromSession();
 
-    auto& region = requireComponent(panel, "authoringDrawer");
+    auto& region = requireComponent(panel, "authoringWorkbench");
     auto& map = requireComponent(panel, "authoringZoneMap");
     require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::collapsedHeight,
             "Compact/plugin shell must begin with the same collapsed workbench state.");
-    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     require(region.getHeight() < drs::app::authoring::WorkbenchLayoutState::focusedMinimumHeight
                 && map.getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
             "Focused workbench must clamp below 320 px when a short plugin shell protects the map.");
-    for (const auto* id : { "authoringDrawerWaveformTab", "authoringDrawerGroupsTab",
-                            "authoringDrawerMacrosTab", "authoringDrawerRoutingTab",
-                            "authoringDrawerPerformanceTab", "authoringDrawerArticulationsTab" })
+    for (const auto* id : { "authoringWorkbenchWaveformTab", "authoringWorkbenchGroupsTab",
+                            "authoringWorkbenchMacrosTab", "authoringWorkbenchRoutingTab",
+                            "authoringWorkbenchPerformanceTab", "authoringWorkbenchArticulationsTab" })
     {
         require(findDescendantById(panel, id) != nullptr,
                 std::string { "Compact shell is missing shared tab: " } + id);

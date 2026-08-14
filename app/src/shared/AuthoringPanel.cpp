@@ -914,7 +914,7 @@ void AuthoringPanel::requestWaveformPreviewLoad(const bool refreshImmediately)
     if (waveformPreviewRequestCallback)
         waveformPreviewRequestCallback();
     if (refreshImmediately)
-        refreshWaveformDrawerContent();
+        refreshWaveformWorkbenchContent();
 }
 
 AuthoringPanel::AuthoringControlLookAndFeel::AuthoringControlLookAndFeel()
@@ -1110,17 +1110,17 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 {
     setLookAndFeel(&authoringLookAndFeel);
     setComponentID("authoringWorkspace");
-    drawerState.open = isExpandedLayout(layoutMode);
-    drawerState.activeTab = authoring::DrawerTab::waveform;
-    workbenchLayoutState.setOpen(drawerState.open);
-    workbenchLayoutState.suggestHeightForTab(drawerState.activeTab);
+    workbenchState.open = isExpandedLayout(layoutMode);
+    workbenchState.activeTab = authoring::WorkbenchTab::waveform;
+    workbenchLayoutState.setOpen(workbenchState.open);
+    workbenchLayoutState.suggestHeightForTab(workbenchState.activeTab);
 
     playbackBanner.setComponentID("authoringPlaybackBanner");
     playbackBannerLabel.setComponentID("authoringPlaybackBannerLabel");
     playbackBannerPrepareButton.setComponentID("authoringPlaybackBannerPrepareButton");
     playbackBannerPublishButton.setComponentID("authoringPlaybackBannerPublishButton");
     configureMetadataLabel(waveformScopeLabel);
-    configureMetadataLabel(drawerBreadcrumbLabel);
+    configureMetadataLabel(workbenchBreadcrumbLabel);
     configureMetadataLabel(waveformStatusLabel);
     configureMetadataLabel(waveformInfoLabel);
     configureMetadataLabel(loopInfoLabel);
@@ -1206,22 +1206,22 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupMoveDownButton.setComponentID("authoringGroupMoveDownButton");
     groupVisibilityButton.setComponentID("authoringGroupVisibilityButton");
     groupVisibilityHintLabel.setComponentID("authoringGroupVisibilityHintLabel");
-    drawerRegion.setComponentID("authoringDrawer");
-    drawerTabStrip.setComponentID("authoringDrawerTabStrip");
-    drawerContentHost.setComponentID("authoringDrawerContentHost");
-    macroDrawerContent.setComponentID("authoringMacroContent");
-    macroDrawerViewport.setComponentID("authoringMacroViewport");
-    routingDrawerContent.setComponentID("authoringRoutingContent");
-    routingDrawerViewport.setComponentID("authoringRoutingViewport");
-    drawerToggleButton.setComponentID("authoringDrawerToggleButton");
-    drawerWaveformTabButton.setComponentID("authoringDrawerWaveformTab");
-    drawerGroupsTabButton.setComponentID("authoringDrawerGroupsTab");
-    drawerMacrosTabButton.setComponentID("authoringDrawerMacrosTab");
-    drawerRoutingTabButton.setComponentID("authoringDrawerRoutingTab");
-    drawerPerformanceTabButton.setComponentID("authoringDrawerPerformanceTab");
-    waveformLabel.setComponentID("authoringDrawerTitleLabel");
-    waveformScopeLabel.setComponentID("authoringDrawerScopeLabel");
-    drawerBreadcrumbLabel.setComponentID("authoringDrawerBreadcrumbLabel");
+    workbenchRegion.setComponentID("authoringWorkbench");
+    workbenchTabStrip.setComponentID("authoringWorkbenchTabStrip");
+    workbenchContentHost.setComponentID("authoringWorkbenchContentHost");
+    macroWorkbenchContent.setComponentID("authoringMacroContent");
+    macroWorkbenchViewport.setComponentID("authoringMacroViewport");
+    routingWorkbenchContent.setComponentID("authoringRoutingContent");
+    routingWorkbenchViewport.setComponentID("authoringRoutingViewport");
+    workbenchToggleButton.setComponentID("authoringWorkbenchToggleButton");
+    workbenchWaveformTabButton.setComponentID("authoringWorkbenchWaveformTab");
+    workbenchGroupsTabButton.setComponentID("authoringWorkbenchGroupsTab");
+    workbenchMacrosTabButton.setComponentID("authoringWorkbenchMacrosTab");
+    workbenchRoutingTabButton.setComponentID("authoringWorkbenchRoutingTab");
+    workbenchPerformanceTabButton.setComponentID("authoringWorkbenchPerformanceTab");
+    waveformLabel.setComponentID("authoringWorkbenchTitleLabel");
+    waveformScopeLabel.setComponentID("authoringWorkbenchScopeLabel");
+    workbenchBreadcrumbLabel.setComponentID("authoringWorkbenchBreadcrumbLabel");
     waveformStatusLabel.setComponentID("authoringWaveformStatusLabel");
     waveformInfoLabel.setComponentID("authoringWaveformInfoLabel");
     loopInfoLabel.setComponentID("authoringWaveformLoopLabel");
@@ -1305,9 +1305,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     roundRobinResetDeleteButton.setComponentID("authoringRoundRobinResetDeleteButton");
     roundRobinResetSummaryLabel.setComponentID("authoringRoundRobinResetSummaryLabel");
     phraseImportPathEditor.setComponentID("authoringPhraseImportPath");
-    drawerArticulationsTabButton.setComponentID("authoringDrawerArticulationsTab");
+    workbenchArticulationsTabButton.setComponentID("authoringWorkbenchArticulationsTab");
     articulationList.setComponentID("authoringArticulationList");
-    articulationDrawerViewport.setComponentID("authoringArticulationDrawerViewport");
+    articulationWorkbenchViewport.setComponentID("authoringArticulationWorkbenchViewport");
     articulationCreateButton.setComponentID("authoringArticulationCreateButton");
     articulationDuplicateButton.setComponentID("authoringArticulationDuplicateButton");
     articulationDefaultButton.setComponentID("authoringArticulationDefaultButton");
@@ -1322,27 +1322,27 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     articulationDeleteReassignSelector.setComponentID("authoringArticulationDeleteReassignSelector");
     articulationStatusLabel.setComponentID("authoringArticulationStatusLabel");
 
-    drawerToggleButton.onClick = [this]
+    workbenchToggleButton.onClick = [this]
     {
-        setDrawerOpen(!drawerState.open);
+        setWorkbenchOpen(!workbenchState.open);
     };
-    drawerWaveformTabButton.setButtonText("Waveform");
-    drawerGroupsTabButton.setButtonText("Groups");
-    drawerMacrosTabButton.setButtonText("Macros");
-    drawerRoutingTabButton.setButtonText("Routing");
-    drawerPerformanceTabButton.setButtonText("Performance");
-    drawerArticulationsTabButton.setButtonText("Articulations");
-    drawerWaveformTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::waveform); };
-    drawerGroupsTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::groups); };
-    drawerMacrosTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::macros); };
-    drawerRoutingTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::routing); };
-    drawerPerformanceTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::performance); };
-    drawerArticulationsTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::articulations); };
+    workbenchWaveformTabButton.setButtonText("Waveform");
+    workbenchGroupsTabButton.setButtonText("Groups");
+    workbenchMacrosTabButton.setButtonText("Macros");
+    workbenchRoutingTabButton.setButtonText("Routing");
+    workbenchPerformanceTabButton.setButtonText("Performance");
+    workbenchArticulationsTabButton.setButtonText("Articulations");
+    workbenchWaveformTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::waveform); };
+    workbenchGroupsTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::groups); };
+    workbenchMacrosTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::macros); };
+    workbenchRoutingTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::routing); };
+    workbenchPerformanceTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::performance); };
+    workbenchArticulationsTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::articulations); };
     workbenchSplitter.setOnHeightRequested([this](const int height)
     {
         workbenchLayoutState.setUserHeight(height);
-        drawerState.open = true;
-        refreshDrawerVisibility();
+        workbenchState.open = true;
+        refreshWorkbenchVisibility();
         resized();
     });
     workbenchSplitter.setOnSizeToggleRequested([this]
@@ -1351,8 +1351,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             workbenchLayoutState.requestStandard();
         else
             workbenchLayoutState.requestFocused();
-        drawerState.open = true;
-        refreshDrawerVisibility();
+        workbenchState.open = true;
+        refreshWorkbenchVisibility();
         resized();
         workbenchSplitter.grabKeyboardFocus();
     });
@@ -1511,7 +1511,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 
         if (applyZoneMapSelectionState(selectionState))
         {
-            requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
+            requestWaveformPreviewLoad(workbenchState.activeTab == authoring::WorkbenchTab::waveform);
             refreshSelectionFromSession();
         }
     });
@@ -1572,8 +1572,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (!result.applied)
             return;
 
-        setActiveDrawerTab(authoring::DrawerTab::groups);
-        requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
+        setActiveWorkbenchTab(authoring::WorkbenchTab::groups);
+        requestWaveformPreviewLoad(workbenchState.activeTab == authoring::WorkbenchTab::waveform);
         refreshSelectionFromSession();
     });
 
@@ -1683,7 +1683,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         authoringSession.selectZone(zones[static_cast<std::size_t>(zoneIndex)].id);
-        requestWaveformPreviewLoad(drawerState.activeTab == authoring::DrawerTab::waveform);
+        requestWaveformPreviewLoad(workbenchState.activeTab == authoring::WorkbenchTab::waveform);
         refreshSelectionFromSession();
     };
 
@@ -1698,7 +1698,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             command.source = drs::engine::AuthoringPreviewAuditionSource::summaryPreview;
             previewCommandCallback(command);
         }
-        refreshWaveformDrawerContent();
+        refreshWaveformWorkbenchContent();
     };
     previewStopButton.onClick = [this]
     {
@@ -1713,12 +1713,12 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             command.source = drs::engine::AuthoringPreviewAuditionSource::summaryPreview;
             previewCommandCallback(command);
         }
-        refreshWaveformDrawerContent();
+        refreshWaveformWorkbenchContent();
     };
     sourceValidationButton.onClick = [this]
     {
         updateSourceValidationAction();
-        refreshWaveformDrawerContent();
+        refreshWaveformWorkbenchContent();
     };
 
     macroList.setOnSelectionChanged([this](int nextIndex)
@@ -2022,24 +2022,24 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&playbackBannerLabel),
              static_cast<juce::Component*>(&playbackBannerPrepareButton),
              static_cast<juce::Component*>(&playbackBannerPublishButton),
-             static_cast<juce::Component*>(&drawerRegion),
-             static_cast<juce::Component*>(&drawerTabStrip),
-             static_cast<juce::Component*>(&drawerContentHost),
+             static_cast<juce::Component*>(&workbenchRegion),
+             static_cast<juce::Component*>(&workbenchTabStrip),
+             static_cast<juce::Component*>(&workbenchContentHost),
              static_cast<juce::Component*>(&waveformLabel),
              static_cast<juce::Component*>(&waveformScopeLabel),
-             static_cast<juce::Component*>(&drawerBreadcrumbLabel),
+             static_cast<juce::Component*>(&workbenchBreadcrumbLabel),
              static_cast<juce::Component*>(&waveformStatusLabel),
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
              static_cast<juce::Component*>(&importMetricsLabel),
              static_cast<juce::Component*>(&sourceValidationLabel),
              static_cast<juce::Component*>(&sourceValidationButton),
-             static_cast<juce::Component*>(&drawerToggleButton),
-             static_cast<juce::Component*>(&drawerWaveformTabButton),
-             static_cast<juce::Component*>(&drawerMacrosTabButton),
-             static_cast<juce::Component*>(&drawerRoutingTabButton),
-             static_cast<juce::Component*>(&drawerPerformanceTabButton),
-             static_cast<juce::Component*>(&drawerArticulationsTabButton),
+             static_cast<juce::Component*>(&workbenchToggleButton),
+             static_cast<juce::Component*>(&workbenchWaveformTabButton),
+             static_cast<juce::Component*>(&workbenchMacrosTabButton),
+             static_cast<juce::Component*>(&workbenchRoutingTabButton),
+             static_cast<juce::Component*>(&workbenchPerformanceTabButton),
+             static_cast<juce::Component*>(&workbenchArticulationsTabButton),
              static_cast<juce::Component*>(&zoneLabel),
              static_cast<juce::Component*>(&zoneSelector),
              static_cast<juce::Component*>(&previewEnabledToggle),
@@ -2058,8 +2058,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&groupVisibilityHintLabel),
              static_cast<juce::Component*>(&zoneMappingEditor),
              static_cast<juce::Component*>(&waveformPreview),
-             static_cast<juce::Component*>(&drawerGroupsTabButton),
-             static_cast<juce::Component*>(&macroDrawerViewport),
+             static_cast<juce::Component*>(&workbenchGroupsTabButton),
+             static_cast<juce::Component*>(&macroWorkbenchViewport),
              static_cast<juce::Component*>(&macroList),
              static_cast<juce::Component*>(&macroCreateButton),
              static_cast<juce::Component*>(&macroDuplicateButton),
@@ -2081,7 +2081,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&macroSummaryLabel),
              static_cast<juce::Component*>(&macroMoveUpButton),
              static_cast<juce::Component*>(&macroMoveDownButton),
-             static_cast<juce::Component*>(&routingDrawerViewport),
+             static_cast<juce::Component*>(&routingWorkbenchViewport),
              static_cast<juce::Component*>(&fxSectionLabel),
              static_cast<juce::Component*>(&fxScopeLabel),
              static_cast<juce::Component*>(&fxScopeSelector),
@@ -2154,18 +2154,18 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&roundRobinResetAddButton),
              static_cast<juce::Component*>(&roundRobinResetDeleteButton),
              static_cast<juce::Component*>(&roundRobinResetSummaryLabel),
-             static_cast<juce::Component*>(&articulationDrawerViewport)
+             static_cast<juce::Component*>(&articulationWorkbenchViewport)
          })
     {
         addAndMakeVisible(component);
     }
     addAndMakeVisible(workbenchSplitter);
 
-    macroDrawerViewport.setViewedComponent(&macroDrawerContent, false);
-    macroDrawerViewport.setScrollBarsShown(true, false);
-    macroDrawerViewport.setScrollBarThickness(12);
-    macroDrawerViewport.setWantsKeyboardFocus(false);
-    macroDrawerContent.setSize(1, 1);
+    macroWorkbenchViewport.setViewedComponent(&macroWorkbenchContent, false);
+    macroWorkbenchViewport.setScrollBarsShown(true, false);
+    macroWorkbenchViewport.setScrollBarThickness(12);
+    macroWorkbenchViewport.setWantsKeyboardFocus(false);
+    macroWorkbenchContent.setSize(1, 1);
     for (auto* component : {
              static_cast<juce::Component*>(&macroList),
              static_cast<juce::Component*>(&macroCreateButton),
@@ -2190,14 +2190,14 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&macroMoveDownButton)
          })
     {
-        macroDrawerContent.addAndMakeVisible(component);
+        macroWorkbenchContent.addAndMakeVisible(component);
     }
 
-    routingDrawerViewport.setViewedComponent(&routingDrawerContent, false);
-    routingDrawerViewport.setScrollBarsShown(true, false);
-    routingDrawerViewport.setScrollBarThickness(12);
-    routingDrawerViewport.setWantsKeyboardFocus(false);
-    routingDrawerContent.setSize(1, 1);
+    routingWorkbenchViewport.setViewedComponent(&routingWorkbenchContent, false);
+    routingWorkbenchViewport.setScrollBarsShown(true, false);
+    routingWorkbenchViewport.setScrollBarThickness(12);
+    routingWorkbenchViewport.setWantsKeyboardFocus(false);
+    routingWorkbenchContent.setSize(1, 1);
     for (auto* component : {
              static_cast<juce::Component*>(&fxSectionLabel),
              static_cast<juce::Component*>(&fxScopeLabel),
@@ -2233,15 +2233,15 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&routingSummaryLabel)
          })
     {
-        routingDrawerContent.addAndMakeVisible(component);
+        routingWorkbenchContent.addAndMakeVisible(component);
     }
 
-    articulationDrawerViewport.setViewedComponent(&articulationDrawerContent, false);
-    articulationDrawerViewport.setScrollBarsShown(true, false);
-    articulationDrawerViewport.setScrollBarThickness(12);
-    articulationDrawerViewport.setWantsKeyboardFocus(false);
-    articulationDrawerContent.setSize(1, 1);
-    articulationDrawerContent.setVisible(true);
+    articulationWorkbenchViewport.setViewedComponent(&articulationWorkbenchContent, false);
+    articulationWorkbenchViewport.setScrollBarsShown(true, false);
+    articulationWorkbenchViewport.setScrollBarThickness(12);
+    articulationWorkbenchViewport.setWantsKeyboardFocus(false);
+    articulationWorkbenchContent.setSize(1, 1);
+    articulationWorkbenchContent.setVisible(true);
     for (auto* component : {
              static_cast<juce::Component*>(&articulationList),
              static_cast<juce::Component*>(&articulationCreateButton),
@@ -2262,7 +2262,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&articulationStatusLabel)
          })
     {
-        articulationDrawerContent.addAndMakeVisible(component);
+        articulationWorkbenchContent.addAndMakeVisible(component);
     }
     for (int midiNote = 0; midiNote < 36; ++midiNote)
     {
@@ -2275,7 +2275,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             articulationSwitchNoteSlider.setValue(midiNote, juce::dontSendNotification);
             applySelectedArticulationEdit("Assign key switch from keyboard");
         };
-        articulationDrawerContent.addAndMakeVisible(*key);
+        articulationWorkbenchContent.addAndMakeVisible(*key);
         articulationKeyButtons.push_back(std::move(key));
     }
 
@@ -2381,71 +2381,71 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Use the mouse wheel or Control-scroll to zoom around the pointer. Use a smooth trackpad gesture to pan, Shift-scroll to pan horizontally, or middle-drag to pan. Hold Space while dragging for the temporary hand. Use Fit All or Fit Selected in the map toolbar, arrow keys to move the primary selection, Control to toggle extra zones, or drag a box to multi-select.");
     zoneMap.setExplicitFocusOrder(30);
 
-    configureAccessibleMetadata(drawerRegion,
+    configureAccessibleMetadata(workbenchRegion,
                                 "Authoring workbench",
                                 "Hosts waveform, groups, macros, routing, performance, and articulation editors.");
-    configureAccessibleMetadata(drawerTabStrip,
+    configureAccessibleMetadata(workbenchTabStrip,
                                 "Workbench tab strip",
                                 "Contains the workbench visibility control and editor tab buttons.");
-    configureAccessibleMetadata(drawerContentHost,
+    configureAccessibleMetadata(workbenchContentHost,
                                 "Workbench content",
                                 "Displays the active workbench editor when expanded.");
     workbenchSplitter.setExplicitFocusOrder(59);
-    configureAccessibleMetadata(macroDrawerViewport,
+    configureAccessibleMetadata(macroWorkbenchViewport,
                                 "Macro editor",
                                 "Provides access to project macro creation, assignment, range, and ordering controls.",
                                 "All macro controls are visible at standard workspace heights. Scroll vertically in unusually short host windows.");
-    configureAccessibleMetadata(routingDrawerViewport,
+    configureAccessibleMetadata(routingWorkbenchViewport,
                                 "Scrollable routing inspector",
                                 "Provides access to project routing, FX chain, ownership, and parameter controls.",
                                 "Scroll vertically to reach the advanced FX controls.");
 
-    configureAccessibleMetadata(drawerToggleButton,
+    configureAccessibleMetadata(workbenchToggleButton,
                                 "Workbench visibility",
                                 "Shows or hides the active workbench content.",
                                 "Press to collapse or expand the workbench.");
-    drawerToggleButton.setExplicitFocusOrder(60);
+    workbenchToggleButton.setExplicitFocusOrder(60);
 
-    configureAccessibleMetadata(drawerWaveformTabButton,
+    configureAccessibleMetadata(workbenchWaveformTabButton,
                                 "Waveform workbench tab",
                                 "Shows zone-scoped waveform detail.",
-                                "Press to switch the drawer to waveform detail.");
-    configureAccessibleMetadata(drawerGroupsTabButton,
+                                "Press to switch the workbench to waveform detail.");
+    configureAccessibleMetadata(workbenchGroupsTabButton,
                                 "Groups workbench tab",
                                 "Shows group-scoped mixing, routing, and visibility detail.",
-                                "Press to switch the drawer to group detail.");
-    configureAccessibleMetadata(drawerMacrosTabButton,
+                                "Press to switch the workbench to group detail.");
+    configureAccessibleMetadata(workbenchMacrosTabButton,
                                 "Macros workbench tab",
                                 "Shows project-scoped macro assignments.",
-                                "Press to switch the drawer to macro editing.");
-    configureAccessibleMetadata(drawerRoutingTabButton,
+                                "Press to switch the workbench to macro editing.");
+    configureAccessibleMetadata(workbenchRoutingTabButton,
                                 "Routing workbench tab",
                                 "Shows project-scoped FX and bus routing detail.",
-                                "Press to switch the drawer to routing detail.");
-    configureAccessibleMetadata(drawerPerformanceTabButton,
+                                "Press to switch the workbench to routing detail.");
+    configureAccessibleMetadata(workbenchPerformanceTabButton,
                                 "Performance workbench tab",
                                 "Shows bank-scoped performance and trigger detail.",
-                                "Press to switch the drawer to performance detail.");
-    configureAccessibleMetadata(drawerArticulationsTabButton,
+                                "Press to switch the workbench to performance detail.");
+    configureAccessibleMetadata(workbenchArticulationsTabButton,
                                 "Articulations workbench tab",
                                 "Shows project articulations and key-switch assignment.",
-                                "Press to switch the drawer to articulation management.");
-    drawerWaveformTabButton.setExplicitFocusOrder(61);
-    drawerGroupsTabButton.setExplicitFocusOrder(62);
-    drawerMacrosTabButton.setExplicitFocusOrder(63);
-    drawerRoutingTabButton.setExplicitFocusOrder(64);
-    drawerPerformanceTabButton.setExplicitFocusOrder(65);
-    drawerArticulationsTabButton.setExplicitFocusOrder(66);
+                                "Press to switch the workbench to articulation management.");
+    workbenchWaveformTabButton.setExplicitFocusOrder(61);
+    workbenchGroupsTabButton.setExplicitFocusOrder(62);
+    workbenchMacrosTabButton.setExplicitFocusOrder(63);
+    workbenchRoutingTabButton.setExplicitFocusOrder(64);
+    workbenchPerformanceTabButton.setExplicitFocusOrder(65);
+    workbenchArticulationsTabButton.setExplicitFocusOrder(66);
 
     configureAccessibleMetadata(waveformLabel,
-                                "Drawer title",
-                                "Names the active drawer surface.");
+                                "Workbench title",
+                                "Names the active workbench surface.");
     configureAccessibleMetadata(waveformScopeLabel,
-                                "Drawer scope",
-                                "Shows whether the active drawer is zone-, project-, bank-, or trigger-scoped.");
-    configureAccessibleMetadata(drawerBreadcrumbLabel,
-                                "Drawer breadcrumb",
-                                "Shows the selection path for the active drawer.");
+                                "Workbench scope",
+                                "Shows whether the active workbench is zone-, project-, bank-, or trigger-scoped.");
+    configureAccessibleMetadata(workbenchBreadcrumbLabel,
+                                "Workbench breadcrumb",
+                                "Shows the selection path for the active workbench.");
     configureAccessibleMetadata(waveformPreview,
                                 "Waveform preview",
                                 "Displays the selected zone waveform and loop region.");
@@ -2728,7 +2728,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     phraseImportPathEditor.setExplicitFocusOrder(96);
     phraseImportButton.setExplicitFocusOrder(97);
 
-    configureAccessibleMetadata(articulationDrawerViewport,
+    configureAccessibleMetadata(articulationWorkbenchViewport,
                                 "Articulation editor",
                                 "Creates, reorders, and assigns articulations and their key switches.",
                                 "Use the list to choose an articulation, then edit its name or key switch.");
@@ -2880,90 +2880,90 @@ void AuthoringPanel::resized()
 
     area.removeFromTop(shortHeightLayout ? 8 : 12);
     const auto expanded = isExpandedLayout(layoutMode);
-    const auto groupDrawerInShortLayout = shortHeightLayout
-        && drawerState.activeTab == authoring::DrawerTab::groups;
-    const auto routingDrawerInShortLayout = shortHeightLayout
-        && drawerState.activeTab == authoring::DrawerTab::routing;
-    const auto inspectorDrawerInShortLayout = groupDrawerInShortLayout || routingDrawerInShortLayout;
-    const auto mapGap = inspectorDrawerInShortLayout ? 4 : 8;
-    auto drawerHeight = workbenchLayoutState.resolveHeight(
+    const auto groupWorkbenchInShortLayout = shortHeightLayout
+        && workbenchState.activeTab == authoring::WorkbenchTab::groups;
+    const auto routingWorkbenchInShortLayout = shortHeightLayout
+        && workbenchState.activeTab == authoring::WorkbenchTab::routing;
+    const auto inspectorWorkbenchInShortLayout = groupWorkbenchInShortLayout || routingWorkbenchInShortLayout;
+    const auto mapGap = inspectorWorkbenchInShortLayout ? 4 : 8;
+    auto workbenchHeight = workbenchLayoutState.resolveHeight(
         area.getHeight(), authoring::minimumMapVisibleHeight, mapGap);
-    if (inspectorDrawerInShortLayout && !workbenchLayoutState.hasUserHeight())
-        drawerHeight = std::min(drawerHeight,
-                                authoring::drawerTabStripHeight
-                                    + authoring::shortInspectorDrawerOpenHeight);
-    auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
-    drawerRegion.setBounds(drawerArea);
-    if (drawerState.open)
+    if (inspectorWorkbenchInShortLayout && !workbenchLayoutState.hasUserHeight())
+        workbenchHeight = std::min(workbenchHeight,
+                                authoring::workbenchTabStripHeight
+                                    + authoring::shortInspectorWorkbenchOpenHeight);
+    auto workbenchArea = area.removeFromBottom(std::min(workbenchHeight, area.getHeight()));
+    workbenchRegion.setBounds(workbenchArea);
+    if (workbenchState.open)
     {
-        workbenchSplitter.setBounds(drawerArea.getX(),
-                                    drawerArea.getY() - authoring::WorkbenchLayoutState::splitterHeight / 2,
-                                    drawerArea.getWidth(),
+        workbenchSplitter.setBounds(workbenchArea.getX(),
+                                    workbenchArea.getY() - authoring::WorkbenchLayoutState::splitterHeight / 2,
+                                    workbenchArea.getWidth(),
                                     authoring::WorkbenchLayoutState::splitterHeight);
-        workbenchSplitter.setCurrentHeight(drawerHeight);
+        workbenchSplitter.setCurrentHeight(workbenchHeight);
     }
     else
     {
         workbenchSplitter.setBounds({});
     }
-    drawerTabStrip.setBounds(drawerArea.removeFromTop(authoring::drawerTabStripHeight));
-    drawerContentHost.setBounds(drawerArea);
+    workbenchTabStrip.setBounds(workbenchArea.removeFromTop(authoring::workbenchTabStripHeight));
+    workbenchContentHost.setBounds(workbenchArea);
 
-    auto toggleArea = drawerTabStrip.getBounds().reduced(0, 4);
-    drawerToggleButton.setBounds(toggleArea.removeFromRight(110));
+    auto toggleArea = workbenchTabStrip.getBounds().reduced(0, 4);
+    workbenchToggleButton.setBounds(toggleArea.removeFromRight(110));
 
-    auto tabArea = drawerTabStrip.getBounds().reduced(0, 4);
+    auto tabArea = workbenchTabStrip.getBounds().reduced(0, 4);
     constexpr auto tabGap = 8;
     const auto tabCount = 6;
     const auto desiredTabWidth = expanded ? 104 : 96;
     const auto tabWidth = juce::jlimit(54,
                                        desiredTabWidth,
                                        (tabArea.getWidth() - (tabGap * (tabCount - 1)) - 114) / tabCount);
-    drawerWaveformTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    workbenchWaveformTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
-    drawerGroupsTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    workbenchGroupsTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
-    drawerMacrosTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    workbenchMacrosTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
-    drawerRoutingTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    workbenchRoutingTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
-    drawerPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
+    workbenchPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
-    drawerArticulationsTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
+    workbenchArticulationsTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
-    auto drawerEditorArea = drawerContentHost.getBounds().reduced(12, inspectorDrawerInShortLayout ? 6 : 10);
-    if (drawerState.activeTab == authoring::DrawerTab::groups)
+    auto workbenchEditorArea = workbenchContentHost.getBounds().reduced(12, inspectorWorkbenchInShortLayout ? 6 : 10);
+    if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
     {
-        auto headingRow = drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 20 : 22);
+        auto headingRow = workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 20 : 22);
         waveformLabel.setBounds(headingRow.removeFromLeft(std::min(160, headingRow.getWidth())));
         waveformScopeLabel.setBounds(headingRow);
-        drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 0 : 1);
-        drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
-        drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 2 : 3);
+        workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 0 : 1);
+        workbenchBreadcrumbLabel.setBounds(workbenchEditorArea.removeFromTop(14));
+        workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 2 : 3);
     }
     else
     {
-        waveformLabel.setBounds(drawerEditorArea.removeFromTop(22));
-        drawerEditorArea.removeFromTop(2);
-        waveformScopeLabel.setBounds(drawerEditorArea.removeFromTop(14));
-        drawerEditorArea.removeFromTop(1);
-        drawerBreadcrumbLabel.setBounds(drawerEditorArea.removeFromTop(14));
-        drawerEditorArea.removeFromTop(3);
+        waveformLabel.setBounds(workbenchEditorArea.removeFromTop(22));
+        workbenchEditorArea.removeFromTop(2);
+        waveformScopeLabel.setBounds(workbenchEditorArea.removeFromTop(14));
+        workbenchEditorArea.removeFromTop(1);
+        workbenchBreadcrumbLabel.setBounds(workbenchEditorArea.removeFromTop(14));
+        workbenchEditorArea.removeFromTop(3);
     }
 
-    if (drawerState.activeTab == authoring::DrawerTab::waveform)
+    if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
     {
-        if (drawerEditorArea.getWidth() >= 620)
+        if (workbenchEditorArea.getWidth() >= 620)
         {
-            auto previewArea = drawerEditorArea.removeFromLeft(
-                std::max(320, static_cast<int>(drawerEditorArea.getWidth() * 0.58f)));
-            drawerEditorArea.removeFromLeft(std::min(12, drawerEditorArea.getWidth()));
+            auto previewArea = workbenchEditorArea.removeFromLeft(
+                std::max(320, static_cast<int>(workbenchEditorArea.getWidth() * 0.58f)));
+            workbenchEditorArea.removeFromLeft(std::min(12, workbenchEditorArea.getWidth()));
             waveformPreview.setBounds(previewArea);
 
-            auto metadataLeft = drawerEditorArea.removeFromLeft(
-                std::max(1, (drawerEditorArea.getWidth() - 10) / 2));
-            drawerEditorArea.removeFromLeft(std::min(10, drawerEditorArea.getWidth()));
-            auto metadataRight = drawerEditorArea;
+            auto metadataLeft = workbenchEditorArea.removeFromLeft(
+                std::max(1, (workbenchEditorArea.getWidth() - 10) / 2));
+            workbenchEditorArea.removeFromLeft(std::min(10, workbenchEditorArea.getWidth()));
+            auto metadataRight = workbenchEditorArea;
             waveformStatusLabel.setBounds(metadataLeft.removeFromTop(18));
             metadataLeft.removeFromTop(3);
             waveformInfoLabel.setBounds(metadataLeft.removeFromTop(18));
@@ -2978,30 +2978,30 @@ void AuthoringPanel::resized()
         }
         else
         {
-            const auto metadataHeight = std::min(84, drawerEditorArea.getHeight() / 2);
-            waveformPreview.setBounds(drawerEditorArea.removeFromTop(
-                std::max(1, drawerEditorArea.getHeight() - metadataHeight - 4)));
-            drawerEditorArea.removeFromTop(4);
-            waveformStatusLabel.setBounds(drawerEditorArea.removeFromTop(16));
-            waveformInfoLabel.setBounds(drawerEditorArea.removeFromTop(16));
-            loopInfoLabel.setBounds(drawerEditorArea.removeFromTop(16));
-            importMetricsLabel.setBounds(drawerEditorArea.removeFromTop(16));
-            sourceValidationButton.setBounds(drawerEditorArea.removeFromTop(std::min(20, drawerEditorArea.getHeight())));
-            sourceValidationLabel.setBounds(drawerEditorArea);
+            const auto metadataHeight = std::min(84, workbenchEditorArea.getHeight() / 2);
+            waveformPreview.setBounds(workbenchEditorArea.removeFromTop(
+                std::max(1, workbenchEditorArea.getHeight() - metadataHeight - 4)));
+            workbenchEditorArea.removeFromTop(4);
+            waveformStatusLabel.setBounds(workbenchEditorArea.removeFromTop(16));
+            waveformInfoLabel.setBounds(workbenchEditorArea.removeFromTop(16));
+            loopInfoLabel.setBounds(workbenchEditorArea.removeFromTop(16));
+            importMetricsLabel.setBounds(workbenchEditorArea.removeFromTop(16));
+            sourceValidationButton.setBounds(workbenchEditorArea.removeFromTop(std::min(20, workbenchEditorArea.getHeight())));
+            sourceValidationLabel.setBounds(workbenchEditorArea);
         }
     }
 
-    if (drawerState.activeTab == authoring::DrawerTab::groups)
+    if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
     {
-        const auto fieldRowHeight = groupDrawerInShortLayout ? 21 : (expanded ? 26 : 24);
-        const auto summaryRowHeight = groupDrawerInShortLayout ? 16 : (expanded ? 20 : 18);
-        const auto actionRowHeight = groupDrawerInShortLayout ? 24 : (expanded ? 30 : 28);
+        const auto fieldRowHeight = groupWorkbenchInShortLayout ? 21 : (expanded ? 26 : 24);
+        const auto summaryRowHeight = groupWorkbenchInShortLayout ? 16 : (expanded ? 20 : 18);
+        const auto actionRowHeight = groupWorkbenchInShortLayout ? 24 : (expanded ? 30 : 28);
 
-        auto row = drawerEditorArea.removeFromTop(fieldRowHeight);
+        auto row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutLabelAndField(row, groupNameLabel, groupNameEditor, 92);
-        drawerEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(2);
 
-        row = drawerEditorArea.removeFromTop(fieldRowHeight);
+        row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    masterGainLabel,
                                    masterGainSlider,
@@ -3009,9 +3009,9 @@ void AuthoringPanel::resized()
                                    groupVisibilityLabel,
                                    groupVisibilityToggle,
                                    74);
-        drawerEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(2);
 
-        row = drawerEditorArea.removeFromTop(fieldRowHeight);
+        row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    groupGainLabel,
                                    groupGainSlider,
@@ -3019,9 +3019,9 @@ void AuthoringPanel::resized()
                                    groupPanLabel,
                                    groupPanSlider,
                                    36);
-        drawerEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(2);
 
-        row = drawerEditorArea.removeFromTop(fieldRowHeight);
+        row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
                                    groupRoutingLabel,
                                    groupRoutingSelector,
@@ -3029,16 +3029,16 @@ void AuthoringPanel::resized()
                                    groupAnchorLabel,
                                    groupAnchorSelector,
                                    96);
-        drawerEditorArea.removeFromTop(2);
-        auto summaryRow = drawerEditorArea.removeFromTop(summaryRowHeight);
+        workbenchEditorArea.removeFromTop(2);
+        auto summaryRow = workbenchEditorArea.removeFromTop(summaryRowHeight);
         auto groupSummaryArea = summaryRow.removeFromLeft((summaryRow.getWidth() - 12) / 2);
         summaryRow.removeFromLeft(12);
         groupSummaryLabel.setBounds(groupSummaryArea);
         groupRoundRobinLabel.setBounds(summaryRow);
         groupRoundRobinHintLabel.setBounds({});
-        drawerEditorArea.removeFromTop(groupDrawerInShortLayout ? 3 : (expanded ? 6 : 4));
+        workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 3 : (expanded ? 6 : 4));
 
-        auto actionRow = drawerEditorArea.removeFromTop(actionRowHeight);
+        auto actionRow = workbenchEditorArea.removeFromTop(actionRowHeight);
         constexpr auto actionGap = 8;
         const auto deleteButtonWidth = expanded ? 136 : 128;
         auto deleteArea = actionRow.removeFromRight(std::min(deleteButtonWidth, actionRow.getWidth()));
@@ -3049,21 +3049,21 @@ void AuthoringPanel::resized()
         groupRoundRobinModeSelector.setBounds(actionRow);
         groupDeleteButton.setBounds(deleteArea);
     }
-    else if (drawerState.activeTab == authoring::DrawerTab::macros)
+    else if (workbenchState.activeTab == authoring::WorkbenchTab::macros)
     {
-        macroDrawerViewport.setBounds(drawerEditorArea);
+        macroWorkbenchViewport.setBounds(workbenchEditorArea);
         const auto macroContentWidth = std::max(420,
-                                                macroDrawerViewport.getWidth()
-                                                    - macroDrawerViewport.getScrollBarThickness());
+                                                macroWorkbenchViewport.getWidth()
+                                                    - macroWorkbenchViewport.getScrollBarThickness());
         const auto useMacroListDetail = !shortHeightLayout
             && macroContentWidth >= 680
-            && macroDrawerViewport.getHeight() >= 176;
+            && macroWorkbenchViewport.getHeight() >= 176;
         const auto macroContentHeight = useMacroListDetail
-            ? macroDrawerViewport.getHeight()
+            ? macroWorkbenchViewport.getHeight()
             : (expanded ? 196 : 176);
-        macroDrawerContent.setSize(macroContentWidth, macroContentHeight);
+        macroWorkbenchContent.setSize(macroContentWidth, macroContentHeight);
 
-        auto macroEditorArea = macroDrawerContent.getLocalBounds();
+        auto macroEditorArea = macroWorkbenchContent.getLocalBounds();
         if (useMacroListDetail)
         {
             constexpr auto columnGap = 14;
@@ -3162,22 +3162,22 @@ void AuthoringPanel::resized()
             }
         }
     }
-    else if (drawerState.activeTab == authoring::DrawerTab::routing)
+    else if (workbenchState.activeTab == authoring::WorkbenchTab::routing)
     {
-        routingDrawerViewport.setBounds(drawerEditorArea);
+        routingWorkbenchViewport.setBounds(workbenchEditorArea);
         const auto routingContentWidth = std::max(320,
-                                                  routingDrawerViewport.getWidth()
-                                                      - routingDrawerViewport.getScrollBarThickness());
+                                                  routingWorkbenchViewport.getWidth()
+                                                      - routingWorkbenchViewport.getScrollBarThickness());
         const auto useRoutingColumns = expanded
             && !shortHeightLayout
             && routingContentWidth >= 700
-            && routingDrawerViewport.getHeight() >= 190;
+            && routingWorkbenchViewport.getHeight() >= 190;
         const auto routingContentHeight = useRoutingColumns
-            ? std::max(244, routingDrawerViewport.getHeight() + 18)
+            ? std::max(244, routingWorkbenchViewport.getHeight() + 18)
             : (expanded ? 364 : 160);
-        routingDrawerContent.setSize(routingContentWidth, routingContentHeight);
+        routingWorkbenchContent.setSize(routingContentWidth, routingContentHeight);
 
-        auto routingEditorArea = routingDrawerContent.getLocalBounds().reduced(0, 0);
+        auto routingEditorArea = routingWorkbenchContent.getLocalBounds().reduced(0, 0);
         constexpr auto routingColumnGap = 12;
         auto splitRoutingRow = [=](juce::Rectangle<int> row)
         {
@@ -3311,24 +3311,24 @@ void AuthoringPanel::resized()
             }
         }
     }
-    else if (drawerState.activeTab == authoring::DrawerTab::performance)
+    else if (workbenchState.activeTab == authoring::WorkbenchTab::performance)
     {
-        if (drawerEditorArea.getWidth() < 420)
+        if (workbenchEditorArea.getWidth() < 420)
         {
-            performanceBankSelector.setBounds(drawerEditorArea.removeFromTop(28));
-            drawerEditorArea.removeFromTop(4);
-            triggerSlotSelector.setBounds(drawerEditorArea.removeFromTop(28));
+            performanceBankSelector.setBounds(workbenchEditorArea.removeFromTop(28));
+            workbenchEditorArea.removeFromTop(4);
+            triggerSlotSelector.setBounds(workbenchEditorArea.removeFromTop(28));
         }
         else
         {
-            auto selectorRow = drawerEditorArea.removeFromTop(28);
+            auto selectorRow = workbenchEditorArea.removeFromTop(28);
             performanceBankSelector.setBounds(selectorRow.removeFromLeft(280));
             selectorRow.removeFromLeft(10);
             triggerSlotSelector.setBounds(selectorRow.removeFromLeft(280));
         }
 
-        drawerEditorArea.removeFromTop(4);
-        auto row = drawerEditorArea.removeFromTop(28);
+        workbenchEditorArea.removeFromTop(4);
+        auto row = workbenchEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    triggerEventLabel,
                                    triggerEventSelector,
@@ -3336,9 +3336,9 @@ void AuthoringPanel::resized()
                                    targetArticulationLabel,
                                    targetArticulationSelector,
                                    72);
-        drawerEditorArea.removeFromTop(4);
+        workbenchEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(28);
+        row = workbenchEditorArea.removeFromTop(28);
         layoutDualLabelAndFieldRow(row,
                                    phraseAssetLabel,
                                    phraseAssetSelector,
@@ -3346,15 +3346,15 @@ void AuthoringPanel::resized()
                                    chordModeLabel,
                                    chordModeSelector,
                                    72);
-        drawerEditorArea.removeFromTop(4);
+        workbenchEditorArea.removeFromTop(4);
 
-        row = drawerEditorArea.removeFromTop(28);
+        row = workbenchEditorArea.removeFromTop(28);
         auto buttonArea = row.removeFromRight(180);
         row.removeFromRight(10);
         layoutLabelAndField(row, phraseImportPathLabel, phraseImportPathEditor, 56);
         phraseImportButton.setBounds(buttonArea);
-        drawerEditorArea.removeFromTop(4);
-        row = drawerEditorArea.removeFromTop(26);
+        workbenchEditorArea.removeFromTop(4);
+        row = workbenchEditorArea.removeFromTop(26);
         roundRobinResetLabel.setBounds(row.removeFromLeft(58));
         roundRobinResetSelector.setBounds(row.removeFromLeft(std::max(96, row.getWidth() / 4)));
         row.removeFromLeft(6);
@@ -3367,21 +3367,21 @@ void AuthoringPanel::resized()
         roundRobinResetDeleteButton.setBounds(row);
         if (expanded)
         {
-            drawerEditorArea.removeFromTop(6);
-            performanceSummaryLabel.setBounds(drawerEditorArea.removeFromTop(20));
-            drawerEditorArea.removeFromTop(4);
-            phraseSummaryLabel.setBounds(drawerEditorArea.removeFromTop(24));
-            drawerEditorArea.removeFromTop(2);
-            roundRobinResetSummaryLabel.setBounds(drawerEditorArea.removeFromTop(18));
+            workbenchEditorArea.removeFromTop(6);
+            performanceSummaryLabel.setBounds(workbenchEditorArea.removeFromTop(20));
+            workbenchEditorArea.removeFromTop(4);
+            phraseSummaryLabel.setBounds(workbenchEditorArea.removeFromTop(24));
+            workbenchEditorArea.removeFromTop(2);
+            roundRobinResetSummaryLabel.setBounds(workbenchEditorArea.removeFromTop(18));
         }
     }
-    else if (drawerState.activeTab == authoring::DrawerTab::articulations)
+    else if (workbenchState.activeTab == authoring::WorkbenchTab::articulations)
     {
-        articulationDrawerViewport.setBounds(drawerEditorArea);
+        articulationWorkbenchViewport.setBounds(workbenchEditorArea);
         const auto articulationContentWidth = std::max(420,
-            articulationDrawerViewport.getWidth() - articulationDrawerViewport.getScrollBarThickness());
-        articulationDrawerContent.setSize(articulationContentWidth, expanded ? 308 : 286);
-        auto editorArea = articulationDrawerContent.getLocalBounds();
+            articulationWorkbenchViewport.getWidth() - articulationWorkbenchViewport.getScrollBarThickness());
+        articulationWorkbenchContent.setSize(articulationContentWidth, expanded ? 308 : 286);
+        auto editorArea = articulationWorkbenchContent.getLocalBounds();
         auto actionRow = editorArea.removeFromTop(26);
         constexpr auto actionGap = 5;
         const auto actionWidth = std::max(48, (actionRow.getWidth() - actionGap * 5) / 6);
@@ -3536,7 +3536,7 @@ void AuthoringPanel::refreshNow()
     selectionSummaryViewModel = buildSelectionSummaryViewModel();
     summaryStrip.setViewModel(selectionSummaryViewModel);
     refreshDraftPlaybackBanner();
-    refreshWaveformDrawerContent();
+    refreshWaveformWorkbenchContent();
 }
 
 void AuthoringPanel::refreshDraftPlaybackBanner()
@@ -4301,26 +4301,26 @@ void AuthoringPanel::rebuildTriggerSlotSelector()
     triggerSlotSelector.setSelectedId(selectedTriggerSlotIndex + 1, juce::dontSendNotification);
 }
 
-void AuthoringPanel::setDrawerOpen(bool shouldOpen)
+void AuthoringPanel::setWorkbenchOpen(bool shouldOpen)
 {
-    if (drawerState.open == shouldOpen)
+    if (workbenchState.open == shouldOpen)
         return;
 
-    drawerState.open = shouldOpen;
+    workbenchState.open = shouldOpen;
     workbenchLayoutState.setOpen(shouldOpen);
-    refreshDrawerVisibility();
+    refreshWorkbenchVisibility();
     resized();
 }
 
-void AuthoringPanel::setActiveDrawerTab(authoring::DrawerTab nextTab)
+void AuthoringPanel::setActiveWorkbenchTab(authoring::WorkbenchTab nextTab)
 {
-    drawerState.activeTab = nextTab;
-    drawerState.open = true;
+    workbenchState.activeTab = nextTab;
+    workbenchState.open = true;
     workbenchLayoutState.suggestHeightForTab(nextTab);
     workbenchLayoutState.setOpen(true);
-    refreshDrawerVisibility();
+    refreshWorkbenchVisibility();
     resized();
-    if (drawerState.activeTab == authoring::DrawerTab::waveform)
+    if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
         requestWaveformPreviewLoad(true);
 }
 
@@ -4362,15 +4362,15 @@ void AuthoringPanel::timerCallback(int timerId)
         stopTimer(previewReleaseTimerId);
 }
 
-void AuthoringPanel::refreshDrawerVisibility()
+void AuthoringPanel::refreshWorkbenchVisibility()
 {
-    const auto waveformTab = drawerState.activeTab == authoring::DrawerTab::waveform;
-    const auto groupsTab = drawerState.activeTab == authoring::DrawerTab::groups;
-    const auto macrosTab = drawerState.activeTab == authoring::DrawerTab::macros;
-    const auto routingTab = drawerState.activeTab == authoring::DrawerTab::routing;
-    const auto performanceTab = drawerState.activeTab == authoring::DrawerTab::performance;
-    const auto articulationsTab = drawerState.activeTab == authoring::DrawerTab::articulations;
-    const auto drawerContentVisible = drawerState.open;
+    const auto waveformTab = workbenchState.activeTab == authoring::WorkbenchTab::waveform;
+    const auto groupsTab = workbenchState.activeTab == authoring::WorkbenchTab::groups;
+    const auto macrosTab = workbenchState.activeTab == authoring::WorkbenchTab::macros;
+    const auto routingTab = workbenchState.activeTab == authoring::WorkbenchTab::routing;
+    const auto performanceTab = workbenchState.activeTab == authoring::WorkbenchTab::performance;
+    const auto articulationsTab = workbenchState.activeTab == authoring::WorkbenchTab::articulations;
+    const auto workbenchContentVisible = workbenchState.open;
     const auto expanded = isExpandedLayout(layoutMode);
     const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
     const auto focusWithinWaveform = isComponentFocusedWithin(focusedComponent, waveformPreview)
@@ -4417,158 +4417,158 @@ void AuthoringPanel::refreshDrawerVisibility()
         || isComponentFocusedWithin(focusedComponent, chordModeSelector)
         || isComponentFocusedWithin(focusedComponent, phraseImportPathEditor)
         || isComponentFocusedWithin(focusedComponent, phraseImportButton);
-    const auto focusWithinArticulations = isComponentFocusedWithin(focusedComponent, articulationDrawerViewport)
+    const auto focusWithinArticulations = isComponentFocusedWithin(focusedComponent, articulationWorkbenchViewport)
         || isComponentFocusedWithin(focusedComponent, articulationList)
         || isComponentFocusedWithin(focusedComponent, articulationNameEditor)
         || isComponentFocusedWithin(focusedComponent, articulationSwitchNoteSlider)
         || isComponentFocusedWithin(focusedComponent, articulationMidiLearnButton);
 
-    refreshDrawerContextLabels();
+    refreshWorkbenchContextLabels();
 
-    drawerToggleButton.setButtonText(drawerState.open ? "Hide Drawer" : "Show Drawer");
-    drawerToggleButton.setTitle(drawerToggleButton.getButtonText());
-    setVisibleAndAccessible(drawerContentHost, drawerContentVisible);
-    setVisibleAndAccessible(workbenchSplitter, drawerContentVisible);
-    setVisibleAndAccessible(waveformLabel, drawerContentVisible);
-    setVisibleAndAccessible(waveformScopeLabel, drawerContentVisible);
-    setVisibleAndAccessible(drawerBreadcrumbLabel, drawerContentVisible);
-    setVisibleAndAccessible(waveformPreview, drawerContentVisible && waveformTab);
-    setVisibleAndAccessible(waveformStatusLabel, drawerContentVisible && waveformTab);
-    setVisibleAndAccessible(waveformInfoLabel, drawerContentVisible && waveformTab);
-    setVisibleAndAccessible(loopInfoLabel, drawerContentVisible && waveformTab);
-    setVisibleAndAccessible(importMetricsLabel, drawerContentVisible && waveformTab);
-    setVisibleAndAccessible(sourceValidationLabel, drawerContentVisible && waveformTab);
-    setVisibleAndAccessible(sourceValidationButton, drawerContentVisible && waveformTab);
+    workbenchToggleButton.setButtonText(workbenchState.open ? "Hide Workbench" : "Show Workbench");
+    workbenchToggleButton.setTitle(workbenchToggleButton.getButtonText());
+    setVisibleAndAccessible(workbenchContentHost, workbenchContentVisible);
+    setVisibleAndAccessible(workbenchSplitter, workbenchContentVisible);
+    setVisibleAndAccessible(waveformLabel, workbenchContentVisible);
+    setVisibleAndAccessible(waveformScopeLabel, workbenchContentVisible);
+    setVisibleAndAccessible(workbenchBreadcrumbLabel, workbenchContentVisible);
+    setVisibleAndAccessible(waveformPreview, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformStatusLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformInfoLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(loopInfoLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(importMetricsLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(sourceValidationLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(sourceValidationButton, workbenchContentVisible && waveformTab);
 
-    setVisibleAndAccessible(groupNameLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupNameEditor, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(masterGainLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(masterGainSlider, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupVisibilityLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupVisibilityToggle, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupGainLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupGainSlider, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupPanLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupPanSlider, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupRoutingLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupRoutingSelector, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupAnchorLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupAnchorSelector, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupDeleteButton, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupAssignZonesButton, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupSummaryLabel, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupRoundRobinLabel, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupNameLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupNameEditor, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(masterGainLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(masterGainSlider, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupVisibilityLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupVisibilityToggle, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupGainLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupGainSlider, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupPanLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupPanSlider, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoutingLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoutingSelector, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAnchorLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAnchorSelector, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupDeleteButton, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupAssignZonesButton, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupSummaryLabel, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinLabel, workbenchContentVisible && groupsTab);
     setVisibleAndAccessible(groupRoundRobinHintLabel, false);
-    setVisibleAndAccessible(groupRoundRobinToggle, drawerContentVisible && groupsTab);
-    setVisibleAndAccessible(groupRoundRobinModeSelector, drawerContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinToggle, workbenchContentVisible && groupsTab);
+    setVisibleAndAccessible(groupRoundRobinModeSelector, workbenchContentVisible && groupsTab);
 
-    setVisibleAndAccessible(macroDrawerViewport, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroList, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroCreateButton, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroDuplicateButton, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroDeleteButton, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroNameLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroNameEditor, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroExposeLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroExposeToggle, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroAssignmentLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroAssignmentSelector, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroRoleLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroRoleSelector, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroDefaultLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroDefaultSlider, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroMinLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroMinSlider, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroMaxLabel, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroMaxSlider, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroMoveUpButton, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroMoveDownButton, drawerContentVisible && macrosTab);
-    setVisibleAndAccessible(macroSummaryLabel, drawerContentVisible && macrosTab && expanded);
+    setVisibleAndAccessible(macroWorkbenchViewport, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroList, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroCreateButton, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDuplicateButton, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDeleteButton, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroNameLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroNameEditor, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroExposeLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroExposeToggle, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroAssignmentLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroAssignmentSelector, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroRoleLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroRoleSelector, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDefaultLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroDefaultSlider, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMinLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMinSlider, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMaxLabel, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMaxSlider, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMoveUpButton, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroMoveDownButton, workbenchContentVisible && macrosTab);
+    setVisibleAndAccessible(macroSummaryLabel, workbenchContentVisible && macrosTab && expanded);
 
-    setVisibleAndAccessible(routingDrawerViewport, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(fxSectionLabel, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(fxScopeLabel, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxScopeSelector, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxScopeBreadcrumbLabel, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxSelector, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(fxNameEditor, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxTypeLabel, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(fxTypeSelector, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(fxBypassedToggle, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(fxAddButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxDuplicateButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxMoveUpButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxMoveDownButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxDeleteButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxOwnerSelector, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxMoveOwnerButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterSelector, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterSlider, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterResetButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxAssignMacroButton, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterValueLabel, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxSummaryLabel, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxDiagnosticsLabel, drawerContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(routingSectionLabel, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingBusSelector, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingInputLabel, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingInputSelector, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingInsertOneLabel, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingInsertOneSelector, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingInsertTwoLabel, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingInsertTwoSelector, drawerContentVisible && routingTab);
-    setVisibleAndAccessible(routingSummaryLabel, drawerContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(routingWorkbenchViewport, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxSectionLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxScopeLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxScopeSelector, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxScopeBreadcrumbLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxNameEditor, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxTypeLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxTypeSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxBypassedToggle, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxAddButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxDuplicateButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxMoveUpButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxMoveDownButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxDeleteButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxOwnerSelector, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxMoveOwnerButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterSelector, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterSlider, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterResetButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxAssignMacroButton, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxParameterValueLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxSummaryLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxDiagnosticsLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(routingSectionLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingBusSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingInputLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingInputSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertOneLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertOneSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertTwoLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingInsertTwoSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(routingSummaryLabel, workbenchContentVisible && routingTab && expanded);
 
-    setVisibleAndAccessible(performanceBankSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(triggerSlotSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(triggerEventLabel, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(triggerEventSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(targetArticulationLabel, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(targetArticulationSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(phraseAssetLabel, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(phraseAssetSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(chordModeLabel, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(chordModeSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(phraseImportPathLabel, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(phraseImportPathEditor, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(phraseImportButton, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(performanceSummaryLabel, drawerContentVisible && performanceTab && expanded);
-    setVisibleAndAccessible(phraseSummaryLabel, drawerContentVisible && performanceTab && expanded);
-    setVisibleAndAccessible(roundRobinResetLabel, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(roundRobinResetSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(roundRobinResetEventSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(roundRobinResetTargetSelector, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(roundRobinResetAddButton, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(roundRobinResetDeleteButton, drawerContentVisible && performanceTab);
-    setVisibleAndAccessible(roundRobinResetSummaryLabel, drawerContentVisible && performanceTab && expanded);
+    setVisibleAndAccessible(performanceBankSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(triggerSlotSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(triggerEventLabel, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(triggerEventSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(targetArticulationLabel, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(targetArticulationSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseAssetLabel, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseAssetSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(chordModeLabel, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(chordModeSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseImportPathLabel, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseImportPathEditor, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(phraseImportButton, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(performanceSummaryLabel, workbenchContentVisible && performanceTab && expanded);
+    setVisibleAndAccessible(phraseSummaryLabel, workbenchContentVisible && performanceTab && expanded);
+    setVisibleAndAccessible(roundRobinResetLabel, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetEventSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetTargetSelector, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetAddButton, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetDeleteButton, workbenchContentVisible && performanceTab);
+    setVisibleAndAccessible(roundRobinResetSummaryLabel, workbenchContentVisible && performanceTab && expanded);
 
-    setVisibleAndAccessible(articulationDrawerViewport, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationList, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationCreateButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationDuplicateButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationDefaultButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationMoveUpButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationMoveDownButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationDeleteButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationNameLabel, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationNameEditor, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationSwitchNoteLabel, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationSwitchNoteSlider, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationSwitchNoteValueLabel, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationClearSwitchButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationMidiLearnButton, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationDeleteReassignLabel, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationDeleteReassignSelector, drawerContentVisible && articulationsTab);
-    setVisibleAndAccessible(articulationStatusLabel, drawerContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationWorkbenchViewport, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationList, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationCreateButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDuplicateButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDefaultButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationMoveUpButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationMoveDownButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDeleteButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationNameLabel, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationNameEditor, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationSwitchNoteLabel, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationSwitchNoteSlider, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationSwitchNoteValueLabel, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationClearSwitchButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationMidiLearnButton, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDeleteReassignLabel, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationDeleteReassignSelector, workbenchContentVisible && articulationsTab);
+    setVisibleAndAccessible(articulationStatusLabel, workbenchContentVisible && articulationsTab);
 
-    drawerWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
-    drawerGroupsTabButton.setToggleState(groupsTab, juce::dontSendNotification);
-    drawerMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
-    drawerRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
-    drawerPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
-    drawerArticulationsTabButton.setToggleState(articulationsTab, juce::dontSendNotification);
+    workbenchWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
+    workbenchGroupsTabButton.setToggleState(groupsTab, juce::dontSendNotification);
+    workbenchMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
+    workbenchRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
+    workbenchPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
+    workbenchArticulationsTabButton.setToggleState(articulationsTab, juce::dontSendNotification);
 
-    const auto focusedDrawerContentBecameHidden = !drawerContentVisible
+    const auto focusedWorkbenchContentBecameHidden = !workbenchContentVisible
         ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
         : (waveformTab ? (focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
                        : groupsTab ? (focusWithinWaveform || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
@@ -4577,22 +4577,22 @@ void AuthoringPanel::refreshDrawerVisibility()
                                                             : performanceTab ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinArticulations)
                                                                              : (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance));
 
-    if (focusedDrawerContentBecameHidden)
+    if (focusedWorkbenchContentBecameHidden)
     {
-        if (!drawerContentVisible)
-            drawerToggleButton.grabKeyboardFocus();
+        if (!workbenchContentVisible)
+            workbenchToggleButton.grabKeyboardFocus();
         else if (waveformTab)
-            drawerWaveformTabButton.grabKeyboardFocus();
+            workbenchWaveformTabButton.grabKeyboardFocus();
         else if (groupsTab)
-            drawerGroupsTabButton.grabKeyboardFocus();
+            workbenchGroupsTabButton.grabKeyboardFocus();
         else if (macrosTab)
-            drawerMacrosTabButton.grabKeyboardFocus();
+            workbenchMacrosTabButton.grabKeyboardFocus();
         else if (routingTab)
-            drawerRoutingTabButton.grabKeyboardFocus();
+            workbenchRoutingTabButton.grabKeyboardFocus();
         else if (performanceTab)
-            drawerPerformanceTabButton.grabKeyboardFocus();
+            workbenchPerformanceTabButton.grabKeyboardFocus();
         else
-            drawerArticulationsTabButton.grabKeyboardFocus();
+            workbenchArticulationsTabButton.grabKeyboardFocus();
     }
 }
 
@@ -5097,33 +5097,33 @@ void AuthoringPanel::refreshInspectorVisibility()
     zoneMap.setVisible(true);
     zoneMappingEditor.setVisible(true);
 
-    refreshDrawerVisibility();
+    refreshWorkbenchVisibility();
 }
 
-void AuthoringPanel::refreshDrawerContextLabels()
+void AuthoringPanel::refreshWorkbenchContextLabels()
 {
     const auto& project = authoringSession.getProject();
 
-    switch (drawerState.activeTab)
+    switch (workbenchState.activeTab)
     {
-        case authoring::DrawerTab::waveform:
+        case authoring::WorkbenchTab::waveform:
         {
             waveformLabel.setText("Waveform Detail", juce::dontSendNotification);
             waveformScopeLabel.setText("Zone-scoped selection detail", juce::dontSendNotification);
 
             if (const auto selectedZone = authoringSession.getSelectedZone(); selectedZone.has_value())
             {
-                drawerBreadcrumbLabel.setText("Project > Zones > "
+                workbenchBreadcrumbLabel.setText("Project > Zones > "
                                                   + juce::String::fromUTF8(selectedZone->displayName.c_str()),
                                               juce::dontSendNotification);
             }
             else
             {
-                drawerBreadcrumbLabel.setText("Project > Zones", juce::dontSendNotification);
+                workbenchBreadcrumbLabel.setText("Project > Zones", juce::dontSendNotification);
             }
             break;
         }
-        case authoring::DrawerTab::macros:
+        case authoring::WorkbenchTab::macros:
         {
             waveformLabel.setText("Macro Assignment", juce::dontSendNotification);
             waveformScopeLabel.setText("Project-scoped automation detail", juce::dontSendNotification);
@@ -5135,10 +5135,10 @@ void AuthoringPanel::refreshDrawerContextLabels()
                 breadcrumb << " > "
                            << juce::String::fromUTF8(project.authoring.macros[static_cast<std::size_t>(selectedMacroIndex)].name.c_str());
             }
-            drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
+            workbenchBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
             break;
         }
-        case authoring::DrawerTab::groups:
+        case authoring::WorkbenchTab::groups:
         {
             waveformLabel.setText("Group Inspector", juce::dontSendNotification);
             waveformScopeLabel.setText("Group-scoped mix and visibility detail", juce::dontSendNotification);
@@ -5147,10 +5147,10 @@ void AuthoringPanel::refreshDrawerContextLabels()
             if (const auto selectedGroup = authoringSession.getSelectedGroup(); selectedGroup.has_value())
                 breadcrumb << " > " << juce::String::fromUTF8(selectedGroup->displayName.c_str());
 
-            drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
+            workbenchBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
             break;
         }
-        case authoring::DrawerTab::routing:
+        case authoring::WorkbenchTab::routing:
         {
             waveformLabel.setText("Routing Detail", juce::dontSendNotification);
             waveformScopeLabel.setText("Project-scoped FX and bus detail", juce::dontSendNotification);
@@ -5169,11 +5169,11 @@ void AuthoringPanel::refreshDrawerContextLabels()
                 busName = juce::String::fromUTF8(project.authoring.routingBuses[static_cast<std::size_t>(selectedRoutingBusIndex)].displayName.c_str());
             }
 
-            drawerBreadcrumbLabel.setText("Project > Routing > FX: " + fxName + " | Bus: " + busName,
+            workbenchBreadcrumbLabel.setText("Project > Routing > FX: " + fxName + " | Bus: " + busName,
                                           juce::dontSendNotification);
             break;
         }
-        case authoring::DrawerTab::performance:
+        case authoring::WorkbenchTab::performance:
         {
             waveformLabel.setText("Performance Detail", juce::dontSendNotification);
 
@@ -5196,16 +5196,16 @@ void AuthoringPanel::refreshDrawerContextLabels()
                     waveformScopeLabel.setText("Bank-scoped performance detail", juce::dontSendNotification);
                 }
 
-                drawerBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
+                workbenchBreadcrumbLabel.setText(breadcrumb, juce::dontSendNotification);
             }
             else
             {
                 waveformScopeLabel.setText("Bank-scoped performance detail", juce::dontSendNotification);
-                drawerBreadcrumbLabel.setText("Project > Performance", juce::dontSendNotification);
+                workbenchBreadcrumbLabel.setText("Project > Performance", juce::dontSendNotification);
             }
             break;
         }
-        case authoring::DrawerTab::articulations:
+        case authoring::WorkbenchTab::articulations:
         {
             waveformLabel.setText("Articulation Detail", juce::dontSendNotification);
             waveformScopeLabel.setText("Project-scoped articulation and key-switch detail",
@@ -5215,7 +5215,7 @@ void AuthoringPanel::refreshDrawerContextLabels()
                     && static_cast<std::size_t>(selectedArticulationIndex) < articulations.size()
                 ? juce::String::fromUTF8(articulations[static_cast<std::size_t>(selectedArticulationIndex)].displayName.c_str())
                 : juce::String("(none)");
-            drawerBreadcrumbLabel.setText("Project > Articulations > " + name,
+            workbenchBreadcrumbLabel.setText("Project > Articulations > " + name,
                                           juce::dontSendNotification);
             break;
         }
@@ -5223,12 +5223,12 @@ void AuthoringPanel::refreshDrawerContextLabels()
             break;
     }
 
-    updateDynamicAccessibleText(waveformLabel, waveformLabel.getText(), "Active drawer title: ");
-    updateDynamicAccessibleText(waveformScopeLabel, waveformScopeLabel.getText(), "Active drawer scope: ");
-    updateDynamicAccessibleText(drawerBreadcrumbLabel, drawerBreadcrumbLabel.getText(), "Active drawer breadcrumb: ");
+    updateDynamicAccessibleText(waveformLabel, waveformLabel.getText(), "Active workbench title: ");
+    updateDynamicAccessibleText(waveformScopeLabel, waveformScopeLabel.getText(), "Active workbench scope: ");
+    updateDynamicAccessibleText(workbenchBreadcrumbLabel, workbenchBreadcrumbLabel.getText(), "Active workbench breadcrumb: ");
 }
 
-void AuthoringPanel::refreshWaveformDrawerContent()
+void AuthoringPanel::refreshWaveformWorkbenchContent()
 {
     AuthoringWaveformPreview preview;
     if (waveformPreviewProvider)
@@ -6053,7 +6053,7 @@ void AuthoringPanel::refreshFromSession()
                                 "Phrase summary: ");
     refreshContextualAccessibility();
 
-    refreshWaveformDrawerContent();
+    refreshWaveformWorkbenchContent();
     refreshInspectorVisibility();
     observedDocumentRevision = authoringSession.getDocumentState().revision;
     observedWorkspaceSelectionRevision = authoringSession.getWorkspaceSelectionRevision();
@@ -6125,8 +6125,8 @@ void AuthoringPanel::refreshSelectionFromSession()
             juce::dontSendNotification);
     }
 
-    refreshWaveformDrawerContent();
-    refreshDrawerContextLabels();
+    refreshWaveformWorkbenchContent();
+    refreshWorkbenchContextLabels();
     observedDocumentRevision = authoringSession.getDocumentState().revision;
     observedWorkspaceSelectionRevision = authoringSession.getWorkspaceSelectionRevision();
     hasObservedSessionRevisions = true;
@@ -6283,7 +6283,7 @@ void AuthoringPanel::createGroup()
     const auto result = authoringSession.createGroup(group, "Create group");
     if (result.applied)
     {
-        setActiveDrawerTab(authoring::DrawerTab::groups);
+        setActiveWorkbenchTab(authoring::WorkbenchTab::groups);
         refreshFromSession();
     }
     else
@@ -6785,7 +6785,7 @@ void AuthoringPanel::createMacro()
     const auto result = authoringSession.createMacro(macro, "Create macro");
     if (result.applied)
     {
-        setActiveDrawerTab(authoring::DrawerTab::macros);
+        setActiveWorkbenchTab(authoring::WorkbenchTab::macros);
         refreshFromSession();
         return;
     }
@@ -7031,7 +7031,7 @@ void AuthoringPanel::assignSelectedFxParameterToMacro()
         existingMacroIndex.has_value())
     {
         authoringSession.selectMacro(project.authoring.macros[*existingMacroIndex].id);
-        setActiveDrawerTab(authoring::DrawerTab::macros);
+        setActiveWorkbenchTab(authoring::WorkbenchTab::macros);
         refreshFromSession();
         return;
     }
@@ -7132,7 +7132,7 @@ void AuthoringPanel::assignSelectedFxParameterToMacro()
         return;
     }
 
-    setActiveDrawerTab(authoring::DrawerTab::macros);
+    setActiveWorkbenchTab(authoring::WorkbenchTab::macros);
     refreshFromSession();
 }
 

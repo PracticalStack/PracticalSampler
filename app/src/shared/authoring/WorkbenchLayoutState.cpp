@@ -30,12 +30,12 @@ void WorkbenchLayoutState::requestFocused() noexcept
     open = true;
 }
 
-void WorkbenchLayoutState::suggestHeightForTab(const DrawerTab tab) noexcept
+void WorkbenchLayoutState::suggestHeightForTab(const WorkbenchTab tab) noexcept
 {
     if (userHeightSet)
         return;
 
-    rememberedHeight = tab == DrawerTab::waveform
+    rememberedHeight = tab == WorkbenchTab::waveform
         ? standardDefaultHeight
         : focusedDefaultHeight;
 }

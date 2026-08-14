@@ -31,7 +31,7 @@ public:
     void setUserHeight(int height) noexcept;
     void requestStandard() noexcept;
     void requestFocused() noexcept;
-    void suggestHeightForTab(DrawerTab tab) noexcept;
+    void suggestHeightForTab(WorkbenchTab tab) noexcept;
 
     int getRememberedHeight() const noexcept { return rememberedHeight; }
     bool hasUserHeight() const noexcept { return userHeightSet; }

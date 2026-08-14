@@ -118,13 +118,13 @@ int main()
         require(session.getSelectedPerformanceBank()->triggerSlots[0].chordMode == "preserve-intervals",
                 "Trigger-slot chord mode did not persist in the authoring session.");
         require(session.undo().applied,
-                "Performance-bank edits should remain undoable after the UI25-402 drawer migration.");
+                "Performance-bank edits should remain undoable after the UI25-402 workbench migration.");
         require(session.getSelectedPerformanceBank()->phraseAssets.size() == 1,
                 "Undo should restore the pre-import performance-bank phrase library.");
         require(session.getSelectedPerformanceBank()->triggerSlots[0].phraseAssetId == "writer-bank-c-major",
                 "Undo should restore the pre-import trigger-slot phrase wiring.");
         require(session.redo().applied,
-                "Performance-bank edits should remain redoable after the UI25-402 drawer migration.");
+                "Performance-bank edits should remain redoable after the UI25-402 workbench migration.");
         require(session.getSelectedPerformanceBank()->phraseAssets.size() == 2,
                 "Redo should restore the imported performance-bank phrase library.");
         require(session.getSelectedPerformanceBank()->triggerSlots[0].phraseAssetId == "writer-bank-imported",
@@ -150,8 +150,8 @@ int main()
         pluginTabs->setCurrentTabIndex(1);
         require(findDescendantById(*editor, "authoringModeSelector") == nullptr,
                 "Plugin authoring shell should retire the temporary mode selector after UI25-402.");
-        require(findDescendantById(*editor, "authoringDrawerPerformanceTab") != nullptr,
-                "Plugin authoring shell should expose the performance drawer tab.");
+        require(findDescendantById(*editor, "authoringWorkbenchPerformanceTab") != nullptr,
+                "Plugin authoring shell should expose the performance workbench tab.");
         require(findDescendantById(*editor, "authoringPerformanceBankSelector") != nullptr,
                 "Plugin authoring shell should expose the Sprint 6 performance-bank selector.");
         require(findDescendantById(*editor, "authoringTriggerSlotSelector") != nullptr,
@@ -167,8 +167,8 @@ int main()
         standaloneTabs->setCurrentTabIndex(1);
         require(findDescendantById(standalone, "authoringModeSelector") == nullptr,
                 "Standalone authoring shell should retire the temporary mode selector after UI25-402.");
-        require(findDescendantById(standalone, "authoringDrawerPerformanceTab") != nullptr,
-                "Standalone authoring shell should expose the performance drawer tab.");
+        require(findDescendantById(standalone, "authoringWorkbenchPerformanceTab") != nullptr,
+                "Standalone authoring shell should expose the performance workbench tab.");
         require(findDescendantById(standalone, "authoringPerformanceBankSelector") != nullptr,
                 "Standalone authoring shell should expose the Sprint 6 performance-bank selector.");
         require(findDescendantById(standalone, "authoringTriggerSlotSelector") != nullptr,

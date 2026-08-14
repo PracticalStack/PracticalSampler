@@ -25,10 +25,10 @@ inline constexpr int expandedInspectorMinWidth = 320;
 inline constexpr int expandedInspectorPreferredWidth = 340;
 inline constexpr int expandedInspectorMaxWidth = 360;
 inline constexpr int minimumMapVisibleHeight = 160;
-inline constexpr int drawerTabStripHeight = 36;
-inline constexpr int compactDrawerOpenHeight = 220;
-inline constexpr int expandedDrawerOpenHeight = 250;
-inline constexpr int macroDrawerOpenHeight = 272;
+inline constexpr int workbenchTabStripHeight = 36;
+inline constexpr int compactWorkbenchOpenHeight = 220;
+inline constexpr int expandedWorkbenchOpenHeight = 250;
+inline constexpr int macroWorkbenchOpenHeight = 272;
 inline constexpr int shortHeightBreakpoint = 650;
-inline constexpr int shortInspectorDrawerOpenHeight = 184;
+inline constexpr int shortInspectorWorkbenchOpenHeight = 184;
 } // namespace drs::app::authoring

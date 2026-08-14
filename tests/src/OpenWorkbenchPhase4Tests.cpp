@@ -103,7 +103,7 @@ void qualifyAuthoringSurfaceAndStates()
                 && summaryTitle->findColour(juce::Label::textColourId) == visual::text,
             "The authoring summary title must no longer depend on a dark background.");
 
-    auto* tab = dynamic_cast<juce::Button*>(findDescendantById(panel, "authoringDrawerWaveformTab"));
+    auto* tab = dynamic_cast<juce::Button*>(findDescendantById(panel, "authoringWorkbenchWaveformTab"));
     require(tab != nullptr,
             "Phase 4 qualification could not locate the shared workbench tabs.");
     require(tab->findColour(juce::TextButton::buttonColourId) == visual::surfaceRaised

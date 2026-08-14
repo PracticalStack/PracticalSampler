@@ -75,21 +75,49 @@ std::vector<float> renderSelectedZonePreview(const std::string& zoneId)
 
     const auto zone = processor.getAuthoringSession().getSelectedZone();
     require(zone.has_value(), "Selected zone should remain available during playback validation.");
-    require(processor.serviceMessageThreadWork(),
-            "Selected-zone playback should normalize the new Preview route off the audio thread.");
-
-    processor.queueAuthoringPreviewNoteOn(zone->rootKey, 0.8f);
-
+    const auto selectedRevision = processor.getAuthoringSession().getDocumentState().revision;
+    processor.requestAuthoringPreview(drs::engine::AuthoringPreviewScope::selectedZone);
     juce::AudioBuffer<float> buffer(2, 512);
     juce::MidiBuffer midiBuffer;
-    processor.processBlock(buffer, midiBuffer);
-
-    std::vector<float> rendered;
-    rendered.reserve(static_cast<std::size_t>(buffer.getNumChannels() * buffer.getNumSamples()));
-    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+    auto servicedPreviewRoute = false;
+    auto previewRouteReady = false;
+    const auto previewDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < previewDeadline)
     {
-        for (int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); ++sampleIndex)
-            rendered.push_back(buffer.getSample(channel, sampleIndex));
+        servicedPreviewRoute = processor.serviceMessageThreadWork() || servicedPreviewRoute;
+        buffer.clear();
+        midiBuffer.clear();
+        processor.processBlock(buffer, midiBuffer);
+        servicedPreviewRoute = processor.serviceMessageThreadWork() || servicedPreviewRoute;
+        const auto previewStatus = processor.getAuthoringPreviewStatusSnapshot();
+        if (previewStatus.activationState == drs::engine::AuthoringPreviewActivationState::active
+            && previewStatus.activeRevision == selectedRevision
+            && previewStatus.selectedZoneId == zone->id)
+        {
+            previewRouteReady = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    require(servicedPreviewRoute && previewRouteReady,
+            "Selected-zone playback should prepare and activate the on-demand Preview route off the audio thread.");
+
+    processor.queueAuthoringPreviewNoteOn(std::clamp(zone->rootKey, zone->keyLow, zone->keyHigh), 0.8f);
+    std::vector<float> rendered;
+    constexpr int renderBlockCount = 8;
+    rendered.reserve(static_cast<std::size_t>(buffer.getNumChannels()
+                                              * buffer.getNumSamples()
+                                              * renderBlockCount));
+    for (int block = 0; block < renderBlockCount; ++block)
+    {
+        buffer.clear();
+        midiBuffer.clear();
+        processor.processBlock(buffer, midiBuffer);
+        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+        {
+            for (int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); ++sampleIndex)
+                rendered.push_back(buffer.getSample(channel, sampleIndex));
+        }
     }
 
     return rendered;
@@ -108,6 +136,14 @@ bool buffersDiffer(const std::vector<float>& first, const std::vector<float>& se
     }
 
     return false;
+}
+
+float bufferPeak(const std::vector<float>& buffer)
+{
+    auto peak = 0.0f;
+    for (const auto sample : buffer)
+        peak = std::max(peak, std::abs(sample));
+    return peak;
 }
 
 fs::path makeScratchDirectory()
@@ -458,6 +494,8 @@ int main()
 
         const auto leadRender = renderSelectedZonePreview("lead-a4-sustain");
         const auto padRender = renderSelectedZonePreview("pad-a3-high");
+        std::cout << "Waveform selected-zone playback peaks: lead=" << bufferPeak(leadRender)
+                  << " pad=" << bufferPeak(padRender) << '\n';
         require(buffersDiffer(leadRender, padRender),
                 "Selected-zone playback should render different audio for different authoring samples.");
 

@@ -374,7 +374,7 @@ void requireRetiredTemporaryIdsAbsent(juce::Component& root)
 {
     for (const auto& componentId : {
              juce::String("authoringModeSelector"),
-             juce::String("authoringDrawerPlaceholder"),
+             juce::String("authoringWorkbenchPlaceholder"),
              juce::String("authoringMacroSelector")
          })
     {
@@ -1199,15 +1199,15 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Toolbar row: authoringZoneSelector\n";
     inventory << "- Persistent map: authoringZoneMap\n";
     inventory << "- Zone Map context menu: Delete Selected Sample\n";
-    inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
-    inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
+    inventory << "- Workbench host: authoringWorkbench, authoringWorkbenchTabStrip, authoringWorkbenchToggleButton\n";
+    inventory << "- Workbench tabs: authoringWorkbenchWaveformTab, authoringWorkbenchMacrosTab, authoringWorkbenchRoutingTab, authoringWorkbenchPerformanceTab\n";
     inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringReleaseSecondsSlider, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
-    inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
-    inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
-    inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroCreateButton, authoringMacroDuplicateButton, authoringMacroDeleteButton, authoringMacroNameEditor, authoringMacroExposeToggle, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
-    inventory << "- Routing drawer content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
-    inventory << "- Performance drawer content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
-    inventory << "- Retired temporary IDs absent: authoringModeSelector, authoringDrawerPlaceholder, authoringMacroSelector\n";
+    inventory << "- Workbench context: authoringWorkbenchTitleLabel, authoringWorkbenchScopeLabel, authoringWorkbenchBreadcrumbLabel\n";
+    inventory << "- Waveform workbench content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
+    inventory << "- Macros workbench content: authoringMacroList, authoringMacroListBox, authoringMacroCreateButton, authoringMacroDuplicateButton, authoringMacroDeleteButton, authoringMacroNameEditor, authoringMacroExposeToggle, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
+    inventory << "- Routing workbench content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
+    inventory << "- Performance workbench content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
+    inventory << "- Retired temporary IDs absent: authoringModeSelector, authoringWorkbenchPlaceholder, authoringMacroSelector\n";
     inventory << "\n";
 }
 
@@ -1273,13 +1273,13 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringPlaybackBannerLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringPlaybackBannerPrepareButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringZoneMap", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawer", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerTabStrip", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerToggleButton", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerWaveformTab", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerMacrosTab", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerRoutingTab", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerPerformanceTab", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbench", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchTabStrip", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchToggleButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchWaveformTab", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchMacrosTab", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchRoutingTab", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchPerformanceTab", panelBounds);
     requireComponentVisibleWithin(panel, "authoringPreviewButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringUndoButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringRedoButton", panelBounds);
@@ -1289,15 +1289,15 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
             "Authoring shell must preserve the minimum visible map height.");
 
     if (surfaceId == 2)
-        requireButton(panel, "authoringDrawerMacrosTab").onClick();
+        requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
     else if (surfaceId == 3)
-        requireButton(panel, "authoringDrawerRoutingTab").onClick();
+        requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     else if (surfaceId == 4)
-        requireButton(panel, "authoringDrawerPerformanceTab").onClick();
+        requireButton(panel, "authoringWorkbenchPerformanceTab").onClick();
     else if (surfaceId == 1
-             && requireButton(panel, "authoringDrawerToggleButton").getButtonText() == "Hide Drawer")
+             && requireButton(panel, "authoringWorkbenchToggleButton").getButtonText() == "Hide Workbench")
     {
-        requireButton(panel, "authoringDrawerToggleButton").onClick();
+        requireButton(panel, "authoringWorkbenchToggleButton").onClick();
     }
 
     switch (surfaceId)
@@ -1389,32 +1389,32 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
             requireComponentVisibleWithin(panel, "authoringMacroList", panelBounds);
             requireComponentVisibleWithin(panel, "authoringMacroAssignmentSelector", panelBounds);
             requireComponentVisibleWithin(panel, "authoringMacroRoleSelector", panelBounds);
-            require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString().find("Project-scoped")
+            require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                         != std::string::npos,
-                    "Macros drawer should expose explicit project scope vocabulary.");
-            require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find("Project > Macros >")
+                    "Macros workbench should expose explicit project scope vocabulary.");
+            require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find("Project > Macros >")
                         != std::string::npos,
-                    "Macros drawer should expose a breadcrumb for the selected macro.");
+                    "Macros workbench should expose a breadcrumb for the selected macro.");
             break;
         case 3:
             requireComponentVisibleWithin(panel, "authoringFxSelector", panelBounds);
             requireComponentVisibleWithin(panel, "authoringRoutingSelector", panelBounds);
-            require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString().find("Project-scoped")
+            require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                         != std::string::npos,
-                    "Routing drawer should expose explicit project scope vocabulary.");
-            require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find("Project > Routing >")
+                    "Routing workbench should expose explicit project scope vocabulary.");
+            require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find("Project > Routing >")
                         != std::string::npos,
-                    "Routing drawer should expose a breadcrumb for the selected FX and bus.");
+                    "Routing workbench should expose a breadcrumb for the selected FX and bus.");
             break;
         case 4:
             requireComponentVisibleWithin(panel, "authoringPerformanceBankSelector", panelBounds);
             requireComponentVisibleWithin(panel, "authoringTriggerSlotSelector", panelBounds);
-            require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString().find("Bank-scoped")
+            require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Bank-scoped")
                         != std::string::npos,
-                    "Performance drawer should expose explicit bank/trigger scope vocabulary.");
-            require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find("Project > Performance >")
+                    "Performance workbench should expose explicit bank/trigger scope vocabulary.");
+            require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find("Project > Performance >")
                         != std::string::npos,
-                    "Performance drawer should expose a breadcrumb for the selected bank and trigger.");
+                    "Performance workbench should expose a breadcrumb for the selected bank and trigger.");
             break;
         default:
             require(false, "Unexpected authoring mode ID.");
@@ -1425,8 +1425,8 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
     for (const auto& componentId : {
              juce::String("authoringWorkspace"),
              juce::String("authoringZoneSelector"),
-             juce::String("authoringDrawer"),
-             juce::String("authoringDrawerTabStrip"),
+             juce::String("authoringWorkbench"),
+             juce::String("authoringWorkbenchTabStrip"),
              juce::String("authoringWaveformPreview"),
              juce::String("authoringZoneMap"),
              juce::String("authoringGainSlider"),
@@ -1518,7 +1518,7 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
     saveComponentPng(panel, outputDirectory / (shellName + "-" + surfaceName + ".png"));
 }
 
-void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
+void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
                             const std::string& shellName,
                             std::vector<std::string>& baselineFindings,
                             drs::app::AuthoringSourceValidationSnapshot& validationSnapshot,
@@ -1526,19 +1526,19 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
                             int& validationCancelCount)
 {
     const auto panelBounds = panel.getLocalBounds();
-    auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
-    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
-    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& toggleButton = requireButton(panel, "authoringWorkbenchToggleButton");
+    auto& waveformTabButton = requireButton(panel, "authoringWorkbenchWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
     auto* zoneSelector = dynamic_cast<juce::ComboBox*>(findDescendantById(panel, "authoringZoneSelector"));
 
-    require(zoneSelector != nullptr, "Drawer behavior checks require the zone selector.");
+    require(zoneSelector != nullptr, "Workbench behavior checks require the zone selector.");
 
     if (shellName == "compact")
     {
         require(!requireSlider(panel, "authoringRootKeySlider").getBounds().isEmpty(),
-                "Compact shell should still lay out mapping controls before drawer checks.");
+                "Compact shell should still lay out mapping controls before workbench checks.");
         require(!findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
-                "Compact shell should begin with the drawer content hidden.");
+                "Compact shell should begin with the workbench content hidden.");
         toggleButton.onClick();
         requireComponentVisibleWithin(panel, "authoringWaveformPreview", panelBounds);
     }
@@ -1547,9 +1547,9 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
         requireComponentVisibleWithin(panel, "authoringWaveformPreview", panelBounds);
     }
 
-    requireComponentVisibleWithin(panel, "authoringDrawerTitleLabel", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerScopeLabel", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringDrawerBreadcrumbLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchTitleLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchScopeLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWorkbenchBreadcrumbLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformStatusLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformInfoLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopLabel", panelBounds);
@@ -1560,89 +1560,89 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
     const auto initialZoneId = zoneSelector->getSelectedId();
     const auto alternateZoneId = initialZoneId == 2 ? 1 : 2;
     require(alternateZoneId != initialZoneId,
-            "Drawer behavior checks require at least two selectable zones.");
-    const auto initialWaveformScope = requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString();
-    const auto initialWaveformBreadcrumb = requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString();
+            "Workbench behavior checks require at least two selectable zones.");
+    const auto initialWaveformScope = requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString();
+    const auto initialWaveformBreadcrumb = requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString();
     const auto initialWaveformInfo = requireLabel(panel, "authoringWaveformInfoLabel").getText().toStdString();
     require(requireLabel(panel, "authoringWaveformImportLabel").getText().containsIgnoreCase("completed"),
-            "Waveform drawer import metrics should expose the current responsiveness state.");
+            "Waveform workbench import metrics should expose the current responsiveness state.");
     require(requireLabel(panel, "authoringWaveformValidationLabel").getText().containsIgnoreCase("completed"),
-            "Waveform drawer source validation status should expose the current validation state.");
+            "Waveform workbench source validation status should expose the current validation state.");
     require(requireButton(panel, "authoringWaveformValidationButton").getButtonText() == "Validate Sources",
-            "Waveform drawer should start with an explicit validation request action.");
+            "Waveform workbench should start with an explicit validation request action.");
     require(initialWaveformScope.find("Zone-scoped") != std::string::npos,
-            "Waveform drawer should expose explicit zone scope vocabulary.");
+            "Waveform workbench should expose explicit zone scope vocabulary.");
     require(initialWaveformBreadcrumb.find("Project > Zones >") != std::string::npos,
-            "Waveform drawer should expose a breadcrumb for the selected zone.");
+            "Waveform workbench should expose a breadcrumb for the selected zone.");
 
     requireButton(panel, "authoringWaveformValidationButton").onClick();
     require(validationRequestCount == 1,
-            "Waveform drawer validation button should issue an explicit validation request.");
+            "Waveform workbench validation button should issue an explicit validation request.");
     require(requireLabel(panel, "authoringWaveformValidationLabel").getText().containsIgnoreCase("active"),
-            "Waveform drawer validation label should update when validation becomes active.");
+            "Waveform workbench validation label should update when validation becomes active.");
     require(requireButton(panel, "authoringWaveformValidationButton").getButtonText() == "Cancel Validation",
-            "Waveform drawer validation button should switch to a cancel action while active.");
+            "Waveform workbench validation button should switch to a cancel action while active.");
 
     requireButton(panel, "authoringWaveformValidationButton").onClick();
     require(validationCancelCount == 1,
-            "Waveform drawer validation button should cancel an active validation request.");
+            "Waveform workbench validation button should cancel an active validation request.");
     require(validationSnapshot.state == "canceled",
             "Validation cancel test fixture should transition into the canceled state.");
     require(requireLabel(panel, "authoringWaveformValidationLabel").getText().containsIgnoreCase("canceled"),
-            "Waveform drawer validation label should update when validation is canceled.");
+            "Waveform workbench validation label should update when validation is canceled.");
     require(requireButton(panel, "authoringWaveformValidationButton").getButtonText() == "Validate Sources",
-            "Waveform drawer validation button should return to an explicit request action after cancellation.");
+            "Waveform workbench validation button should return to an explicit request action after cancellation.");
 
     zoneSelector->setSelectedId(alternateZoneId, juce::sendNotificationSync);
     require(waveformTabButton.getToggleState(),
-            "Changing zones should not change the active waveform drawer tab.");
+            "Changing zones should not change the active waveform workbench tab.");
     require(findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
-            "Changing zones should not collapse an open waveform drawer.");
+            "Changing zones should not collapse an open waveform workbench.");
     require(requireLabel(panel, "authoringWaveformInfoLabel").getText().toStdString() != initialWaveformInfo
-                || requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString() != initialWaveformBreadcrumb,
-            "Waveform drawer content should update when the selected zone changes.");
+                || requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString() != initialWaveformBreadcrumb,
+            "Waveform workbench content should update when the selected zone changes.");
 
     macrosTabButton.onClick();
     requireComponentVisibleWithin(panel, "authoringMacroList", panelBounds);
     requireComponentVisibleWithin(panel, "authoringMacroAssignmentSelector", panelBounds);
     require(!findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
-            "Non-waveform drawer tabs should hide waveform content during Sprint 4.");
-    require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString().find("Project-scoped")
+            "Non-waveform workbench tabs should hide waveform content during Sprint 4.");
+    require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                 != std::string::npos,
-            "Macros drawer should expose explicit project scope vocabulary.");
-    require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find("Project > Macros >")
+            "Macros workbench should expose explicit project scope vocabulary.");
+    require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find("Project > Macros >")
                 != std::string::npos,
-            "Macros drawer should expose the selected macro breadcrumb.");
+            "Macros workbench should expose the selected macro breadcrumb.");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     auto& macroListBox = macroList.getListBox();
     if (macroList.getRowCount() > 1)
     {
-        const auto initialMacroBreadcrumb = requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString();
+        const auto initialMacroBreadcrumb = requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString();
         macroListBox.selectRow(1);
-        require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString() != initialMacroBreadcrumb,
-                "Selecting a repeated-structure row should rebind the macro drawer breadcrumb.");
+        require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString() != initialMacroBreadcrumb,
+                "Selecting a repeated-structure row should rebind the macro workbench breadcrumb.");
         macroListBox.selectRow(0);
     }
 
-    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     requireComponentVisibleWithin(panel, "authoringFxSelector", panelBounds);
     requireComponentVisibleWithin(panel, "authoringRoutingSelector", panelBounds);
-    require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString().find("Project-scoped")
+    require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                 != std::string::npos,
-            "Routing drawer should expose explicit project scope vocabulary.");
-    require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find("Project > Routing >")
+            "Routing workbench should expose explicit project scope vocabulary.");
+    require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find("Project > Routing >")
                 != std::string::npos,
-            "Routing drawer should expose the selected routing breadcrumb.");
+            "Routing workbench should expose the selected routing breadcrumb.");
 
-    requireButton(panel, "authoringDrawerPerformanceTab").onClick();
+    requireButton(panel, "authoringWorkbenchPerformanceTab").onClick();
     requireComponentVisibleWithin(panel, "authoringPerformanceBankSelector", panelBounds);
     requireComponentVisibleWithin(panel, "authoringTriggerSlotSelector", panelBounds);
-    require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString().find("Bank-scoped")
+    require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Bank-scoped")
                 != std::string::npos,
-            "Performance drawer should expose explicit bank scope vocabulary.");
-    require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find("Project > Performance >")
+            "Performance workbench should expose explicit bank scope vocabulary.");
+    require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find("Project > Performance >")
                 != std::string::npos,
-            "Performance drawer should expose the selected performance breadcrumb.");
+            "Performance workbench should expose the selected performance breadcrumb.");
 
     waveformTabButton.onClick();
     requireComponentVisibleWithin(panel, "authoringWaveformPreview", panelBounds);
@@ -1650,33 +1650,33 @@ void exerciseDrawerBehavior(drs::app::AuthoringPanel& panel,
     macrosTabButton.onClick();
     zoneSelector->setSelectedId(initialZoneId, juce::sendNotificationSync);
     require(macrosTabButton.getToggleState(),
-            "Changing zones should not replace the active non-waveform drawer tab.");
+            "Changing zones should not replace the active non-waveform workbench tab.");
     if (auto* macroListComponent = findDescendantById(panel, "authoringMacroList");
         macroListComponent == nullptr || !macroListComponent->isVisible())
     {
-        baselineFindings.push_back(shellName + " / drawer state did not survive zone selection");
+        baselineFindings.push_back(shellName + " / workbench state did not survive zone selection");
     }
 
     waveformTabButton.onClick();
-    require(requireLabel(panel, "authoringDrawerScopeLabel").getText().toStdString() == initialWaveformScope,
-            "Waveform drawer should preserve explicit scope vocabulary when revisited.");
-    require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString() == initialWaveformBreadcrumb,
-            "Waveform drawer should restore its original breadcrumb when the original zone is reselected.");
+    require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString() == initialWaveformScope,
+            "Waveform workbench should preserve explicit scope vocabulary when revisited.");
+    require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString() == initialWaveformBreadcrumb,
+            "Waveform workbench should restore its original breadcrumb when the original zone is reselected.");
     require(requireLabel(panel, "authoringWaveformInfoLabel").getText().toStdString() == initialWaveformInfo,
-            "Waveform drawer should restore its original metadata when the original zone is reselected.");
+            "Waveform workbench should restore its original metadata when the original zone is reselected.");
 
     if (shellName == "compact")
     {
         toggleButton.onClick();
         require(!findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
-                "Compact shell drawer should close back to its default collapsed state.");
+                "Compact shell workbench should close back to its default collapsed state.");
     }
 }
 
-void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
+void exerciseWorkbenchEditorTransactions(drs::app::AuthoringPanel& panel,
                                       drs::engine::AuthoringSession& session)
 {
-    requireButton(panel, "authoringDrawerMacrosTab").onClick();
+    requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
     auto& macroDefaultSlider = requireSlider(panel, "authoringMacroDefaultSlider");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     auto& macroListBox = macroList.getListBox();
@@ -1695,19 +1695,19 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
     macroDefaultSlider.setValue(macroTargetValue, juce::dontSendNotification);
     macroDefaultSlider.onDragEnd();
     require(session.getDocumentState().undoDepth == macroUndoDepth + 1,
-            "Macro drawer edits should create one undo transaction per completed gesture.");
+            "Macro workbench edits should create one undo transaction per completed gesture.");
     require(std::abs(session.getProject().authoring.macros.front().defaultValue - macroTargetValue) < 0.001,
-            "Macro drawer edits should persist through the authoring session.");
+            "Macro workbench edits should persist through the authoring session.");
 
-    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     auto& fxTypeSelector = requireComboBox(panel, "authoringFxTypeSelector");
     const auto routingUndoDepth = session.getDocumentState().undoDepth;
     const auto nextFxId = fxTypeSelector.getSelectedId() == fxTypeSelector.getNumItems() ? 1 : fxTypeSelector.getSelectedId() + 1;
     fxTypeSelector.setSelectedId(nextFxId, juce::sendNotificationSync);
     require(session.getDocumentState().undoDepth == routingUndoDepth + 1,
-            "Routing drawer edits should create one undo transaction per committed selection.");
+            "Routing workbench edits should create one undo transaction per committed selection.");
     require(session.getProject().authoring.fxSlots.front().effectType == fxTypeSelector.getText().toStdString(),
-            "Routing drawer edits should persist through the authoring session.");
+            "Routing workbench edits should persist through the authoring session.");
     const auto& editedSlot = session.getProject().authoring.fxSlots.front();
     const auto* descriptor = drs::engine::findCuratedDspEffect(editedSlot.effectType,
                                                                editedSlot.effectVersion);
@@ -1720,14 +1720,14 @@ void exerciseDrawerEditorTransactions(drs::app::AuthoringPanel& panel,
     }
 }
 
-void exerciseMacroDrawerLayout(drs::app::AuthoringPanel& panel,
+void exerciseMacroWorkbenchLayout(drs::app::AuthoringPanel& panel,
                                bool shortHost)
 {
-    requireButton(panel, "authoringDrawerMacrosTab").onClick();
+    requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
     auto& viewport = requireViewport(panel, "authoringMacroViewport");
     auto* content = findDescendantById(panel, "authoringMacroContent");
     require(viewport.isVisible() && content != nullptr && viewport.getViewedComponent() == content,
-            "Macro drawer should host its controls in a height-aware viewport.");
+            "Macro workbench should host its controls in a height-aware viewport.");
 
     if (shortHost)
     {
@@ -1743,7 +1743,7 @@ void exerciseMacroDrawerLayout(drs::app::AuthoringPanel& panel,
         auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
         require(zoneMap != nullptr
                     && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
-                "The taller Macro drawer should preserve the minimum usable map height.");
+                "The taller Macro workbench should preserve the minimum usable map height.");
     }
 
     const auto contentBounds = content->getLocalBounds();
@@ -1797,7 +1797,7 @@ void exerciseMacroDrawerLayout(drs::app::AuthoringPanel& panel,
             require(component != nullptr
                         && viewportBoundsInPanel.contains(
                             panel.getLocalArea(component, component->getLocalBounds())),
-                    "Standard-height Macro drawer should show every editor control at once: "
+                    "Standard-height Macro workbench should show every editor control at once: "
                         + componentId.toStdString());
         }
     }
@@ -1806,11 +1806,11 @@ void exerciseMacroDrawerLayout(drs::app::AuthoringPanel& panel,
 void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
                                          bool requireMinimumMapHeight)
 {
-    requireButton(panel, "authoringDrawerRoutingTab").onClick();
+    requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     auto& viewport = requireViewport(panel, "authoringRoutingViewport");
     auto* content = findDescendantById(panel, "authoringRoutingContent");
     require(viewport.isVisible() && content != nullptr && viewport.getViewedComponent() == content,
-            "Routing drawer should expose its controls through the routing viewport.");
+            "Routing workbench should expose its controls through the routing viewport.");
     require(content->getHeight() > viewport.getHeight()
                 && viewport.getVerticalScrollBar().isVisible(),
             "Expanded routing controls should expose a visible vertical scroll path.");
@@ -1820,7 +1820,7 @@ void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
         auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
         require(zoneMap != nullptr
                     && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
-                "Open Routing drawer should preserve the minimum usable map height.");
+                "Open Routing workbench should preserve the minimum usable map height.");
     }
 
     const auto contentBounds = content->getLocalBounds();
@@ -1902,11 +1902,11 @@ void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
     auto& parameterSelector = requireComboBox(panel, "authoringFxParameterSelector");
     auto& parameterSlider = requireSlider(panel, "authoringFxParameterSlider");
     auto& assignControlButton = requireButton(panel, "authoringFxAssignMacroButton");
-    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
-    auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
+    auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
+    auto& routingTabButton = requireButton(panel, "authoringWorkbenchRoutingTab");
     auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
     require(scopeSelector.isVisible() && addButton.isVisible(),
-            "Expanded routing drawer must expose an explicit DSP scope and insert action.");
+            "Expanded routing workbench must expose an explicit DSP scope and insert action.");
 
     const auto selectedZone = session.getSelectedZone();
     require(selectedZone.has_value(), "Scoped DSP workflow requires a selected zone.");
@@ -1984,7 +1984,7 @@ void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
     const auto macroCountBeforeCreate = session.getProject().authoring.macros.size();
     assignControlButton.onClick();
     require(macrosTabButton.getToggleState(),
-            "Create Control should hand off directly into the macros drawer.");
+            "Create Control should hand off directly into the macros workbench.");
     require(session.getProject().authoring.macros.size() == macroCountBeforeCreate + 1,
             "Create Control must author exactly one new macro for an unbound scoped DSP parameter.");
     const auto createdMacro = session.getSelectedMacro();
@@ -2010,7 +2010,7 @@ void exerciseScopedDspWorkflow(drs::app::AuthoringPanel& panel,
     const auto macroCountBeforeEdit = session.getProject().authoring.macros.size();
     assignControlButton.onClick();
     require(macrosTabButton.getToggleState(),
-            "Edit Control should return the creator to the selected macro drawer.");
+            "Edit Control should return the creator to the selected macro workbench.");
     require(session.getProject().authoring.macros.size() == macroCountBeforeEdit,
             "Edit Control must not create duplicate macros for the same scoped DSP target.");
     require(session.getSelectedMacro().has_value() && session.getSelectedMacro()->id == createdMacro->id,
@@ -2036,7 +2036,7 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     auto& groupList = requireRepeatedStructureList(panel, "authoringGroupList");
     auto& groupVisibilityButton = requireButton(panel, "authoringGroupVisibilityButton");
     auto& groupPreviewAnchorButton = requireButton(panel, "authoringGroupPreviewAnchorButton");
-    auto& groupsTabButton = requireButton(panel, "authoringDrawerGroupsTab");
+    auto& groupsTabButton = requireButton(panel, "authoringWorkbenchGroupsTab");
     auto& groupRoundRobinToggle = requireButton(panel, "authoringGroupRoundRobinToggle");
     auto& groupRoundRobinModeSelector = requireComboBox(panel, "authoringGroupRoundRobinModeSelector");
     auto* groupNameEditor = dynamic_cast<juce::TextEditor*>(findDescendantById(panel, "authoringGroupNameEditor"));
@@ -2086,9 +2086,9 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
             "Group manager visibility toggle should restore the selected group.");
 
     groupsTabButton.onClick();
-    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Group Inspector");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Group-scoped");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Groups >");
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Group Inspector");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchScopeLabel", "Group-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchBreadcrumbLabel", "Project > Groups >");
     requireComponentVisibleWithin(panel, "authoringGroupNameEditor", panelBounds);
     requireComponentVisibleWithin(panel, "authoringMasterGainSlider", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupVisibilityToggle", panelBounds);
@@ -2101,13 +2101,13 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringGroupRoundRobinToggle", panelBounds);
     requireComponentVisibleWithin(panel, "authoringGroupRoundRobinModeSelector", panelBounds);
 
-    auto* drawerContent = findDescendantById(panel, "authoringDrawerContentHost");
-    require(drawerContent != nullptr, "Group inspector layout checks require the drawer content host.");
-    const auto drawerContentBounds = drawerContent->getBounds();
+    auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
+    require(workbenchContent != nullptr, "Group inspector layout checks require the workbench content host.");
+    const auto workbenchContentBounds = workbenchContent->getBounds();
     for (const auto& componentId : {
-             juce::String("authoringDrawerTitleLabel"),
-             juce::String("authoringDrawerScopeLabel"),
-             juce::String("authoringDrawerBreadcrumbLabel"),
+             juce::String("authoringWorkbenchTitleLabel"),
+             juce::String("authoringWorkbenchScopeLabel"),
+             juce::String("authoringWorkbenchBreadcrumbLabel"),
              juce::String("authoringGroupNameLabel"),
              juce::String("authoringGroupNameEditor"),
              juce::String("authoringMasterGainLabel"),
@@ -2129,7 +2129,7 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
              juce::String("authoringGroupDeleteButton")
          })
     {
-        requireComponentVisibleWithin(panel, componentId, drawerContentBounds);
+        requireComponentVisibleWithin(panel, componentId, workbenchContentBounds);
     }
 
     for (const auto& componentId : {
@@ -2216,7 +2216,7 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
     require(panel.getHeight() < drs::app::authoring::shortHeightBreakpoint,
             "Short-height group coverage requires a panel below the responsive breakpoint.");
 
-    requireButton(panel, "authoringDrawerGroupsTab").onClick();
+    requireButton(panel, "authoringWorkbenchGroupsTab").onClick();
     const auto panelBounds = panel.getLocalBounds();
 
     for (const auto& componentId : {
@@ -2239,15 +2239,15 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
                 && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
             "Short-height Map layout should preserve the minimum usable map height.");
 
-    auto* drawerContent = findDescendantById(panel, "authoringDrawerContentHost");
-    require(drawerContent != nullptr
-                && drawerContent->getHeight() == drs::app::authoring::shortInspectorDrawerOpenHeight,
-            "Short-height Group Inspector should use its compact responsive drawer height.");
-    const auto drawerContentBounds = drawerContent->getBounds();
+    auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
+    require(workbenchContent != nullptr
+                && workbenchContent->getHeight() == drs::app::authoring::shortInspectorWorkbenchOpenHeight,
+            "Short-height Group Inspector should use its compact responsive workbench height.");
+    const auto workbenchContentBounds = workbenchContent->getBounds();
     for (const auto& componentId : {
-             juce::String("authoringDrawerTitleLabel"),
-             juce::String("authoringDrawerScopeLabel"),
-             juce::String("authoringDrawerBreadcrumbLabel"),
+             juce::String("authoringWorkbenchTitleLabel"),
+             juce::String("authoringWorkbenchScopeLabel"),
+             juce::String("authoringWorkbenchBreadcrumbLabel"),
              juce::String("authoringGroupNameEditor"),
              juce::String("authoringMasterGainSlider"),
              juce::String("authoringGroupVisibilityToggle"),
@@ -2262,7 +2262,7 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
              juce::String("authoringGroupDeleteButton")
          })
     {
-        requireComponentVisibleWithin(panel, componentId, drawerContentBounds);
+        requireComponentVisibleWithin(panel, componentId, workbenchContentBounds);
     }
 
     for (const auto& componentId : {
@@ -2290,16 +2290,16 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
 void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
                                            const std::string& shellName)
 {
-    auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
-    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
-    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& toggleButton = requireButton(panel, "authoringWorkbenchToggleButton");
+    auto& waveformTabButton = requireButton(panel, "authoringWorkbenchWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
     auto& macroCreateButton = requireButton(panel, "authoringMacroCreateButton");
     auto& macroDuplicateButton = requireButton(panel, "authoringMacroDuplicateButton");
     auto& macroDeleteButton = requireButton(panel, "authoringMacroDeleteButton");
     auto& macroNameEditor = requireTextEditor(panel, "authoringMacroNameEditor");
     auto& macroExposeToggle = requireButton(panel, "authoringMacroExposeToggle");
-    auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
-    auto& performanceTabButton = requireButton(panel, "authoringDrawerPerformanceTab");
+    auto& routingTabButton = requireButton(panel, "authoringWorkbenchRoutingTab");
+    auto& performanceTabButton = requireButton(panel, "authoringWorkbenchPerformanceTab");
     auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
     auto& macroMoveUpButton = requireButton(panel, "authoringMacroMoveUpButton");
     auto& macroMoveDownButton = requireButton(panel, "authoringMacroMoveDownButton");
@@ -2323,7 +2323,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     auto& playbackBannerPublishButton = requireButton(panel, "authoringPlaybackBannerPublishButton");
     auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
-    require(phraseImportPath != nullptr, "Performance drawer accessibility checks require the phrase import path.");
+    require(phraseImportPath != nullptr, "Performance workbench accessibility checks require the phrase import path.");
 
     for (const auto& componentId : {
              juce::String("authoringPreviewButton"),
@@ -2335,12 +2335,12 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
              juce::String("authoringSaveButton"),
              juce::String("authoringZoneSelector"),
              juce::String("authoringZoneMap"),
-             juce::String("authoringDrawerToggleButton"),
-             juce::String("authoringDrawerWaveformTab"),
-             juce::String("authoringDrawerGroupsTab"),
-             juce::String("authoringDrawerMacrosTab"),
-             juce::String("authoringDrawerRoutingTab"),
-             juce::String("authoringDrawerPerformanceTab")
+             juce::String("authoringWorkbenchToggleButton"),
+             juce::String("authoringWorkbenchWaveformTab"),
+             juce::String("authoringWorkbenchGroupsTab"),
+             juce::String("authoringWorkbenchMacrosTab"),
+             juce::String("authoringWorkbenchRoutingTab"),
+             juce::String("authoringWorkbenchPerformanceTab")
          })
     {
         requireNonEmptyAccessibilityTitle(panel, componentId);
@@ -2373,15 +2373,15 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
                                     "authoringPlaybackBannerPrepareButton",
                                     "authoringZoneSelector",
                                     "authoringZoneMap",
-                                    "authoringDrawerToggleButton",
-                                    "authoringDrawerWaveformTab",
-                                    "authoringDrawerGroupsTab",
-                                    "authoringDrawerMacrosTab",
-                                    "authoringDrawerRoutingTab",
-                                    "authoringDrawerPerformanceTab"
+                                    "authoringWorkbenchToggleButton",
+                                    "authoringWorkbenchWaveformTab",
+                                    "authoringWorkbenchGroupsTab",
+                                    "authoringWorkbenchMacrosTab",
+                                    "authoringWorkbenchRoutingTab",
+                                    "authoringWorkbenchPerformanceTab"
                                 });
 
-    if (shellName == "compact" && toggleButton.getButtonText() == "Show Drawer")
+    if (shellName == "compact" && toggleButton.getButtonText() == "Show Workbench")
     {
         toggleButton.onClick();
     }
@@ -2454,22 +2454,22 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", updatedSummaryArticulation);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", updatedSummaryPlayback);
 
-    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", requireLabel(panel, "authoringDrawerTitleLabel").getText());
-    requireAccessibilityTitleEquals(panel, "authoringDrawerScopeLabel", requireLabel(panel, "authoringDrawerScopeLabel").getText());
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", requireLabel(panel, "authoringWorkbenchTitleLabel").getText());
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchScopeLabel", requireLabel(panel, "authoringWorkbenchScopeLabel").getText());
     requireAccessibilityTitleEquals(panel,
-                                    "authoringDrawerBreadcrumbLabel",
-                                    requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText());
+                                    "authoringWorkbenchBreadcrumbLabel",
+                                    requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText());
     requireAccessibilityDescriptionContains(panel,
-                                            "authoringDrawerScopeLabel",
-                                            requireLabel(panel, "authoringDrawerScopeLabel").getText());
+                                            "authoringWorkbenchScopeLabel",
+                                            requireLabel(panel, "authoringWorkbenchScopeLabel").getText());
     requireAccessibilityDescriptionContains(panel,
-                                            "authoringDrawerBreadcrumbLabel",
-                                            requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText());
+                                            "authoringWorkbenchBreadcrumbLabel",
+                                            requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText());
     requireAccessibilityTitleEquals(panel,
                                     "authoringWaveformStatusLabel",
                                     requireLabel(panel, "authoringWaveformStatusLabel").getText());
     require(requireLabel(panel, "authoringWaveformStatusLabel").getText().contains("Fix: Relink or re-import the selected sample file."),
-            "Waveform drawer status should include the next prerequisite for failed authoring preview preparation.");
+            "Waveform workbench status should include the next prerequisite for failed authoring preview preparation.");
     requireAccessibilityDescriptionContains(panel,
                                             "authoringWaveformStatusLabel",
                                             requireLabel(panel, "authoringWaveformStatusLabel").getText());
@@ -2483,19 +2483,19 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     macrosTabButton.onClick();
     require(macroAssignmentSelector.isVisible(),
-            "Macro drawer controls should be visible when the macros tab is active.");
+            "Macro workbench controls should be visible when the macros tab is active.");
     require(macroCreateButton.isVisible() && macroNameEditor.isVisible() && macroExposeToggle.isVisible(),
-            "Macro drawer should expose creation, naming, and Perform-exposure controls when active.");
+            "Macro workbench should expose creation, naming, and Perform-exposure controls when active.");
     requireAccessibilityHandlerState(panel, "authoringMacroAssignmentSelector", true);
     requireAccessibilityHandlerState(panel, "authoringMacroCreateButton", true);
     requireAccessibilityHandlerState(panel, "authoringMacroNameEditor", true);
     requireAccessibilityHandlerState(panel, "authoringMacroExposeToggle", true);
-    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Macro Assignment");
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Macro Assignment");
     requireAccessibilityTitleEquals(panel,
-                                    "authoringDrawerScopeLabel",
-                                    requireLabel(panel, "authoringDrawerScopeLabel").getText());
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Project-scoped");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Macros");
+                                    "authoringWorkbenchScopeLabel",
+                                    requireLabel(panel, "authoringWorkbenchScopeLabel").getText());
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchScopeLabel", "Project-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchBreadcrumbLabel", "Project > Macros");
     requireAccessibilityDescriptionContains(panel,
                                             "authoringMacroCreateButton",
                                             "Creates a new authored macro");
@@ -2540,14 +2540,14 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     routingTabButton.onClick();
     require(!macroAssignmentSelector.isVisible(),
-            "Macro drawer controls should be hidden after switching to routing.");
+            "Macro workbench controls should be hidden after switching to routing.");
     requireAccessibilityHandlerState(panel, "authoringMacroAssignmentSelector", false);
     requireAccessibilityHandlerState(panel, "authoringMacroCreateButton", false);
     requireAccessibilityHandlerState(panel, "authoringMacroNameEditor", false);
     requireAccessibilityHandlerState(panel, "authoringMacroExposeToggle", false);
-    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Routing Detail");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Project-scoped");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Routing >");
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Routing Detail");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchScopeLabel", "Project-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchBreadcrumbLabel", "Project > Routing >");
     require(fxSelector.isVisible(),
             "FX selector should be visible when the routing tab is active.");
     require(fxBypassedToggle.isVisible(),
@@ -2555,7 +2555,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     require(routingBusSelector.isVisible(),
             "Routing bus selector should be visible when the routing tab is active.");
     require(routingInputSelector.isVisible(),
-            "Routing drawer controls should be visible when the routing tab is active.");
+            "Routing workbench controls should be visible when the routing tab is active.");
     require(routingInsertOneSelector.isVisible(),
             "Routing insert A selector should be visible when the routing tab is active.");
     require(routingInsertTwoSelector.isVisible(),
@@ -2642,13 +2642,13 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     }
     toggleButton.onClick();
     require(!routingInputSelector.isVisible(),
-            "Routing drawer controls should be hidden after closing the drawer.");
+            "Routing workbench controls should be hidden after closing the workbench.");
     requireAccessibilityHandlerState(panel, "authoringRoutingInputSelector", false);
 
     performanceTabButton.onClick();
-    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Performance Detail");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Bank-scoped");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Performance");
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Performance Detail");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchScopeLabel", "Bank-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchBreadcrumbLabel", "Project > Performance");
     require(performanceBankSelector.isVisible(),
             "Performance bank selector should be visible when the performance tab is active.");
     require(triggerSlotSelector.isVisible(),
@@ -2764,7 +2764,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     }
     auto* phraseImportTextEditor = dynamic_cast<juce::TextEditor*>(phraseImportPath);
     require(phraseImportTextEditor != nullptr,
-            "Performance drawer accessibility checks require the phrase import path editor.");
+            "Performance workbench accessibility checks require the phrase import path editor.");
     phraseImportTextEditor->setText("C:/fixtures/phase2/accessibility-check.mid");
     if (phraseImportTextEditor->onTextChange)
         phraseImportTextEditor->onTextChange();
@@ -2798,9 +2798,9 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     waveformTabButton.onClick();
     requireAccessibilityHandlerState(panel, "authoringWaveformPreview", true);
-    requireAccessibilityTitleEquals(panel, "authoringDrawerTitleLabel", "Waveform Detail");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerScopeLabel", "Zone-scoped");
-    requireAccessibilityDescriptionContains(panel, "authoringDrawerBreadcrumbLabel", "Project > Zones >");
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Waveform Detail");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchScopeLabel", "Zone-scoped");
+    requireAccessibilityDescriptionContains(panel, "authoringWorkbenchBreadcrumbLabel", "Project > Zones >");
     requireAccessibilityDescriptionContains(panel,
                                             "authoringWaveformStatusLabel",
                                             "Preview Failed");
@@ -2834,18 +2834,18 @@ void exerciseHostedFocusTransitions(drs::app::AuthoringPanel& panel, const std::
     DesktopHostedComponent hostedPanel(panel);
     pumpMessages();
 
-    auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
-    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
-    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
-    auto& routingTabButton = requireButton(panel, "authoringDrawerRoutingTab");
-    auto& performanceTabButton = requireButton(panel, "authoringDrawerPerformanceTab");
+    auto& toggleButton = requireButton(panel, "authoringWorkbenchToggleButton");
+    auto& waveformTabButton = requireButton(panel, "authoringWorkbenchWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
+    auto& routingTabButton = requireButton(panel, "authoringWorkbenchRoutingTab");
+    auto& performanceTabButton = requireButton(panel, "authoringWorkbenchPerformanceTab");
     auto& macroAssignmentSelector = requireComboBox(panel, "authoringMacroAssignmentSelector");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     auto& phraseImportButton = requireButton(panel, "authoringPhraseImportButton");
     auto& sampleDisclosureButton = requireButton(panel, "authoringSampleInspectorSectionDisclosure");
     auto& velocityLowSlider = requireSlider(panel, "authoringVelocityLowSlider");
 
-    if (shellName == "compact" && toggleButton.getButtonText() == "Show Drawer")
+    if (shellName == "compact" && toggleButton.getButtonText() == "Show Workbench")
     {
         toggleButton.onClick();
         pumpMessages();
@@ -2872,7 +2872,7 @@ void exerciseHostedFocusTransitions(drs::app::AuthoringPanel& panel, const std::
     phraseImportButton.grabKeyboardFocus();
     pumpMessages();
     requireFocusedWithin(phraseImportButton,
-                         "Visible performance drawer controls should be able to take keyboard focus in a desktop host.");
+                         "Visible performance workbench controls should be able to take keyboard focus in a desktop host.");
 
     waveformTabButton.onClick();
     pumpMessages();
@@ -2884,12 +2884,12 @@ void exerciseHostedFocusTransitions(drs::app::AuthoringPanel& panel, const std::
     phraseImportButton.grabKeyboardFocus();
     pumpMessages();
     requireFocusedWithin(phraseImportButton,
-                         "Performance drawer import button should regain focus when revisited.");
+                         "Performance workbench import button should regain focus when revisited.");
 
     toggleButton.onClick();
     pumpMessages();
     requireFocusedWithin(toggleButton,
-                         "Collapsing the drawer while a drawer control is focused should redirect focus to the toggle.");
+                         "Collapsing the workbench while a workbench control is focused should redirect focus to the toggle.");
 
     if (findDescendantById(panel, "authoringVelocityLowSlider")->getBounds().isEmpty())
     {
@@ -2913,15 +2913,15 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
                                        const std::string& shellName)
 {
     DesktopHostedComponent host(panel);
-    auto& waveformTabButton = requireButton(panel, "authoringDrawerWaveformTab");
-    auto& macrosTabButton = requireButton(panel, "authoringDrawerMacrosTab");
+    auto& waveformTabButton = requireButton(panel, "authoringWorkbenchWaveformTab");
+    auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
     auto& undoButton = requireButton(panel, "authoringUndoButton");
     auto& redoButton = requireButton(panel, "authoringRedoButton");
     auto& saveButton = requireButton(panel, "authoringSaveButton");
     auto& previewButton = requireButton(panel, "authoringPreviewButton");
     auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
     auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
-    auto& drawerToggleButton = requireButton(panel, "authoringDrawerToggleButton");
+    auto& workbenchToggleButton = requireButton(panel, "authoringWorkbenchToggleButton");
     auto& restoreRootKeyButton = requireButton(panel, "authoringRestoreRootKeyButton");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     auto ensureSectionOpen = [&](const juce::String& targetComponentId, const juce::String& disclosureButtonId)
@@ -2951,10 +2951,10 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
     pumpMessages();
     requireFocusedWithin(zoneMap,
                          "Keyboard workflow should allow the zone map to take keyboard focus.");
-    drawerToggleButton.grabKeyboardFocus();
+    workbenchToggleButton.grabKeyboardFocus();
     pumpMessages();
-    requireFocusedWithin(drawerToggleButton,
-                         "Keyboard workflow should allow the drawer toggle to take keyboard focus.");
+    requireFocusedWithin(workbenchToggleButton,
+                         "Keyboard workflow should allow the workbench toggle to take keyboard focus.");
 
     macrosTabButton.onClick();
     pumpMessages();
@@ -3000,7 +3000,7 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
     pumpMessages();
     if (shellName == "compact" && findDescendantById(panel, "authoringWaveformPreview")->isVisible())
     {
-        drawerToggleButton.onClick();
+        workbenchToggleButton.onClick();
         pumpMessages();
     }
 }
@@ -3801,7 +3801,7 @@ int main()
             {
                 exerciseShortHeightGroupLayout(panel, outputDirectory);
                 exerciseRoutingViewportReachability(panel, true);
-                exerciseMacroDrawerLayout(panel, true);
+                exerciseMacroWorkbenchLayout(panel, true);
                 return;
             }
 
@@ -3817,15 +3817,15 @@ int main()
                                   lastPreviewMidiNote,
                                   lastPreviewVelocity);
             exerciseKeyboardOnlyWorkflowSmoke(panel, session, shellName);
-            exerciseDrawerBehavior(panel,
+            exerciseWorkbenchBehavior(panel,
                                    shellName,
                                    baselineFindings,
                                    validationSnapshot,
                                    validationRequestCount,
                                    validationCancelCount);
             exerciseAccessibilityAndFocusBehavior(panel, shellName);
-            exerciseDrawerEditorTransactions(panel, session);
-            exerciseMacroDrawerLayout(panel, false);
+            exerciseWorkbenchEditorTransactions(panel, session);
+            exerciseMacroWorkbenchLayout(panel, false);
             exerciseGroupUi(panel, session, shellName, outputDirectory, inventory);
             if (layoutMode == drs::app::AuthoringPanel::LayoutMode::expanded)
                 exerciseScopedDspWorkflow(panel, session);

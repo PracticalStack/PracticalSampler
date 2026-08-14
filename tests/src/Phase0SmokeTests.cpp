@@ -102,6 +102,16 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
     return maxMagnitude;
 }
 
+void settlePreparedPerformanceActivation(drs::plugin::Processor& processor)
+{
+    processor.serviceMessageThreadWork();
+    juce::AudioBuffer<float> buffer(2, 512);
+    juce::MidiBuffer midi;
+    buffer.clear();
+    processor.processBlock(buffer, midi);
+    processor.serviceMessageThreadWork();
+}
+
 float renderClickedPerformanceKeyboardMagnitude(drs::plugin::Processor& processor,
                                                  juce::MidiKeyboardComponent& keyboard,
                                                  int midiNoteNumber)
@@ -371,6 +381,12 @@ int main()
                 "Standalone shell should hide the Map tab in performance-only workspace mode.");
         require(findDescendantById(mainComponent, "authoringZoneSelector") == nullptr,
                 "Standalone shell should remove authoring descendants in performance-only workspace mode.");
+        mainComponent.getProcessor().closePerformancePackageWorkspace(
+            mainComponent.getProcessor().getAuthoringSession().getProject());
+        mainComponent.resized();
+        require(mainComponent.getProcessor().getWorkspaceDocumentState().authoringAvailable
+                    && standaloneTabs->getNumTabs() == 2,
+                "Standalone shell should restore the authoring workspace before bundled playback validation.");
         require(!mainComponent.isAudioOutputEnabled(),
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
@@ -379,7 +395,10 @@ int main()
             = mainComponent.getProcessor().getEngineFacade().waitForPreparedPlaybackIdle();
         const auto standaloneActivationServiced
             = mainComponent.getProcessor().serviceMessageThreadWork();
-        if (!standalonePreparedIdle || !standaloneActivationServiced)
+        settlePreparedPerformanceActivation(mainComponent.getProcessor());
+        const auto standaloneActivationInstalled
+            = mainComponent.getProcessor().getEngineFacade().getPerformanceActivationPayload() != nullptr;
+        if (!standalonePreparedIdle || !standaloneActivationInstalled)
         {
             const auto& facade = mainComponent.getProcessor().getEngineFacade();
             const auto& draft = facade.getDraftPlaybackStatus();
@@ -400,8 +419,8 @@ int main()
             std::cerr
                       << std::endl;
         }
-        require(standalonePreparedIdle && standaloneActivationServiced,
-                "Standalone smoke validation should explicitly install the default Performance activation.");
+        require(standalonePreparedIdle && standaloneActivationInstalled,
+                "Standalone smoke validation should retain an installed default Performance activation.");
         require(renderQueuedPerformanceSurfaceMagnitude(mainComponent.getProcessor(), 57, 0.8f) > 0.0001f,
                 "Standalone performance surface should render audible output through the shared processor path.");
         standaloneTabs->setCurrentTabIndex(0);
@@ -463,12 +482,19 @@ int main()
                 "Plugin editor should hide the Map tab in performance-only workspace mode.");
         require(findDescendantById(*editor, "authoringZoneSelector") == nullptr,
                 "Plugin editor should remove authoring descendants in performance-only workspace mode.");
+        processor.closePerformancePackageWorkspace(processor.getAuthoringSession().getProject());
+        editor->resized();
+        require(processor.getWorkspaceDocumentState().authoringAvailable
+                    && pluginTabs->getNumTabs() == 2,
+                "Plugin editor should restore the authoring workspace before bundled playback validation.");
 
         processor.prepareToPlay(44100.0, 512);
         processor.getEngineFacade().resetSessionStateToDefault();
-        require(processor.getEngineFacade().waitForPreparedPlaybackIdle()
-                    && processor.serviceMessageThreadWork(),
-                "Plugin smoke validation should explicitly install the default Performance activation.");
+        const auto pluginPreparedIdle = processor.getEngineFacade().waitForPreparedPlaybackIdle();
+        settlePreparedPerformanceActivation(processor);
+        require(pluginPreparedIdle
+                    && processor.getEngineFacade().getPerformanceActivationPayload() != nullptr,
+                "Plugin smoke validation should retain an installed default Performance activation.");
         juce::AudioBuffer<float> pluginBuffer(2, 512);
         pluginBuffer.clear();
         juce::MidiBuffer midiBuffer;

@@ -19,6 +19,9 @@ ZoneMapOverview::ZoneMapOverview()
     setComponentID("authoringZoneMapMinimap");
     setTitle("Zone Map overview");
     setDescription("Full key and velocity map. Click or drag the viewport frame to navigate.");
+    setHelpText("Use the arrow keys to move the visible map region without changing selection.");
+    setWantsKeyboardFocus(true);
+    setMouseClickGrabsKeyboardFocus(true);
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
 }
 
@@ -122,6 +125,9 @@ void ZoneMapOverview::paint(juce::Graphics& g)
     g.drawRect(frame.expanded(1.0f), 3.0f);
     g.setColour(overviewBorder);
     g.drawRect(frame, 1.5f);
+
+    if (hasKeyboardFocus(false))
+        visual::drawFocusRing(g, bounds.reduced(2.0f), visual::controlRadius);
 }
 
 void ZoneMapOverview::requestViewportAt(const juce::Point<float> contentPosition)
@@ -138,6 +144,7 @@ void ZoneMapOverview::requestViewportAt(const juce::Point<float> contentPosition
 
 void ZoneMapOverview::mouseDown(const juce::MouseEvent& event)
 {
+    grabKeyboardFocus();
     const auto contentPosition = componentToContent(event.position);
     const auto frame = getViewportFrameBounds();
     const auto hitFrame = frame.withSizeKeepingCentre(std::max(6.0f, frame.getWidth()),
@@ -160,5 +167,36 @@ void ZoneMapOverview::mouseUp(const juce::MouseEvent&)
 {
     draggingViewport = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
+}
+
+bool ZoneMapOverview::keyPressed(const juce::KeyPress& key)
+{
+    auto delta = juce::Point<float> {};
+    const auto stepX = std::max(0.01f, viewport.getWidth() * (key.getModifiers().isShiftDown() ? 0.25f : 0.08f));
+    const auto stepY = std::max(0.01f, viewport.getHeight() * (key.getModifiers().isShiftDown() ? 0.25f : 0.08f));
+    if (key == juce::KeyPress::leftKey)
+        delta.x = -stepX;
+    else if (key == juce::KeyPress::rightKey)
+        delta.x = stepX;
+    else if (key == juce::KeyPress::upKey)
+        delta.y = -stepY;
+    else if (key == juce::KeyPress::downKey)
+        delta.y = stepY;
+    else
+        return false;
+
+    dragOffset = { viewport.getWidth() * 0.5f, viewport.getHeight() * 0.5f };
+    requestViewportAt(viewport.getCentre() + delta);
+    return true;
+}
+
+void ZoneMapOverview::focusGained(FocusChangeType)
+{
+    repaint();
+}
+
+void ZoneMapOverview::focusLost(FocusChangeType)
+{
+    repaint();
 }
 } // namespace drs::app::authoring

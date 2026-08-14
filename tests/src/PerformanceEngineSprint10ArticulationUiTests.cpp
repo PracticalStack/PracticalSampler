@@ -50,9 +50,9 @@ int main()
         panel.setVisible(true);
         panel.resized();
 
-        requireButton(panel, "authoringDrawerArticulationsTab").onClick();
+        requireButton(panel, "authoringWorkbenchArticulationsTab").onClick();
         require(findById(panel, "authoringArticulationList")->isVisible(),
-                "Articulation workspace must be visible when its drawer tab is active.");
+                "Articulation workspace must be visible when its workbench tab is active.");
         require(findById(panel, "authoringArticulationKeySwitchPicker")->isVisible(),
                 "The key-switch note picker must be visible in the articulation workspace.");
         require(findById(panel, "authoringZoneArticulationSelector") != nullptr,

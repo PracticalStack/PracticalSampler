@@ -84,6 +84,11 @@ ZoneMapCanvas::ZoneMapCanvas()
     zoomValueLabel.setTooltip("Current Zone Map zoom. Fit All is the 25% overview.");
     zoomValueLabel.setJustificationType(juce::Justification::centred);
     zoomValueLabel.setInterceptsMouseClicks(false, false);
+    fitAllButton.setExplicitFocusOrder(34);
+    fitSelectedButton.setExplicitFocusOrder(35);
+    zoomOutButton.setExplicitFocusOrder(36);
+    zoomInButton.setExplicitFocusOrder(37);
+    overview.setExplicitFocusOrder(38);
 
     for (auto* child : { static_cast<juce::Component*>(&fitAllButton),
                          static_cast<juce::Component*>(&fitSelectedButton),

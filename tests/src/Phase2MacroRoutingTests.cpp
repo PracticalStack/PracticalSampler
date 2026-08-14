@@ -265,10 +265,10 @@ int main()
         pluginTabs->setCurrentTabIndex(1);
         require(findDescendantById(*editor, "authoringModeSelector") == nullptr,
                 "Plugin authoring shell should retire the temporary mode selector after UI25-402.");
-        require(findDescendantById(*editor, "authoringDrawerMacrosTab") != nullptr,
-                "Plugin authoring shell should expose the macros drawer tab.");
-        require(findDescendantById(*editor, "authoringDrawerRoutingTab") != nullptr,
-                "Plugin authoring shell should expose the routing drawer tab.");
+        require(findDescendantById(*editor, "authoringWorkbenchMacrosTab") != nullptr,
+                "Plugin authoring shell should expose the macros workbench tab.");
+        require(findDescendantById(*editor, "authoringWorkbenchRoutingTab") != nullptr,
+                "Plugin authoring shell should expose the routing workbench tab.");
         require(findDescendantById(*editor, "authoringMacroList") != nullptr,
                 "Plugin authoring shell should expose the UI25-404 macro repeated-structure list.");
         require(findDescendantById(*editor, "authoringFxSelector") != nullptr,
@@ -283,10 +283,10 @@ int main()
         standaloneTabs->setCurrentTabIndex(1);
         require(findDescendantById(standalone, "authoringModeSelector") == nullptr,
                 "Standalone authoring shell should retire the temporary mode selector after UI25-402.");
-        require(findDescendantById(standalone, "authoringDrawerMacrosTab") != nullptr,
-                "Standalone authoring shell should expose the macros drawer tab.");
-        require(findDescendantById(standalone, "authoringDrawerRoutingTab") != nullptr,
-                "Standalone authoring shell should expose the routing drawer tab.");
+        require(findDescendantById(standalone, "authoringWorkbenchMacrosTab") != nullptr,
+                "Standalone authoring shell should expose the macros workbench tab.");
+        require(findDescendantById(standalone, "authoringWorkbenchRoutingTab") != nullptr,
+                "Standalone authoring shell should expose the routing workbench tab.");
         require(findDescendantById(standalone, "authoringMacroList") != nullptr,
                 "Standalone authoring shell should expose the UI25-404 macro repeated-structure list.");
         require(findDescendantById(standalone, "authoringFxSelector") != nullptr,

@@ -527,10 +527,10 @@ void exerciseMacroDensityInProduction(const fs::path& outputDirectory)
     panel.resized();
     panel.reloadFromSession();
 
-    auto& toggleButton = requireButton(panel, "authoringDrawerToggleButton");
-    if (toggleButton.getButtonText() == "Show Drawer")
+    auto& toggleButton = requireButton(panel, "authoringWorkbenchToggleButton");
+    if (toggleButton.getButtonText() == "Show Workbench")
         toggleButton.onClick();
-    requireButton(panel, "authoringDrawerMacrosTab").onClick();
+    requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
 
     const auto panelBounds = panel.getLocalBounds();
     requireComponentVisibleWithin(panel, "authoringMacroList", panelBounds);
@@ -542,28 +542,28 @@ void exerciseMacroDensityInProduction(const fs::path& outputDirectory)
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     auto& listBox = macroList.getListBox();
     require(macroList.getRowCount() == static_cast<int>(project.authoring.macros.size()),
-            "Production macro drawer should expose every dense fixture macro.");
+            "Production macro workbench should expose every dense fixture macro.");
 
     const auto targetIndex = static_cast<int>(project.authoring.macros.size()) - 1;
     for (int index = 0; index < targetIndex; ++index)
     {
         require(listBox.keyPressed(juce::KeyPress(juce::KeyPress::downKey)),
-                "Production macro drawer should support keyboard navigation across dense macro rows.");
+                "Production macro workbench should support keyboard navigation across dense macro rows.");
     }
 
     require(listBox.getSelectedRow() == targetIndex,
-            "Production macro drawer should allow selection to reach the final dense macro row.");
-    require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find(project.authoring.macros.back().name)
+            "Production macro workbench should allow selection to reach the final dense macro row.");
+    require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find(project.authoring.macros.back().name)
                 != std::string::npos,
-            "Production macro drawer breadcrumb should identify the selected dense macro row.");
+            "Production macro workbench breadcrumb should identify the selected dense macro row.");
     require(std::abs(requireSlider(panel, "authoringMacroDefaultSlider").getValue()
                      - project.authoring.macros.back().defaultValue) < 0.001,
-            "Production macro drawer detail binding should follow the selected dense macro row.");
+            "Production macro workbench detail binding should follow the selected dense macro row.");
 
     listBox.selectRow(10);
-    require(requireLabel(panel, "authoringDrawerBreadcrumbLabel").getText().toStdString().find(project.authoring.macros[10].name)
+    require(requireLabel(panel, "authoringWorkbenchBreadcrumbLabel").getText().toStdString().find(project.authoring.macros[10].name)
                 != std::string::npos,
-            "Production macro drawer should keep unassigned dense macro rows selectable.");
+            "Production macro workbench should keep unassigned dense macro rows selectable.");
 
     saveComponentPng(panel, outputDirectory / "production-macro-density-compact.png");
 }

@@ -66,7 +66,7 @@ public:
     void resized() override;
     void reloadFromSession();
     void refreshNow();
-    // Shells can forward a learned MIDI note here while the Articulations drawer
+    // Shells can forward a learned MIDI note here while the Articulations workbench
     // is listening. The value is validated through the normal project transaction.
     bool applyLearnedKeySwitchMidiNote(int midiNote);
 
@@ -113,9 +113,9 @@ private:
     void rebuildTriggerSlotSelector();
     void rebuildArticulationList();
     void refreshInspectorVisibility();
-    void refreshDrawerContextLabels();
+    void refreshWorkbenchContextLabels();
     void refreshContextualAccessibility();
-    void refreshWaveformDrawerContent();
+    void refreshWaveformWorkbenchContent();
     void updateSourceValidationAction();
     void requestWaveformPreviewLoad(bool refreshImmediately = false);
     void refreshDraftPlaybackBanner();
@@ -180,10 +180,10 @@ private:
     void syncZoneMapSelectionState();
     bool applyZoneMapSelectionState(const authoring::ZoneMapCanvas::SelectionState& selectionState);
     std::size_t getZoneMapSelectionCount() const;
-    void setDrawerOpen(bool shouldOpen);
-    void setActiveDrawerTab(authoring::DrawerTab nextTab);
+    void setWorkbenchOpen(bool shouldOpen);
+    void setActiveWorkbenchTab(authoring::WorkbenchTab nextTab);
     void configureAccessibilityAndFocus();
-    void refreshDrawerVisibility();
+    void refreshWorkbenchVisibility();
     void timerCallback(int timerId) override;
     authoring::SelectionSummaryViewModel buildSelectionSummaryViewModel() const;
     authoring::ZoneFieldValuesViewModel buildZoneFieldValuesViewModel() const;
@@ -239,7 +239,7 @@ private:
     int selectedRoundRobinResetIndex = 0;
     bool keySwitchMidiLearnActive = false;
     double keySwitchMidiLearnDeadlineMillis = 0.0;
-    authoring::DrawerState drawerState;
+    authoring::WorkbenchState workbenchState;
     authoring::WorkbenchLayoutState workbenchLayoutState;
     authoring::SelectionSummaryViewModel selectionSummaryViewModel;
     authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
@@ -253,24 +253,24 @@ private:
     juce::TextButton playbackBannerPublishButton;
     juce::Label waveformLabel;
     juce::Label waveformScopeLabel;
-    juce::Label drawerBreadcrumbLabel;
+    juce::Label workbenchBreadcrumbLabel;
     juce::Label waveformStatusLabel;
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
     juce::Label sourceValidationLabel;
     juce::TextButton sourceValidationButton;
-    juce::Component drawerRegion;
-    juce::Component drawerTabStrip;
-    juce::Component drawerContentHost;
+    juce::Component workbenchRegion;
+    juce::Component workbenchTabStrip;
+    juce::Component workbenchContentHost;
     authoring::WorkbenchSplitter workbenchSplitter;
-    juce::TextButton drawerToggleButton;
-    juce::TextButton drawerWaveformTabButton;
-    juce::TextButton drawerGroupsTabButton;
-    juce::TextButton drawerMacrosTabButton;
-    juce::TextButton drawerRoutingTabButton;
-    juce::TextButton drawerPerformanceTabButton;
-    juce::TextButton drawerArticulationsTabButton;
+    juce::TextButton workbenchToggleButton;
+    juce::TextButton workbenchWaveformTabButton;
+    juce::TextButton workbenchGroupsTabButton;
+    juce::TextButton workbenchMacrosTabButton;
+    juce::TextButton workbenchRoutingTabButton;
+    juce::TextButton workbenchPerformanceTabButton;
+    juce::TextButton workbenchArticulationsTabButton;
     juce::Label zoneLabel;
     juce::ComboBox zoneSelector;
     juce::ToggleButton previewEnabledToggle;
@@ -290,8 +290,8 @@ private:
     juce::TextButton groupVisibilityButton;
     juce::Label groupVisibilityHintLabel;
 
-    juce::Component macroDrawerContent;
-    juce::Viewport macroDrawerViewport;
+    juce::Component macroWorkbenchContent;
+    juce::Viewport macroWorkbenchViewport;
     authoring::RepeatedStructureList macroList;
     juce::TextButton macroCreateButton;
     juce::TextButton macroDuplicateButton;
@@ -314,8 +314,8 @@ private:
     juce::TextButton macroMoveUpButton;
     juce::TextButton macroMoveDownButton;
 
-    juce::Component routingDrawerContent;
-    juce::Viewport routingDrawerViewport;
+    juce::Component routingWorkbenchContent;
+    juce::Viewport routingWorkbenchViewport;
     juce::Label fxSectionLabel;
     juce::Label fxScopeLabel;
     juce::ComboBox fxScopeSelector;
@@ -391,8 +391,8 @@ private:
     juce::TextButton roundRobinResetDeleteButton;
     juce::Label roundRobinResetSummaryLabel;
 
-    juce::Component articulationDrawerContent;
-    juce::Viewport articulationDrawerViewport;
+    juce::Component articulationWorkbenchContent;
+    juce::Viewport articulationWorkbenchViewport;
     authoring::RepeatedStructureList articulationList;
     juce::TextButton articulationCreateButton;
     juce::TextButton articulationDuplicateButton;

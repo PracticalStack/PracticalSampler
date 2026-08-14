@@ -20,7 +20,7 @@ Sprint 1 keeps the current baseline sizes intact. The larger expanded target is 
 - Summary strip target height band: `72-88 px`
 - Compact inspector target width band: `270-300 px`
 - Expanded inspector target width band: `320-360 px`
-- Drawer tab strip reservation: `36 px`
+- Workbench tab strip reservation: `36 px`
 - Current waveform detail baseline height: `150 px`
 - Current map baseline height: `160 px` compact, `190 px` expanded
 - Minimum visible map height during compaction work: `160 px`
@@ -32,16 +32,16 @@ Sprint 1 keeps the current baseline sizes intact. The larger expanded target is 
 - `ZoneMappingEditor` owns the zone-field sliders, loop toggle, and restore-root-key action in Sprint 1.
 - `ZoneMapCanvas` owns map painting only in Sprint 1.
 - `WaveformDetailView` owns waveform painting only in Sprint 1.
-- Selection summary, zone field values, and drawer state are represented as explicit UI view-model/state structs.
-- Temporary migration rule: editor-mode routing still lives behind the existing selector until drawer migrations land.
+- Selection summary, zone field values, and workbench state are represented as explicit UI view-model/state structs.
+- Temporary migration rule: editor-mode routing still lives behind the existing selector until workbench migrations land.
 
-## Selection And Drawer Rules
+## Selection And Workbench Rules
 
 - Zone selection must not silently mutate macro, routing, or performance selections.
-- Drawer state is UI-only state and must not be serialized into the project document.
-- Compact shell default drawer state: closed.
-- Expanded shell default drawer state: open to Waveform.
-- Sprint 2 renders a visible drawer host and tab strip; non-waveform tabs remain placeholder hosts until later migrations land.
+- Workbench state is UI-only state and must not be serialized into the project document.
+- Compact shell default workbench state: closed.
+- Expanded shell default workbench state: open to Waveform.
+- Sprint 2 renders a visible workbench host and tab strip; non-waveform tabs remain placeholder hosts until later migrations land.
 
 ## Keyboard And Focus Rules
 

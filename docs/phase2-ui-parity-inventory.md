@@ -11,8 +11,8 @@ This checklist records where every current authoring control lives in the Sprint
 - Summary strip: selection identity, project revision status, Preview, Undo, Redo, and Mark Saved.
 - Toolbar row: zone selector and temporary `Editor` mode selector.
 - Center workspace: persistent zone map in every editor mode.
-- Right inspector: temporary host for Mapping, Macros, Routing, and Performance editors until drawer migrations complete.
-- Bottom drawer: persistent tab strip plus Waveform content on the Waveform tab. Macros, Routing, and Performance tabs are placeholders in Sprint 2 and do not yet own their editors.
+- Right inspector: temporary host for Mapping, Macros, Routing, and Performance editors until workbench migrations complete.
+- Bottom workbench: persistent tab strip plus Waveform content on the Waveform tab. Macros, Routing, and Performance tabs are placeholders in Sprint 2 and do not yet own their editors.
 
 ## Global Reachability
 
@@ -25,13 +25,13 @@ This checklist records where every current authoring control lives in the Sprint
 | Redo | `authoringRedoButton` | Summary strip | Always visible in both shells |
 | Mark Saved | `authoringSaveButton` | Summary strip | Always visible in both shells |
 | Zone selector | `authoringZoneSelector` | Toolbar row | Always visible in both shells |
-| Temporary editor selector | `authoringModeSelector` | Toolbar row | Remains until drawer migrations complete |
+| Temporary editor selector | `authoringModeSelector` | Toolbar row | Remains until workbench migrations complete |
 | Persistent zone map | `authoringZoneMap` | Center workspace | Visible in all four editor modes |
-| Drawer collapse / expand | `authoringDrawerToggleButton` | Drawer tab strip | Compact defaults closed, expanded defaults open |
-| Waveform drawer tab | `authoringDrawerWaveformTab` | Drawer tab strip | Owns live waveform content in Sprint 2 |
-| Macros drawer tab | `authoringDrawerMacrosTab` | Drawer tab strip | Placeholder host only in Sprint 2 |
-| Routing drawer tab | `authoringDrawerRoutingTab` | Drawer tab strip | Placeholder host only in Sprint 2 |
-| Performance drawer tab | `authoringDrawerPerformanceTab` | Drawer tab strip | Placeholder host only in Sprint 2 |
+| Workbench collapse / expand | `authoringWorkbenchToggleButton` | Workbench tab strip | Compact defaults closed, expanded defaults open |
+| Waveform workbench tab | `authoringWorkbenchWaveformTab` | Workbench tab strip | Owns live waveform content in Sprint 2 |
+| Macros workbench tab | `authoringWorkbenchMacrosTab` | Workbench tab strip | Placeholder host only in Sprint 2 |
+| Routing workbench tab | `authoringWorkbenchRoutingTab` | Workbench tab strip | Placeholder host only in Sprint 2 |
+| Performance workbench tab | `authoringWorkbenchPerformanceTab` | Workbench tab strip | Placeholder host only in Sprint 2 |
 
 ## Mapping Mode
 
@@ -51,10 +51,10 @@ This checklist records where every current authoring control lives in the Sprint
 
 | Control / Information | Component ID | Sprint 2 location | Notes |
 | --- | --- | --- | --- |
-| Waveform preview | `authoringWaveformPreview` | Bottom drawer, Waveform tab | Live content in Sprint 2 |
-| Waveform summary text | `waveformLabel` / `waveformInfoLabel` | Bottom drawer, Waveform tab | Shell-owned labels |
-| Loop metadata | `loopInfoLabel` | Bottom drawer, Waveform tab | Shell-owned label |
-| Import responsiveness | `importMetricsLabel` | Bottom drawer, Waveform tab | Shell-owned label |
+| Waveform preview | `authoringWaveformPreview` | Bottom workbench, Waveform tab | Live content in Sprint 2 |
+| Waveform summary text | `waveformLabel` / `waveformInfoLabel` | Bottom workbench, Waveform tab | Shell-owned labels |
+| Loop metadata | `loopInfoLabel` | Bottom workbench, Waveform tab | Shell-owned label |
+| Import responsiveness | `importMetricsLabel` | Bottom workbench, Waveform tab | Shell-owned label |
 
 ## Macros Mode
 
@@ -68,7 +68,7 @@ This checklist records where every current authoring control lives in the Sprint
 | Macro max | `authoringMacroMaxSlider` | Right inspector | Temporary inspector host |
 | Move macro up | `authoringMacroMoveUpButton` | Right inspector | Temporary inspector host |
 | Move macro down | `authoringMacroMoveDownButton` | Right inspector | Temporary inspector host |
-| Future Macros tab entry point | `authoringDrawerMacrosTab` | Drawer tab strip | Placeholder only in Sprint 2 |
+| Future Macros tab entry point | `authoringWorkbenchMacrosTab` | Workbench tab strip | Placeholder only in Sprint 2 |
 
 ## Routing Mode
 
@@ -81,7 +81,7 @@ This checklist records where every current authoring control lives in the Sprint
 | Routing input | `authoringRoutingInputSelector` | Right inspector | Temporary inspector host |
 | Insert A | `authoringRoutingInsertOneSelector` | Right inspector | Temporary inspector host |
 | Insert B | `authoringRoutingInsertTwoSelector` | Right inspector | Temporary inspector host |
-| Future Routing tab entry point | `authoringDrawerRoutingTab` | Drawer tab strip | Placeholder only in Sprint 2 |
+| Future Routing tab entry point | `authoringWorkbenchRoutingTab` | Workbench tab strip | Placeholder only in Sprint 2 |
 
 ## Performance Mode
 
@@ -95,10 +95,10 @@ This checklist records where every current authoring control lives in the Sprint
 | Chord rule | `authoringChordModeSelector` | Right inspector | Temporary inspector host |
 | MIDI import path | `authoringPhraseImportPath` | Right inspector | Temporary inspector host |
 | Import MIDI phrase | `authoringPhraseImportButton` | Right inspector | Temporary inspector host |
-| Future Performance tab entry point | `authoringDrawerPerformanceTab` | Drawer tab strip | Placeholder only in Sprint 2 |
+| Future Performance tab entry point | `authoringWorkbenchPerformanceTab` | Workbench tab strip | Placeholder only in Sprint 2 |
 
 ## Sprint 2 Notes
 
 - There is one production editor per currently editable value in Sprint 2.
-- No duplicate editable macro, routing, or performance controls were introduced into the drawer; those tabs are placeholders until Sprint 4 migrations land.
+- No duplicate editable macro, routing, or performance controls were introduced into the workbench; those tabs are placeholders until Sprint 4 migrations land.
 - The mode selector is still the source of truth for those three editor families during Sprint 2.

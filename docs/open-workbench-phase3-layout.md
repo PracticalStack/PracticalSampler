@@ -2,7 +2,7 @@
 
 Status: implemented August 13, 2026
 
-Phase 3 converts the fixed authoring drawer into a session-local, resizable
+Phase 3 converts the fixed authoring workbench into a session-local, resizable
 workbench while preserving the existing content components, callbacks, command
 handlers, and authored-state boundaries.
 
@@ -16,7 +16,7 @@ handlers, and authored-state boundaries.
 | Standard | 232 px | Default Waveform height within the approved 220–240 px band. |
 | Focused | 340 px | Preferred for Groups, Macros, Routing, Performance, and Articulations within the approved 320–360 px band. |
 
-The active tab remains in the existing `DrawerState`, and the remembered height
+The active tab remains in the existing `WorkbenchState`, and the remembered height
 lives in `WorkbenchLayoutState`. Both are members of one `AuthoringPanel`, so
 they persist for the workspace UI session but have no project-document, host
 recall, or authoring transaction path.
@@ -36,7 +36,7 @@ a larger host restores the remembered value.
 - Up/Down adjusts by 8 px; Shift+Up/Down adjusts by 32 px.
 - Return or Space switches between Standard and Focused.
 - Double-click provides the same Standard/Focused switch.
-- The existing `authoringDrawerToggleButton` remains the keyboard-accessible
+- The existing `authoringWorkbenchToggleButton` remains the keyboard-accessible
   collapse/expand action.
 
 The splitter has explicit focus order 59, immediately before the workbench
@@ -68,7 +68,7 @@ full editor content. The remembered height is not changed by this clamp.
   to diagnostic summaries; short and compact shells retain the established
   scroll-safe fallback.
 
-Legacy `DrawerTab`, `DrawerState`, component IDs, and visible toggle text remain
+Legacy `WorkbenchTab`, `WorkbenchState`, component IDs, and visible toggle text remain
 intentionally stable for the migration pass. Accessibility titles now describe
 the surface as the Authoring Workbench.
 

@@ -8,7 +8,7 @@
 
 namespace drs::app::authoring
 {
-enum class DrawerTab
+enum class WorkbenchTab
 {
     waveform,
     groups,
@@ -18,10 +18,10 @@ enum class DrawerTab
     articulations
 };
 
-struct DrawerState
+struct WorkbenchState
 {
     bool open = false;
-    DrawerTab activeTab = DrawerTab::waveform;
+    WorkbenchTab activeTab = WorkbenchTab::waveform;
 };
 
 struct SelectionSummaryViewModel
