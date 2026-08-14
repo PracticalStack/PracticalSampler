@@ -3922,6 +3922,57 @@ add_test(
 )
 set_tests_properties(drs.phase1.performance_package_host_validation PROPERTIES RUN_SERIAL TRUE)
 
+juce_add_console_app(drs_playable_instrument_license_contract_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Playable Instrument License Contract Tests"
+)
+
+target_sources(drs_playable_instrument_license_contract_tests
+    PRIVATE
+        src/PlayableInstrumentLicenseContractTests.cpp
+)
+
+target_link_libraries(drs_playable_instrument_license_contract_tests
+    PRIVATE
+        juce::juce_core
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_include_directories(drs_playable_instrument_license_contract_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/app/src
+        ${CMAKE_SOURCE_DIR}/engine_adapter/include
+)
+
+target_compile_features(drs_playable_instrument_license_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.playable_instrument_license.contract
+    COMMAND drs_playable_instrument_license_contract_tests
+)
+
+set_target_properties(drs_playable_instrument_license_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+add_executable(drs_playable_instrument_license_contract_red_tests
+    src/PlayableInstrumentLicenseContractRedTests.cpp
+)
+
+target_compile_features(drs_playable_instrument_license_contract_red_tests PRIVATE cxx_std_17)
+target_compile_definitions(drs_playable_instrument_license_contract_red_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+# LI-01 expected-red seams are invoked directly and intentionally excluded from
+# CTest and drs_all_tests. LI-02 through LI-04 promote each seam to green coverage.
+set_target_properties(drs_playable_instrument_license_contract_red_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 juce_add_console_app(drs_phase1_performance_package_release_gate
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Release Gate"
 )
@@ -4429,6 +4480,7 @@ add_dependencies(drs_all_tests
     drs_phase1_performance_package_session_tests
     drs_performance_package_export_lifecycle_tests
     drs_phase1_performance_package_host_validation_tests
+    drs_playable_instrument_license_contract_tests
     drs_phase1_performance_package_release_gate
 )
 

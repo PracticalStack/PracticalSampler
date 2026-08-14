@@ -204,6 +204,7 @@ const char* toString(const PackageV2RecordKind kind) noexcept
         case PackageV2RecordKind::sampleHead: return "sample-head";
         case PackageV2RecordKind::samplePage: return "sample-page";
         case PackageV2RecordKind::backgroundImage: return "background-image";
+        case PackageV2RecordKind::licenseText: return "license-text";
     }
     return "unknown";
 }

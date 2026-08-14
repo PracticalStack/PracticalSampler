@@ -13,6 +13,8 @@ inline constexpr const char* exportPerformancePackageMenuLabel = "Export Playabl
 inline constexpr const char* importWavMenuLabel = "Import WAV...";
 inline constexpr const char* importSfzMenuLabel = "Import SFZ...";
 inline constexpr const char* importBackgroundImageMenuLabel = "Import Background Image...";
+inline constexpr const char* importLicenseFileMenuLabel = "Import License File...";
+inline constexpr const char* viewLicenseMenuLabel = "View License";
 inline constexpr const char* projectDirectoryHelpText
     = "Open/Save Project edits .drsproj files; Export Playable Instrument creates a separate read-only .drpkg package.";
 } // namespace drs::app

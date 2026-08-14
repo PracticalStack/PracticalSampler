@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/PlayableInstrumentLicense.h"
+
 #include <string>
 #include <vector>
 
@@ -72,6 +74,11 @@ struct PerformancePackageManifest
         std::string payloadId;
     };
 
+    struct License
+    {
+        std::string payloadId;
+    };
+
     std::string schemaName = performancePackageSchemaName;
     int schemaVersion = performancePackageSchemaVersion;
     std::string packageId;
@@ -82,6 +89,7 @@ struct PerformancePackageManifest
     double masterGainDb = 0.0;
     std::vector<GroupRoute> groupRoutes;
     BackgroundImage backgroundImage;
+    License license;
     std::vector<std::string> notes;
 };
 

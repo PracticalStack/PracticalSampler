@@ -651,6 +651,8 @@ const char* toString(const PerformancePackagePayloadKind kind) noexcept
             return "runtimeStreamPayload";
         case PerformancePackagePayloadKind::backgroundImage:
             return "backgroundImage";
+        case PerformancePackagePayloadKind::licenseText:
+            return "licenseText";
     }
 
     return "unknown";

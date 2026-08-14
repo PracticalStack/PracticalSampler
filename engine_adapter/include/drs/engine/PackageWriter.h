@@ -21,7 +21,8 @@ enum class PerformancePackagePayloadKind
     runtimeInstrument,
     runtimeStreamIndex,
     runtimeStreamPayload,
-    backgroundImage
+    backgroundImage,
+    licenseText
 };
 
 struct PerformancePackagePayloadSource

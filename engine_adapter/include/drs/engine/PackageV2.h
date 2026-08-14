@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/PackageCrypto.h"
+#include "drs/engine/PlayableInstrumentLicense.h"
 
 #include <cstdint>
 #include <functional>
@@ -20,7 +21,8 @@ enum class PackageV2RecordKind : std::uint32_t
     streamIndex = 3,
     sampleHead = 4,
     samplePage = 5,
-    backgroundImage = 6
+    backgroundImage = 6,
+    licenseText = playableInstrumentLicensePackageV2RecordKind
 };
 
 enum class PackageV2Failure
