@@ -2350,7 +2350,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(zoneMap,
                                 "Zone map",
                                 "Displays project zones across key and velocity ranges.",
-                                "Hold Control while scrolling to zoom around the pointer. When zoomed, drag empty map space to pan. Use arrow keys to move the primary selection, hold Control to toggle extra zones, drag a box to multi-select, drag handles to edit ranges, or right-click to delete the selected sample.");
+                                "Use the mouse wheel or Control-scroll to zoom around the pointer. Use a smooth trackpad gesture to pan, Shift-scroll to pan horizontally, or middle-drag to pan. Hold Space while dragging for the temporary hand. Use Fit All or Fit Selected in the map toolbar, arrow keys to move the primary selection, Control to toggle extra zones, or drag a box to multi-select.");
     zoneMap.setExplicitFocusOrder(30);
 
     configureAccessibleMetadata(drawerRegion,

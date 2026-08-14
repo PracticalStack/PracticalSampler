@@ -75,10 +75,15 @@ public:
     bool isCrossfadeGestureActive() const { return activeCrossfadeGesture.has_value(); }
     bool requestZoomAt(juce::Point<float> position, float wheelDelta);
     bool requestPanBy(juce::Point<float> pixelDelta);
+    bool zoomBy(float wheelDelta);
+    bool fitSelected(float paddingProportion = 0.04f);
     void resetViewport();
     float getZoomFactor() const noexcept { return viewport.getZoom(); }
+    int getDisplayedZoomPercentage() const noexcept { return viewport.getDisplayedZoomPercentage(); }
     juce::Point<float> getViewportOrigin() const noexcept { return viewport.getOrigin(); }
+    juce::Rectangle<float> getMapViewportBounds() const { return getInnerBounds(); }
     void paint(juce::Graphics& g) override;
+    void resized() override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
@@ -86,6 +91,7 @@ public:
     void mouseWheelMove(const juce::MouseEvent& event,
                         const juce::MouseWheelDetails& wheel) override;
     bool keyPressed(const juce::KeyPress& key) override;
+    bool keyStateChanged(bool isKeyDown) override;
     void focusGained(FocusChangeType cause) override;
     void focusLost(FocusChangeType cause) override;
 
@@ -131,6 +137,9 @@ private:
     };
 
     juce::Rectangle<float> getInnerBounds() const;
+    juce::Rectangle<int> getNavigationToolbarBounds() const;
+    juce::Rectangle<float> computeNormalizedZoneBounds(
+        const drs::engine::AuthoringZoneSummary& zone) const;
     juce::Point<float> normalizedContentToCanvas(juce::Point<float> position) const;
     drs::engine::AuthoringZoneSummary getDisplayZoneSummary(std::size_t index) const;
     juce::Rectangle<float> computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const;
@@ -158,6 +167,7 @@ private:
     SelectionState buildSelectionStateForBounds(juce::Rectangle<float> bounds, SelectionMode mode) const;
     bool requestSelectionByIndex(std::size_t index, SelectionMode mode = SelectionMode::replace);
     bool requestSelectionState(const SelectionState& selectionState);
+    void refreshViewportUi();
     void showContextMenuAt(juce::Point<int> screenPosition);
 
     std::vector<drs::engine::AuthoringZoneSummary> zoneSummaries;
@@ -179,6 +189,13 @@ private:
     std::optional<MarqueeGesture> activeMarqueeGesture;
     std::optional<PanGesture> activePanGesture;
     ZoneMapViewState viewport;
+    juce::Component navigationToolbar;
+    juce::TextButton fitAllButton;
+    juce::TextButton fitSelectedButton;
+    juce::TextButton zoomOutButton;
+    juce::TextButton zoomInButton;
+    juce::Label zoomValueLabel;
+    bool temporaryPanKeyDown = false;
     bool sampleFileDragActive = false;
 };
 } // namespace drs::app::authoring

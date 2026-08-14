@@ -403,12 +403,13 @@ bool componentTreeContainsLabelText(juce::Component& root, const juce::String& e
 juce::Point<float> computeZoneMapPoint(const juce::Component& zoneMap,
                                        const drs::engine::AuthoringZoneSummary& zone)
 {
-    const auto inner = zoneMap.getLocalBounds().toFloat().reduced(12.0f);
-    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 127.0f);
+    const auto inner = dynamic_cast<const drs::app::authoring::ZoneMapCanvas&>(zoneMap)
+                           .getMapViewportBounds();
+    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 128.0f);
     const auto width = std::max(10.0f,
                                 inner.getWidth() * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
     const auto normalizedVelocityLow = 1.0f - (static_cast<float>(zone.velocityHigh) / 127.0f);
-    const auto normalizedVelocityHigh = 1.0f - (static_cast<float>(zone.velocityLow) / 127.0f);
+    const auto normalizedVelocityHigh = static_cast<float>(128 - zone.velocityLow) / 127.0f;
     const auto y = inner.getY() + inner.getHeight() * normalizedVelocityLow;
     const auto height = std::max(14.0f, inner.getHeight() * (normalizedVelocityHigh - normalizedVelocityLow));
     return {x + (width * 0.5f), y + (height * 0.5f)};
@@ -417,12 +418,13 @@ juce::Point<float> computeZoneMapPoint(const juce::Component& zoneMap,
 juce::Rectangle<float> computeZoneMapBounds(const juce::Component& zoneMap,
                                             const drs::engine::AuthoringZoneSummary& zone)
 {
-    const auto inner = zoneMap.getLocalBounds().toFloat().reduced(12.0f);
-    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 127.0f);
+    const auto inner = dynamic_cast<const drs::app::authoring::ZoneMapCanvas&>(zoneMap)
+                           .getMapViewportBounds();
+    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 128.0f);
     const auto width = std::max(10.0f,
                                 inner.getWidth() * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
     const auto normalizedVelocityLow = 1.0f - (static_cast<float>(zone.velocityHigh) / 127.0f);
-    const auto normalizedVelocityHigh = 1.0f - (static_cast<float>(zone.velocityLow) / 127.0f);
+    const auto normalizedVelocityHigh = static_cast<float>(128 - zone.velocityLow) / 127.0f;
     const auto y = inner.getY() + inner.getHeight() * normalizedVelocityLow;
     const auto height = std::max(14.0f, inner.getHeight() * (normalizedVelocityHigh - normalizedVelocityLow));
     return {x, y, width, height};
@@ -456,12 +458,13 @@ juce::Point<float> computeZoneMapHandlePoint(const juce::Component& zoneMap,
                                              const drs::engine::AuthoringZoneSummary& zone,
                                              drs::app::authoring::ZoneMapCanvas::RangeHandle handle)
 {
-    const auto inner = zoneMap.getLocalBounds().toFloat().reduced(12.0f);
-    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 127.0f);
+    const auto inner = dynamic_cast<const drs::app::authoring::ZoneMapCanvas&>(zoneMap)
+                           .getMapViewportBounds();
+    const auto x = inner.getX() + inner.getWidth() * (static_cast<float>(zone.keyLow) / 128.0f);
     const auto width = std::max(10.0f,
                                 inner.getWidth() * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
     const auto normalizedVelocityLow = 1.0f - (static_cast<float>(zone.velocityHigh) / 127.0f);
-    const auto normalizedVelocityHigh = 1.0f - (static_cast<float>(zone.velocityLow) / 127.0f);
+    const auto normalizedVelocityHigh = static_cast<float>(128 - zone.velocityLow) / 127.0f;
     const auto y = inner.getY() + inner.getHeight() * normalizedVelocityLow;
     const auto height = std::max(14.0f, inner.getHeight() * (normalizedVelocityHigh - normalizedVelocityLow));
     const auto bounds = juce::Rectangle<float>(x, y, width, height);
@@ -486,7 +489,8 @@ juce::Point<float> computeZoneMapTargetPointForKey(const juce::Component& zoneMa
                                                    const drs::engine::AuthoringZoneSummary& zone,
                                                    int midiKey)
 {
-    const auto inner = zoneMap.getLocalBounds().toFloat().reduced(12.0f);
+    const auto inner = dynamic_cast<const drs::app::authoring::ZoneMapCanvas&>(zoneMap)
+                           .getMapViewportBounds();
     const auto normalizedKey = juce::jlimit(0.0f, 127.0f, static_cast<float>(midiKey)) / 127.0f;
     const auto x = inner.getX() + inner.getWidth() * normalizedKey;
     return {x, computeZoneMapPoint(zoneMap, zone).y};
@@ -496,7 +500,8 @@ juce::Point<float> computeZoneMapTargetPointForVelocity(const juce::Component& z
                                                         const drs::engine::AuthoringZoneSummary& zone,
                                                         int velocity)
 {
-    const auto inner = zoneMap.getLocalBounds().toFloat().reduced(12.0f);
+    const auto inner = dynamic_cast<const drs::app::authoring::ZoneMapCanvas&>(zoneMap)
+                           .getMapViewportBounds();
     const auto clampedVelocity = juce::jlimit(1.0f, 127.0f, static_cast<float>(velocity));
     const auto normalizedVelocity = 1.0f - (clampedVelocity / 127.0f);
     const auto y = inner.getY() + inner.getHeight() * normalizedVelocity;
@@ -3487,9 +3492,10 @@ void exerciseZoneMapViewportGestures()
 
     ZoneMapCanvas zoneMap;
     zoneMap.setBounds(0, 0, 800, 320);
-    const auto centre = zoneMap.getLocalBounds().getCentre().toFloat();
+    const auto centre = zoneMap.getMapViewportBounds().getCentre();
     require(std::abs(zoneMap.getZoomFactor() - 1.0f) < 0.001f
-                && zoneMap.getViewportOrigin() == juce::Point<float> {},
+                && zoneMap.getViewportOrigin() == juce::Point<float> {}
+                && zoneMap.getDisplayedZoomPercentage() == 25,
             "Zone Map should begin at the full key/velocity extent.");
 
     const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();
@@ -3500,11 +3506,12 @@ void exerciseZoneMapViewportGestures()
                                            1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                            &zoneMap, &zoneMap,
                                            eventTime, centre, eventTime, 1, false);
-    juce::MouseWheelDetails wheel;
+    juce::MouseWheelDetails wheel {};
     wheel.deltaY = 0.5f;
     zoneMap.mouseWheelMove(plainWheelEvent, wheel);
-    require(std::abs(zoneMap.getZoomFactor() - 1.0f) < 0.001f,
-            "Scrolling without Control must leave the Zone Map viewport unchanged.");
+    require(zoneMap.getZoomFactor() > 1.0f,
+            "A stepped mouse wheel should zoom without requiring a modifier.");
+    zoneMap.resetViewport();
 
     const juce::MouseEvent ctrlWheelEvent(mouseSource,
                                           centre,
@@ -3527,13 +3534,13 @@ void exerciseZoneMapViewportGestures()
     const auto dragEnd = juce::Point<float> { 380.0f, 210.0f };
     const juce::MouseEvent panMouseDown(mouseSource,
                                         dragStart,
-                                        juce::ModifierKeys::leftButtonModifier,
+                                        juce::ModifierKeys::middleButtonModifier,
                                         1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                         &zoneMap, &zoneMap,
                                         eventTime, dragStart, eventTime, 1, false);
     const juce::MouseEvent panMouseDrag(mouseSource,
                                         dragEnd,
-                                        juce::ModifierKeys::leftButtonModifier,
+                                        juce::ModifierKeys::middleButtonModifier,
                                         1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                         &zoneMap, &zoneMap,
                                         eventTime, dragStart, eventTime, 1, true);
@@ -3542,7 +3549,26 @@ void exerciseZoneMapViewportGestures()
     zoneMap.mouseUp(panMouseDrag);
     const auto pannedOrigin = zoneMap.getViewportOrigin();
     require(pannedOrigin.x < zoomedOrigin.x && pannedOrigin.y < zoomedOrigin.y,
-            "Dragging empty space while zoomed should pan the mapping focus with the pointer.");
+            "Middle-button drag should pan the mapping focus with the pointer.");
+
+    const auto originBeforeMarquee = zoneMap.getViewportOrigin();
+    const juce::MouseEvent marqueeMouseDown(mouseSource,
+                                            dragStart,
+                                            juce::ModifierKeys::leftButtonModifier,
+                                            1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                            &zoneMap, &zoneMap,
+                                            eventTime, dragStart, eventTime, 1, false);
+    const juce::MouseEvent marqueeMouseDrag(mouseSource,
+                                            dragEnd,
+                                            juce::ModifierKeys::leftButtonModifier,
+                                            1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                            &zoneMap, &zoneMap,
+                                            eventTime, dragStart, eventTime, 1, true);
+    zoneMap.mouseDown(marqueeMouseDown);
+    zoneMap.mouseDrag(marqueeMouseDrag);
+    zoneMap.mouseUp(marqueeMouseDrag);
+    require(zoneMap.getViewportOrigin() == originBeforeMarquee,
+            "Plain left drag on empty space must remain a marquee gesture while zoomed.");
 
     zoneMap.resetViewport();
     require(std::abs(zoneMap.getZoomFactor() - 1.0f) < 0.001f

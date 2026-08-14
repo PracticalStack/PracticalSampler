@@ -28,6 +28,10 @@ constexpr float rangeHandleHitRadius = 12.0f;
 constexpr float crossfadeHandleRadius = 7.0f;
 constexpr float crossfadeHandleHitRadius = 14.0f;
 constexpr float marqueeDragThreshold = 4.0f;
+constexpr int navigationToolbarHeight = 28;
+constexpr int navigationToolbarGap = 5;
+constexpr float velocityAxisWidth = 36.0f;
+constexpr float pitchAxisHeight = 24.0f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
 
 bool isSupportedSampleFile(const juce::String& path)
@@ -54,18 +58,69 @@ ZoneMapCanvas::ZoneMapCanvas()
     setMouseClickGrabsKeyboardFocus(true);
     setColour(juce::ListBox::backgroundColourId, zoneMapGrid);
     setColour(juce::TextEditor::focusedOutlineColourId, zoneMapFocusRing);
+
+    navigationToolbar.setComponentID("authoringZoneMapToolbar");
+    navigationToolbar.setTitle("Zone Map navigation");
+    navigationToolbar.setDescription("Zoom and fit commands for the Zone Map viewport.");
+    navigationToolbar.setInterceptsMouseClicks(false, true);
+    addAndMakeVisible(navigationToolbar);
+
+    fitAllButton.setComponentID("authoringZoneMapFitAll");
+    fitSelectedButton.setComponentID("authoringZoneMapFitSelected");
+    zoomOutButton.setComponentID("authoringZoneMapZoomOut");
+    zoomInButton.setComponentID("authoringZoneMapZoomIn");
+    zoomValueLabel.setComponentID("authoringZoneMapZoomValue");
+
+    fitAllButton.setButtonText("Fit All");
+    fitSelectedButton.setButtonText("Fit Selected");
+    zoomOutButton.setButtonText("−");
+    zoomInButton.setButtonText("+");
+    fitAllButton.setTitle("Fit all zones");
+    fitSelectedButton.setTitle("Fit selected zones");
+    zoomOutButton.setTitle("Zoom out");
+    zoomInButton.setTitle("Zoom in");
+    zoomValueLabel.setTitle("Map zoom");
+    fitAllButton.setTooltip("Show the complete key and velocity map.");
+    fitSelectedButton.setTooltip("Zoom and pan to include every selected zone.");
+    zoomOutButton.setTooltip("Zoom out around the centre of the current view.");
+    zoomInButton.setTooltip("Zoom in around the centre of the current view.");
+    zoomValueLabel.setTooltip("Current Zone Map zoom. Fit All is the 25% overview.");
+    zoomValueLabel.setJustificationType(juce::Justification::centred);
+    zoomValueLabel.setInterceptsMouseClicks(false, false);
+
+    for (auto* child : { static_cast<juce::Component*>(&fitAllButton),
+                         static_cast<juce::Component*>(&fitSelectedButton),
+                         static_cast<juce::Component*>(&zoomOutButton),
+                         static_cast<juce::Component*>(&zoomInButton),
+                         static_cast<juce::Component*>(&zoomValueLabel) })
+    {
+        navigationToolbar.addAndMakeVisible(child);
+    }
+
+    fitAllButton.onClick = [this] { resetViewport(); grabKeyboardFocus(); };
+    fitSelectedButton.onClick = [this] { fitSelected(); grabKeyboardFocus(); };
+    zoomOutButton.onClick = [this] { zoomBy(-0.22f); grabKeyboardFocus(); };
+    zoomInButton.onClick = [this] { zoomBy(0.22f); grabKeyboardFocus(); };
+    refreshViewportUi();
 }
 
 void ZoneMapCanvas::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries)
 {
+    const auto topologyChanged = summaries.size() != zoneSummaries.size()
+        || !std::equal(summaries.begin(), summaries.end(), zoneSummaries.begin(), zoneSummaries.end(),
+                       [](const auto& left, const auto& right) { return left.id == right.id; });
     zoneSummaries = std::move(summaries);
     focusedCrossfadeGesture.reset();
+    if (topologyChanged)
+        viewport.reset();
+    refreshViewportUi();
     repaint();
 }
 
 void ZoneMapCanvas::setSelectionState(SelectionState nextSelectionState)
 {
     selectionState = std::move(nextSelectionState);
+    refreshViewportUi();
     repaint();
 }
 
@@ -252,6 +307,7 @@ bool ZoneMapCanvas::requestZoomAt(juce::Point<float> position, float wheelDelta)
     };
     if (!viewport.zoomAt(pointerProportion, wheelDelta))
         return false;
+    refreshViewportUi();
     repaint();
     return true;
 }
@@ -261,6 +317,48 @@ bool ZoneMapCanvas::requestPanBy(juce::Point<float> pixelDelta)
     const auto inner = getInnerBounds();
     if (!viewport.panByPixels(pixelDelta, { inner.getWidth(), inner.getHeight() }))
         return false;
+    refreshViewportUi();
+    repaint();
+    return true;
+}
+
+bool ZoneMapCanvas::zoomBy(const float wheelDelta)
+{
+    return requestZoomAt(getInnerBounds().getCentre(), wheelDelta);
+}
+
+bool ZoneMapCanvas::fitSelected(const float paddingProportion)
+{
+    if (selectionState.zoneIds.empty()
+        || activeGesture.has_value()
+        || activeCrossfadeGesture.has_value()
+        || activeMarqueeGesture.has_value()
+        || activePanGesture.has_value())
+    {
+        return false;
+    }
+
+    std::unordered_set<std::string> selectedIds(selectionState.zoneIds.begin(),
+                                                selectionState.zoneIds.end());
+    std::optional<juce::Rectangle<float>> selectedBounds;
+    for (const auto& zone : zoneSummaries)
+    {
+        if (selectedIds.count(zone.id) == 0u)
+            continue;
+
+        const auto zoneBounds = computeNormalizedZoneBounds(zone);
+        selectedBounds = selectedBounds.has_value()
+            ? selectedBounds->getUnion(zoneBounds)
+            : zoneBounds;
+    }
+
+    if (!selectedBounds.has_value()
+        || !viewport.fitContentBounds(*selectedBounds, paddingProportion))
+    {
+        return false;
+    }
+
+    refreshViewportUi();
     repaint();
     return true;
 }
@@ -270,7 +368,22 @@ void ZoneMapCanvas::resetViewport()
     viewport.reset();
     activePanGesture.reset();
     setMouseCursor(juce::MouseCursor::NormalCursor);
+    refreshViewportUi();
     repaint();
+}
+
+void ZoneMapCanvas::resized()
+{
+    navigationToolbar.setBounds(getNavigationToolbarBounds());
+    auto toolbar = navigationToolbar.getLocalBounds();
+    fitAllButton.setBounds(toolbar.removeFromLeft(std::min(62, toolbar.getWidth())));
+    toolbar.removeFromLeft(std::min(4, toolbar.getWidth()));
+    fitSelectedButton.setBounds(toolbar.removeFromLeft(std::min(92, toolbar.getWidth())));
+
+    auto zoomControls = toolbar.removeFromRight(std::min(114, toolbar.getWidth()));
+    zoomOutButton.setBounds(zoomControls.removeFromLeft(std::min(28, zoomControls.getWidth())));
+    zoomValueLabel.setBounds(zoomControls.removeFromLeft(std::min(58, zoomControls.getWidth())));
+    zoomInButton.setBounds(zoomControls);
 }
 
 void ZoneMapCanvas::paint(juce::Graphics& g)
@@ -284,6 +397,25 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
         drawFocusRing(g, bounds.reduced(2.0f), 14.0f, findColour(juce::TextEditor::focusedOutlineColourId));
 
     const auto inner = getInnerBounds();
+    const auto toolbarBounds = getNavigationToolbarBounds().toFloat();
+    const auto axisSurface = findColour(juce::ListBox::backgroundColourId).brighter(0.06f);
+    g.setColour(axisSurface);
+    g.fillRect(toolbarBounds.expanded(0.0f, 2.0f));
+    g.fillRect(juce::Rectangle<float> { inner.getX() - velocityAxisWidth,
+                                       inner.getY(),
+                                       velocityAxisWidth,
+                                       inner.getHeight() });
+    g.fillRect(juce::Rectangle<float> { inner.getX(),
+                                       inner.getBottom(),
+                                       inner.getWidth(),
+                                       pitchAxisHeight });
+    g.setColour(zoneMapOutline.withAlpha(0.42f));
+    g.drawHorizontalLine(static_cast<int>(toolbarBounds.getBottom() + 2.0f),
+                         bounds.getX() + 8.0f,
+                         bounds.getRight() - 8.0f);
+    g.drawVerticalLine(static_cast<int>(inner.getX()), inner.getY(), inner.getBottom());
+    g.drawHorizontalLine(static_cast<int>(inner.getBottom()), inner.getX(), inner.getRight());
+
     g.setColour(juce::Colour::fromRGBA(24, 29, 33, 24));
 
     for (int key = 0; key <= 127; key += 12)
@@ -448,17 +580,42 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
         g.drawRoundedRectangle(marqueeBounds, 6.0f, 1.5f);
     }
 
-    const auto zoomText = viewport.getZoom() > ZoneMapViewState::minimumZoom
-        ? juce::String(std::lround(viewport.getZoom() * 100.0f)) + "%  |  Drag empty space to pan"
-        : juce::String("Ctrl + scroll to zoom");
-    g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
-    const auto zoomTextWidth = std::min(getWidth() - 24,
-                                        viewport.getZoom() > ZoneMapViewState::minimumZoom ? 220 : 142);
-    auto zoomBounds = getLocalBounds().reduced(12).removeFromTop(22).removeFromRight(zoomTextWidth);
-    g.setColour(zoneMapLabelFill);
-    g.fillRoundedRectangle(zoomBounds.toFloat(), 6.0f);
-    g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.drawFittedText(zoomText, zoomBounds.reduced(8, 2), juce::Justification::centredRight, 1);
+    constexpr const char* noteNames[] = {
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+    };
+    g.setFont(juce::FontOptions(9.5f, juce::Font::bold));
+    g.setColour(zoneMapFocusRing.withAlpha(0.72f));
+    for (int key = 0; key <= 127; key += 12)
+    {
+        const auto x = normalizedContentToCanvas(
+            { static_cast<float>(key) / 127.0f, 0.0f }).x;
+        if (x < inner.getX() || x > inner.getRight())
+            continue;
+        g.drawVerticalLine(static_cast<int>(x), inner.getBottom(), inner.getBottom() + 4.0f);
+        const auto label = juce::String(noteNames[key % 12]) + juce::String(key / 12 - 1);
+        g.drawFittedText(label,
+                         juce::Rectangle<int>(static_cast<int>(x) - 16,
+                                              static_cast<int>(inner.getBottom()) + 4,
+                                              32,
+                                              static_cast<int>(pitchAxisHeight) - 5),
+                         juce::Justification::centred,
+                         1);
+    }
+
+    for (const auto velocity : { 1, 32, 64, 96, 127 })
+    {
+        const auto y = velocityToCanvasY(velocity);
+        if (y < inner.getY() || y > inner.getBottom())
+            continue;
+        g.drawHorizontalLine(static_cast<int>(y), inner.getX() - 4.0f, inner.getX());
+        g.drawFittedText(juce::String(velocity),
+                         juce::Rectangle<int>(static_cast<int>(inner.getX() - velocityAxisWidth),
+                                              static_cast<int>(y) - 8,
+                                              static_cast<int>(velocityAxisWidth) - 5,
+                                              16),
+                         juce::Justification::centredRight,
+                         1);
+    }
 
     const auto hasCrossfades = std::any_of(zoneSummaries.begin(), zoneSummaries.end(), [](const auto& zone)
     {
@@ -466,7 +623,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     });
     if (hasCrossfades)
     {
-        auto legendBounds = getLocalBounds().reduced(12).removeFromTop(22).removeFromLeft(190);
+        auto legendBounds = inner.toNearestInt().reduced(5).removeFromTop(20).removeFromLeft(174);
         g.setColour(zoneMapLabelFill);
         g.fillRoundedRectangle(legendBounds.toFloat(), 6.0f);
         g.setColour(crossfadeInColour);
@@ -503,14 +660,18 @@ void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
     if (beginRangeGestureAt(event.position))
         return;
 
-    if (viewport.getZoom() > ZoneMapViewState::minimumZoom
-        && event.mods.isLeftButtonDown()
-        && !findZoneIndexAt(event.position).has_value())
+    temporaryPanKeyDown = juce::KeyPress::isKeyCurrentlyDown(juce::KeyPress::spaceKey);
+    const auto temporaryHandRequested = event.mods.isMiddleButtonDown()
+        || (event.mods.isLeftButtonDown() && temporaryPanKeyDown);
+    if (temporaryHandRequested)
     {
         activePanGesture = PanGesture { event.position, viewport };
         setMouseCursor(juce::MouseCursor::DraggingHandCursor);
         return;
     }
+
+    if (!event.mods.isLeftButtonDown())
+        return;
 
     activeMarqueeGesture = MarqueeGesture { event.position, event.position, event.mods.isCtrlDown(), false };
 }
@@ -556,6 +717,7 @@ void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)
         viewport = activePanGesture->initialViewport;
         const auto inner = getInnerBounds();
         viewport.panByPixels(pixelDelta, { inner.getWidth(), inner.getHeight() });
+        refreshViewportUi();
         repaint();
         return;
     }
@@ -583,7 +745,8 @@ void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
     if (activePanGesture.has_value())
     {
         activePanGesture.reset();
-        setMouseCursor(juce::MouseCursor::NormalCursor);
+        setMouseCursor(temporaryPanKeyDown ? juce::MouseCursor::DraggingHandCursor
+                                          : juce::MouseCursor::NormalCursor);
         repaint();
         return;
     }
@@ -610,16 +773,31 @@ void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
 void ZoneMapCanvas::mouseWheelMove(const juce::MouseEvent& event,
                                    const juce::MouseWheelDetails& wheel)
 {
-    if (!event.mods.isCtrlDown())
+    const auto inner = getInnerBounds();
+    const auto primaryDelta = !juce::approximatelyEqual(wheel.deltaY, 0.0f)
+        ? wheel.deltaY
+        : wheel.deltaX;
+
+    if (event.mods.isShiftDown())
     {
-        juce::Component::mouseWheelMove(event, wheel);
+        const auto horizontalDelta = !juce::approximatelyEqual(wheel.deltaY, 0.0f)
+            ? wheel.deltaY
+            : wheel.deltaX;
+        requestPanBy({ horizontalDelta * inner.getWidth() * 0.35f, 0.0f });
         return;
     }
 
-    const auto wheelDelta = !juce::approximatelyEqual(wheel.deltaY, 0.0f)
-        ? wheel.deltaY
-        : wheel.deltaX;
-    requestZoomAt(event.position, wheelDelta);
+    const auto explicitZoom = event.mods.isCtrlDown() || event.mods.isCommandDown();
+    if (wheel.isSmooth && !explicitZoom)
+    {
+        const auto handled = requestPanBy({ wheel.deltaX * inner.getWidth() * 0.35f,
+                                            wheel.deltaY * inner.getHeight() * 0.35f });
+        if (!handled)
+            juce::Component::mouseWheelMove(event, wheel);
+        return;
+    }
+
+    requestZoomAt(event.position, primaryDelta);
 }
 
 bool ZoneMapCanvas::keyPressed(const juce::KeyPress& key)
@@ -663,6 +841,16 @@ bool ZoneMapCanvas::keyPressed(const juce::KeyPress& key)
     return false;
 }
 
+bool ZoneMapCanvas::keyStateChanged(const bool isKeyDown)
+{
+    const auto wasActive = temporaryPanKeyDown;
+    temporaryPanKeyDown = juce::KeyPress::isKeyCurrentlyDown(juce::KeyPress::spaceKey);
+    if (temporaryPanKeyDown != wasActive && !activePanGesture.has_value())
+        setMouseCursor(temporaryPanKeyDown ? juce::MouseCursor::DraggingHandCursor
+                                          : juce::MouseCursor::NormalCursor);
+    return temporaryPanKeyDown || juce::Component::keyStateChanged(isKeyDown);
+}
+
 void ZoneMapCanvas::focusGained(FocusChangeType)
 {
     repaint();
@@ -670,12 +858,37 @@ void ZoneMapCanvas::focusGained(FocusChangeType)
 
 void ZoneMapCanvas::focusLost(FocusChangeType)
 {
+    temporaryPanKeyDown = false;
+    if (!activePanGesture.has_value())
+        setMouseCursor(juce::MouseCursor::NormalCursor);
     repaint();
 }
 
 juce::Rectangle<float> ZoneMapCanvas::getInnerBounds() const
 {
-    return getLocalBounds().toFloat().reduced(12.0f);
+    auto bounds = getLocalBounds().toFloat().reduced(8.0f);
+    bounds.removeFromTop(static_cast<float>(navigationToolbarHeight + navigationToolbarGap));
+    bounds.removeFromLeft(velocityAxisWidth);
+    bounds.removeFromBottom(pitchAxisHeight);
+    return bounds;
+}
+
+juce::Rectangle<int> ZoneMapCanvas::getNavigationToolbarBounds() const
+{
+    return getLocalBounds().reduced(8).removeFromTop(navigationToolbarHeight);
+}
+
+juce::Rectangle<float> ZoneMapCanvas::computeNormalizedZoneBounds(
+    const drs::engine::AuthoringZoneSummary& zone) const
+{
+    const auto left = static_cast<float>(juce::jlimit(0, 127, zone.keyLow)) / 128.0f;
+    const auto right = static_cast<float>(juce::jlimit(0, 127, zone.keyHigh) + 1) / 128.0f;
+    const auto top = 1.0f - static_cast<float>(juce::jlimit(1, 127, zone.velocityHigh)) / 127.0f;
+    const auto bottom = static_cast<float>(128 - juce::jlimit(1, 127, zone.velocityLow)) / 127.0f;
+    return juce::Rectangle<float>::leftTopRightBottom(left,
+                                                      top,
+                                                      right,
+                                                      juce::jlimit(top, 1.0f, bottom));
 }
 
 juce::Point<float> ZoneMapCanvas::normalizedContentToCanvas(juce::Point<float> position) const
@@ -727,19 +940,13 @@ drs::engine::AuthoringZoneSummary ZoneMapCanvas::getDisplayZoneSummary(std::size
 
 juce::Rectangle<float> ZoneMapCanvas::computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const
 {
-    const auto inner = getInnerBounds();
-    const auto topLeft = normalizedContentToCanvas({
-        static_cast<float>(zone.keyLow) / 127.0f,
-        1.0f - static_cast<float>(zone.velocityHigh) / 127.0f
-    });
-    const auto x = topLeft.x;
-    const auto width = std::max(10.0f,
-                                inner.getWidth() * viewport.getZoom()
-                                    * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
-    const auto normalizedVelocityHeight = static_cast<float>(zone.velocityHigh - zone.velocityLow) / 127.0f;
-    const auto height = std::max(14.0f,
-                                 inner.getHeight() * viewport.getZoom() * normalizedVelocityHeight);
-    return {x, topLeft.y, width, height};
+    const auto normalizedBounds = computeNormalizedZoneBounds(zone);
+    const auto topLeft = normalizedContentToCanvas(normalizedBounds.getTopLeft());
+    const auto bottomRight = normalizedContentToCanvas(normalizedBounds.getBottomRight());
+    return { topLeft.x,
+             topLeft.y,
+             std::max(10.0f, bottomRight.x - topLeft.x),
+             std::max(14.0f, bottomRight.y - topLeft.y) };
 }
 
 std::vector<ZoneMapCanvas::ZoneLayout> ZoneMapCanvas::buildZoneLayouts() const
@@ -1286,6 +1493,17 @@ bool ZoneMapCanvas::requestSelectionState(const SelectionState& nextSelectionSta
     }
 
     return false;
+}
+
+void ZoneMapCanvas::refreshViewportUi()
+{
+    zoomValueLabel.setText(juce::String(viewport.getDisplayedZoomPercentage()) + "%",
+                           juce::dontSendNotification);
+    fitAllButton.setEnabled(viewport.getZoom() > ZoneMapViewState::minimumZoom
+                            || viewport.getOrigin() != juce::Point<float> {});
+    fitSelectedButton.setEnabled(!selectionState.zoneIds.empty());
+    zoomOutButton.setEnabled(viewport.getZoom() > ZoneMapViewState::minimumZoom);
+    zoomInButton.setEnabled(viewport.getZoom() < ZoneMapViewState::maximumZoom);
 }
 
 bool ZoneMapCanvas::beginRangeGestureAt(juce::Point<float> position)

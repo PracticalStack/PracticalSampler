@@ -5,6 +5,13 @@
 
 namespace drs::app::authoring
 {
+int ZoneMapViewState::getDisplayedZoomPercentage() const noexcept
+{
+    // The design scale presents Fit All as the 25% overview and the existing
+    // 8x transform as 200% detail. This changes only user-facing vocabulary.
+    return static_cast<int>(std::lround(zoom * 25.0f));
+}
+
 juce::Rectangle<float> ZoneMapViewState::getVisibleContentBounds() const noexcept
 {
     const auto extent = 1.0f / zoom;

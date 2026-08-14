@@ -15,6 +15,7 @@ public:
     static constexpr float zoomSensitivity = 1.5f;
 
     float getZoom() const noexcept { return zoom; }
+    int getDisplayedZoomPercentage() const noexcept;
     juce::Point<float> getOrigin() const noexcept { return origin; }
     juce::Rectangle<float> getVisibleContentBounds() const noexcept;
 

@@ -70,7 +70,7 @@ int main()
         juce::Graphics graphics(image);
         canvas.paintEntireComponent(graphics, true);
 
-        const auto inner = canvas.getLocalBounds().toFloat().reduced(12.0f);
+        const auto inner = canvas.getMapViewportBounds();
         const auto crossfadeHandleX = inner.getRight() - 9.0f;
         const auto lowHandle = juce::Point<float>(crossfadeHandleX, velocityToY(inner, 55));
         const auto lowTarget = juce::Point<float>(crossfadeHandleX, velocityToY(inner, 48));
@@ -129,18 +129,20 @@ int main()
                 denseSelectionCount = static_cast<int>(selectionState.zoneIds.size());
             });
 
-        const auto denseInner = denseCanvas.getLocalBounds().toFloat().reduced(12.0f);
+        const auto denseInner = denseCanvas.getMapViewportBounds();
         const auto targetKey = 60;
         const auto targetLayer = 3;
         const auto targetLow = targetLayer * 16;
         const auto targetHigh = (targetLayer + 1) * 16 - 1;
         const auto targetLeft = denseInner.getX()
-            + denseInner.getWidth() * (static_cast<float>(targetKey) / 127.0f);
+            + denseInner.getWidth() * (static_cast<float>(targetKey) / 128.0f);
         const auto targetWidth = std::max(10.0f, denseInner.getWidth() / 128.0f);
         const auto targetTop = velocityToY(denseInner, targetHigh);
+        const auto targetBottom = denseInner.getY()
+            + (static_cast<float>(128 - targetLow) / 127.0f) * denseInner.getHeight();
         const auto targetHeight = std::max(
             14.0f,
-            denseInner.getHeight() * (static_cast<float>(targetHigh - targetLow) / 127.0f));
+            targetBottom - targetTop);
         const auto targetX = targetLeft + targetWidth * 0.5f;
         const auto targetY = targetTop + targetHeight * 0.5f;
         require(denseCanvas.requestSelectionAt({ targetX, targetY }),
