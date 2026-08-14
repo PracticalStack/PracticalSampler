@@ -421,7 +421,11 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || !zone.controllerConditions.empty();
         });
     const auto requiresFxRoutingInstrumentSchema = !plan.fxSlots.empty()
-        || !plan.routingBuses.empty();
+        || !plan.routingBuses.empty()
+        || std::any_of(plan.macros.begin(), plan.macros.end(), [](const auto& macro)
+        {
+            return !macro.targets.empty();
+        });
     result.instrument.schemaName = "drs.instrument";
     result.instrument.schemaVersion = requiresFxRoutingInstrumentSchema
         ? runtimeInstrumentFxRoutingSchemaVersion

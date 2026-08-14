@@ -125,6 +125,21 @@ fs::path buildSemanticPackageV2Fixture(const fs::path& scratchDirectory)
         { "host-master-gain", "Host Master Gain", "drs.gain", false, 1,
           { { "gainDb", -3.0 }, { "polarity", 0.0 }, { "mute", 0.0 } } }
     };
+    drs::engine::RuntimeMacroDefinition macro;
+    macro.id = "Instrument";
+    macro.name = "Instrument";
+    macro.defaultValue = 0.75;
+    macro.exposedInPerformance = true;
+    drs::engine::RuntimeProjectMacroTargetDefinition target;
+    target.parameterId = "host-master-gain-db";
+    target.parameterPath = "fx.host-master-gain.gainDb";
+    target.role = "dsp-control";
+    target.dspSlotId = "host-master-gain";
+    target.dspParameterId = "gainDb";
+    target.destinationMinimum = -12.0;
+    target.destinationMaximum = 0.0;
+    macro.targets.push_back(std::move(target));
+    packagePlan.compiledRuntime.instrument.macros = { std::move(macro) };
     packagePlan.compiledRuntime.instrument.routingBuses = {
         { "host-master-bus", "Host Master Bus", "master",
           { "host-master-gain" }, false }
@@ -246,6 +261,20 @@ int main(int argc, char** argv)
         require(pluginGraph.compiled
                     && pluginGraph.plan.planDigest == standaloneGraph.plan.planDigest,
                 "Plugin and standalone hosts did not compile the same package DSP graph.");
+        const auto pluginMacroBindings = processor->getEngineFacade()
+            .getActivePublishedMacroBindings();
+        require(pluginMacroBindings != nullptr
+                    && std::any_of(pluginMacroBindings->bindings.begin(),
+                                   pluginMacroBindings->bindings.end(), [](const auto& binding)
+                    {
+                        return binding.assigned
+                            && binding.stableAuthoredId == "Instrument"
+                            && binding.renderTarget
+                                == drs::engine::PublishedMacroRenderTarget::dspControl
+                            && binding.dspSlotId == "host-master-gain"
+                            && binding.dspParameterId == "gainDb";
+                    }),
+                "Plugin host validation did not restore the packaged macro-to-FX binding.");
 
         const auto pluginPlaybackStarted = Clock::now();
         const auto pluginMagnitude = renderQueuedPerformanceSurfaceMagnitude(

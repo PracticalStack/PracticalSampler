@@ -1917,16 +1917,44 @@ RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
         result.issues.push_back("[" + code + "] " + path + ": " + message);
     };
 
+    std::unordered_set<std::string> macroIds;
+    for (std::size_t index = 0; index < instrument.macros.size(); ++index)
+    {
+        const auto& macro = instrument.macros[index];
+        const auto path = "macros[" + std::to_string(index) + "]";
+        if (macro.id.empty() || !macroIds.insert(macro.id).second)
+            addFinding("macro-invalid-id", path + ".id", "Runtime macro IDs must be non-empty and unique.");
+        if (!std::isfinite(macro.minValue) || !std::isfinite(macro.maxValue)
+            || !std::isfinite(macro.defaultValue) || macro.minValue > macro.maxValue
+            || macro.defaultValue < macro.minValue || macro.defaultValue > macro.maxValue)
+        {
+            addFinding("macro-invalid-range", path,
+                       "Runtime macro ranges must be finite and contain the default value.");
+        }
+        for (std::size_t targetIndex = 0; targetIndex < macro.targets.size(); ++targetIndex)
+        {
+            const auto& target = macro.targets[targetIndex];
+            const auto targetPath = path + ".targets[" + std::to_string(targetIndex) + "]";
+            if (target.parameterId.empty() || target.parameterPath.empty() || target.role.empty())
+                addFinding("macro-target-invalid", targetPath,
+                           "Runtime macro targets require parameterId, parameterPath, and role.");
+        }
+    }
+
     if (instrument.schemaVersion != 4)
     {
         if (!instrument.fxSlots.empty() || !instrument.routingBuses.empty()
+            || std::any_of(instrument.macros.begin(), instrument.macros.end(), [](const auto& macro)
+            {
+                return !macro.targets.empty();
+            })
             || std::any_of(instrument.groups.begin(), instrument.groups.end(), [](const auto& group)
             {
                 return !group.routingBusId.empty();
             }))
         {
             addFinding("graph-requires-instrument-v4", "schemaVersion",
-                       "FX slots, routing buses, and group routing assignments require runtime instrument schema v4.");
+                       "FX slots, routing buses, group routing assignments, and macro targets require runtime instrument schema v4.");
         }
 
         result.valid = result.issues.empty();
@@ -2026,6 +2054,46 @@ RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
             {
                 addFinding("graph-invalid-parameter", parameterPath,
                            "Catalog DSP parameters must be known and remain within their versioned range.");
+            }
+        }
+    }
+    for (std::size_t macroIndex = 0; macroIndex < instrument.macros.size(); ++macroIndex)
+    {
+        const auto& macro = instrument.macros[macroIndex];
+        for (std::size_t targetIndex = 0; targetIndex < macro.targets.size(); ++targetIndex)
+        {
+            const auto& target = macro.targets[targetIndex];
+            const auto path = "macros[" + std::to_string(macroIndex) + "].targets["
+                + std::to_string(targetIndex) + "]";
+            const auto hasSlotId = !target.dspSlotId.empty();
+            const auto hasParameterId = !target.dspParameterId.empty();
+            if (hasSlotId != hasParameterId)
+            {
+                addFinding("macro-dsp-target-invalid", path,
+                           "Structured macro targets require both DSP slot and parameter IDs.");
+                continue;
+            }
+            if (!hasSlotId)
+                continue;
+            if (!std::isfinite(target.sourceMinimum) || !std::isfinite(target.sourceMaximum)
+                || !std::isfinite(target.destinationMinimum) || !std::isfinite(target.destinationMaximum)
+                || target.sourceMinimum > target.sourceMaximum
+                || target.destinationMinimum > target.destinationMaximum)
+            {
+                addFinding("macro-dsp-target-range-invalid", path,
+                           "Structured macro target ranges must be finite and ordered.");
+            }
+            const auto slot = slotsById.find(target.dspSlotId);
+            const auto parameterExists = slot != slotsById.end()
+                && std::any_of(slot->second->parameters.begin(), slot->second->parameters.end(),
+                               [&](const auto& parameter)
+                               {
+                                   return parameter.id == target.dspParameterId;
+                               });
+            if (!parameterExists)
+            {
+                addFinding("macro-dsp-target-missing", path,
+                           "Structured macro targets must reference a persisted DSP control.");
             }
         }
     }
@@ -3167,6 +3235,55 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             if (const auto maxValue = readRequired<RuntimeManifestLoadResult, double>(macroObject, result, "maxValue", context.c_str()))
                 macro.maxValue = *maxValue;
 
+            if (instrument.schemaVersion >= 4)
+            {
+                if (const auto exposed = readOptional<RuntimeManifestLoadResult, bool>(
+                        macroObject, result, "exposedInPerformance", context.c_str()))
+                    macro.exposedInPerformance = *exposed;
+
+                const auto targetsIterator = macroObject.find("targets");
+                if (targetsIterator != macroObject.end())
+                {
+                    if (!isObjectArray(*targetsIterator))
+                    {
+                        addIssue(result, context + " field 'targets' must be an array of objects.");
+                    }
+                    else
+                    {
+                        macro.targets.reserve(targetsIterator->size());
+                        for (std::size_t targetIndex = 0; targetIndex < targetsIterator->size(); ++targetIndex)
+                        {
+                            const auto& targetObject = targetsIterator->at(targetIndex);
+                            const auto targetContext = context + ".Target[" + std::to_string(targetIndex) + "]";
+                            RuntimeProjectMacroTargetDefinition target;
+                            if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(targetObject, result, "parameterId", targetContext.c_str())) target.parameterId = *value;
+                            if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(targetObject, result, "parameterPath", targetContext.c_str())) target.parameterPath = *value;
+                            if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(targetObject, result, "role", targetContext.c_str())) target.role = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, std::string>(targetObject, result, "dspSlotId", targetContext.c_str())) target.dspSlotId = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, std::string>(targetObject, result, "dspParameterId", targetContext.c_str())) target.dspParameterId = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, double>(targetObject, result, "sourceMinimum", targetContext.c_str())) target.sourceMinimum = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, double>(targetObject, result, "sourceMaximum", targetContext.c_str())) target.sourceMaximum = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, double>(targetObject, result, "destinationMinimum", targetContext.c_str())) target.destinationMinimum = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, double>(targetObject, result, "destinationMaximum", targetContext.c_str())) target.destinationMaximum = *value;
+                            if (const auto value = readOptional<RuntimeManifestLoadResult, std::string>(targetObject, result, "curve", targetContext.c_str())) target.curve = *value;
+                            if (const auto controlLaw = targetObject.find("controlLaw"); controlLaw != targetObject.end())
+                            {
+                                if (!controlLaw->is_object())
+                                {
+                                    addIssue(result, targetContext + " field 'controlLaw' must be an object.");
+                                }
+                                else
+                                {
+                                    if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(*controlLaw, result, "id", (targetContext + ".controlLaw").c_str())) target.controlLaw.id = *value;
+                                    if (const auto value = readRequired<RuntimeManifestLoadResult, std::uint32_t>(*controlLaw, result, "version", (targetContext + ".controlLaw").c_str())) target.controlLaw.version = *value;
+                                }
+                            }
+                            macro.targets.push_back(std::move(target));
+                        }
+                    }
+                }
+            }
+
             if (macro.minValue > macro.maxValue)
                 addIssue(result, context + " has minValue greater than maxValue.");
 
@@ -3719,6 +3836,11 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         macroObject["defaultValue"] = macro.defaultValue;
         macroObject["minValue"] = macro.minValue;
         macroObject["maxValue"] = macro.maxValue;
+        if (instrument.schemaVersion >= 4)
+        {
+            macroObject["exposedInPerformance"] = macro.exposedInPerformance;
+            macroObject["targets"] = serializeMacroTargets(macro.targets);
+        }
         macros.push_back(std::move(macroObject));
     }
     root["macros"] = std::move(macros);

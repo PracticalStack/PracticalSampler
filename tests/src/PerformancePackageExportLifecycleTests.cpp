@@ -112,6 +112,42 @@ void addAuthoredFxRoutingGraph(drs::app::PerformancePackageExportRequest& reques
     request.project.authoring.routingBuses.push_back(std::move(bus));
 }
 
+void addAuthoredMacroTargets(drs::app::PerformancePackageExportRequest& request,
+                             const bool includeDspTarget = true)
+{
+    drs::engine::RuntimeProjectMacroDefinition macro;
+    macro.id = "Instrument";
+    macro.name = "Instrument";
+    macro.defaultValue = 0.25;
+    macro.minValue = 0.0;
+    macro.maxValue = 1.0;
+    macro.exposedInPerformance = true;
+
+    drs::engine::RuntimeProjectMacroTargetDefinition velocityTarget;
+    velocityTarget.parameterId = "trigger-velocity";
+    velocityTarget.parameterPath = "preview.triggerVelocity";
+    velocityTarget.role = "velocity";
+    macro.targets.push_back(std::move(velocityTarget));
+
+    if (includeDspTarget)
+    {
+        drs::engine::RuntimeProjectMacroTargetDefinition driveTarget;
+        driveTarget.parameterId = "drive-db";
+        driveTarget.parameterPath = "fx.drive.driveDb";
+        driveTarget.role = "dsp-control";
+        driveTarget.dspSlotId = "drive";
+        driveTarget.dspParameterId = "driveDb";
+        driveTarget.sourceMinimum = 0.0;
+        driveTarget.sourceMaximum = 1.0;
+        driveTarget.destinationMinimum = 0.0;
+        driveTarget.destinationMaximum = 12.0;
+        driveTarget.curve = "linear";
+        macro.targets.push_back(std::move(driveTarget));
+    }
+
+    request.project.authoring.macros.push_back(std::move(macro));
+}
+
 void replaceRequestSamplesWithFlac(drs::app::PerformancePackageExportRequest& request)
 {
     const auto contentRoot = fs::path(request.project.contentRootPath);
@@ -200,7 +236,7 @@ int main()
         const auto compatibilityProjection = projectPerformancePackage(
             unsupportedProject, {}, PerformancePackageProjectionContext { "unsupported" });
         require(!compatibilityProjection.projected
-                    && containsIssue(compatibilityProjection.issues, "target mappings")
+                    && !containsIssue(compatibilityProjection.issues, "target mappings")
                     && containsIssue(compatibilityProjection.issues, "performance banks")
                     && containsIssue(compatibilityProjection.issues, "non-default pan")
                     && containsIssue(compatibilityProjection.issues, "loop settings"),
@@ -355,8 +391,46 @@ int main()
                     && *performanceSnapshot.backgroundArtworkJpgBytes == expectedBackgroundBytes,
                 "Prepared package activation must expose the v2 background JPEG to Performance.");
 
+        auto targetOnlyRequest = makeRequest(tempRoot / "completed-macro-target.drpkg");
+        addAuthoredMacroTargets(targetOnlyRequest, false);
+        const auto targetOnlyExport = executePerformancePackageExport(targetOnlyRequest);
+        require(targetOnlyExport.exported,
+                "A target-only Instrument macro must not block playable package export.");
+        const auto targetOnlyPackage = drs::engine::loadPerformancePackageV2Metadata(
+            (tempRoot / "completed-macro-target.drpkg").generic_string());
+        require(targetOnlyPackage.loaded
+                    && targetOnlyPackage.metadata.manifest.schemaVersion
+                        == drs::engine::performancePackageFxRoutingSchemaVersion
+                    && targetOnlyPackage.metadata.instrument.instrument.schemaVersion
+                        == drs::engine::runtimeInstrumentFxRoutingSchemaVersion
+                    && targetOnlyPackage.metadata.instrument.instrument.fxSlots.empty()
+                    && targetOnlyPackage.metadata.instrument.instrument.macros.size() == 1
+                    && targetOnlyPackage.metadata.instrument.instrument.macros.front().targets.size() == 1
+                    && targetOnlyPackage.metadata.instrument.instrument.groups.front().routingBusId
+                        == "master",
+                "Target-only macro export must promote compatibility and retain mappings without inventing FX slots.");
+        auto targetOnlyActivation = drs::engine::preparePerformancePackageV2Activation(
+            targetOnlyPackage.metadata, targetOnlyPackage.package,
+            targetOnlyPackage.sampleDescriptors);
+        require(targetOnlyActivation.prepared
+                    && facade.activatePreparedPerformancePackageSession(
+                        std::move(targetOnlyActivation)).activated,
+                "A target-only Instrument macro package must activate.");
+        const auto targetOnlyBindings = facade.getActivePublishedMacroBindings();
+        require(targetOnlyBindings != nullptr
+                    && std::any_of(targetOnlyBindings->bindings.begin(),
+                                   targetOnlyBindings->bindings.end(), [](const auto& binding)
+                    {
+                        return binding.assigned
+                            && binding.stableAuthoredId == "Instrument"
+                            && binding.renderTarget
+                                == drs::engine::PublishedMacroRenderTarget::toneVelocity;
+                    }),
+                "A target-only Instrument macro must restore its runtime velocity binding.");
+
         auto graphRequest = makeRequest(tempRoot / "completed-fx-routing.drpkg");
         addAuthoredFxRoutingGraph(graphRequest);
+        addAuthoredMacroTargets(graphRequest);
         drs::engine::PlaybackSnapshotBuilder sourceSnapshotBuilder;
         const auto sourceSnapshotRequest = sourceSnapshotBuilder.requestBuild(1, true);
         const auto sourceSnapshot = sourceSnapshotBuilder.buildSnapshot(
@@ -394,6 +468,16 @@ int main()
                         == std::vector<std::string> { "drive" }
                     && graphInstrument.groups.front().routingBusId == "bus-group-pad-core",
                 "Graph-bearing export must preserve slot order, parameters, bypass state, bus chains, and group assignment.");
+        require(graphInstrument.macros.size() == 1
+                    && graphInstrument.macros.front().id == "Instrument"
+                    && graphInstrument.macros.front().exposedInPerformance
+                    && graphInstrument.macros.front().targets.size() == 2
+                    && graphInstrument.macros.front().targets.at(0).parameterPath
+                        == "preview.triggerVelocity"
+                    && graphInstrument.macros.front().targets.at(1).dspSlotId == "drive"
+                    && graphInstrument.macros.front().targets.at(1).dspParameterId == "driveDb"
+                    && graphInstrument.macros.front().targets.at(1).destinationMaximum == 12.0,
+                "Graph-bearing export must preserve generic and structured macro target mappings.");
 
         auto graphActivation = drs::engine::preparePerformancePackageV2Activation(
             graphPackage.metadata, graphPackage.package, graphPackage.sampleDescriptors);
@@ -414,6 +498,12 @@ int main()
                     && reopenedGroup->routingBusId == "bus-group-pad-core"
                     && reopenedSnapshot.dspGraphDigest == sourceSnapshot.snapshot.dspGraphDigest,
                 "Package preparation must hydrate catalog metadata, buses, group routing, and the authored graph digest.");
+        require(reopenedSnapshot.macroDefaults.size() == 1
+                    && reopenedSnapshot.macroDefaults.front().id == "Instrument"
+                    && reopenedSnapshot.macroDefaults.front().targets.size() == 2
+                    && reopenedSnapshot.macroDefaults.front().targets.at(1).dspSlotId == "drive"
+                    && reopenedSnapshot.macroDefaults.front().targets.at(1).dspParameterId == "driveDb",
+                "Package preparation must hydrate authored macro target mappings.");
         const auto reopenedGraphPlan = drs::engine::compileDspGraphPlan(reopenedSnapshot);
         require(reopenedGraphPlan.compiled
                     && reopenedGraphPlan.plan.planDigest == sourceGraphPlan.plan.planDigest
@@ -428,6 +518,19 @@ int main()
             std::move(graphActivation));
         require(graphActivated.activated,
                 "The graph-bearing package must activate through the production facade.");
+        const auto activeMacroBindings = facade.getActivePublishedMacroBindings();
+        require(activeMacroBindings != nullptr
+                    && std::any_of(activeMacroBindings->bindings.begin(),
+                                   activeMacroBindings->bindings.end(), [](const auto& binding)
+                    {
+                        return binding.assigned
+                            && binding.stableAuthoredId == "Instrument"
+                            && binding.renderTarget
+                                == drs::engine::PublishedMacroRenderTarget::dspControl
+                            && binding.dspSlotId == "drive"
+                            && binding.dspParameterId == "driveDb";
+                    }),
+                "Package activation must compile the restored structured macro target binding.");
         const auto activeGraphPayload = facade.getPerformancePackageActivationPayload();
         const auto activeGraphModel = facade.getPerformancePackageRenderModel();
         require(activeGraphPayload != nullptr && activeGraphModel != nullptr,

@@ -457,7 +457,7 @@ public:
     {
         const auto payload = performancePublishController.getActiveActivationPayload();
         return payload != nullptr ? payload->macroBindings
-                                  : ImmutablePublishedMacroBindingTablePtr {};
+                                  : packagePublishedMacroBindings;
     }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
@@ -557,6 +557,7 @@ private:
     bool referenceInstrumentActive = false;
     PlaybackActivationPayloadPtr packagePerformanceActivationPayload;
     SamplerRenderModelPtr packagePerformanceRenderModel;
+    ImmutablePublishedMacroBindingTablePtr packagePublishedMacroBindings;
     std::string packageBackgroundArtworkPayloadId;
     std::shared_ptr<const std::vector<std::uint8_t>> packageBackgroundArtworkJpgBytes;
     RuntimeSessionStateSnapshot currentSessionState;

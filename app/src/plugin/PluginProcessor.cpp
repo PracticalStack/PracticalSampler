@@ -3651,6 +3651,13 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
     if (payload == nullptr)
         return false;
 
+    const auto macroBindings = authorized != nullptr && authorized->macroBindings != nullptr
+        ? authorized->macroBindings
+        : (packageSession ? engineFacade.getActivePublishedMacroBindings()
+                          : drs::engine::ImmutablePublishedMacroBindingTablePtr {});
+    if (packageSession && macroBindings != nullptr)
+        installPublishedMacroBindings(*macroBindings);
+
     if (packageSession
         && performanceSnapshot.hasActiveActivation
         && !performanceSnapshot.hasPendingActivation
@@ -3690,9 +3697,9 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
         options.selectedArticulationId = authoredFallback != authoredRoutes.end()
             ? authoredFallback->articulationId : std::string {};
     }
-    if (authorized != nullptr && authorized->macroBindings != nullptr)
+    if (macroBindings != nullptr)
     {
-        for (const auto& slot : authorized->macroBindings->callbackView.slots)
+        for (const auto& slot : macroBindings->callbackView.slots)
         {
             if (!slot.assigned)
                 continue;
@@ -3778,9 +3785,9 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
                       dspFailure });
             return false;
         }
-        if (authorized != nullptr && authorized->macroBindings != nullptr)
+        if (macroBindings != nullptr)
         {
-            for (const auto& slot : authorized->macroBindings->callbackView.slots)
+            for (const auto& slot : macroBindings->callbackView.slots)
             {
                 if (slot.assigned
                     && slot.renderTarget == drs::engine::PublishedMacroRenderTarget::dspControl)

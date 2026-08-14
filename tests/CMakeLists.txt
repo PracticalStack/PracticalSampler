@@ -2511,6 +2511,10 @@ target_link_libraries(drs_sprint6_published_macro_binding_tests
 
 target_compile_features(drs_sprint6_published_macro_binding_tests PRIVATE cxx_std_17)
 
+if(MSVC)
+    target_link_options(drs_sprint6_published_macro_binding_tests PRIVATE /STACK:8388608)
+endif()
+
 add_test(
     NAME drs.sprint6.published_macro_binding
     COMMAND drs_sprint6_published_macro_binding_tests
@@ -3044,6 +3048,10 @@ target_link_libraries(drs_phase2_macro_routing_tests
 )
 
 target_compile_features(drs_phase2_macro_routing_tests PRIVATE cxx_std_17)
+
+if(MSVC)
+    target_link_options(drs_phase2_macro_routing_tests PRIVATE /STACK:8388608)
+endif()
 
 add_test(
     NAME drs.phase2.macro_routing

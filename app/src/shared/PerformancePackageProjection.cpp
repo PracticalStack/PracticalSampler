@@ -40,15 +40,6 @@ std::string sanitizeExportStableId(std::string_view source, std::string_view fal
 void collectCompatibilityIssues(const drs::engine::RuntimeProjectModel& project,
                                 std::vector<std::string>& issues)
 {
-    for (const auto& macro : project.authoring.macros)
-    {
-        if (!macro.targets.empty())
-        {
-            issues.push_back("Macro '" + macro.id
-                             + "' carries target mappings that playable package export does not yet preserve.");
-        }
-    }
-
     if (!project.authoring.performanceBanks.empty())
         issues.push_back("Playable package export does not yet support authored performance banks.");
 
@@ -101,6 +92,12 @@ PerformancePackageProjectionResult projectPerformancePackage(
         : context.fallbackPackageName;
     const auto hasAuthoredGraph = !project.authoring.fxSlots.empty()
         || !project.authoring.routingBuses.empty();
+    const auto hasAuthoredMacroTargets = std::any_of(
+        project.authoring.macros.begin(), project.authoring.macros.end(), [](const auto& macro)
+        {
+            return !macro.targets.empty();
+        });
+    const auto requiresExtendedPackageRuntime = hasAuthoredGraph || hasAuthoredMacroTargets;
 
     auto& plan = result.compilePlan;
     plan.outputProjectPath = std::move(context.outputProjectPath);
@@ -133,6 +130,8 @@ PerformancePackageProjectionResult projectPerformancePackage(
         macro.defaultValue = projectMacro.defaultValue;
         macro.minValue = projectMacro.minValue;
         macro.maxValue = projectMacro.maxValue;
+        macro.targets = projectMacro.targets;
+        macro.exposedInPerformance = projectMacro.exposedInPerformance;
         plan.macros.push_back(std::move(macro));
     }
 
@@ -167,7 +166,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
         group.id = projectGroup.id;
         group.name = projectGroup.displayName.empty() ? projectGroup.id : projectGroup.displayName;
         group.gainDb = projectGroup.gainDb;
-        group.routingBusId = hasAuthoredGraph
+        group.routingBusId = requiresExtendedPackageRuntime
             ? (projectGroup.routingBusId.empty() ? "master" : projectGroup.routingBusId)
             : std::string {};
         if (!hasAuthoredGraph && !projectGroup.routingBusId.empty()
@@ -217,7 +216,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
             drs::engine::RuntimeGroupDefinition group;
             group.id = projectZone.groupId;
             group.name = projectZone.groupId;
-            group.routingBusId = hasAuthoredGraph ? "master" : std::string {};
+            group.routingBusId = requiresExtendedPackageRuntime ? "master" : std::string {};
             groupIndexes.emplace(group.id, plan.groups.size());
             plan.groups.push_back(std::move(group));
         }
@@ -275,14 +274,14 @@ PerformancePackageProjectionResult projectPerformancePackage(
     plan.roundRobinResetRules = project.authoring.roundRobinResetRules;
     plan.controllerDefaults = project.authoring.controllerDefaults;
 
-    result.manifest.schemaVersion = hasAuthoredGraph
+    result.manifest.schemaVersion = requiresExtendedPackageRuntime
         ? drs::engine::performancePackageFxRoutingSchemaVersion
         : drs::engine::performancePackageLegacySchemaVersion;
     result.manifest.packageId = baseId;
     result.manifest.displayName = displayName;
     result.manifest.instrumentId = plan.instrumentId;
     result.manifest.defaultLoadProfile = plan.defaultLoadProfile;
-    result.manifest.minimumReaderSchemaVersion = hasAuthoredGraph
+    result.manifest.minimumReaderSchemaVersion = requiresExtendedPackageRuntime
         ? drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion
         : drs::engine::performancePackageLegacySchemaVersion;
     result.manifest.masterGainDb = plan.masterGainDb;

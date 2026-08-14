@@ -1194,7 +1194,16 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotMacro.defaultValue = macro.defaultValue;
         snapshotMacro.minValue = macro.minValue;
         snapshotMacro.maxValue = macro.maxValue;
-        snapshotMacro.exposedInPerformance = true;
+        snapshotMacro.exposedInPerformance = macro.exposedInPerformance;
+        snapshotMacro.targets.reserve(macro.targets.size());
+        for (const auto& target : macro.targets)
+        {
+            snapshotMacro.targets.push_back({ target.parameterId, target.parameterPath, target.role,
+                                              target.dspSlotId, target.dspParameterId,
+                                              target.sourceMinimum, target.sourceMaximum,
+                                              target.destinationMinimum, target.destinationMaximum,
+                                              target.curve, target.controlLaw });
+        }
         result.snapshot.macroDefaults.push_back(std::move(snapshotMacro));
     }
 
@@ -1654,6 +1663,7 @@ EnginePerformancePackageActivationResult EngineFacade::openPerformancePackageSes
     authoringProjectPublication.reset();
     packagePerformanceActivationPayload.reset();
     packagePerformanceRenderModel.reset();
+    packagePublishedMacroBindings.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     referenceManifest = packageLoad.instrument;
@@ -1732,6 +1742,66 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
         result.issues.push_back("The prepared performance package render model is unavailable.");
         return result;
     }
+
+    auto nextSessionState = buildDefaultRuntimeSessionState(preparedActivation.packageLoad.instrument);
+    if (!preparedActivation.packageLoad.manifest.defaultLoadProfile.empty())
+        nextSessionState.loadProfileId = preparedActivation.packageLoad.manifest.defaultLoadProfile;
+
+    PublishedMacroBindingBuildRequest macroBindingRequest;
+    macroBindingRequest.revision = nextActivationPayload->revision;
+    macroBindingRequest.macroSchemaDigest = nextActivationPayload->macroSchemaDigest;
+    macroBindingRequest.dspGraphDigest = nextActivationPayload->snapshot->dspGraphDigest;
+    macroBindingRequest.authoredMacros = nextActivationPayload->snapshot->macroDefaults;
+    macroBindingRequest.presentationHints = buildPresentationHints(*nextActivationPayload->snapshot);
+    macroBindingRequest.previousActiveTable = getActivePublishedMacroBindings();
+    macroBindingRequest.hostSlots = buildPublishedHostSlots(
+        macroBindingRequest.authoredMacros, macroBindingRequest.previousActiveTable);
+    macroBindingRequest.currentValues = buildPublishedCurrentValues(
+        nextSessionState, macroBindingRequest.authoredMacros,
+        macroBindingRequest.previousActiveTable);
+
+    DspParameterControlLayout dspControlLayout;
+    const auto requiresDspMacroControls = std::any_of(
+        macroBindingRequest.authoredMacros.begin(), macroBindingRequest.authoredMacros.end(),
+        [](const auto& macro)
+        {
+            return std::any_of(macro.targets.begin(), macro.targets.end(), [](const auto& target)
+            {
+                return !target.dspSlotId.empty() || !target.dspParameterId.empty();
+            });
+        });
+    if (requiresDspMacroControls)
+    {
+        const auto graphPlan = compileDspGraphPlan(*nextActivationPayload->snapshot);
+        if (!graphPlan.compiled)
+        {
+            result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+            result.state = "Performance package macro activation failed";
+            result.issues.push_back("The packaged macro target could not compile its DSP graph.");
+            return result;
+        }
+        const auto controlLayout = compileDspParameterControlLayout(graphPlan.plan);
+        if (!controlLayout.compiled)
+        {
+            result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+            result.state = "Performance package macro activation failed";
+            result.issues.push_back("The packaged macro target could not compile its DSP control layout.");
+            return result;
+        }
+        dspControlLayout = controlLayout.layout;
+        macroBindingRequest.dspControlLayout = &dspControlLayout;
+    }
+
+    const auto macroBindingResult = buildPublishedMacroBindingTable(macroBindingRequest);
+    if (!macroBindingResult.built || macroBindingResult.table == nullptr)
+    {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+        result.state = "Performance package macro activation failed";
+        result.issues.push_back(macroBindingResult.findings.empty()
+            ? "The packaged macro target bindings could not be constructed."
+            : macroBindingResult.findings.front().message);
+        return result;
+    }
     if (nextActivationPayload->prepared != nullptr)
         for (const auto& sample : nextActivationPayload->prepared->samples)
             preparedPlaybackService.registerPageServiceSource(sample.dataSource);
@@ -1745,14 +1815,13 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
     authoringProjectPublication.reset();
     packagePerformanceActivationPayload = nextActivationPayload;
     packagePerformanceRenderModel = nextRenderModel;
+    packagePublishedMacroBindings = macroBindingResult.table;
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     referenceManifest = std::move(packageLoad.instrument);
     referenceStream = std::move(packageLoad.stream);
     referenceInstrumentActive = true;
-    currentSessionState = buildDefaultRuntimeSessionState(referenceManifest);
-    if (!packageLoad.manifest.defaultLoadProfile.empty())
-        currentSessionState.loadProfileId = packageLoad.manifest.defaultLoadProfile;
+    currentSessionState = std::move(nextSessionState);
     if (packageLoad.backgroundImage.loaded)
     {
         packageBackgroundArtworkPayloadId = packageLoad.backgroundImage.payload.payloadId;
@@ -1785,6 +1854,7 @@ void EngineFacade::restoreBundledReferenceRuntimeSession()
     referenceStream = bundledReferenceStream;
     packagePerformanceActivationPayload.reset();
     packagePerformanceRenderModel.reset();
+    packagePublishedMacroBindings.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
@@ -3300,6 +3370,7 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
             if (payload != nullptr)
             {
                 packagePerformanceActivationPayload = payload;
+                packagePublishedMacroBindings.reset();
                 SamplerRenderModelBuildOptions renderOptions;
                 renderOptions.selectedArticulationId = currentSessionState.selectedArticulationId;
                 const auto renderModel = buildSamplerRenderModel(payload, renderOptions);
@@ -3314,6 +3385,7 @@ bool EngineFacade::pumpPreparedPlaybackWorkerCompletions()
             {
                 packagePerformanceActivationPayload.reset();
                 packagePerformanceRenderModel.reset();
+                packagePublishedMacroBindings.reset();
                 currentSessionState.transientMetrics.integrationState
                     = "Performance package preparation failed";
                 currentSessionState.transientMetrics.lastFailure =
@@ -4021,6 +4093,7 @@ void EngineFacade::resetSessionStateToDefault()
     referenceStream = bundledReferenceStream;
     packagePerformanceActivationPayload.reset();
     packagePerformanceRenderModel.reset();
+    packagePublishedMacroBindings.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);

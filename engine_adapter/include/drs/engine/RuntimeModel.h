@@ -351,6 +351,8 @@ struct RuntimeMacroDefinition
     double defaultValue = 0.0;
     double minValue = 0.0;
     double maxValue = 1.0;
+    std::vector<RuntimeProjectMacroTargetDefinition> targets;
+    bool exposedInPerformance = true;
 };
 
 struct RuntimeArticulationDefinition
