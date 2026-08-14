@@ -240,6 +240,55 @@ int main()
                     < 1.0e-9,
                 "Generated runtime-instrument payload should expose packaged zone gain for inspection.");
 
+        auto guardedV4WritePlan = packageWritePlan;
+        guardedV4WritePlan.outputPackagePath
+            = (scratchDirectory / "v4-before-package-hydration.drpkg").generic_string();
+        const auto guardedRuntimePayload = std::find_if(
+            guardedV4WritePlan.payloads.begin(), guardedV4WritePlan.payloads.end(), [](const auto& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::runtimeInstrument;
+            });
+        require(guardedRuntimePayload != guardedV4WritePlan.payloads.end(),
+                "The fail-closed package fixture must contain a runtime instrument payload.");
+        auto guardedRuntimeJson = json::parse(std::string(guardedRuntimePayload->plaintextBytes.begin(),
+                                                          guardedRuntimePayload->plaintextBytes.end()));
+        guardedRuntimeJson["schemaVersion"] = drs::engine::runtimeInstrumentFxRoutingSchemaVersion;
+        for (auto& group : guardedRuntimeJson.at("groups"))
+            group["routingBusId"] = "master";
+        guardedRuntimeJson["fxSlots"] = json::array({ {
+            { "id", "room" },
+            { "displayName", "Room" },
+            { "effectType", "drs.algorithmicReverb" },
+            { "effectVersion", 1 },
+            { "bypassed", false },
+            { "parameters", json::array({
+                { { "id", "decaySeconds" }, { "value", 2.5 } },
+                { { "id", "mix" }, { "value", 0.18 } }
+            }) }
+        } });
+        guardedRuntimeJson["routingBuses"] = json::array({ {
+            { "id", "bus-master" },
+            { "displayName", "Master Insert" },
+            { "inputSourceId", "master" },
+            { "fxSlotIds", json::array({ "room" }) },
+            { "chainBypassed", false }
+        } });
+        guardedRuntimePayload->plaintextBytes = package_support::toBytes(
+            guardedRuntimeJson.dump(2) + "\n");
+        const auto guardedV4Write = drs::engine::writePerformancePackage(
+            guardedV4WritePlan, cryptoProvider);
+        require(guardedV4Write.written,
+                "The fail-closed package fixture must write before reader behavior is checked.");
+        const auto guardedV4Load = drs::engine::loadPerformancePackage(
+            guardedV4WritePlan.outputPackagePath, cryptoProvider,
+            drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion);
+        require(!guardedV4Load.loaded
+                    && guardedV4Load.failureCategory
+                        == drs::engine::PerformancePackageFailureCategory::playbackCompatibilityFailure
+                    && package_support::containsIssue(
+                        guardedV4Load.issues, "v4 FX/routing activation is not enabled"),
+                "PX-02 package loading must fail closed until package graph hydration ships.");
+
         const auto backgroundImagePayloadIterator = std::find_if(
             generatedInspection.payloads.begin(),
             generatedInspection.payloads.end(),

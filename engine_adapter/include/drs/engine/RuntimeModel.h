@@ -10,6 +10,8 @@
 
 namespace drs::engine
 {
+inline constexpr int runtimeInstrumentFxRoutingSchemaVersion = 4;
+
 enum class ZoneTriggerMode : std::uint8_t
 {
     gated,
@@ -365,6 +367,7 @@ struct RuntimeGroupDefinition
     std::string name;
     std::vector<std::string> articulationIds;
     double gainDb = 0.0;
+    std::string routingBusId;
 };
 
 struct RuntimeZoneDefinition
@@ -413,6 +416,8 @@ struct RuntimeInstrumentModel
     std::vector<RuntimeArticulationDefinition> articulations;
     std::vector<RuntimeGroupDefinition> groups;
     std::vector<RuntimeZoneDefinition> zones;
+    std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
+    std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> validationNotes;
@@ -538,6 +543,13 @@ struct RuntimeProjectLoadResult
 };
 
 struct RuntimeProjectValidationResult
+{
+    bool valid = false;
+    std::string state;
+    std::vector<std::string> issues;
+};
+
+struct RuntimeInstrumentValidationResult
 {
     bool valid = false;
     std::string state;

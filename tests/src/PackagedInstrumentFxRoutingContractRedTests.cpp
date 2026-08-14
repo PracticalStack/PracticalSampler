@@ -1,7 +1,6 @@
 #include "Phase1PerformancePackageSupport.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReader.h"
-#include "drs/engine/RuntimeLoader.h"
 #include "shared/PerformancePackageExportService.h"
 
 #include <json/json.hpp>
@@ -20,9 +19,7 @@ namespace
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-constexpr std::array<std::string_view, 4> redSeams {
-    "runtime-v4-round-trip",
-    "runtime-v4-fail-closed-validation",
+constexpr std::array<std::string_view, 2> redSeams {
     "export-authored-graph",
     "package-open-authored-graph"
 };
@@ -39,66 +36,6 @@ void printIssues(const std::vector<std::string>& issues)
 {
     for (const auto& issue : issues)
         std::cerr << "  - " << issue << '\n';
-}
-
-int checkRuntimeV4RoundTrip()
-{
-    const auto fixture = fs::path(DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT)
-        / "runtime-instrument-v4-ordered-graph.json";
-    const auto source = readText(fixture);
-    const auto parsed = drs::engine::parseRuntimeInstrumentManifest(
-        source, fixture.generic_string(), false);
-    if (!parsed.loaded)
-    {
-        std::cerr << "EXPECTED RED: runtime instrument v4 parse is not implemented.\n";
-        printIssues(parsed.issues);
-        return 1;
-    }
-
-    const auto serialized = drs::engine::serializeRuntimeInstrumentManifest(
-        parsed.instrument, fixture.generic_string());
-    const auto sourceJson = json::parse(source);
-    const auto serializedJson = json::parse(serialized);
-    if (!serializedJson.contains("fxSlots") || !serializedJson.contains("routingBuses")
-        || serializedJson.at("fxSlots") != sourceJson.at("fxSlots")
-        || serializedJson.at("routingBuses") != sourceJson.at("routingBuses")
-        || serializedJson.at("groups") != sourceJson.at("groups"))
-    {
-        std::cerr << "EXPECTED RED: runtime instrument v4 serialization drops graph semantics.\n";
-        return 1;
-    }
-
-    return 0;
-}
-
-int checkRuntimeV4Validation()
-{
-    const auto fixture = fs::path(DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT)
-        / "runtime-instrument-v4-invalid-graph.json";
-    const auto source = readText(fixture);
-    const auto expectations = json::parse(readText(
-        fs::path(DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT)
-            / "validation-expectations.json"));
-    const auto parsed = drs::engine::parseRuntimeInstrumentManifest(
-        source, fixture.generic_string(), false);
-
-    auto allExpectedFindingsPresent = !parsed.loaded;
-    for (const auto& expected : expectations.at("expectedFindingCodes"))
-    {
-        auto found = false;
-        for (const auto& issue : parsed.issues)
-            found = found || issue.find(expected.get<std::string>()) != std::string::npos;
-        allExpectedFindingsPresent = allExpectedFindingsPresent && found;
-    }
-
-    if (!allExpectedFindingsPresent)
-    {
-        std::cerr << "EXPECTED RED: runtime instrument v4 does not report the frozen graph findings.\n";
-        printIssues(parsed.issues);
-        return 1;
-    }
-
-    return 0;
 }
 
 int checkExportAuthoredGraph()
@@ -240,10 +177,6 @@ int main(const int argc, char** argv)
     }
 
     const auto seam = std::string_view(argv[1]);
-    if (seam == "runtime-v4-round-trip")
-        return checkRuntimeV4RoundTrip();
-    if (seam == "runtime-v4-fail-closed-validation")
-        return checkRuntimeV4Validation();
     if (seam == "export-authored-graph")
         return checkExportAuthoredGraph();
     if (seam == "package-open-authored-graph")

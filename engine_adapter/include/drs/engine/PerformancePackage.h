@@ -9,7 +9,6 @@ inline constexpr const char* performancePackageSchemaName = "drs.performancePack
 inline constexpr int performancePackageLegacySchemaVersion = 1;
 inline constexpr int performancePackageFxRoutingSchemaVersion = 2;
 inline constexpr int performancePackageFxRoutingMinimumReaderSchemaVersion = 2;
-inline constexpr int runtimeInstrumentFxRoutingSchemaVersion = 4;
 
 // PX-01 freezes the target versions without changing production behavior. The
 // writer and reader move off the legacy alias only when graph support ships.

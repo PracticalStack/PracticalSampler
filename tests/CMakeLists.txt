@@ -3657,6 +3657,11 @@ add_test(
     COMMAND drs_phase1_compile_path_tests
 )
 
+add_test(
+    NAME drs.packaged_instrument_fx_routing.compile
+    COMMAND drs_phase1_compile_path_tests --px02-fx-routing
+)
+
 juce_add_console_app(drs_phase1_performance_package_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Tests"
 )

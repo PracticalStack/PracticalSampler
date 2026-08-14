@@ -66,6 +66,8 @@ struct RuntimeCompilePlan
     std::vector<RuntimeArticulationDefinition> articulations;
     std::vector<RuntimeGroupDefinition> groups;
     std::vector<RuntimeCompileZoneDefinition> zones;
+    std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
+    std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> projectNotes;

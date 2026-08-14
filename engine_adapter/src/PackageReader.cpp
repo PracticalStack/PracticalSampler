@@ -971,6 +971,15 @@ PerformancePackageLoadResult loadPerformancePackageInternal(const std::string& p
                                                        packagePath + "#runtime-instrument",
                                                        false);
     appendIssues(result.issues, result.instrument.issues);
+    if (result.instrument.loaded
+        && result.instrument.instrument.schemaVersion == runtimeInstrumentFxRoutingSchemaVersion)
+    {
+        addIssue(result,
+                 "Runtime instrument v4 FX/routing activation is not enabled in the current package reader.");
+        setFailureCategory(result, PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        finalizeLoadFailure(result, PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        return result;
+    }
 
     const auto streamIndexOpen = openPerformancePackagePayload(result.package,
                                                                streamIndexPayload->payloadId,

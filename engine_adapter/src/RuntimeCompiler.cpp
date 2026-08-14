@@ -1,4 +1,5 @@
 #include "drs/engine/RuntimeCompiler.h"
+#include "drs/engine/RuntimeLoader.h"
 
 #include <json/json.hpp>
 
@@ -419,9 +420,13 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || zone.amplitudeVelocityTracking != 100.0
                 || !zone.controllerConditions.empty();
         });
+    const auto requiresFxRoutingInstrumentSchema = !plan.fxSlots.empty()
+        || !plan.routingBuses.empty();
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = requiresPerformanceInstrumentSchema ? 3
-        : (requiresExtendedInstrumentSchema ? 2 : 1);
+    result.instrument.schemaVersion = requiresFxRoutingInstrumentSchema
+        ? runtimeInstrumentFxRoutingSchemaVersion
+        : (requiresPerformanceInstrumentSchema ? 3
+            : (requiresExtendedInstrumentSchema ? 2 : 1));
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -430,6 +435,8 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     result.instrument.macros = plan.macros;
     result.instrument.articulations = plan.articulations;
     result.instrument.groups = plan.groups;
+    result.instrument.fxSlots = plan.fxSlots;
+    result.instrument.routingBuses = plan.routingBuses;
     result.instrument.roundRobinResetRules = plan.roundRobinResetRules;
     result.instrument.controllerDefaults = plan.controllerDefaults;
     result.instrument.validationNotes = plan.instrumentValidationNotes;
@@ -627,6 +634,18 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     }
 
     populateCrossfadeRuntimeDescriptors(plan, result.instrument.zones);
+
+    if (result.instrument.schemaVersion == runtimeInstrumentFxRoutingSchemaVersion)
+    {
+        const auto validation = validateRuntimeInstrumentModel(result.instrument);
+        for (const auto& issue : validation.issues)
+            addIssue(result, issue);
+        if (!validation.valid)
+        {
+            result.state = "Compile plan invalid";
+            return result;
+        }
+    }
 
     result.compiled = true;
     result.state = "Compile completed";

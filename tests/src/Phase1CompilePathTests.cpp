@@ -207,14 +207,107 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
 
     return plan;
 }
+
+void addPackagedFxRoutingGraph(drs::engine::RuntimeCompilePlan& plan)
+{
+    for (auto& group : plan.groups)
+        group.routingBusId = group.id == "pad-core" ? "bus-group-pad-core" : "master";
+
+    drs::engine::RuntimeProjectFxSlotDefinition drive;
+    drive.id = "drive";
+    drive.displayName = "Drive";
+    drive.effectType = "drs.saturator";
+    drive.effectVersion = 1;
+    drive.parameters = {
+        { "character", 0.0 },
+        { "driveDb", 7.5 },
+        { "tone", 0.55 },
+        { "mix", 0.8 },
+        { "outputDb", -1.0 }
+    };
+
+    drs::engine::RuntimeProjectFxSlotDefinition room;
+    room.id = "room";
+    room.displayName = "Room";
+    room.effectType = "drs.algorithmicReverb";
+    room.effectVersion = 1;
+    room.parameters = {
+        { "preDelayMs", 18.0 },
+        { "size", 0.62 },
+        { "decaySeconds", 2.5 },
+        { "damping", 0.45 },
+        { "width", 1.0 },
+        { "mix", 0.18 }
+    };
+
+    plan.fxSlots = { std::move(drive), std::move(room) };
+    plan.routingBuses = {
+        { "bus-group-pad-core", "Pad Core Insert", "groups/pad-core", { "drive" }, false },
+        { "bus-master", "Master Insert", "master", { "room" }, false }
+    };
+}
+
+void runPackagedFxRoutingCompileContract(const fs::path& outputDirectory)
+{
+    auto graphCompilePlan = buildReferenceCompilePlan(outputDirectory / "fx-routing-v4");
+    addPackagedFxRoutingGraph(graphCompilePlan);
+    const auto graphCompile = drs::engine::compileRuntimeInstrument(graphCompilePlan);
+    require(graphCompile.compiled
+                && graphCompile.instrument.schemaVersion
+                    == drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
+            "A graph-bearing compile plan must produce runtime instrument schema v4.");
+    require(graphCompile.instrument.fxSlots.size() == 2
+                && graphCompile.instrument.fxSlots.at(0).id == "drive"
+                && graphCompile.instrument.fxSlots.at(0).parameters.at(1).id == "driveDb"
+                && graphCompile.instrument.routingBuses.size() == 2
+                && graphCompile.instrument.routingBuses.at(0).fxSlotIds
+                    == std::vector<std::string> { "drive" }
+                && graphCompile.instrument.groups.at(0).routingBusId == "bus-group-pad-core"
+                && graphCompile.instrument.groups.at(1).routingBusId == "master",
+            "Runtime compilation must preserve ordered slots, parameters, buses, chains, and group routing.");
+
+    const auto graphInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(
+        graphCompile.instrument, graphCompilePlan.outputInstrumentPath);
+    const auto graphRoundTrip = drs::engine::parseRuntimeInstrumentManifest(
+        graphInstrumentJson, graphCompilePlan.outputInstrumentPath, false);
+    require(graphRoundTrip.loaded
+                && drs::engine::serializeRuntimeInstrumentManifest(
+                       graphRoundTrip.instrument, graphCompilePlan.outputInstrumentPath)
+                    == graphInstrumentJson,
+            "A compiled runtime instrument v4 graph must round-trip deterministically.");
+
+    auto invalidGraphPlan = graphCompilePlan;
+    invalidGraphPlan.groups.at(0).routingBusId = "missing-group-bus";
+    invalidGraphPlan.routingBuses.at(0).inputSourceId = "group/pad-core";
+    invalidGraphPlan.routingBuses.at(1).fxSlotIds = { "drive", "missing-slot" };
+    const auto invalidGraphCompile = drs::engine::compileRuntimeInstrument(invalidGraphPlan);
+    require(!invalidGraphCompile.compiled,
+            "Runtime compilation must fail closed for malformed v4 graph topology.");
+    requireAnyContains(invalidGraphCompile.issues, "graph-invalid-owner-source",
+                       "Compile validation must report non-canonical graph owners.");
+    requireAnyContains(invalidGraphCompile.issues, "graph-unknown-group-bus",
+                       "Compile validation must report unknown group routing buses.");
+    requireAnyContains(invalidGraphCompile.issues, "graph-duplicate-slot-owner",
+                       "Compile validation must report duplicate slot ownership.");
+    requireAnyContains(invalidGraphCompile.issues, "graph-unknown-slot",
+                       "Compile validation must report unknown slot references.");
+}
 } // namespace
 
-int main()
+int main(const int argc, char** argv)
 {
     try
     {
-        const auto referenceDirectory = getReferenceDirectory();
         const auto compileOutputDirectory = fs::temp_directory_path() / "drs-phase1-compile-path-tests";
+        if (argc == 2 && std::string(argv[1]) == "--px02-fx-routing")
+        {
+            runPackagedFxRoutingCompileContract(compileOutputDirectory);
+            std::cout << "PX-02 packaged instrument FX/routing compile contract passed." << std::endl;
+            return 0;
+        }
+        require(argc == 1, "Usage: drs_phase1_compile_path_tests [--px02-fx-routing]");
+
+        const auto referenceDirectory = getReferenceDirectory();
         const auto referenceCompilePlan = buildReferenceCompilePlan(referenceDirectory);
         const auto tempCompilePlan = buildReferenceCompilePlan(compileOutputDirectory);
 
@@ -257,6 +350,9 @@ int main()
 
         auto tempCompile = drs::engine::compileRuntimeInstrument(tempCompilePlan);
         require(tempCompile.compiled, "Temp compile plan should compile successfully.");
+
+        runPackagedFxRoutingCompileContract(compileOutputDirectory);
+
         const auto tempWrite = drs::engine::writeCompiledStreamAssets(tempCompile);
         require(tempWrite.written, "Temp compile plan should write compiled stream assets successfully.");
 

@@ -27,6 +27,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& text
                                                          const std::string& manifestPath,
                                                          bool validateReferencedPaths = true);
 RuntimeManifestLoadResult loadPhase1ReferenceInstrumentManifest();
+RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
+    const RuntimeInstrumentModel& instrument);
 RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPhase2Authoring(const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPhase3RoundRobinSchema(const RuntimeProjectModel& project);

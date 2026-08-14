@@ -1,7 +1,9 @@
 #include "drs/engine/PerformancePackage.h"
+#include "drs/engine/RuntimeLoader.h"
 
 #include <json/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -11,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace
@@ -100,6 +103,74 @@ int main()
                     && stringArray(buses.at(2).at("fxSlotIds")) == std::vector<std::string> { "room" },
                 "Each slot must have exactly one canonical chain owner.");
 
+        const auto validText = readText(fixtureRoot / "runtime-instrument-v4-ordered-graph.json");
+        const auto productionParse = parseRuntimeInstrumentManifest(
+            validText, "runtime-instrument-v4-ordered-graph.json", false);
+        require(productionParse.loaded
+                    && productionParse.instrument.schemaVersion == runtimeInstrumentFxRoutingSchemaVersion
+                    && productionParse.instrument.fxSlots.size() == 3
+                    && productionParse.instrument.routingBuses.size() == 3,
+                "The production runtime loader must parse the complete instrument v4 graph.");
+        require(productionParse.instrument.groups.at(0).routingBusId == "bus-group-piano"
+                    && productionParse.instrument.fxSlots.at(1).parameters.at(1).id == "driveDb"
+                    && productionParse.instrument.routingBuses.at(1).fxSlotIds
+                        == std::vector<std::string> { "drive" },
+                "The production loader must preserve group routing, slot order, parameter order, and chain order.");
+
+        const auto serialized = serializeRuntimeInstrumentManifest(
+            productionParse.instrument, "runtime-instrument-v4-ordered-graph.json");
+        const auto reparsed = parseRuntimeInstrumentManifest(
+            serialized, "runtime-instrument-v4-ordered-graph.json", false);
+        require(reparsed.loaded
+                    && serializeRuntimeInstrumentManifest(
+                           reparsed.instrument, "runtime-instrument-v4-ordered-graph.json") == serialized,
+                "Instrument v4 serialization must be deterministic after a production round trip.");
+        const auto serializedJson = json::parse(serialized);
+        require(serializedJson.at("fxSlots") == valid.at("fxSlots")
+                    && serializedJson.at("routingBuses") == valid.at("routingBuses")
+                    && serializedJson.at("groups").at(0).at("routingBusId") == "bus-group-piano",
+                "Instrument v4 production serialization must preserve every frozen graph field.");
+
+        const auto requireRejectedWith = [&](json candidate,
+                                             const std::string& findingCode,
+                                             const std::string& message)
+        {
+            const auto rejected = parseRuntimeInstrumentManifest(
+                candidate.dump(), "runtime-instrument-v4-negative.json", false);
+            require(!rejected.loaded
+                        && std::any_of(rejected.issues.begin(), rejected.issues.end(), [&](const auto& issue)
+                        {
+                            return issue.find(findingCode) != std::string::npos;
+                        }),
+                    message);
+        };
+
+        auto unknownActiveEffect = valid;
+        unknownActiveEffect["fxSlots"][1]["effectType"] = "vendor.unknown";
+        requireRejectedWith(std::move(unknownActiveEffect), "graph-unknown-catalog-version",
+                            "An unresolved active v4 effect must fail catalog validation.");
+
+        auto invalidParameter = valid;
+        invalidParameter["fxSlots"][1]["parameters"][1]["value"] = 100.0;
+        requireRejectedWith(std::move(invalidParameter), "graph-invalid-parameter",
+                            "An out-of-range v4 parameter must fail catalog validation.");
+
+        auto missingGraphArray = valid;
+        missingGraphArray.erase("fxSlots");
+        requireRejectedWith(std::move(missingGraphArray), "Manifest field 'fxSlots'",
+                            "Instrument v4 must require an explicit fxSlots array.");
+
+        auto bypassedUnknownEffect = valid;
+        bypassedUnknownEffect["fxSlots"][0]["effectType"] = "vendor.future-bypassed";
+        bypassedUnknownEffect["fxSlots"][0]["effectVersion"] = 99;
+        bypassedUnknownEffect["fxSlots"][0]["parameters"] = json::array();
+        const auto bypassedUnknownParse = parseRuntimeInstrumentManifest(
+            bypassedUnknownEffect.dump(), "runtime-instrument-v4-bypassed-unknown.json", false);
+        require(bypassedUnknownParse.loaded
+                    && bypassedUnknownParse.instrument.fxSlots.at(0).unavailable
+                    && bypassedUnknownParse.instrument.fxSlots.at(0).bypassed,
+                "A bypassed unresolved v4 effect may remain loadable but must be marked unavailable.");
+
         const auto invalid = json::parse(readText(fixtureRoot / "runtime-instrument-v4-invalid-graph.json"));
         const auto validationExpectations = json::parse(
             readText(fixtureRoot / "validation-expectations.json"));
@@ -116,6 +187,19 @@ int main()
         require(std::unordered_set<std::string>(invalidFindingCodes.begin(), invalidFindingCodes.end())
                     == expectedFindingCodes,
                 "The invalid graph fixture must freeze all fail-closed validation findings.");
+        const auto invalidParse = parseRuntimeInstrumentManifest(
+            readText(fixtureRoot / "runtime-instrument-v4-invalid-graph.json"),
+            "runtime-instrument-v4-invalid-graph.json", false);
+        require(!invalidParse.loaded,
+                "The production runtime loader must fail closed for malformed instrument v4 graphs.");
+        for (const auto& code : expectedFindingCodes)
+        {
+            require(std::any_of(invalidParse.issues.begin(), invalidParse.issues.end(), [&](const auto& issue)
+                    {
+                        return issue.find(code) != std::string::npos;
+                    }),
+                    "The production validator did not report frozen finding code '" + code + "'.");
+        }
 
         const auto matrix = json::parse(readText(fixtureRoot / "compatibility-matrix.json"));
         require(matrix.at("policyId") == "drs.performancePackage.fxRouting.v1"

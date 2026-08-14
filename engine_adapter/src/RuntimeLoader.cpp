@@ -1904,6 +1904,259 @@ RuntimeProjectLoadResult loadPhase2ReferenceProjectManifest()
     return loadRuntimeProjectManifest(getPhase2ReferenceProjectManifestPath());
 }
 
+RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
+    const RuntimeInstrumentModel& instrument)
+{
+    RuntimeInstrumentValidationResult result;
+    result.state = "Runtime instrument validation failed";
+
+    const auto addFinding = [&](const std::string& code,
+                                const std::string& path,
+                                const std::string& message)
+    {
+        result.issues.push_back("[" + code + "] " + path + ": " + message);
+    };
+
+    if (instrument.schemaVersion != 4)
+    {
+        if (!instrument.fxSlots.empty() || !instrument.routingBuses.empty()
+            || std::any_of(instrument.groups.begin(), instrument.groups.end(), [](const auto& group)
+            {
+                return !group.routingBusId.empty();
+            }))
+        {
+            addFinding("graph-requires-instrument-v4", "schemaVersion",
+                       "FX slots, routing buses, and group routing assignments require runtime instrument schema v4.");
+        }
+
+        result.valid = result.issues.empty();
+        result.state = result.valid ? "Runtime instrument validated" : result.state;
+        return result;
+    }
+
+    std::unordered_set<std::string> zoneIds;
+    for (std::size_t index = 0; index < instrument.zones.size(); ++index)
+    {
+        const auto& id = instrument.zones[index].id;
+        if (!id.empty() && !zoneIds.insert(id).second)
+            addFinding("graph-duplicate-zone-id", "zones[" + std::to_string(index) + "].id",
+                       "Zone IDs must be unique before graph owners are resolved.");
+    }
+
+    std::unordered_set<std::string> groupIds;
+    for (std::size_t index = 0; index < instrument.groups.size(); ++index)
+    {
+        const auto& id = instrument.groups[index].id;
+        if (!id.empty() && !groupIds.insert(id).second)
+            addFinding("graph-duplicate-group-id", "groups[" + std::to_string(index) + "].id",
+                       "Group IDs must be unique before graph owners are resolved.");
+    }
+
+    if (instrument.fxSlots.size() > 128)
+        addFinding("graph-node-budget", "fxSlots", "The runtime graph exceeds the 128-slot limit.");
+
+    std::unordered_map<std::string, const RuntimeProjectFxSlotDefinition*> slotsById;
+    std::unordered_map<std::string, const CuratedDspEffectDescriptor*> catalogBySlotId;
+    std::size_t parameterCount = 0;
+    for (std::size_t index = 0; index < instrument.fxSlots.size(); ++index)
+    {
+        const auto& slot = instrument.fxSlots[index];
+        const auto path = "fxSlots[" + std::to_string(index) + "]";
+        if (slot.id.empty())
+        {
+            addFinding("graph-missing-slot-id", path + ".id", "FX slot IDs must be non-empty.");
+        }
+        else if (!slotsById.emplace(slot.id, &slot).second)
+        {
+            addFinding("graph-duplicate-slot-id", path + ".id",
+                       "FX slot ID '" + slot.id + "' is duplicated.");
+        }
+
+        if (slot.displayName.empty())
+            addFinding("graph-missing-slot-name", path + ".displayName",
+                       "FX slots must retain their authored display name.");
+        if (slot.effectType.empty() || slot.effectVersion == 0)
+            addFinding("graph-invalid-effect-identity", path,
+                       "FX slots must carry a non-empty effectType and non-zero effectVersion.");
+
+        const auto* descriptor = findCuratedDspEffect(slot.effectType, slot.effectVersion);
+        if (!slot.id.empty())
+            catalogBySlotId[slot.id] = descriptor;
+        if (descriptor == nullptr && !slot.bypassed)
+        {
+            addFinding("graph-unknown-catalog-version", path,
+                       "Active FX slots must resolve to a curated effect type and version.");
+        }
+
+        std::unordered_set<std::string> parameterIds;
+        for (std::size_t parameterIndex = 0; parameterIndex < slot.parameters.size(); ++parameterIndex)
+        {
+            ++parameterCount;
+            const auto& parameter = slot.parameters[parameterIndex];
+            const auto parameterPath = path + ".parameters[" + std::to_string(parameterIndex) + "]";
+            if (parameter.id.empty())
+            {
+                addFinding("graph-invalid-parameter", parameterPath,
+                           "DSP parameter IDs must be non-empty.");
+                continue;
+            }
+            if (!parameterIds.insert(parameter.id).second)
+            {
+                addFinding("graph-duplicate-parameter", parameterPath,
+                           "DSP parameter ID '" + parameter.id + "' is duplicated in its slot.");
+                continue;
+            }
+            if (!std::isfinite(parameter.value))
+            {
+                addFinding("graph-invalid-parameter", parameterPath,
+                           "DSP parameter values must be finite.");
+                continue;
+            }
+            if (descriptor == nullptr)
+                continue;
+
+            const auto catalogParameter = std::find_if(
+                descriptor->parameters.begin(), descriptor->parameters.end(), [&](const auto& candidate)
+                {
+                    return candidate.id == parameter.id;
+                });
+            if (catalogParameter == descriptor->parameters.end()
+                || parameter.value < catalogParameter->minimum
+                || parameter.value > catalogParameter->maximum)
+            {
+                addFinding("graph-invalid-parameter", parameterPath,
+                           "Catalog DSP parameters must be known and remain within their versioned range.");
+            }
+        }
+    }
+    if (parameterCount > 1024)
+        addFinding("graph-parameter-budget", "fxSlots", "The runtime graph exceeds the 1,024-parameter limit.");
+
+    std::unordered_map<std::string, const RuntimeProjectRoutingBusDefinition*> busesById;
+    std::unordered_set<std::string> canonicalOwners;
+    std::unordered_map<std::string, std::size_t> slotOwnerCounts;
+    for (std::size_t index = 0; index < instrument.routingBuses.size(); ++index)
+    {
+        const auto& bus = instrument.routingBuses[index];
+        const auto path = "routingBuses[" + std::to_string(index) + "]";
+        if (bus.id.empty())
+        {
+            addFinding("graph-missing-bus-id", path + ".id", "Routing bus IDs must be non-empty.");
+        }
+        else if (!busesById.emplace(bus.id, &bus).second)
+        {
+            addFinding("graph-duplicate-bus-id", path + ".id",
+                       "Routing bus ID '" + bus.id + "' is duplicated.");
+        }
+        if (bus.displayName.empty())
+            addFinding("graph-missing-bus-name", path + ".displayName",
+                       "Routing buses must retain their authored display name.");
+
+        auto ownerValid = false;
+        auto scope = CuratedDspScope::instrument;
+        if (bus.inputSourceId == "master")
+        {
+            ownerValid = true;
+        }
+        else if (const auto zoneId = extractZoneIdFromRoutingSourceId(bus.inputSourceId);
+                 !zoneId.empty() && zoneIds.count(zoneId))
+        {
+            ownerValid = true;
+            scope = CuratedDspScope::zone;
+        }
+        else if (const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+                 !groupId.empty() && groupIds.count(groupId))
+        {
+            ownerValid = true;
+            scope = CuratedDspScope::group;
+        }
+
+        if (!ownerValid)
+        {
+            addFinding("graph-invalid-owner-source", path + ".inputSourceId",
+                       "Only existing zones/<id>, groups/<id>, or master sources are valid graph owners.");
+        }
+        else if (!canonicalOwners.insert(bus.inputSourceId).second)
+        {
+            addFinding("graph-duplicate-owner-source", path + ".inputSourceId",
+                       "Every canonical graph source must have exactly one chain owner.");
+        }
+
+        for (const auto& slotId : bus.fxSlotIds)
+        {
+            const auto slot = slotsById.find(slotId);
+            if (slot == slotsById.end())
+            {
+                addFinding("graph-unknown-slot", path + ".fxSlotIds",
+                           "Routing bus '" + bus.id + "' references unknown FX slot '" + slotId + "'.");
+                continue;
+            }
+
+            ++slotOwnerCounts[slotId];
+            const auto catalog = catalogBySlotId.find(slotId);
+            const auto* descriptor = catalog != catalogBySlotId.end() ? catalog->second : nullptr;
+            if (ownerValid && descriptor != nullptr
+                && std::find(descriptor->supportedScopes.begin(), descriptor->supportedScopes.end(), scope)
+                    == descriptor->supportedScopes.end())
+            {
+                addFinding("graph-unsupported-scope", path + ".fxSlotIds",
+                           "FX slot '" + slotId + "' is unsupported at this graph owner scope.");
+            }
+        }
+    }
+
+    for (const auto& slot : instrument.fxSlots)
+    {
+        const auto ownerCount = slotOwnerCounts[slot.id];
+        if (ownerCount == 0)
+            addFinding("graph-unowned-slot", "fxSlots", "FX slot '" + slot.id + "' has no chain owner.");
+        else if (ownerCount > 1)
+            addFinding("graph-duplicate-slot-owner", "fxSlots",
+                       "FX slot '" + slot.id + "' has more than one chain owner.");
+    }
+
+    std::unordered_set<std::string> claimedGroupBusIds;
+    for (std::size_t index = 0; index < instrument.groups.size(); ++index)
+    {
+        const auto& group = instrument.groups[index];
+        const auto path = "groups[" + std::to_string(index) + "].routingBusId";
+        if (group.routingBusId == "master")
+            continue;
+
+        const auto bus = busesById.find(group.routingBusId);
+        if (group.routingBusId.empty() || bus == busesById.end())
+        {
+            addFinding("graph-unknown-group-bus", path,
+                       "Group '" + group.id + "' must route to master or an existing group-owned bus.");
+            continue;
+        }
+        if (bus->second->inputSourceId != "groups/" + group.id)
+        {
+            addFinding("graph-group-bus-source-mismatch", path,
+                       "Group '" + group.id + "' must reference a bus sourced from groups/" + group.id + ".");
+        }
+        if (!claimedGroupBusIds.insert(group.routingBusId).second)
+        {
+            addFinding("graph-duplicate-group-bus", path,
+                       "A group-owned routing bus may be assigned to only one group.");
+        }
+    }
+
+    for (const auto& bus : instrument.routingBuses)
+    {
+        if (!extractGroupIdFromRoutingSourceId(bus.inputSourceId).empty()
+            && !claimedGroupBusIds.count(bus.id))
+        {
+            addFinding("graph-orphaned-group-bus", "routingBuses",
+                       "Group-owned bus '" + bus.id + "' is not claimed by its group.");
+        }
+    }
+
+    result.valid = result.issues.empty();
+    result.state = result.valid ? "Runtime instrument validated" : result.state;
+    return result;
+}
+
 RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectModel& project)
 {
     RuntimeProjectValidationResult result;
@@ -2861,6 +3114,12 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             group.articulationIds = readRequiredStringArray(groupObject, result, "articulationIds", context.c_str());
             if (const auto gainDb = readOptional<RuntimeManifestLoadResult, double>(groupObject, result, "gainDb", context.c_str()))
                 group.gainDb = *gainDb;
+            if (instrument.schemaVersion >= 4)
+            {
+                if (const auto routingBusId = readRequired<RuntimeManifestLoadResult, std::string>(
+                        groupObject, result, "routingBusId", context.c_str()))
+                    group.routingBusId = *routingBusId;
+            }
 
             for (const auto& articulationId : group.articulationIds)
             {
@@ -3173,6 +3432,87 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
     populateVelocityCrossfadeRuntimeDescriptors(instrument.zones);
 
+    if (instrument.schemaVersion >= 4)
+    {
+        const auto fxSlots = root.find("fxSlots");
+        if (fxSlots == root.end() || !isObjectArray(*fxSlots))
+        {
+            addIssue(result, "Manifest field 'fxSlots' must be an array of objects for schemaVersion 4.");
+        }
+        else
+        {
+            instrument.fxSlots.reserve(fxSlots->size());
+            for (std::size_t index = 0; index < fxSlots->size(); ++index)
+            {
+                const auto& object = fxSlots->at(index);
+                const auto context = "FxSlot[" + std::to_string(index) + "]";
+                RuntimeProjectFxSlotDefinition slot;
+                if (const auto id = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "id", context.c_str()))
+                    slot.id = *id;
+                if (const auto name = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "displayName", context.c_str()))
+                    slot.displayName = *name;
+                if (const auto type = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "effectType", context.c_str()))
+                    slot.effectType = *type;
+                if (const auto version = readRequired<RuntimeManifestLoadResult, std::uint32_t>(object, result, "effectVersion", context.c_str()))
+                    slot.effectVersion = *version;
+                if (const auto bypassed = readRequired<RuntimeManifestLoadResult, bool>(object, result, "bypassed", context.c_str()))
+                    slot.bypassed = *bypassed;
+
+                const auto parameters = object.find("parameters");
+                if (parameters == object.end() || !isObjectArray(*parameters))
+                {
+                    addIssue(result, context + " field 'parameters' must be an array of objects.");
+                }
+                else
+                {
+                    slot.parameters.reserve(parameters->size());
+                    for (std::size_t parameterIndex = 0; parameterIndex < parameters->size(); ++parameterIndex)
+                    {
+                        const auto& parameterObject = parameters->at(parameterIndex);
+                        const auto parameterContext = context + ".parameters[" + std::to_string(parameterIndex) + "]";
+                        RuntimeProjectFxSlotDefinition::ParameterValue parameter;
+                        if (const auto id = readRequired<RuntimeManifestLoadResult, std::string>(
+                                parameterObject, result, "id", parameterContext.c_str()))
+                            parameter.id = *id;
+                        if (const auto value = readRequired<RuntimeManifestLoadResult, double>(
+                                parameterObject, result, "value", parameterContext.c_str()))
+                            parameter.value = *value;
+                        slot.parameters.push_back(std::move(parameter));
+                    }
+                }
+
+                slot.unavailable = findCuratedDspEffect(slot.effectType, slot.effectVersion) == nullptr;
+                instrument.fxSlots.push_back(std::move(slot));
+            }
+        }
+
+        const auto routingBuses = root.find("routingBuses");
+        if (routingBuses == root.end() || !isObjectArray(*routingBuses))
+        {
+            addIssue(result, "Manifest field 'routingBuses' must be an array of objects for schemaVersion 4.");
+        }
+        else
+        {
+            instrument.routingBuses.reserve(routingBuses->size());
+            for (std::size_t index = 0; index < routingBuses->size(); ++index)
+            {
+                const auto& object = routingBuses->at(index);
+                const auto context = "RoutingBus[" + std::to_string(index) + "]";
+                RuntimeProjectRoutingBusDefinition bus;
+                if (const auto id = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "id", context.c_str()))
+                    bus.id = *id;
+                if (const auto name = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "displayName", context.c_str()))
+                    bus.displayName = *name;
+                if (const auto source = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "inputSourceId", context.c_str()))
+                    bus.inputSourceId = *source;
+                bus.fxSlotIds = readRequiredStringArray(object, result, "fxSlotIds", context.c_str());
+                if (const auto bypassed = readRequired<RuntimeManifestLoadResult, bool>(object, result, "chainBypassed", context.c_str()))
+                    bus.chainBypassed = *bypassed;
+                instrument.routingBuses.push_back(std::move(bus));
+            }
+        }
+    }
+
     if (instrument.schemaVersion >= 3 && root.contains("roundRobinResetRules"))
     {
         const auto& resetRules = root["roundRobinResetRules"];
@@ -3236,8 +3576,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
     if (instrument.schemaName != "drs.instrument")
         addIssue(result, "Manifest schemaName must be 'drs.instrument' for the Sprint 1 loader.");
 
-    if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2 && instrument.schemaVersion != 3)
-        addIssue(result, "Manifest schemaVersion must be 1, 2, or 3.");
+    if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2
+        && instrument.schemaVersion != 3 && instrument.schemaVersion != 4)
+        addIssue(result, "Manifest schemaVersion must be 1, 2, 3, or 4.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -3250,6 +3591,11 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
     if (!result.metrics.usesStreaming)
         addIssue(result, "Compiled stream asset must exist so the Sprint 1 loader can prove the stream-container seam.");
+
+    const auto instrumentValidation = validateRuntimeInstrumentModel(instrument);
+    result.issues.insert(result.issues.end(),
+                         instrumentValidation.issues.begin(),
+                         instrumentValidation.issues.end());
 
     result.loaded = result.issues.empty();
     result.state = result.loaded ? "Reference manifest loaded" : "Reference manifest invalid";
@@ -3405,6 +3751,8 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         groupObject["name"] = group.name;
         groupObject["articulationIds"] = serializeStringArray(group.articulationIds);
         groupObject["gainDb"] = group.gainDb;
+        if (instrument.schemaVersion >= 4)
+            groupObject["routingBusId"] = group.routingBusId;
         groups.push_back(std::move(groupObject));
     }
     root["groups"] = std::move(groups);
@@ -3432,7 +3780,8 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
-        zoneObject["releaseShape"] = zone.releaseShape;
+        if (zone.releaseShape != 0.0)
+            zoneObject["releaseShape"] = zone.releaseShape;
         if (instrument.schemaVersion >= 2)
         {
             if (zone.roundRobin.has_value())
@@ -3465,6 +3814,27 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zones.push_back(std::move(zoneObject));
     }
     root["zones"] = std::move(zones);
+
+    if (instrument.schemaVersion >= 4)
+    {
+        ordered_json fxSlots = ordered_json::array();
+        for (const auto& slot : instrument.fxSlots)
+        {
+            ordered_json slotObject;
+            slotObject["id"] = slot.id;
+            slotObject["displayName"] = slot.displayName;
+            slotObject["effectType"] = slot.effectType;
+            slotObject["effectVersion"] = slot.effectVersion;
+            slotObject["bypassed"] = slot.bypassed;
+            ordered_json parameters = ordered_json::array();
+            for (const auto& parameter : slot.parameters)
+                parameters.push_back({ { "id", parameter.id }, { "value", parameter.value } });
+            slotObject["parameters"] = std::move(parameters);
+            fxSlots.push_back(std::move(slotObject));
+        }
+        root["fxSlots"] = std::move(fxSlots);
+        root["routingBuses"] = serializeRoutingBuses(instrument.routingBuses, true);
+    }
 
     if (instrument.schemaVersion >= 3)
     {
