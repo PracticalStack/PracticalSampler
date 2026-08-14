@@ -1,6 +1,8 @@
 #pragma once
 
 #include "drs/engine/AuthoringSession.h"
+#include "shared/authoring/ZoneMapOverview.h"
+#include "shared/authoring/ZoneMapRenderPolicy.h"
 #include "shared/authoring/ZoneMapViewState.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -12,7 +14,8 @@
 namespace drs::app::authoring
 {
 class ZoneMapCanvas final : public juce::Component,
-                            public juce::FileDragAndDropTarget
+                            public juce::FileDragAndDropTarget,
+                            private juce::Timer
 {
 public:
     enum class RangeHandle
@@ -82,12 +85,19 @@ public:
     int getDisplayedZoomPercentage() const noexcept { return viewport.getDisplayedZoomPercentage(); }
     juce::Point<float> getViewportOrigin() const noexcept { return viewport.getOrigin(); }
     juce::Rectangle<float> getMapViewportBounds() const { return getInnerBounds(); }
+    juce::Rectangle<int> getMinimapBounds() const;
+    ZoneMapDetailLevel getDetailLevel() const noexcept;
+    std::size_t getCachedGeometryCount() const noexcept { return cachedZoneGeometry.size(); }
+    std::size_t getLastVisibleZoneCount() const noexcept { return lastVisibleZoneCount; }
+    ZoneMapOverview& getOverview() noexcept { return overview; }
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
+    void mouseMove(const juce::MouseEvent& event) override;
+    void mouseExit(const juce::MouseEvent& event) override;
     void mouseWheelMove(const juce::MouseEvent& event,
                         const juce::MouseWheelDetails& wheel) override;
     bool keyPressed(const juce::KeyPress& key) override;
@@ -100,6 +110,13 @@ private:
     {
         std::size_t index = 0;
         juce::Rectangle<float> bounds;
+    };
+
+    struct CachedZoneGeometry
+    {
+        std::size_t index = 0;
+        juce::Rectangle<float> normalizedBounds;
+        juce::Colour groupTint;
     };
 
     struct RangeGesture
@@ -143,6 +160,7 @@ private:
     juce::Point<float> normalizedContentToCanvas(juce::Point<float> position) const;
     drs::engine::AuthoringZoneSummary getDisplayZoneSummary(std::size_t index) const;
     juce::Rectangle<float> computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const;
+    juce::Rectangle<float> computeZoneBounds(juce::Rectangle<float> normalizedBounds) const;
     std::vector<ZoneLayout> buildZoneLayouts() const;
     std::vector<std::size_t> buildPaintOrder() const;
     std::optional<std::size_t> findZoneIndexAt(juce::Point<float> position) const;
@@ -167,10 +185,13 @@ private:
     SelectionState buildSelectionStateForBounds(juce::Rectangle<float> bounds, SelectionMode mode) const;
     bool requestSelectionByIndex(std::size_t index, SelectionMode mode = SelectionMode::replace);
     bool requestSelectionState(const SelectionState& selectionState);
+    void rebuildGeometryCache();
     void refreshViewportUi();
     void showContextMenuAt(juce::Point<int> screenPosition);
+    void timerCallback() override;
 
     std::vector<drs::engine::AuthoringZoneSummary> zoneSummaries;
+    std::vector<CachedZoneGeometry> cachedZoneGeometry;
     SelectionState selectionState;
     std::function<void(const std::string& zoneId)> onZoneSelectionRequested;
     std::function<void(const SelectionState& selectionState)> onZoneSelectionStateRequested;
@@ -195,6 +216,10 @@ private:
     juce::TextButton zoomOutButton;
     juce::TextButton zoomInButton;
     juce::Label zoomValueLabel;
+    ZoneMapOverview overview;
+    std::optional<std::size_t> pendingHoverZoneIndex;
+    std::optional<std::size_t> hoveredZoneIndex;
+    mutable std::size_t lastVisibleZoneCount = 0;
     bool temporaryPanKeyDown = false;
     bool sampleFileDragActive = false;
 };

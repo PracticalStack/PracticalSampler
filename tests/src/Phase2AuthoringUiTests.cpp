@@ -437,6 +437,7 @@ drs::engine::AuthoringZoneSummary makeZoneSummary(const drs::engine::RuntimeProj
     summary.displayName = zone.displayName;
     summary.sampleSourceId = zone.sampleSourceId;
     summary.articulationId = zone.articulationId;
+    summary.groupId = zone.groupId;
     summary.rootKey = zone.rootKey;
     summary.keyLow = zone.keyLow;
     summary.keyHigh = zone.keyHigh;

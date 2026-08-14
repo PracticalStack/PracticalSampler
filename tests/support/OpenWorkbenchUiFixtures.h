@@ -64,8 +64,9 @@ inline OpenWorkbenchZoneMapFixture makeOpenWorkbenchZoneMapFixture(
         zone.loopEnabled = index % 11u == 0u;
 
         const auto groupIndex = std::min(11, key / 11);
-        fixture.zones.push_back(std::move(zone));
         fixture.groupIdsByZone.push_back("open-workbench-group-" + std::to_string(groupIndex));
+        zone.groupId = fixture.groupIdsByZone.back();
+        fixture.zones.push_back(std::move(zone));
     }
 
     // Reserve the final pair for a stable pathological overlap: identical
@@ -90,6 +91,7 @@ inline OpenWorkbenchZoneMapFixture makeOpenWorkbenchZoneMapFixture(
             zone.velocityCrossfade.fadeOutLowVelocity = 112;
             zone.velocityCrossfade.fadeOutHighVelocity = 127;
             fixture.groupIdsByZone[index] = "open-workbench-group-11";
+            fixture.zones[index].groupId = fixture.groupIdsByZone[index];
         }
     }
 

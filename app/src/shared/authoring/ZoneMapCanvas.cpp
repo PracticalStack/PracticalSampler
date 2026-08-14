@@ -9,12 +9,10 @@ namespace drs::app::authoring
 namespace
 {
 const auto zoneMapGrid = juce::Colour::fromRGB(230, 220, 207);
-const auto zoneMapSelected = juce::Colour::fromRGB(28, 108, 88);
-const auto zoneMapSecondarySelected = juce::Colour::fromRGB(71, 132, 117);
-const auto zoneMapAccent = juce::Colour::fromRGB(181, 96, 21);
-const auto zoneMapSelectedFill = zoneMapSelected.withAlpha(0.62f);
-const auto zoneMapSecondarySelectedFill = zoneMapSecondarySelected.withAlpha(0.46f);
-const auto zoneMapAccentFill = zoneMapAccent.withAlpha(0.5f);
+const auto zoneMapSelected = juce::Colour::fromRGB(215, 104, 40);
+const auto zoneMapSecondarySelected = juce::Colour::fromRGB(194, 126, 75);
+const auto zoneMapSelectedFill = zoneMapSelected.withAlpha(0.58f);
+const auto zoneMapSecondarySelectedFill = zoneMapSecondarySelected.withAlpha(0.44f);
 const auto zoneMapLabelFill = juce::Colour::fromRGBA(20, 25, 31, 168);
 const auto zoneMapOutline = juce::Colour::fromRGBA(24, 29, 33, 92);
 const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
@@ -30,6 +28,7 @@ constexpr float crossfadeHandleHitRadius = 14.0f;
 constexpr float marqueeDragThreshold = 4.0f;
 constexpr int navigationToolbarHeight = 28;
 constexpr int navigationToolbarGap = 5;
+constexpr int hoverDelayMilliseconds = 300;
 constexpr float velocityAxisWidth = 36.0f;
 constexpr float pitchAxisHeight = 24.0f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
@@ -73,7 +72,7 @@ ZoneMapCanvas::ZoneMapCanvas()
 
     fitAllButton.setButtonText("Fit All");
     fitSelectedButton.setButtonText("Fit Selected");
-    zoomOutButton.setButtonText("−");
+    zoomOutButton.setButtonText("-");
     zoomInButton.setButtonText("+");
     fitAllButton.setTitle("Fit all zones");
     fitSelectedButton.setTitle("Fit selected zones");
@@ -97,6 +96,16 @@ ZoneMapCanvas::ZoneMapCanvas()
         navigationToolbar.addAndMakeVisible(child);
     }
 
+    overview.setOnViewportOriginRequested([this](const juce::Point<float> origin)
+    {
+        if (viewport.setView(viewport.getZoom(), origin))
+        {
+            refreshViewportUi();
+            repaint();
+        }
+    });
+    addAndMakeVisible(overview);
+
     fitAllButton.onClick = [this] { resetViewport(); grabKeyboardFocus(); };
     fitSelectedButton.onClick = [this] { fitSelected(); grabKeyboardFocus(); };
     zoomOutButton.onClick = [this] { zoomBy(-0.22f); grabKeyboardFocus(); };
@@ -110,6 +119,9 @@ void ZoneMapCanvas::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSumma
         || !std::equal(summaries.begin(), summaries.end(), zoneSummaries.begin(), zoneSummaries.end(),
                        [](const auto& left, const auto& right) { return left.id == right.id; });
     zoneSummaries = std::move(summaries);
+    rebuildGeometryCache();
+    pendingHoverZoneIndex.reset();
+    hoveredZoneIndex.reset();
     focusedCrossfadeGesture.reset();
     if (topologyChanged)
         viewport.reset();
@@ -120,6 +132,7 @@ void ZoneMapCanvas::setZoneSummaries(std::vector<drs::engine::AuthoringZoneSumma
 void ZoneMapCanvas::setSelectionState(SelectionState nextSelectionState)
 {
     selectionState = std::move(nextSelectionState);
+    overview.setSelection(selectionState.zoneIds);
     refreshViewportUi();
     repaint();
 }
@@ -384,6 +397,20 @@ void ZoneMapCanvas::resized()
     zoomOutButton.setBounds(zoomControls.removeFromLeft(std::min(28, zoomControls.getWidth())));
     zoomValueLabel.setBounds(zoomControls.removeFromLeft(std::min(58, zoomControls.getWidth())));
     zoomInButton.setBounds(zoomControls);
+    overview.setBounds(getMinimapBounds());
+}
+
+juce::Rectangle<int> ZoneMapCanvas::getMinimapBounds() const
+{
+    const auto inner = getInnerBounds().toNearestInt();
+    const auto width = juce::jlimit(132, 196, static_cast<int>(inner.getWidth() * 0.22f));
+    const auto height = juce::jlimit(78, 112, static_cast<int>(inner.getHeight() * 0.24f));
+    return { inner.getRight() - width - 8, inner.getBottom() - height - 8, width, height };
+}
+
+ZoneMapDetailLevel ZoneMapCanvas::getDetailLevel() const noexcept
+{
+    return ZoneMapRenderPolicy::forDisplayedZoom(viewport.getDisplayedZoomPercentage()).level;
 }
 
 void ZoneMapCanvas::paint(juce::Graphics& g)
@@ -434,6 +461,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
             g.drawHorizontalLine(static_cast<int>(y), inner.getX(), inner.getRight());
     }
 
+    const auto policy = ZoneMapRenderPolicy::forDisplayedZoom(viewport.getDisplayedZoomPercentage());
     const auto paintOrder = buildPaintOrder();
     const auto zoneLayouts = buildZoneLayouts();
     std::vector<juce::Rectangle<float>> visibleBoundsByZoneIndex(zoneSummaries.size());
@@ -449,6 +477,8 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     for (const auto& zoneId : selectionState.zoneIds)
         selectedZoneIds.insert(zoneId);
 
+    std::optional<juce::Rectangle<float>> selectedAggregateBounds;
+
     for (const auto zoneIndex : paintOrder)
     {
         if (zoneIndex >= hasVisibleBounds.size() || !hasVisibleBounds[zoneIndex])
@@ -458,10 +488,21 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
         const auto& zoneBounds = visibleBoundsByZoneIndex[zoneIndex];
         const auto primarySelected = selectionState.primaryZoneId == zone.id;
         const auto secondarySelected = !primarySelected && selectedZoneIds.count(zone.id) > 0;
-        g.setColour(primarySelected
-                        ? zoneMapSelectedFill
-                        : (secondarySelected ? zoneMapSecondarySelectedFill : zoneMapAccentFill));
-        g.fillRoundedRectangle(zoneBounds, 8.0f);
+        const auto selected = primarySelected || secondarySelected;
+        const auto hovered = hoveredZoneIndex.has_value() && *hoveredZoneIndex == zoneIndex;
+        const auto groupTint = zoneIndex < cachedZoneGeometry.size()
+            ? cachedZoneGeometry[zoneIndex].groupTint
+            : stableZoneGroupTint(zone.groupId);
+        g.setColour(primarySelected ? zoneMapSelectedFill
+                                    : (secondarySelected ? zoneMapSecondarySelectedFill
+                                                         : groupTint.withAlpha(policy.level == ZoneMapDetailLevel::overview
+                                                                                   ? 0.48f : 0.58f)));
+        g.fillRect(zoneBounds);
+
+        if (selected)
+            selectedAggregateBounds = selectedAggregateBounds.has_value()
+                ? selectedAggregateBounds->getUnion(zoneBounds)
+                : zoneBounds;
 
         const auto paintCrossfadeBand = [&](int low, int high, const juce::Colour& colour, bool rising)
         {
@@ -482,36 +523,73 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
             g.setColour(colour.withAlpha(0.94f));
             g.drawRect(band, 1.25f);
         };
-        paintCrossfadeBand(zone.velocityCrossfade.fadeInLowVelocity,
-                           zone.velocityCrossfade.fadeInHighVelocity,
-                           crossfadeInColour,
-                           true);
-        paintCrossfadeBand(zone.velocityCrossfade.fadeOutLowVelocity,
-                           zone.velocityCrossfade.fadeOutHighVelocity,
-                           crossfadeOutColour,
-                           false);
+        if (policy.drawCrossfades && (selected || hovered))
+        {
+            paintCrossfadeBand(zone.velocityCrossfade.fadeInLowVelocity,
+                               zone.velocityCrossfade.fadeInHighVelocity,
+                               crossfadeInColour,
+                               true);
+            paintCrossfadeBand(zone.velocityCrossfade.fadeOutLowVelocity,
+                               zone.velocityCrossfade.fadeOutHighVelocity,
+                               crossfadeOutColour,
+                               false);
+        }
 
-        g.setColour(primarySelected
-                        ? juce::Colours::white
-                        : (secondarySelected ? zoneMapSecondarySelected : zoneMapOutline));
-        g.drawRoundedRectangle(zoneBounds.reduced(0.75f), 8.0f, primarySelected ? 2.0f : 1.2f);
+        if (policy.drawZoneOutlines)
+        {
+            g.setColour(selected ? zoneMapSelected
+                                 : (hovered ? groupTint.darker(0.45f) : zoneMapOutline));
+            const auto stroke = selected ? 2.0f : 1.0f;
+            g.drawRect(zoneBounds.reduced(stroke * 0.5f), stroke);
+        }
 
-        auto labelBounds = zoneBounds.toNearestInt().reduced(6, 4);
-        labelBounds.setWidth(std::min(labelBounds.getWidth(), 132));
-        labelBounds.setHeight(std::min(labelBounds.getHeight(), 20));
-        g.setColour(primarySelected
-                        ? zoneMapLabelFill.brighter(0.12f)
-                        : (secondarySelected ? zoneMapLabelFill.brighter(0.04f) : zoneMapLabelFill));
-        g.fillRoundedRectangle(labelBounds.toFloat(), 5.0f);
+        const auto drawLabel = (policy.drawSelectedLabel && selected)
+            || (policy.drawHoverLabel && hovered);
+        if (drawLabel)
+        {
+            const auto detailLabel = policy.level == ZoneMapDetailLevel::detail;
+            const auto labelHeight = detailLabel ? 38 : 22;
+            const auto labelWidth = juce::jlimit(116, 226,
+                std::max(static_cast<int>(zoneBounds.getWidth()) - 8, 116));
+            auto labelBounds = juce::Rectangle<int>(static_cast<int>(zoneBounds.getX()) + 4,
+                                                     static_cast<int>(zoneBounds.getY()) + 4,
+                                                     labelWidth,
+                                                     labelHeight);
+            labelBounds.setPosition(juce::jlimit(static_cast<int>(inner.getX()) + 3,
+                                                 std::max(static_cast<int>(inner.getX()) + 3,
+                                                          static_cast<int>(inner.getRight()) - labelWidth - 3),
+                                                 labelBounds.getX()),
+                                    juce::jlimit(static_cast<int>(inner.getY()) + 3,
+                                                 std::max(static_cast<int>(inner.getY()) + 3,
+                                                          static_cast<int>(inner.getBottom()) - labelHeight - 3),
+                                                 labelBounds.getY()));
+            g.setColour(zoneMapLabelFill.brighter(selected ? 0.12f : 0.02f));
+            g.fillRect(labelBounds);
+            g.setColour(juce::Colours::white.withAlpha(0.96f));
+            g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+            g.drawFittedText(juce::String::fromUTF8(zone.displayName.c_str()),
+                             labelBounds.reduced(6, 2).removeFromTop(18),
+                             juce::Justification::centredLeft,
+                             1);
+            if (detailLabel)
+            {
+                const auto metadata = "Root " + juce::String(zone.rootKey)
+                    + "  K " + juce::String(zone.keyLow) + "-" + juce::String(zone.keyHigh)
+                    + "  V " + juce::String(zone.velocityLow) + "-" + juce::String(zone.velocityHigh)
+                    + (zone.roundRobinLength > 0
+                           ? "  RR " + juce::String(zone.roundRobinPosition + 1)
+                               + "/" + juce::String(zone.roundRobinLength)
+                           : juce::String {});
+                g.setColour(juce::Colours::white.withAlpha(0.72f));
+                g.setFont(juce::FontOptions(9.5f));
+                g.drawFittedText(metadata,
+                                 labelBounds.reduced(6, 2).withTrimmedTop(18),
+                                 juce::Justification::centredLeft,
+                                 1);
+            }
+        }
 
-        g.setColour(juce::Colours::white.withAlpha(primarySelected || secondarySelected ? 1.0f : 0.92f));
-        g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
-        g.drawFittedText(juce::String::fromUTF8(zone.displayName.c_str()),
-                         labelBounds.reduced(6, 2),
-                         juce::Justification::centredLeft,
-                         1);
-
-        if (primarySelected)
+        if (primarySelected && policy.drawRangeHandles)
         {
             const auto handleCenters = buildHandleCenters(zoneBounds);
             for (const auto& [handle, center] : handleCenters)
@@ -534,25 +612,47 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                               activeHandle ? 2.0f : 1.0f);
             }
 
-            const auto crossfadeHandles = buildCrossfadeHandleCenters(zone, zoneBounds);
-            for (const auto& [handle, center] : crossfadeHandles)
+            if (policy.drawCrossfadeHandles)
             {
-                if (!inner.contains(center))
-                    continue;
-                const auto activeHandle = activeCrossfadeGesture.has_value()
-                    && activeCrossfadeGesture->handle == handle;
-                const auto colour = handle == RangeHandle::crossfadeLow ? crossfadeInColour : crossfadeOutColour;
-                juce::Path diamond;
-                diamond.startNewSubPath(center.x, center.y - crossfadeHandleRadius);
-                diamond.lineTo(center.x + crossfadeHandleRadius, center.y);
-                diamond.lineTo(center.x, center.y + crossfadeHandleRadius);
-                diamond.lineTo(center.x - crossfadeHandleRadius, center.y);
-                diamond.closeSubPath();
-                g.setColour(activeHandle ? juce::Colours::white : colour);
-                g.fillPath(diamond);
-                g.setColour(zoneMapOutline.withAlpha(0.95f));
-                g.strokePath(diamond, juce::PathStrokeType(activeHandle ? 2.0f : 1.2f));
+                const auto crossfadeHandles = buildCrossfadeHandleCenters(zone, zoneBounds);
+                for (const auto& [handle, center] : crossfadeHandles)
+                {
+                    if (!inner.contains(center))
+                        continue;
+                    const auto activeHandle = activeCrossfadeGesture.has_value()
+                        && activeCrossfadeGesture->handle == handle;
+                    const auto colour = handle == RangeHandle::crossfadeLow ? crossfadeInColour : crossfadeOutColour;
+                    juce::Path diamond;
+                    diamond.startNewSubPath(center.x, center.y - crossfadeHandleRadius);
+                    diamond.lineTo(center.x + crossfadeHandleRadius, center.y);
+                    diamond.lineTo(center.x, center.y + crossfadeHandleRadius);
+                    diamond.lineTo(center.x - crossfadeHandleRadius, center.y);
+                    diamond.closeSubPath();
+                    g.setColour(activeHandle ? juce::Colours::white : colour);
+                    g.fillPath(diamond);
+                    g.setColour(zoneMapOutline.withAlpha(0.95f));
+                    g.strokePath(diamond, juce::PathStrokeType(activeHandle ? 2.0f : 1.2f));
+                }
             }
+        }
+    }
+
+    if (policy.drawSelectionAggregate && selectedAggregateBounds.has_value())
+    {
+        g.setColour(zoneMapSelected);
+        g.drawRect(selectedAggregateBounds->reduced(1.0f), 2.0f);
+        if (selectionState.zoneIds.size() > 1u)
+        {
+            const auto countText = juce::String(static_cast<int>(selectionState.zoneIds.size())) + " zones";
+            auto badge = juce::Rectangle<int>(static_cast<int>(selectedAggregateBounds->getX()) + 4,
+                                              static_cast<int>(selectedAggregateBounds->getY()) + 4,
+                                              62,
+                                              18).getIntersection(inner.toNearestInt());
+            g.setColour(zoneMapSelected);
+            g.fillRect(badge);
+            g.setColour(juce::Colours::white);
+            g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+            g.drawFittedText(countText, badge.reduced(4, 1), juce::Justification::centred, 1);
         }
     }
 
@@ -621,7 +721,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     {
         return drs::engine::hasAnyVelocityCrossfadeValue(zone.velocityCrossfade);
     });
-    if (hasCrossfades)
+    if (hasCrossfades && policy.level == ZoneMapDetailLevel::detail)
     {
         auto legendBounds = inner.toNearestInt().reduced(5).removeFromTop(20).removeFromLeft(174);
         g.setColour(zoneMapLabelFill);
@@ -768,6 +868,46 @@ void ZoneMapCanvas::mouseUp(const juce::MouseEvent& event)
 
     requestSelectionAt(event.position,
                        gesture.ctrlDown ? SelectionMode::toggle : SelectionMode::replace);
+}
+
+void ZoneMapCanvas::mouseMove(const juce::MouseEvent& event)
+{
+    if (getDetailLevel() == ZoneMapDetailLevel::overview
+        || activeGesture.has_value()
+        || activePanGesture.has_value())
+    {
+        mouseExit(event);
+        return;
+    }
+
+    const auto nextHover = findZoneIndexAt(event.position);
+    if (nextHover == pendingHoverZoneIndex || nextHover == hoveredZoneIndex)
+        return;
+
+    pendingHoverZoneIndex = nextHover;
+    hoveredZoneIndex.reset();
+    stopTimer();
+    if (pendingHoverZoneIndex.has_value())
+        startTimer(hoverDelayMilliseconds);
+    repaint();
+}
+
+void ZoneMapCanvas::mouseExit(const juce::MouseEvent&)
+{
+    stopTimer();
+    const auto hadHover = pendingHoverZoneIndex.has_value() || hoveredZoneIndex.has_value();
+    pendingHoverZoneIndex.reset();
+    hoveredZoneIndex.reset();
+    if (hadHover)
+        repaint();
+}
+
+void ZoneMapCanvas::timerCallback()
+{
+    stopTimer();
+    hoveredZoneIndex = pendingHoverZoneIndex;
+    pendingHoverZoneIndex.reset();
+    repaint();
 }
 
 void ZoneMapCanvas::mouseWheelMove(const juce::MouseEvent& event,
@@ -940,28 +1080,42 @@ drs::engine::AuthoringZoneSummary ZoneMapCanvas::getDisplayZoneSummary(std::size
 
 juce::Rectangle<float> ZoneMapCanvas::computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const
 {
-    const auto normalizedBounds = computeNormalizedZoneBounds(zone);
+    return computeZoneBounds(computeNormalizedZoneBounds(zone));
+}
+
+juce::Rectangle<float> ZoneMapCanvas::computeZoneBounds(
+    const juce::Rectangle<float> normalizedBounds) const
+{
     const auto topLeft = normalizedContentToCanvas(normalizedBounds.getTopLeft());
     const auto bottomRight = normalizedContentToCanvas(normalizedBounds.getBottomRight());
     return { topLeft.x,
              topLeft.y,
-             std::max(10.0f, bottomRight.x - topLeft.x),
-             std::max(14.0f, bottomRight.y - topLeft.y) };
+             std::max(0.75f, bottomRight.x - topLeft.x),
+             std::max(0.75f, bottomRight.y - topLeft.y) };
 }
 
 std::vector<ZoneMapCanvas::ZoneLayout> ZoneMapCanvas::buildZoneLayouts() const
 {
     std::vector<ZoneLayout> layouts;
-    layouts.reserve(zoneSummaries.size());
+    layouts.reserve(std::min<std::size_t>(zoneSummaries.size(), 256u));
 
     const auto inner = getInnerBounds();
-    for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
+    const auto visibleContentBounds = viewport.getVisibleContentBounds();
+    const auto geometryIsPreviewed = activeGesture.has_value() || activeCrossfadeGesture.has_value();
+    for (const auto& cached : cachedZoneGeometry)
     {
-        const auto visibleBounds = computeZoneBounds(getDisplayZoneSummary(index)).getIntersection(inner);
+        const auto normalizedBounds = geometryIsPreviewed
+            ? computeNormalizedZoneBounds(getDisplayZoneSummary(cached.index))
+            : cached.normalizedBounds;
+        if (!normalizedBounds.intersects(visibleContentBounds))
+            continue;
+
+        const auto visibleBounds = computeZoneBounds(normalizedBounds).getIntersection(inner);
         if (!visibleBounds.isEmpty())
-            layouts.push_back({index, visibleBounds});
+            layouts.push_back({cached.index, visibleBounds});
     }
 
+    lastVisibleZoneCount = layouts.size();
     return layouts;
 }
 
@@ -992,7 +1146,10 @@ std::optional<std::size_t> ZoneMapCanvas::findZoneIndexAt(juce::Point<float> pos
 
     for (const auto& layout : zoneLayouts)
     {
-        if (layout.bounds.contains(position))
+        const auto hitBounds = layout.bounds.withSizeKeepingCentre(
+            std::max(6.0f, layout.bounds.getWidth()),
+            std::max(6.0f, layout.bounds.getHeight()));
+        if (hitBounds.contains(position))
             hits.push_back(layout);
     }
 
@@ -1495,6 +1652,25 @@ bool ZoneMapCanvas::requestSelectionState(const SelectionState& nextSelectionSta
     return false;
 }
 
+void ZoneMapCanvas::rebuildGeometryCache()
+{
+    cachedZoneGeometry.clear();
+    cachedZoneGeometry.reserve(zoneSummaries.size());
+    std::vector<ZoneMapOverview::Zone> overviewZones;
+    overviewZones.reserve(zoneSummaries.size());
+
+    for (std::size_t index = 0; index < zoneSummaries.size(); ++index)
+    {
+        const auto& zone = zoneSummaries[index];
+        const auto normalizedBounds = computeNormalizedZoneBounds(zone);
+        const auto groupId = zone.groupId.empty() ? std::string { "ungrouped" } : zone.groupId;
+        cachedZoneGeometry.push_back({ index, normalizedBounds, stableZoneGroupTint(groupId) });
+        overviewZones.push_back({ zone.id, groupId, normalizedBounds });
+    }
+
+    overview.setZones(std::move(overviewZones));
+}
+
 void ZoneMapCanvas::refreshViewportUi()
 {
     zoomValueLabel.setText(juce::String(viewport.getDisplayedZoomPercentage()) + "%",
@@ -1504,6 +1680,8 @@ void ZoneMapCanvas::refreshViewportUi()
     fitSelectedButton.setEnabled(!selectionState.zoneIds.empty());
     zoomOutButton.setEnabled(viewport.getZoom() > ZoneMapViewState::minimumZoom);
     zoomInButton.setEnabled(viewport.getZoom() < ZoneMapViewState::maximumZoom);
+    overview.setViewport(viewport.getVisibleContentBounds());
+    overview.setSelection(selectionState.zoneIds);
 }
 
 bool ZoneMapCanvas::beginRangeGestureAt(juce::Point<float> position)

@@ -16,6 +16,7 @@ struct AuthoringZoneSummary
     std::string displayName;
     std::string sampleSourceId;
     std::string articulationId;
+    std::string groupId;
     int rootKey = 60;
     int keyLow = 0;
     int keyHigh = 127;
