@@ -8,6 +8,7 @@
 #include "shared/WorkspaceMenuPolicy.h"
 #include "shared/WavImportWorkflow.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -22,8 +23,8 @@ namespace drs::plugin
 namespace
 {
 namespace fs = std::filesystem;
-const auto performTabColour = juce::Colour::fromRGB(28, 126, 214);
-const auto mapTabColour = juce::Colour::fromRGB(181, 96, 21);
+const auto performTabColour = drs::app::authoring::visual::surfaceSubtle;
+const auto mapTabColour = drs::app::authoring::visual::surface;
 
 constexpr int saveButtonResult = 1;
 constexpr int discardButtonResult = 2;
@@ -545,6 +546,8 @@ Editor::Editor(Processor& owner)
     addAndMakeVisible(workspaceShell);
 
     fileMenuButton.setComponentID("pluginFileMenuButton");
+    fileMenuButton.setColour(juce::TextButton::buttonColourId, drs::app::authoring::visual::surfaceRaised);
+    fileMenuButton.setColour(juce::TextButton::textColourOffId, drs::app::authoring::visual::text);
     fileMenuButton.onClick = [this]
     {
         showFileMenu();
@@ -552,6 +555,8 @@ Editor::Editor(Processor& owner)
     workspaceShell.addAndMakeVisible(fileMenuButton);
 
     settingsMenuButton.setComponentID("pluginSettingsMenuButton");
+    settingsMenuButton.setColour(juce::TextButton::buttonColourId, drs::app::authoring::visual::surfaceRaised);
+    settingsMenuButton.setColour(juce::TextButton::textColourOffId, drs::app::authoring::visual::text);
     settingsMenuButton.onClick = [this]
     {
         showSettingsMenu();
@@ -560,9 +565,22 @@ Editor::Editor(Processor& owner)
 
     projectStatusLabel.setComponentID("pluginProjectStatusLabel");
     projectStatusLabel.setJustificationType(juce::Justification::centredRight);
+    projectStatusLabel.setColour(juce::Label::textColourId, drs::app::authoring::visual::textMuted);
     workspaceShell.addAndMakeVisible(projectStatusLabel);
 
     workspaceTabs.setComponentID("workspaceTabs");
+    workspaceTabs.setColour(juce::TabbedComponent::backgroundColourId,
+                            drs::app::authoring::visual::shell);
+    workspaceTabs.setColour(juce::TabbedComponent::outlineColourId,
+                            drs::app::authoring::visual::border);
+    workspaceTabs.setColour(juce::TabbedButtonBar::tabOutlineColourId,
+                            drs::app::authoring::visual::border);
+    workspaceTabs.setColour(juce::TabbedButtonBar::frontOutlineColourId,
+                            drs::app::authoring::visual::selection);
+    workspaceTabs.setColour(juce::TabbedButtonBar::tabTextColourId,
+                            drs::app::authoring::visual::textMuted);
+    workspaceTabs.setColour(juce::TabbedButtonBar::frontTextColourId,
+                            drs::app::authoring::visual::text);
     workspaceShell.addAndMakeVisible(workspaceTabs);
     workspaceShell.addAndMakeVisible(restoreBanner);
     performancePackageExportProgress.setCancelCallback([this]
@@ -607,6 +625,11 @@ Editor::~Editor()
         sfzImportClient->waitForTerminal(std::chrono::seconds(10));
     }
     appProperties.saveIfNeeded();
+}
+
+void Editor::paint(juce::Graphics& g)
+{
+    g.fillAll(drs::app::authoring::visual::shell);
 }
 
 void Editor::resized()

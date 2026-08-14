@@ -1,9 +1,9 @@
 #pragma once
 
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
+
 #include <juce_graphics/juce_graphics.h>
 
-#include <array>
-#include <cstdint>
 #include <string_view>
 
 namespace drs::app::authoring
@@ -40,16 +40,6 @@ struct ZoneMapRenderPolicy
 
 inline juce::Colour stableZoneGroupTint(const std::string_view groupId) noexcept
 {
-    constexpr std::array<juce::uint32, 8> palette {
-        0xff6689a6, 0xff71937d, 0xffb58a55, 0xff8d78a5,
-        0xff5e9598, 0xffa16f70, 0xff7f8d5c, 0xff8a7b70
-    };
-    std::uint32_t hash = 2166136261u;
-    for (const auto character : groupId)
-    {
-        hash ^= static_cast<std::uint8_t>(character);
-        hash *= 16777619u;
-    }
-    return juce::Colour(palette[hash % palette.size()]);
+    return visual::stableGroupTint(groupId);
 }
 } // namespace drs::app::authoring

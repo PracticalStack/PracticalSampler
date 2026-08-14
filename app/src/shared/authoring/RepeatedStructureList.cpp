@@ -1,4 +1,5 @@
 #include "shared/authoring/RepeatedStructureList.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 
@@ -6,15 +7,14 @@ namespace drs::app::authoring
 {
 namespace
 {
-const auto repeatedStructureSurface = juce::Colour::fromRGB(244, 239, 231);
-const auto repeatedStructureBorder = juce::Colour::fromRGB(214, 202, 187);
-const auto repeatedStructureSelected = juce::Colour::fromRGB(28, 108, 88);
+const auto repeatedStructureSurface = visual::surfaceSubtle;
+const auto repeatedStructureBorder = visual::border;
+const auto repeatedStructureSelected = visual::selection;
 const auto repeatedStructureSelectedSurface = repeatedStructureSelected.withAlpha(0.14f);
-const auto repeatedStructureTitle = juce::Colour::fromRGB(24, 29, 33);
-const auto repeatedStructureMuted = juce::Colour::fromRGB(82, 86, 94);
-const auto repeatedStructureDisabled = juce::Colour::fromRGB(151, 154, 160);
-const auto repeatedStructureFocusRing = juce::Colour::fromRGB(24, 29, 33);
-const auto repeatedStructureFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
+const auto repeatedStructureTitle = visual::text;
+const auto repeatedStructureMuted = visual::textMuted;
+const auto repeatedStructureDisabled = visual::textDisabled;
+const auto repeatedStructureFocusRing = visual::focus;
 
 void configureAccessibleMetadata(juce::Component& component,
                                  const juce::String& title,
@@ -33,10 +33,8 @@ void drawFocusRing(juce::Graphics& g,
                    float cornerSize,
                    const juce::Colour& outlineColour)
 {
-    g.setColour(repeatedStructureFocusHalo);
-    g.drawRoundedRectangle(bounds.expanded(1.0f), cornerSize + 1.0f, 3.0f);
-    g.setColour(outlineColour);
-    g.drawRoundedRectangle(bounds, cornerSize, 1.8f);
+    juce::ignoreUnused(outlineColour);
+    visual::drawFocusRing(g, bounds, cornerSize);
 }
 } // namespace
 
@@ -47,11 +45,11 @@ public:
     {
         setInterceptsMouseClicks(false, true);
 
-        titleLabel.setFont(juce::FontOptions(12.5f, juce::Font::bold));
+        titleLabel.setFont(juce::FontOptions(visual::compactTypeSize, juce::Font::bold));
         titleLabel.setJustificationType(juce::Justification::centredLeft);
         titleLabel.setInterceptsMouseClicks(false, false);
 
-        statusLabel.setFont(juce::FontOptions(11.0f));
+        statusLabel.setFont(juce::FontOptions(visual::metadataTypeSize));
         statusLabel.setJustificationType(juce::Justification::centredRight);
         statusLabel.setInterceptsMouseClicks(false, false);
 
@@ -84,10 +82,11 @@ public:
     {
         auto bounds = getLocalBounds().toFloat().reduced(1.0f);
         g.setColour(selected ? repeatedStructureSelectedSurface : repeatedStructureSurface);
-        g.fillRoundedRectangle(bounds, 8.0f);
+        g.fillRoundedRectangle(bounds, visual::controlRadius);
 
         g.setColour(selected ? repeatedStructureSelected : repeatedStructureBorder);
-        g.drawRoundedRectangle(bounds, 8.0f, selected ? 1.4f : 1.0f);
+        g.drawRoundedRectangle(bounds, visual::controlRadius,
+                               selected ? 1.5f : visual::borderWidth);
     }
 
     void resized() override
@@ -129,7 +128,7 @@ void RepeatedStructureList::KeyboardNavigableListBox::paint(juce::Graphics& g)
     {
         drawFocusRing(g,
                       getLocalBounds().toFloat().reduced(2.0f),
-                      9.0f,
+                      visual::controlRadius,
                       findColour(juce::TextEditor::focusedOutlineColourId));
     }
 }
@@ -160,7 +159,7 @@ RepeatedStructureList::RepeatedStructureList(const juce::String& componentId,
     listBox.setComponentID(listBoxComponentId);
     listBox.setModel(this);
     listBox.setMultipleSelectionEnabled(false);
-    listBox.setRowHeight(24);
+    listBox.setRowHeight(visual::compactRowHeight);
     listBox.setOutlineThickness(0);
     listBox.setColour(juce::ListBox::backgroundColourId, repeatedStructureSurface);
     listBox.setColour(juce::ListBox::outlineColourId, repeatedStructureBorder);

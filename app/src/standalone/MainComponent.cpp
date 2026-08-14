@@ -8,6 +8,7 @@
 #include "shared/WorkspaceMenuPolicy.h"
 #include "shared/WavImportWorkflow.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -21,8 +22,8 @@ namespace drs::standalone
 namespace
 {
 namespace fs = std::filesystem;
-const auto performTabColour = juce::Colour::fromRGB(28, 126, 214);
-const auto mapTabColour = juce::Colour::fromRGB(181, 96, 21);
+const auto performTabColour = drs::app::authoring::visual::surfaceSubtle;
+const auto mapTabColour = drs::app::authoring::visual::surface;
 
 constexpr int saveButtonResult = 1;
 constexpr int discardButtonResult = 2;
@@ -538,9 +539,22 @@ MainComponent::MainComponent(bool enableAudioOutput)
 
     sessionStatusLabel.setComponentID("standaloneWorkspaceStatusLabel");
     sessionStatusLabel.setJustificationType(juce::Justification::centredRight);
+    sessionStatusLabel.setColour(juce::Label::textColourId, drs::app::authoring::visual::textMuted);
     addAndMakeVisible(sessionStatusLabel);
 
     workspaceTabs.setComponentID("workspaceTabs");
+    workspaceTabs.setColour(juce::TabbedComponent::backgroundColourId,
+                            drs::app::authoring::visual::shell);
+    workspaceTabs.setColour(juce::TabbedComponent::outlineColourId,
+                            drs::app::authoring::visual::border);
+    workspaceTabs.setColour(juce::TabbedButtonBar::tabOutlineColourId,
+                            drs::app::authoring::visual::border);
+    workspaceTabs.setColour(juce::TabbedButtonBar::frontOutlineColourId,
+                            drs::app::authoring::visual::selection);
+    workspaceTabs.setColour(juce::TabbedButtonBar::tabTextColourId,
+                            drs::app::authoring::visual::textMuted);
+    workspaceTabs.setColour(juce::TabbedButtonBar::frontTextColourId,
+                            drs::app::authoring::visual::text);
     addAndMakeVisible(workspaceTabs);
     addAndMakeVisible(restoreBanner);
     performancePackageExportProgress.setCancelCallback([this]
@@ -591,6 +605,11 @@ MainComponent::~MainComponent()
     menuBar.setModel(nullptr);
     appProperties.saveIfNeeded();
     shutdownAudioOutput();
+}
+
+void MainComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(drs::app::authoring::visual::shell);
 }
 
 void MainComponent::resized()

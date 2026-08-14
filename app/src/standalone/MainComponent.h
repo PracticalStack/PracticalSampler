@@ -25,6 +25,7 @@ public:
     explicit MainComponent(bool enableAudioOutput = true);
     ~MainComponent() override;
 
+    void paint(juce::Graphics&) override;
     void resized() override;
 
     std::string exportStateJson() const;

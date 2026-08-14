@@ -1,13 +1,14 @@
 #include "shared/authoring/WaveformDetailView.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 namespace drs::app::authoring
 {
 namespace
 {
-const auto waveformGrid = juce::Colour::fromRGB(230, 220, 207);
-const auto waveformMuted = juce::Colour::fromRGB(82, 86, 94);
-const auto waveformSelected = juce::Colour::fromRGB(28, 108, 88);
-const auto waveformAccent = juce::Colour::fromRGB(181, 96, 21);
+const auto waveformGrid = visual::mapSurface;
+const auto waveformMuted = visual::textMuted;
+const auto waveformSelected = visual::modulation;
+const auto waveformAccent = visual::selection;
 } // namespace
 
 void WaveformDetailView::setPreview(AuthoringWaveformPreview nextPreview)
@@ -20,10 +21,12 @@ void WaveformDetailView::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
     g.setColour(waveformGrid);
-    g.fillRoundedRectangle(bounds, 14.0f);
+    g.fillRoundedRectangle(bounds, visual::panelRadius);
+    g.setColour(visual::border);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), visual::panelRadius, visual::borderWidth);
 
     const auto inner = bounds.reduced(12.0f);
-    g.setColour(juce::Colour::fromRGBA(24, 29, 33, 42));
+    g.setColour(visual::text.withAlpha(0.16f));
     g.drawHorizontalLine(static_cast<int>(inner.getCentreY()), inner.getX(), inner.getRight());
 
     const auto drawLoopMarkers = [&]

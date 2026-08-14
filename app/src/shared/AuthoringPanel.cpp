@@ -2,6 +2,7 @@
 
 #include "shared/MessageThreadMetrics.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 #include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
 
@@ -21,19 +22,17 @@ namespace
 constexpr int statusTimerId = 1;
 constexpr int previewReleaseTimerId = 2;
 constexpr int keySwitchMidiLearnTimerId = 3;
-const auto authoringPanelBackground = juce::Colour::fromRGB(18, 24, 29);
-const auto authoringPanelCard = juce::Colour::fromRGB(250, 247, 240);
-const auto authoringPanelAccent = juce::Colour::fromRGB(181, 96, 21);
-const auto authoringPanelMuted = juce::Colour::fromRGB(82, 86, 94);
-const auto authoringControlSurface = juce::Colour::fromRGB(251, 248, 242);
-const auto authoringControlSurfaceHover = juce::Colour::fromRGB(244, 239, 231);
-const auto authoringControlOutline = juce::Colour::fromRGB(176, 160, 141);
-const auto authoringFocusRing = juce::Colour::fromRGB(24, 29, 33);
-const auto authoringFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
-const auto authoringButtonFill = juce::Colour::fromRGB(122, 64, 18);
-const auto authoringButtonFillPressed = juce::Colour::fromRGB(102, 52, 14);
-const auto authoringButtonText = juce::Colours::white;
-const auto authoringToggleTick = juce::Colour::fromRGB(28, 108, 88);
+const auto authoringPanelBackground = authoring::visual::shell;
+const auto authoringPanelCard = authoring::visual::surface;
+const auto authoringPanelAccent = authoring::visual::selection;
+const auto authoringPanelMuted = authoring::visual::textMuted;
+const auto authoringControlSurface = authoring::visual::surfaceRaised;
+const auto authoringControlSurfaceHover = authoring::visual::surfaceHover;
+const auto authoringControlOutline = authoring::visual::border;
+const auto authoringFocusRing = authoring::visual::focus;
+const auto authoringButtonFill = authoring::visual::surfaceRaised;
+const auto authoringButtonFillPressed = authoring::visual::selectionHover;
+const auto authoringToggleTick = authoring::visual::modulation;
 
 juce::String formatMidiNoteName(const int midiNote)
 {
@@ -322,21 +321,21 @@ void configureEditorSlider(juce::Slider& slider,
 void configureSectionLabel(juce::Label& label, const char* text)
 {
     label.setText(text, juce::dontSendNotification);
-    label.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
-    label.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    label.setColour(juce::Label::textColourId, authoring::visual::text);
+    label.setFont(juce::FontOptions(authoring::visual::sectionTypeSize, juce::Font::bold));
 }
 
 void configureFieldLabel(juce::Label& label, const char* text)
 {
     label.setText(text, juce::dontSendNotification);
-    label.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
-    label.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+    label.setColour(juce::Label::textColourId, authoring::visual::text);
+    label.setFont(juce::FontOptions(authoring::visual::fieldTypeSize, juce::Font::bold));
 }
 
 void configureMetadataLabel(juce::Label& label)
 {
     label.setColour(juce::Label::textColourId, authoringPanelMuted);
-    label.setFont(juce::FontOptions(13.0f));
+    label.setFont(juce::FontOptions(authoring::visual::bodyTypeSize));
     label.setJustificationType(juce::Justification::centredLeft);
 }
 
@@ -345,10 +344,8 @@ void drawAuthoringFocusRing(juce::Graphics& g,
                             float cornerSize,
                             const juce::Colour& outlineColour)
 {
-    g.setColour(authoringFocusHalo);
-    g.drawRoundedRectangle(bounds.expanded(1.0f), cornerSize + 1.0f, 3.0f);
-    g.setColour(outlineColour);
-    g.drawRoundedRectangle(bounds, cornerSize, 1.8f);
+    juce::ignoreUnused(outlineColour);
+    authoring::visual::drawFocusRing(g, bounds, cornerSize);
 }
 
 juce::String formatZoneRange(const drs::engine::AuthoringZoneSummary& zone)
@@ -923,37 +920,46 @@ void AuthoringPanel::requestWaveformPreviewLoad(const bool refreshImmediately)
 AuthoringPanel::AuthoringControlLookAndFeel::AuthoringControlLookAndFeel()
 {
     setColour(juce::TextButton::buttonColourId, authoringButtonFill);
-    setColour(juce::TextButton::buttonOnColourId, authoringButtonFillPressed);
-    setColour(juce::TextButton::textColourOffId, authoringButtonText);
-    setColour(juce::TextButton::textColourOnId, authoringButtonText);
+    setColour(juce::TextButton::buttonOnColourId, authoringPanelAccent);
+    setColour(juce::TextButton::textColourOffId, authoring::visual::text);
+    setColour(juce::TextButton::textColourOnId, authoring::visual::textOnAccent);
 
-    setColour(juce::ToggleButton::textColourId, authoringFocusRing);
+    setColour(juce::ToggleButton::textColourId, authoring::visual::text);
     setColour(juce::ToggleButton::tickColourId, authoringToggleTick);
     setColour(juce::ToggleButton::tickDisabledColourId, authoringControlOutline);
 
     setColour(juce::ComboBox::backgroundColourId, authoringControlSurface);
-    setColour(juce::ComboBox::textColourId, authoringFocusRing);
-    setColour(juce::ComboBox::arrowColourId, authoringFocusRing.withAlpha(0.82f));
+    setColour(juce::ComboBox::textColourId, authoring::visual::text);
+    setColour(juce::ComboBox::arrowColourId, authoring::visual::text.withAlpha(0.82f));
     setColour(juce::ComboBox::outlineColourId, authoringControlOutline);
     setColour(juce::ComboBox::focusedOutlineColourId, authoringFocusRing);
 
     setColour(juce::TextEditor::backgroundColourId, authoringControlSurface);
-    setColour(juce::TextEditor::textColourId, authoringFocusRing);
+    setColour(juce::TextEditor::textColourId, authoring::visual::text);
     setColour(juce::TextEditor::outlineColourId, authoringControlOutline);
     setColour(juce::TextEditor::focusedOutlineColourId, authoringFocusRing);
     setColour(juce::TextEditor::highlightColourId, authoringToggleTick.withAlpha(0.18f));
-    setColour(juce::TextEditor::highlightedTextColourId, authoringFocusRing);
+    setColour(juce::TextEditor::highlightedTextColourId, authoring::visual::text);
 
-    setColour(juce::Label::textColourId, authoringFocusRing);
-    setColour(juce::Slider::thumbColourId, authoringButtonFill);
+    setColour(juce::Label::textColourId, authoring::visual::text);
+    setColour(juce::Slider::thumbColourId, authoringPanelAccent);
     setColour(juce::Slider::trackColourId, authoringToggleTick.withAlpha(0.76f));
     setColour(juce::Slider::backgroundColourId, authoringControlSurfaceHover);
-    setColour(juce::Slider::textBoxTextColourId, authoringFocusRing);
+    setColour(juce::Slider::textBoxTextColourId, authoring::visual::text);
     setColour(juce::Slider::textBoxBackgroundColourId, authoringControlSurface);
     setColour(juce::Slider::textBoxOutlineColourId, authoringControlOutline);
 
     setColour(juce::ListBox::backgroundColourId, authoringControlSurfaceHover);
     setColour(juce::ListBox::outlineColourId, authoringControlOutline);
+    setColour(juce::ScrollBar::backgroundColourId, authoring::visual::surfaceSubtle);
+    setColour(juce::ScrollBar::thumbColourId, authoring::visual::borderStrong);
+    setColour(juce::PopupMenu::backgroundColourId, authoring::visual::surfaceRaised);
+    setColour(juce::PopupMenu::textColourId, authoring::visual::text);
+    setColour(juce::PopupMenu::highlightedBackgroundColourId, authoring::visual::selection);
+    setColour(juce::PopupMenu::highlightedTextColourId, authoring::visual::textOnAccent);
+    setColour(juce::TooltipWindow::backgroundColourId, authoring::visual::surfaceRaised);
+    setColour(juce::TooltipWindow::textColourId, authoring::visual::text);
+    setColour(juce::TooltipWindow::outlineColourId, authoring::visual::borderStrong);
 }
 
 void AuthoringPanel::AuthoringControlLookAndFeel::drawButtonBackground(juce::Graphics& g,
@@ -963,7 +969,7 @@ void AuthoringPanel::AuthoringControlLookAndFeel::drawButtonBackground(juce::Gra
                                                                        bool shouldDrawButtonAsDown)
 {
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
-    const auto cornerSize = 7.0f;
+    const auto cornerSize = authoring::visual::controlRadius;
     const auto hasFocus = button.hasKeyboardFocus(true);
 
     if (hasFocus)
@@ -972,11 +978,11 @@ void AuthoringPanel::AuthoringControlLookAndFeel::drawButtonBackground(juce::Gra
         bounds = bounds.reduced(3.0f);
     }
 
-    auto fillColour = backgroundColour.withMultipliedAlpha(button.isEnabled() ? 1.0f : 0.42f);
+    auto fillColour = button.isEnabled() ? backgroundColour : authoring::visual::disabled(backgroundColour);
     if (shouldDrawButtonAsDown)
         fillColour = fillColour.interpolatedWith(authoringButtonFillPressed, 0.45f);
     else if (shouldDrawButtonAsHighlighted)
-        fillColour = fillColour.interpolatedWith(authoringControlSurface, 0.12f);
+        fillColour = fillColour.interpolatedWith(authoringControlSurfaceHover, 0.72f);
 
     g.setColour(fillColour);
     g.fillRoundedRectangle(bounds, cornerSize);
@@ -992,7 +998,7 @@ void AuthoringPanel::AuthoringControlLookAndFeel::drawToggleButton(juce::Graphic
     if (button.hasKeyboardFocus(true))
         drawAuthoringFocusRing(g,
                                button.getLocalBounds().toFloat().reduced(1.0f),
-                               6.0f,
+                               authoring::visual::controlRadius,
                                findColour(juce::TextEditor::focusedOutlineColourId));
 
     juce::LookAndFeel_V4::drawToggleButton(g, button, shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
@@ -1008,7 +1014,7 @@ void AuthoringPanel::AuthoringControlLookAndFeel::drawComboBox(juce::Graphics& g
                                                                int,
                                                                juce::ComboBox& box)
 {
-    const auto cornerSize = 4.0f;
+    const auto cornerSize = authoring::visual::controlRadius;
     auto bounds = juce::Rectangle<float>(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)).reduced(0.5f);
     const auto hasFocus = box.hasKeyboardFocus(true);
 
@@ -1047,7 +1053,7 @@ void AuthoringPanel::AuthoringControlLookAndFeel::drawLinearSliderOutline(juce::
     {
         drawAuthoringFocusRing(g,
                                slider.getLocalBounds().toFloat().reduced(1.0f),
-                               6.0f,
+                               authoring::visual::controlRadius,
                                findColour(juce::TextEditor::focusedOutlineColourId));
     }
     else
@@ -1120,8 +1126,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureMetadataLabel(loopInfoLabel);
     configureMetadataLabel(importMetricsLabel);
     configureMetadataLabel(sourceValidationLabel);
-    playbackBannerLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
-    playbackBannerLabel.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+    playbackBannerLabel.setColour(juce::Label::textColourId, authoring::visual::text);
+    playbackBannerLabel.setFont(juce::FontOptions(authoring::visual::bodyTypeSize, juce::Font::bold));
     playbackBannerLabel.setJustificationType(juce::Justification::centredLeft);
     macroSummaryLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
     fxParameterValueLabel.setColour(juce::Label::textColourId, authoringPanelMuted);
@@ -2756,29 +2762,30 @@ void AuthoringPanel::paint(juce::Graphics& g)
     g.fillAll(authoringPanelBackground);
 
     auto bounds = getLocalBounds().toFloat().reduced(14.0f);
-    g.setColour(authoringPanelAccent.withAlpha(0.22f));
-    g.fillRoundedRectangle(bounds, 20.0f);
-
     g.setColour(authoringPanelCard);
-    g.fillRoundedRectangle(bounds.reduced(4.0f), 18.0f);
+    g.fillRoundedRectangle(bounds, authoring::visual::panelRadius);
+    g.setColour(authoringControlOutline);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), authoring::visual::panelRadius,
+                           authoring::visual::borderWidth);
 
     if (playbackBanner.isVisible() && !playbackBanner.getBounds().isEmpty())
     {
         auto bannerBounds = playbackBanner.getBounds().toFloat().expanded(2.0f, 1.0f);
         auto text = playbackBannerLabel.getText();
-        auto bannerColour = juce::Colour::fromRGB(234, 223, 206);
+        auto bannerColour = authoring::visual::information.withAlpha(0.13f).overlaidWith(authoringPanelCard);
 
         if (text.startsWithIgnoreCase("playback blocked"))
-            bannerColour = juce::Colour::fromRGB(246, 223, 212);
+            bannerColour = authoring::visual::error.withAlpha(0.13f).overlaidWith(authoringPanelCard);
         else if (text.startsWithIgnoreCase("playback action"))
-            bannerColour = juce::Colour::fromRGB(238, 227, 208);
+            bannerColour = authoring::visual::warning.withAlpha(0.14f).overlaidWith(authoringPanelCard);
         else if (text.startsWithIgnoreCase("playback busy") || text.startsWithIgnoreCase("playback paused"))
-            bannerColour = juce::Colour::fromRGB(231, 231, 214);
+            bannerColour = authoring::visual::success.withAlpha(0.12f).overlaidWith(authoringPanelCard);
 
         g.setColour(bannerColour);
-        g.fillRoundedRectangle(bannerBounds, 10.0f);
+        g.fillRoundedRectangle(bannerBounds, authoring::visual::controlRadius);
         g.setColour(authoringControlOutline);
-        g.drawRoundedRectangle(bannerBounds, 10.0f, 1.0f);
+        g.drawRoundedRectangle(bannerBounds, authoring::visual::controlRadius,
+                               authoring::visual::borderWidth);
     }
 }
 
@@ -5445,7 +5452,8 @@ void AuthoringPanel::refreshFromSession()
                           isSwitchKey ? authoringPanelAccent
                                       : (isPlayableKey ? authoringToggleTick : authoringControlSurface));
             key.setColour(juce::TextButton::textColourOffId,
-                          (isSwitchKey || isPlayableKey) ? juce::Colours::white : authoringFocusRing);
+                          (isSwitchKey || isPlayableKey) ? authoring::visual::textOnAccent
+                                                        : authoring::visual::text);
         }
     }
     else

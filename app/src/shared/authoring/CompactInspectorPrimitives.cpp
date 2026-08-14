@@ -1,4 +1,5 @@
 #include "shared/authoring/CompactInspectorPrimitives.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 namespace drs::app::authoring
 {
@@ -47,7 +48,7 @@ void configureInspectorLabel(juce::Label& label,
                              bool bold)
 {
     label.setText(text, juce::dontSendNotification);
-    label.setColour(juce::Label::textColourId, juce::Colour::fromRGB(24, 29, 33));
+    label.setColour(juce::Label::textColourId, visual::text);
     label.setFont(juce::FontOptions(fontHeight, bold ? juce::Font::bold : juce::Font::plain));
 }
 
@@ -417,7 +418,7 @@ CompactInspectorMessage::CompactInspectorMessage(const juce::String& messageComp
 {
     setComponentID(messageComponentId);
     label.setJustificationType(justification);
-    label.setColour(juce::Label::textColourId, juce::Colour::fromRGB(82, 86, 94));
+    label.setColour(juce::Label::textColourId, visual::textMuted);
     label.setFont(juce::FontOptions(12.5f, juce::Font::plain));
     configureAccessibleMetadata(*this,
                                 "Inspector message",

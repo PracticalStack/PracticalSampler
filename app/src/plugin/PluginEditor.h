@@ -22,6 +22,7 @@ public:
     explicit Editor(Processor&);
     ~Editor() override;
 
+    void paint(juce::Graphics&) override;
     void resized() override;
 
 private:

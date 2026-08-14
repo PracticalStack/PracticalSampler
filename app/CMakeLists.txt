@@ -35,6 +35,7 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/WavImportWorkflow.h
     src/shared/authoring/AuthoringViewModels.h
     src/shared/authoring/AuthoringWorkspaceLayout.h
+    src/shared/authoring/OpenWorkbenchVisualSystem.h
     src/shared/authoring/CompactInspectorPrimitives.cpp
     src/shared/authoring/CompactInspectorPrimitives.h
     src/shared/authoring/RepeatedStructureAdapters.h

@@ -1,10 +1,11 @@
 #include "shared/authoring/AuthoringSummaryStrip.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 namespace drs::app::authoring
 {
 namespace
 {
-const auto summaryMuted = juce::Colour::fromRGB(82, 86, 94);
+const auto summaryMuted = visual::textMuted;
 
 void configureAccessibleMetadata(juce::Component& component,
                                  const juce::String& title,
@@ -45,8 +46,8 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
                                 "Selection summary strip",
                                 "Summarizes the current zone selection and exposes preview, undo, redo, and save actions.");
 
-    titleLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
-    titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    titleLabel.setFont(juce::FontOptions(visual::titleTypeSize, juce::Font::bold));
+    titleLabel.setColour(juce::Label::textColourId, visual::text);
     titleLabel.setComponentID("authoringSummaryTitleLabel");
     configureAccessibleMetadata(titleLabel,
                                 "Selected zone title",

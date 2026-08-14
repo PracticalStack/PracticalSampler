@@ -1,4 +1,5 @@
 #include "shared/authoring/ZoneMapOverview.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -8,9 +9,9 @@ namespace drs::app::authoring
 {
 namespace
 {
-const auto overviewSurface = juce::Colour::fromRGB(245, 243, 237);
-const auto overviewBorder = juce::Colour::fromRGB(79, 84, 86);
-const auto selectionOrange = juce::Colour::fromRGB(215, 104, 40);
+const auto overviewSurface = visual::mapSurface;
+const auto overviewBorder = visual::borderStrong;
+const auto selectionOrange = visual::selection;
 }
 
 ZoneMapOverview::ZoneMapOverview()
@@ -117,7 +118,7 @@ void ZoneMapOverview::paint(juce::Graphics& g)
     }
 
     const auto frame = getViewportFrameBounds();
-    g.setColour(juce::Colours::white.withAlpha(0.9f));
+    g.setColour(visual::surfaceRaised.withAlpha(0.96f));
     g.drawRect(frame.expanded(1.0f), 3.0f);
     g.setColour(overviewBorder);
     g.drawRect(frame, 1.5f);

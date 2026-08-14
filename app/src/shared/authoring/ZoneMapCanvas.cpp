@@ -1,4 +1,5 @@
 #include "shared/authoring/ZoneMapCanvas.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,19 +9,18 @@ namespace drs::app::authoring
 {
 namespace
 {
-const auto zoneMapGrid = juce::Colour::fromRGB(230, 220, 207);
-const auto zoneMapSelected = juce::Colour::fromRGB(215, 104, 40);
-const auto zoneMapSecondarySelected = juce::Colour::fromRGB(194, 126, 75);
+const auto zoneMapGrid = visual::mapSurface;
+const auto zoneMapSelected = visual::selection;
+const auto zoneMapSecondarySelected = visual::selectionSecondary;
 const auto zoneMapSelectedFill = zoneMapSelected.withAlpha(0.58f);
 const auto zoneMapSecondarySelectedFill = zoneMapSecondarySelected.withAlpha(0.44f);
-const auto zoneMapLabelFill = juce::Colour::fromRGBA(20, 25, 31, 168);
-const auto zoneMapOutline = juce::Colour::fromRGBA(24, 29, 33, 92);
-const auto zoneMapFocusRing = juce::Colour::fromRGB(24, 29, 33);
-const auto zoneMapFocusHalo = juce::Colour::fromRGBA(255, 255, 255, 232);
+const auto zoneMapLabelFill = visual::dataLabelSurface;
+const auto zoneMapOutline = visual::text.withAlpha(0.36f);
+const auto zoneMapFocusRing = visual::focus;
 const auto zoneMapMarqueeFill = zoneMapSelected.withAlpha(0.16f);
 const auto zoneMapMarqueeOutline = zoneMapSelected.withAlpha(0.92f);
-const auto crossfadeInColour = juce::Colour::fromRGB(67, 159, 211);
-const auto crossfadeOutColour = juce::Colour::fromRGB(231, 149, 67);
+const auto crossfadeInColour = visual::crossfadeIn;
+const auto crossfadeOutColour = visual::crossfadeOut;
 constexpr float rangeHandleRadius = 6.0f;
 constexpr float rangeHandleHitRadius = 12.0f;
 constexpr float crossfadeHandleRadius = 7.0f;
@@ -44,10 +44,8 @@ void drawFocusRing(juce::Graphics& g,
                    float cornerSize,
                    const juce::Colour& outlineColour)
 {
-    g.setColour(zoneMapFocusHalo);
-    g.drawRoundedRectangle(bounds.expanded(1.0f), cornerSize + 1.0f, 3.0f);
-    g.setColour(outlineColour);
-    g.drawRoundedRectangle(bounds, cornerSize, 1.8f);
+    juce::ignoreUnused(outlineColour);
+    visual::drawFocusRing(g, bounds, cornerSize);
 }
 } // namespace
 
@@ -418,14 +416,17 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     auto bounds = getLocalBounds().toFloat();
     g.fillAll(juce::Colours::transparentBlack);
     g.setColour(findColour(juce::ListBox::backgroundColourId));
-    g.fillRoundedRectangle(bounds, 14.0f);
+    g.fillRoundedRectangle(bounds, visual::panelRadius);
+    g.setColour(visual::border);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), visual::panelRadius, visual::borderWidth);
 
     if (hasKeyboardFocus(false))
-        drawFocusRing(g, bounds.reduced(2.0f), 14.0f, findColour(juce::TextEditor::focusedOutlineColourId));
+        drawFocusRing(g, bounds.reduced(2.0f), visual::panelRadius,
+                      findColour(juce::TextEditor::focusedOutlineColourId));
 
     const auto inner = getInnerBounds();
     const auto toolbarBounds = getNavigationToolbarBounds().toFloat();
-    const auto axisSurface = findColour(juce::ListBox::backgroundColourId).brighter(0.06f);
+    const auto axisSurface = visual::surfaceSubtle;
     g.setColour(axisSurface);
     g.fillRect(toolbarBounds.expanded(0.0f, 2.0f));
     g.fillRect(juce::Rectangle<float> { inner.getX() - velocityAxisWidth,
@@ -443,7 +444,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     g.drawVerticalLine(static_cast<int>(inner.getX()), inner.getY(), inner.getBottom());
     g.drawHorizontalLine(static_cast<int>(inner.getBottom()), inner.getX(), inner.getRight());
 
-    g.setColour(juce::Colour::fromRGBA(24, 29, 33, 24));
+    g.setColour(visual::mapGrid.withAlpha(0.72f));
 
     for (int key = 0; key <= 127; key += 12)
     {
@@ -565,7 +566,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                                                  labelBounds.getY()));
             g.setColour(zoneMapLabelFill.brighter(selected ? 0.12f : 0.02f));
             g.fillRect(labelBounds);
-            g.setColour(juce::Colours::white.withAlpha(0.96f));
+            g.setColour(visual::textOnAccent.withAlpha(0.96f));
             g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
             g.drawFittedText(juce::String::fromUTF8(zone.displayName.c_str()),
                              labelBounds.reduced(6, 2).removeFromTop(18),
@@ -580,7 +581,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                            ? "  RR " + juce::String(zone.roundRobinPosition + 1)
                                + "/" + juce::String(zone.roundRobinLength)
                            : juce::String {});
-                g.setColour(juce::Colours::white.withAlpha(0.72f));
+                g.setColour(visual::textOnAccent.withAlpha(0.72f));
                 g.setFont(juce::FontOptions(9.5f));
                 g.drawFittedText(metadata,
                                  labelBounds.reduced(6, 2).withTrimmedTop(18),
@@ -599,7 +600,8 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                 const auto activeHandle = activeGesture.has_value()
                     && activeGesture->zoneIndex == zoneIndex
                     && activeGesture->handle == handle;
-                g.setColour(activeHandle ? findColour(juce::TextEditor::focusedOutlineColourId) : juce::Colours::white);
+                g.setColour(activeHandle ? findColour(juce::TextEditor::focusedOutlineColourId)
+                                         : visual::surfaceRaised);
                 g.fillEllipse(center.x - rangeHandleRadius,
                               center.y - rangeHandleRadius,
                               rangeHandleRadius * 2.0f,
@@ -628,7 +630,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                     diamond.lineTo(center.x, center.y + crossfadeHandleRadius);
                     diamond.lineTo(center.x - crossfadeHandleRadius, center.y);
                     diamond.closeSubPath();
-                    g.setColour(activeHandle ? juce::Colours::white : colour);
+                    g.setColour(activeHandle ? visual::surfaceRaised : colour);
                     g.fillPath(diamond);
                     g.setColour(zoneMapOutline.withAlpha(0.95f));
                     g.strokePath(diamond, juce::PathStrokeType(activeHandle ? 2.0f : 1.2f));
@@ -650,7 +652,7 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
                                               18).getIntersection(inner.toNearestInt());
             g.setColour(zoneMapSelected);
             g.fillRect(badge);
-            g.setColour(juce::Colours::white);
+            g.setColour(visual::textOnAccent);
             g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
             g.drawFittedText(countText, badge.reduced(4, 1), juce::Justification::centred, 1);
         }
@@ -660,9 +662,9 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     {
         const auto dropBounds = getLocalBounds().toFloat().reduced(4.0f);
         g.setColour(zoneMapSelected.withAlpha(0.16f));
-        g.fillRoundedRectangle(dropBounds, 12.0f);
+        g.fillRoundedRectangle(dropBounds, visual::panelRadius);
         g.setColour(zoneMapSelected);
-        g.drawRoundedRectangle(dropBounds, 12.0f, 3.0f);
+        g.drawRoundedRectangle(dropBounds, visual::panelRadius, 3.0f);
         g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
         g.drawFittedText("Drop WAV or FLAC files to import",
                          dropBounds.toNearestInt().reduced(16),
@@ -675,9 +677,9 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
         const auto marqueeBounds = juce::Rectangle<float>(activeMarqueeGesture->start,
                                                           activeMarqueeGesture->current).getSmallestIntegerContainer().toFloat();
         g.setColour(zoneMapMarqueeFill);
-        g.fillRoundedRectangle(marqueeBounds, 6.0f);
+        g.fillRoundedRectangle(marqueeBounds, visual::controlRadius);
         g.setColour(zoneMapMarqueeOutline);
-        g.drawRoundedRectangle(marqueeBounds, 6.0f, 1.5f);
+        g.drawRoundedRectangle(marqueeBounds, visual::controlRadius, 1.5f);
     }
 
     constexpr const char* noteNames[] = {
@@ -725,12 +727,12 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
     {
         auto legendBounds = inner.toNearestInt().reduced(5).removeFromTop(20).removeFromLeft(174);
         g.setColour(zoneMapLabelFill);
-        g.fillRoundedRectangle(legendBounds.toFloat(), 6.0f);
+        g.fillRoundedRectangle(legendBounds.toFloat(), visual::controlRadius);
         g.setColour(crossfadeInColour);
         g.fillEllipse(static_cast<float>(legendBounds.getX() + 8), static_cast<float>(legendBounds.getY() + 7), 8.0f, 8.0f);
         g.setColour(crossfadeOutColour);
         g.fillEllipse(static_cast<float>(legendBounds.getX() + 82), static_cast<float>(legendBounds.getY() + 7), 8.0f, 8.0f);
-        g.setColour(juce::Colours::white.withAlpha(0.9f));
+        g.setColour(visual::textOnAccent.withAlpha(0.9f));
         g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
         g.drawFittedText("Fade In", legendBounds.withTrimmedLeft(20).withWidth(56), juce::Justification::centredLeft, 1);
         g.drawFittedText("Fade Out", legendBounds.withTrimmedLeft(94).withWidth(80), juce::Justification::centredLeft, 1);

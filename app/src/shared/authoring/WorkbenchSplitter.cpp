@@ -1,4 +1,5 @@
 #include "shared/authoring/WorkbenchSplitter.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 namespace drs::app::authoring
 {
@@ -32,14 +33,14 @@ void WorkbenchSplitter::requestHeight(const int height)
 void WorkbenchSplitter::paint(juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(juce::Colour::fromRGB(230, 225, 216));
+    g.setColour(visual::surfaceSubtle);
     g.fillRect(bounds);
-    g.setColour(juce::Colour::fromRGB(105, 109, 110).withAlpha(0.65f));
+    g.setColour(visual::borderStrong.withAlpha(0.72f));
     const auto centreY = bounds.getCentreY();
     g.drawHorizontalLine(static_cast<int>(centreY), bounds.getCentreX() - 24.0f, bounds.getCentreX() + 24.0f);
     if (hasKeyboardFocus(false))
     {
-        g.setColour(juce::Colour::fromRGB(33, 91, 128));
+        g.setColour(visual::focus);
         g.drawRect(bounds.reduced(0.5f), 1.0f);
     }
 }
