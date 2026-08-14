@@ -1106,6 +1106,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     setComponentID("authoringWorkspace");
     drawerState.open = isExpandedLayout(layoutMode);
     drawerState.activeTab = authoring::DrawerTab::waveform;
+    workbenchLayoutState.setOpen(drawerState.open);
+    workbenchLayoutState.suggestHeightForTab(drawerState.activeTab);
 
     playbackBanner.setComponentID("authoringPlaybackBanner");
     playbackBannerLabel.setComponentID("authoringPlaybackBannerLabel");
@@ -1237,6 +1239,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroMoveUpButton.setComponentID("authoringMacroMoveUpButton");
     macroMoveDownButton.setComponentID("authoringMacroMoveDownButton");
     fxSectionLabel.setComponentID("authoringFxSectionLabel");
+    routingSectionLabel.setComponentID("authoringRoutingSectionLabel");
     fxSelector.setComponentID("authoringFxSelector");
     fxScopeSelector.setComponentID("authoringDspScopeSelector");
     fxScopeBreadcrumbLabel.setComponentID("authoringDspScopeBreadcrumb");
@@ -1329,6 +1332,24 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     drawerRoutingTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::routing); };
     drawerPerformanceTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::performance); };
     drawerArticulationsTabButton.onClick = [this] { setActiveDrawerTab(authoring::DrawerTab::articulations); };
+    workbenchSplitter.setOnHeightRequested([this](const int height)
+    {
+        workbenchLayoutState.setUserHeight(height);
+        drawerState.open = true;
+        refreshDrawerVisibility();
+        resized();
+    });
+    workbenchSplitter.setOnSizeToggleRequested([this]
+    {
+        if (workbenchLayoutState.getSizeMode() == authoring::WorkbenchSizeMode::focused)
+            workbenchLayoutState.requestStandard();
+        else
+            workbenchLayoutState.requestFocused();
+        drawerState.open = true;
+        refreshDrawerVisibility();
+        resized();
+        workbenchSplitter.grabKeyboardFocus();
+    });
     playbackBannerPrepareButton.setButtonText("Prepare Draft");
     playbackBannerPrepareButton.onClick = [this] { prepareDraftPlaybackPreview(); };
     playbackBannerPublishButton.setButtonText("Publish Draft");
@@ -2132,6 +2153,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     {
         addAndMakeVisible(component);
     }
+    addAndMakeVisible(workbenchSplitter);
 
     macroDrawerViewport.setViewedComponent(&macroDrawerContent, false);
     macroDrawerViewport.setScrollBarsShown(true, false);
@@ -2274,7 +2296,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
 {
     configureAccessibleMetadata(*this,
                                 "Authoring workspace",
-                                "Phase 2 authoring workspace for zone mapping, compact drawers, routing, and performance editing.");
+                                "Open Workbench authoring workspace for zone mapping, resizable editors, routing, and performance setup.");
     configureAccessibleMetadata(playbackBanner,
                                 "Draft playback action banner",
                                 "Surfaces the next draft playback action close to the mapping workspace.");
@@ -2354,14 +2376,15 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     zoneMap.setExplicitFocusOrder(30);
 
     configureAccessibleMetadata(drawerRegion,
-                                "Authoring drawer",
-                                "Hosts the waveform, macros, routing, and performance drawer surfaces.");
+                                "Authoring workbench",
+                                "Hosts waveform, groups, macros, routing, performance, and articulation editors.");
     configureAccessibleMetadata(drawerTabStrip,
-                                "Drawer tab strip",
-                                "Contains the drawer visibility control and drawer tab buttons.");
+                                "Workbench tab strip",
+                                "Contains the workbench visibility control and editor tab buttons.");
     configureAccessibleMetadata(drawerContentHost,
-                                "Drawer content",
-                                "Displays the active drawer body when the drawer is open.");
+                                "Workbench content",
+                                "Displays the active workbench editor when expanded.");
+    workbenchSplitter.setExplicitFocusOrder(59);
     configureAccessibleMetadata(macroDrawerViewport,
                                 "Macro editor",
                                 "Provides access to project macro creation, assignment, range, and ordering controls.",
@@ -2372,33 +2395,33 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Scroll vertically to reach the advanced FX controls.");
 
     configureAccessibleMetadata(drawerToggleButton,
-                                "Drawer visibility",
-                                "Shows or hides the active drawer content.",
-                                "Press to collapse or expand the drawer.");
+                                "Workbench visibility",
+                                "Shows or hides the active workbench content.",
+                                "Press to collapse or expand the workbench.");
     drawerToggleButton.setExplicitFocusOrder(60);
 
     configureAccessibleMetadata(drawerWaveformTabButton,
-                                "Waveform drawer tab",
+                                "Waveform workbench tab",
                                 "Shows zone-scoped waveform detail.",
                                 "Press to switch the drawer to waveform detail.");
     configureAccessibleMetadata(drawerGroupsTabButton,
-                                "Groups drawer tab",
+                                "Groups workbench tab",
                                 "Shows group-scoped mixing, routing, and visibility detail.",
                                 "Press to switch the drawer to group detail.");
     configureAccessibleMetadata(drawerMacrosTabButton,
-                                "Macros drawer tab",
+                                "Macros workbench tab",
                                 "Shows project-scoped macro assignments.",
                                 "Press to switch the drawer to macro editing.");
     configureAccessibleMetadata(drawerRoutingTabButton,
-                                "Routing drawer tab",
+                                "Routing workbench tab",
                                 "Shows project-scoped FX and bus routing detail.",
                                 "Press to switch the drawer to routing detail.");
     configureAccessibleMetadata(drawerPerformanceTabButton,
-                                "Performance drawer tab",
+                                "Performance workbench tab",
                                 "Shows bank-scoped performance and trigger detail.",
                                 "Press to switch the drawer to performance detail.");
     configureAccessibleMetadata(drawerArticulationsTabButton,
-                                "Articulations drawer tab",
+                                "Articulations workbench tab",
                                 "Shows project articulations and key-switch assignment.",
                                 "Press to switch the drawer to articulation management.");
     drawerWaveformTabButton.setExplicitFocusOrder(61);
@@ -2852,24 +2875,30 @@ void AuthoringPanel::resized()
     const auto expanded = isExpandedLayout(layoutMode);
     const auto groupDrawerInShortLayout = shortHeightLayout
         && drawerState.activeTab == authoring::DrawerTab::groups;
-    const auto macroDrawerInShortLayout = shortHeightLayout
-        && (drawerState.activeTab == authoring::DrawerTab::macros
-            || drawerState.activeTab == authoring::DrawerTab::articulations);
     const auto routingDrawerInShortLayout = shortHeightLayout
         && drawerState.activeTab == authoring::DrawerTab::routing;
     const auto inspectorDrawerInShortLayout = groupDrawerInShortLayout || routingDrawerInShortLayout;
-    const auto drawerOpenHeight = inspectorDrawerInShortLayout
-        ? authoring::shortInspectorDrawerOpenHeight
-        : (macroDrawerInShortLayout
-               ? std::max(authoring::compactDrawerOpenHeight, 252)
-               : ((drawerState.activeTab == authoring::DrawerTab::macros
-                    || drawerState.activeTab == authoring::DrawerTab::articulations)
-                      ? authoring::macroDrawerOpenHeight
-                      : (expanded ? authoring::expandedDrawerOpenHeight
-                                  : authoring::compactDrawerOpenHeight)));
-    const auto drawerHeight = authoring::drawerTabStripHeight + (drawerState.open ? drawerOpenHeight : 0);
+    const auto mapGap = inspectorDrawerInShortLayout ? 4 : 8;
+    auto drawerHeight = workbenchLayoutState.resolveHeight(
+        area.getHeight(), authoring::minimumMapVisibleHeight, mapGap);
+    if (inspectorDrawerInShortLayout && !workbenchLayoutState.hasUserHeight())
+        drawerHeight = std::min(drawerHeight,
+                                authoring::drawerTabStripHeight
+                                    + authoring::shortInspectorDrawerOpenHeight);
     auto drawerArea = area.removeFromBottom(std::min(drawerHeight, area.getHeight()));
     drawerRegion.setBounds(drawerArea);
+    if (drawerState.open)
+    {
+        workbenchSplitter.setBounds(drawerArea.getX(),
+                                    drawerArea.getY() - authoring::WorkbenchLayoutState::splitterHeight / 2,
+                                    drawerArea.getWidth(),
+                                    authoring::WorkbenchLayoutState::splitterHeight);
+        workbenchSplitter.setCurrentHeight(drawerHeight);
+    }
+    else
+    {
+        workbenchSplitter.setBounds({});
+    }
     drawerTabStrip.setBounds(drawerArea.removeFromTop(authoring::drawerTabStripHeight));
     drawerContentHost.setBounds(drawerArea);
 
@@ -2917,24 +2946,42 @@ void AuthoringPanel::resized()
 
     if (drawerState.activeTab == authoring::DrawerTab::waveform)
     {
-        const auto waveformMetadataHeight = 4 + 18 + 2 + 18 + 2 + 18 + 2 + 24 + 2 + 24 + 2 + 18;
-        const auto waveformPreviewHeight = juce::jmax(
-            0,
-            juce::jmin(authoring::waveformPreviewHeight,
-                       drawerEditorArea.getHeight() - waveformMetadataHeight));
-        waveformPreview.setBounds(drawerEditorArea.removeFromTop(waveformPreviewHeight));
-        drawerEditorArea.removeFromTop(4);
-        waveformStatusLabel.setBounds(drawerEditorArea.removeFromTop(18));
-        drawerEditorArea.removeFromTop(2);
-        waveformInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
-        drawerEditorArea.removeFromTop(2);
-        loopInfoLabel.setBounds(drawerEditorArea.removeFromTop(18));
-        drawerEditorArea.removeFromTop(2);
-        importMetricsLabel.setBounds(drawerEditorArea.removeFromTop(24));
-        drawerEditorArea.removeFromTop(2);
-        sourceValidationButton.setBounds(drawerEditorArea.removeFromTop(24));
-        drawerEditorArea.removeFromTop(2);
-        sourceValidationLabel.setBounds(drawerEditorArea.removeFromTop(18));
+        if (drawerEditorArea.getWidth() >= 620)
+        {
+            auto previewArea = drawerEditorArea.removeFromLeft(
+                std::max(320, static_cast<int>(drawerEditorArea.getWidth() * 0.58f)));
+            drawerEditorArea.removeFromLeft(std::min(12, drawerEditorArea.getWidth()));
+            waveformPreview.setBounds(previewArea);
+
+            auto metadataLeft = drawerEditorArea.removeFromLeft(
+                std::max(1, (drawerEditorArea.getWidth() - 10) / 2));
+            drawerEditorArea.removeFromLeft(std::min(10, drawerEditorArea.getWidth()));
+            auto metadataRight = drawerEditorArea;
+            waveformStatusLabel.setBounds(metadataLeft.removeFromTop(18));
+            metadataLeft.removeFromTop(3);
+            waveformInfoLabel.setBounds(metadataLeft.removeFromTop(18));
+            metadataLeft.removeFromTop(3);
+            loopInfoLabel.setBounds(metadataLeft.removeFromTop(18));
+            metadataLeft.removeFromTop(3);
+            importMetricsLabel.setBounds(metadataLeft.removeFromTop(std::min(24, metadataLeft.getHeight())));
+
+            sourceValidationButton.setBounds(metadataRight.removeFromTop(24));
+            metadataRight.removeFromTop(4);
+            sourceValidationLabel.setBounds(metadataRight.removeFromTop(std::min(36, metadataRight.getHeight())));
+        }
+        else
+        {
+            const auto metadataHeight = std::min(84, drawerEditorArea.getHeight() / 2);
+            waveformPreview.setBounds(drawerEditorArea.removeFromTop(
+                std::max(1, drawerEditorArea.getHeight() - metadataHeight - 4)));
+            drawerEditorArea.removeFromTop(4);
+            waveformStatusLabel.setBounds(drawerEditorArea.removeFromTop(16));
+            waveformInfoLabel.setBounds(drawerEditorArea.removeFromTop(16));
+            loopInfoLabel.setBounds(drawerEditorArea.removeFromTop(16));
+            importMetricsLabel.setBounds(drawerEditorArea.removeFromTop(16));
+            sourceValidationButton.setBounds(drawerEditorArea.removeFromTop(std::min(20, drawerEditorArea.getHeight())));
+            sourceValidationLabel.setBounds(drawerEditorArea);
+        }
     }
 
     if (drawerState.activeTab == authoring::DrawerTab::groups)
@@ -3001,60 +3048,111 @@ void AuthoringPanel::resized()
         const auto macroContentWidth = std::max(420,
                                                 macroDrawerViewport.getWidth()
                                                     - macroDrawerViewport.getScrollBarThickness());
-        const auto macroContentHeight = expanded ? 196 : 176;
+        const auto useMacroListDetail = !shortHeightLayout
+            && macroContentWidth >= 680
+            && macroDrawerViewport.getHeight() >= 176;
+        const auto macroContentHeight = useMacroListDetail
+            ? macroDrawerViewport.getHeight()
+            : (expanded ? 196 : 176);
         macroDrawerContent.setSize(macroContentWidth, macroContentHeight);
 
         auto macroEditorArea = macroDrawerContent.getLocalBounds();
-        auto actionRow = macroEditorArea.removeFromTop(28);
-        constexpr auto macroActionGap = 6;
-        const auto buttonWidth = std::max(52, (actionRow.getWidth() - (macroActionGap * 4)) / 5);
-        macroCreateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
-        macroDuplicateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
-        macroDeleteButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
-        macroMoveUpButton.setBounds(actionRow.removeFromLeft(buttonWidth));
-        actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
-        macroMoveDownButton.setBounds(actionRow);
-        macroEditorArea.removeFromTop(4);
-        macroList.setBounds(macroEditorArea.removeFromTop(44));
-
-        macroEditorArea.removeFromTop(4);
-        auto row = macroEditorArea.removeFromTop(28);
-        layoutDualLabelAndFieldRow(row,
-                                   macroNameLabel,
-                                   macroNameEditor,
-                                   76,
-                                   macroExposeLabel,
-                                   macroExposeToggle,
-                                   54);
-        macroEditorArea.removeFromTop(4);
-
-        row = macroEditorArea.removeFromTop(28);
-        layoutDualLabelAndFieldRow(row,
-                                   macroAssignmentLabel,
-                                   macroAssignmentSelector,
-                                   76,
-                                   macroRoleLabel,
-                                   macroRoleSelector,
-                                   56);
-        macroEditorArea.removeFromTop(4);
-
-        row = macroEditorArea.removeFromTop(32);
-        constexpr auto valueColumnGap = 12;
-        const auto valueColumnWidth = (row.getWidth() - (valueColumnGap * 2)) / 3;
-        auto defaultColumn = row.removeFromLeft(valueColumnWidth);
-        row.removeFromLeft(std::min(valueColumnGap, row.getWidth()));
-        auto minimumColumn = row.removeFromLeft(valueColumnWidth);
-        row.removeFromLeft(std::min(valueColumnGap, row.getWidth()));
-        layoutLabelAndField(defaultColumn, macroDefaultLabel, macroDefaultSlider, 56);
-        layoutLabelAndField(minimumColumn, macroMinLabel, macroMinSlider, 40);
-        layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 40);
-        if (expanded)
+        if (useMacroListDetail)
         {
+            constexpr auto columnGap = 14;
+            auto listColumn = macroEditorArea.removeFromLeft(
+                std::max(250, static_cast<int>(macroEditorArea.getWidth() * 0.34f)));
+            macroEditorArea.removeFromLeft(columnGap);
+            auto detailColumn = macroEditorArea;
+
+            auto actionRow = listColumn.removeFromTop(28);
+            constexpr auto actionGap = 5;
+            const auto actionWidth = std::max(60, (actionRow.getWidth() - actionGap * 2) / 3);
+            macroCreateButton.setBounds(actionRow.removeFromLeft(actionWidth));
+            actionRow.removeFromLeft(actionGap);
+            macroDuplicateButton.setBounds(actionRow.removeFromLeft(actionWidth));
+            actionRow.removeFromLeft(actionGap);
+            macroDeleteButton.setBounds(actionRow);
+            listColumn.removeFromTop(5);
+            auto orderRow = listColumn.removeFromBottom(28);
+            auto orderLeft = orderRow.removeFromLeft((orderRow.getWidth() - 5) / 2);
+            orderRow.removeFromLeft(5);
+            macroMoveUpButton.setBounds(orderLeft);
+            macroMoveDownButton.setBounds(orderRow);
+            listColumn.removeFromBottom(5);
+            macroList.setBounds(listColumn);
+
+            auto row = detailColumn.removeFromTop(28);
+            layoutDualLabelAndFieldRow(row,
+                                       macroNameLabel,
+                                       macroNameEditor,
+                                       76,
+                                       macroExposeLabel,
+                                       macroExposeToggle,
+                                       54);
+            detailColumn.removeFromTop(8);
+            row = detailColumn.removeFromTop(28);
+            layoutDualLabelAndFieldRow(row,
+                                       macroAssignmentLabel,
+                                       macroAssignmentSelector,
+                                       76,
+                                       macroRoleLabel,
+                                       macroRoleSelector,
+                                       56);
+            detailColumn.removeFromTop(10);
+            row = detailColumn.removeFromTop(32);
+            constexpr auto valueColumnGap = 10;
+            const auto valueColumnWidth = (row.getWidth() - valueColumnGap * 2) / 3;
+            auto defaultColumn = row.removeFromLeft(valueColumnWidth);
+            row.removeFromLeft(valueColumnGap);
+            auto minimumColumn = row.removeFromLeft(valueColumnWidth);
+            row.removeFromLeft(valueColumnGap);
+            layoutLabelAndField(defaultColumn, macroDefaultLabel, macroDefaultSlider, 56);
+            layoutLabelAndField(minimumColumn, macroMinLabel, macroMinSlider, 40);
+            layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 40);
+            detailColumn.removeFromTop(8);
+            macroSummaryLabel.setBounds(detailColumn.removeFromTop(std::min(32, detailColumn.getHeight())));
+        }
+        else
+        {
+            auto actionRow = macroEditorArea.removeFromTop(28);
+            constexpr auto macroActionGap = 6;
+            const auto buttonWidth = std::max(52, (actionRow.getWidth() - (macroActionGap * 4)) / 5);
+            macroCreateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+            macroDuplicateButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+            macroDeleteButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+            macroMoveUpButton.setBounds(actionRow.removeFromLeft(buttonWidth));
+            actionRow.removeFromLeft(std::min(macroActionGap, actionRow.getWidth()));
+            macroMoveDownButton.setBounds(actionRow);
             macroEditorArea.removeFromTop(4);
-            macroSummaryLabel.setBounds(macroEditorArea.removeFromTop(16));
+            macroList.setBounds(macroEditorArea.removeFromTop(44));
+            macroEditorArea.removeFromTop(4);
+            auto row = macroEditorArea.removeFromTop(28);
+            layoutDualLabelAndFieldRow(row, macroNameLabel, macroNameEditor, 76,
+                                       macroExposeLabel, macroExposeToggle, 54);
+            macroEditorArea.removeFromTop(4);
+            row = macroEditorArea.removeFromTop(28);
+            layoutDualLabelAndFieldRow(row, macroAssignmentLabel, macroAssignmentSelector, 76,
+                                       macroRoleLabel, macroRoleSelector, 56);
+            macroEditorArea.removeFromTop(4);
+            row = macroEditorArea.removeFromTop(32);
+            constexpr auto valueColumnGap = 12;
+            const auto valueColumnWidth = (row.getWidth() - (valueColumnGap * 2)) / 3;
+            auto defaultColumn = row.removeFromLeft(valueColumnWidth);
+            row.removeFromLeft(std::min(valueColumnGap, row.getWidth()));
+            auto minimumColumn = row.removeFromLeft(valueColumnWidth);
+            row.removeFromLeft(std::min(valueColumnGap, row.getWidth()));
+            layoutLabelAndField(defaultColumn, macroDefaultLabel, macroDefaultSlider, 56);
+            layoutLabelAndField(minimumColumn, macroMinLabel, macroMinSlider, 40);
+            layoutLabelAndField(row, macroMaxLabel, macroMaxSlider, 40);
+            if (expanded)
+            {
+                macroEditorArea.removeFromTop(4);
+                macroSummaryLabel.setBounds(macroEditorArea.removeFromTop(16));
+            }
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::routing)
@@ -3063,7 +3161,13 @@ void AuthoringPanel::resized()
         const auto routingContentWidth = std::max(320,
                                                   routingDrawerViewport.getWidth()
                                                       - routingDrawerViewport.getScrollBarThickness());
-        const auto routingContentHeight = expanded ? 364 : 160;
+        const auto useRoutingColumns = expanded
+            && !shortHeightLayout
+            && routingContentWidth >= 700
+            && routingDrawerViewport.getHeight() >= 190;
+        const auto routingContentHeight = useRoutingColumns
+            ? std::max(244, routingDrawerViewport.getHeight() + 18)
+            : (expanded ? 364 : 160);
         routingDrawerContent.setSize(routingContentWidth, routingContentHeight);
 
         auto routingEditorArea = routingDrawerContent.getLocalBounds().reduced(0, 0);
@@ -3081,66 +3185,123 @@ void AuthoringPanel::resized()
             return row;
         };
 
-        auto headerRow = takeRoutingRow(24);
-        auto [leftHeader, rightHeader] = splitRoutingRow(headerRow);
-        fxSectionLabel.setBounds(leftHeader);
-        routingSectionLabel.setBounds(rightHeader);
-
-        if (expanded)
+        if (useRoutingColumns)
         {
-            auto [left, right] = splitRoutingRow(takeRoutingRow());
-            layoutLabelAndField(left, fxScopeLabel, fxScopeSelector, 44);
-            fxScopeBreadcrumbLabel.setBounds(right);
-        }
+            auto columns = splitRoutingRow(routingEditorArea);
+            auto left = columns.first;
+            auto right = columns.second;
+            auto takeColumnRow = [](juce::Rectangle<int>& column, const int height, const int gap = 3)
+            {
+                auto row = column.removeFromTop(std::min(height, column.getHeight()));
+                column.removeFromTop(std::min(gap, column.getHeight()));
+                return row;
+            };
 
-        auto [left, right] = splitRoutingRow(takeRoutingRow());
-        fxSelector.setBounds(left);
-        routingBusSelector.setBounds(right);
+            fxSectionLabel.setBounds(takeColumnRow(left, 20));
+            auto row = takeColumnRow(left, 24);
+            layoutLabelAndField(row, fxScopeLabel, fxScopeSelector, 44);
+            fxSelector.setBounds(takeColumnRow(left, 24));
+            row = takeColumnRow(left, 24);
+            auto bypassArea = row.removeFromRight(std::min(110, row.getWidth() / 3));
+            row.removeFromRight(std::min(6, row.getWidth()));
+            layoutLabelAndField(row, fxTypeLabel, fxTypeSelector, 44);
+            fxBypassedToggle.setBounds(bypassArea);
+            row = takeColumnRow(left, 24);
+            auto ownerArea = row.removeFromRight((row.getWidth() - 6) / 2);
+            row.removeFromRight(std::min(6, row.getWidth()));
+            fxNameEditor.setBounds(row);
+            fxOwnerSelector.setBounds(ownerArea);
 
-        std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-        layoutLabelAndField(left, fxTypeLabel, fxTypeSelector, 44);
-        layoutLabelAndField(right, routingInputLabel, routingInputSelector, 44);
-
-        std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-        fxBypassedToggle.setBounds(left);
-        layoutLabelAndField(right, routingInsertOneLabel, routingInsertOneSelector, 44);
-
-        layoutLabelAndField(takeRoutingRow(28, expanded ? 6 : 0),
-                            routingInsertTwoLabel,
-                            routingInsertTwoSelector,
-                            56);
-
-        if (expanded)
-        {
-            std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-            fxNameEditor.setBounds(left);
-            fxOwnerSelector.setBounds(right);
-
-            auto row = takeRoutingRow();
-            const auto buttonWidth = std::max(64, (row.getWidth() - 20) / 5);
+            row = takeColumnRow(left, 24, 4);
+            const auto buttonWidth = std::max(54, (row.getWidth() - 16) / 5);
             fxAddButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxDuplicateButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxMoveUpButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxMoveDownButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
             fxDeleteButton.setBounds(row);
+            row = takeColumnRow(left, 24);
+            auto parameterArea = row.removeFromRight((row.getWidth() - 6) / 2);
+            row.removeFromRight(std::min(6, row.getWidth()));
+            fxMoveOwnerButton.setBounds(row);
+            fxParameterSelector.setBounds(parameterArea);
+            row = takeColumnRow(left, 28);
+            auto parameterActions = row.removeFromRight(std::min(190, row.getWidth() / 2));
+            row.removeFromRight(std::min(6, row.getWidth()));
+            fxParameterSlider.setBounds(row);
+            fxParameterResetButton.setBounds(parameterActions.removeFromLeft((parameterActions.getWidth() - 5) / 2));
+            parameterActions.removeFromLeft(std::min(5, parameterActions.getWidth()));
+            fxAssignMacroButton.setBounds(parameterActions);
+            row = takeColumnRow(left, 16, 2);
+            auto valueArea = row.removeFromLeft((row.getWidth() - 8) / 2);
+            row.removeFromLeft(std::min(8, row.getWidth()));
+            fxParameterValueLabel.setBounds(valueArea);
+            fxSummaryLabel.setBounds(row);
+            fxDiagnosticsLabel.setBounds(left.removeFromTop(std::max(1, left.getHeight())));
 
+            routingSectionLabel.setBounds(takeColumnRow(right, 20));
+            fxScopeBreadcrumbLabel.setBounds(takeColumnRow(right, 18));
+            routingBusSelector.setBounds(takeColumnRow(right, 24));
+            row = takeColumnRow(right, 24);
+            layoutLabelAndField(row, routingInputLabel, routingInputSelector, 44);
+            row = takeColumnRow(right, 24);
+            layoutLabelAndField(row, routingInsertOneLabel, routingInsertOneSelector, 52);
+            row = takeColumnRow(right, 24);
+            layoutLabelAndField(row, routingInsertTwoLabel, routingInsertTwoSelector, 52);
+            routingSummaryLabel.setBounds(right.removeFromTop(std::max(1, right.getHeight())));
+        }
+        else
+        {
+            auto headerRow = takeRoutingRow(24);
+            auto [leftHeader, rightHeader] = splitRoutingRow(headerRow);
+            fxSectionLabel.setBounds(leftHeader);
+            routingSectionLabel.setBounds(rightHeader);
+
+            if (expanded)
+            {
+                auto [left, right] = splitRoutingRow(takeRoutingRow());
+                layoutLabelAndField(left, fxScopeLabel, fxScopeSelector, 44);
+                fxScopeBreadcrumbLabel.setBounds(right);
+            }
+
+            auto [left, right] = splitRoutingRow(takeRoutingRow());
+            fxSelector.setBounds(left);
+            routingBusSelector.setBounds(right);
             std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-            fxMoveOwnerButton.setBounds(left);
-            fxParameterSelector.setBounds(right);
-
+            layoutLabelAndField(left, fxTypeLabel, fxTypeSelector, 44);
+            layoutLabelAndField(right, routingInputLabel, routingInputSelector, 44);
             std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-            fxParameterSlider.setBounds(left);
-            fxParameterResetButton.setBounds(right.removeFromLeft((right.getWidth() - 5) / 2));
-            right.removeFromLeft(5);
-            fxAssignMacroButton.setBounds(right);
+            fxBypassedToggle.setBounds(left);
+            layoutLabelAndField(right, routingInsertOneLabel, routingInsertOneSelector, 44);
+            layoutLabelAndField(takeRoutingRow(28, expanded ? 6 : 0),
+                                routingInsertTwoLabel, routingInsertTwoSelector, 56);
 
-            std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 2));
-            fxParameterValueLabel.setBounds(left);
-            fxSummaryLabel.setBounds(right);
-
-            std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 0));
-            fxDiagnosticsLabel.setBounds(left);
-            routingSummaryLabel.setBounds(right);
+            if (expanded)
+            {
+                std::tie(left, right) = splitRoutingRow(takeRoutingRow());
+                fxNameEditor.setBounds(left);
+                fxOwnerSelector.setBounds(right);
+                auto row = takeRoutingRow();
+                const auto buttonWidth = std::max(64, (row.getWidth() - 20) / 5);
+                fxAddButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+                fxDuplicateButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+                fxMoveUpButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+                fxMoveDownButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
+                fxDeleteButton.setBounds(row);
+                std::tie(left, right) = splitRoutingRow(takeRoutingRow());
+                fxMoveOwnerButton.setBounds(left);
+                fxParameterSelector.setBounds(right);
+                std::tie(left, right) = splitRoutingRow(takeRoutingRow());
+                fxParameterSlider.setBounds(left);
+                fxParameterResetButton.setBounds(right.removeFromLeft((right.getWidth() - 5) / 2));
+                right.removeFromLeft(5);
+                fxAssignMacroButton.setBounds(right);
+                std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 2));
+                fxParameterValueLabel.setBounds(left);
+                fxSummaryLabel.setBounds(right);
+                std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 0));
+                fxDiagnosticsLabel.setBounds(left);
+                routingSummaryLabel.setBounds(right);
+            }
         }
     }
     else if (drawerState.activeTab == authoring::DrawerTab::performance)
@@ -3261,7 +3422,7 @@ void AuthoringPanel::resized()
         }
     }
 
-    area.removeFromTop(inspectorDrawerInShortLayout ? 4 : 8);
+    area.removeFromTop(mapGap);
     auto shellArea = area;
     const auto desiredInspectorWidth = expanded ? authoring::expandedInspectorPreferredWidth
                                                 : authoring::compactInspectorPreferredWidth;
@@ -4139,6 +4300,7 @@ void AuthoringPanel::setDrawerOpen(bool shouldOpen)
         return;
 
     drawerState.open = shouldOpen;
+    workbenchLayoutState.setOpen(shouldOpen);
     refreshDrawerVisibility();
     resized();
 }
@@ -4147,6 +4309,8 @@ void AuthoringPanel::setActiveDrawerTab(authoring::DrawerTab nextTab)
 {
     drawerState.activeTab = nextTab;
     drawerState.open = true;
+    workbenchLayoutState.suggestHeightForTab(nextTab);
+    workbenchLayoutState.setOpen(true);
     refreshDrawerVisibility();
     resized();
     if (drawerState.activeTab == authoring::DrawerTab::waveform)
@@ -4257,6 +4421,7 @@ void AuthoringPanel::refreshDrawerVisibility()
     drawerToggleButton.setButtonText(drawerState.open ? "Hide Drawer" : "Show Drawer");
     drawerToggleButton.setTitle(drawerToggleButton.getButtonText());
     setVisibleAndAccessible(drawerContentHost, drawerContentVisible);
+    setVisibleAndAccessible(workbenchSplitter, drawerContentVisible);
     setVisibleAndAccessible(waveformLabel, drawerContentVisible);
     setVisibleAndAccessible(waveformScopeLabel, drawerContentVisible);
     setVisibleAndAccessible(drawerBreadcrumbLabel, drawerContentVisible);

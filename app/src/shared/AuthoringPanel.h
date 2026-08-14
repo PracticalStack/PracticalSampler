@@ -6,6 +6,8 @@
 #include "shared/authoring/ZoneMappingEditor.h"
 #include "shared/authoring/ZoneMapCanvas.h"
 #include "shared/authoring/WaveformDetailView.h"
+#include "shared/authoring/WorkbenchLayoutState.h"
+#include "shared/authoring/WorkbenchSplitter.h"
 #include "shared/AuthoringPreviewModel.h"
 #include "shared/PerformanceBankImport.h"
 #include "drs/engine/AuthoringSession.h"
@@ -238,6 +240,7 @@ private:
     bool keySwitchMidiLearnActive = false;
     double keySwitchMidiLearnDeadlineMillis = 0.0;
     authoring::DrawerState drawerState;
+    authoring::WorkbenchLayoutState workbenchLayoutState;
     authoring::SelectionSummaryViewModel selectionSummaryViewModel;
     authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
     std::vector<std::string> zoneMapSelectedZoneIds;
@@ -260,6 +263,7 @@ private:
     juce::Component drawerRegion;
     juce::Component drawerTabStrip;
     juce::Component drawerContentHost;
+    authoring::WorkbenchSplitter workbenchSplitter;
     juce::TextButton drawerToggleButton;
     juce::TextButton drawerWaveformTabButton;
     juce::TextButton drawerGroupsTabButton;

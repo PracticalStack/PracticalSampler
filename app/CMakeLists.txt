@@ -44,6 +44,10 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/authoring/AuthoringSummaryStrip.h
     src/shared/authoring/WaveformDetailView.cpp
     src/shared/authoring/WaveformDetailView.h
+    src/shared/authoring/WorkbenchLayoutState.cpp
+    src/shared/authoring/WorkbenchLayoutState.h
+    src/shared/authoring/WorkbenchSplitter.cpp
+    src/shared/authoring/WorkbenchSplitter.h
     src/shared/authoring/ZoneMappingEditor.cpp
     src/shared/authoring/ZoneMappingEditor.h
     src/shared/authoring/ZoneMapCanvas.cpp

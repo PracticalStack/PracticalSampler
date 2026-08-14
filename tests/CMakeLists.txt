@@ -3262,6 +3262,35 @@ add_test(
 
 set_target_properties(drs_open_workbench_phase2_tests PROPERTIES FOLDER "Tests")
 
+juce_add_console_app(drs_open_workbench_phase3_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 3 Tests"
+)
+
+target_sources(drs_open_workbench_phase3_tests
+    PRIVATE
+        src/OpenWorkbenchPhase3Tests.cpp
+)
+
+target_link_libraries(drs_open_workbench_phase3_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_open_workbench_phase3_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.open_workbench.phase3
+    COMMAND drs_open_workbench_phase3_tests
+)
+
+set_target_properties(drs_open_workbench_phase3_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_performance_engine_s10_articulation_ui_tests
     PRODUCT_NAME "Decent Rhapsody Studio Sprint 10 Articulation UI Tests"
 )
