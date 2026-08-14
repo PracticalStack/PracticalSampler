@@ -4,6 +4,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -50,6 +51,7 @@ public:
     void setControls(std::vector<PerformanceMixerControlView> controls);
     void updateControlValues(const std::vector<PerformanceMixerControlView>& controls);
     std::size_t getControlCount() const noexcept;
+    std::uint64_t getRebuildGeneration() const noexcept { return rebuildGeneration; }
     LayoutSnapshot getLayoutSnapshot() const noexcept;
     void resized() override;
 
@@ -64,5 +66,6 @@ private:
     juce::Viewport viewport;
     juce::Component content;
     LayoutSnapshot layout;
+    std::uint64_t rebuildGeneration = 0;
 };
 } // namespace drs::app

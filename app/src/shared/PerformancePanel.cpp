@@ -1,5 +1,6 @@
 #include "shared/PerformancePanel.h"
 #include "shared/MessageThreadMetrics.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,12 +9,47 @@ namespace drs::app
 {
 namespace
 {
-const auto performancePanelBackground = juce::Colour::fromRGB(14, 20, 27);
-const auto performancePanelCard = juce::Colour::fromRGB(245, 247, 250);
-const auto performancePanelAccent = juce::Colour::fromRGB(28, 126, 214);
-const auto performancePanelSuccess = juce::Colour::fromRGB(27, 128, 84);
-const auto performancePanelWarning = juce::Colour::fromRGB(176, 91, 22);
-const auto performancePanelDanger = juce::Colour::fromRGB(172, 41, 41);
+constexpr int performOuterMargin = 16;
+constexpr int performGap = 10;
+constexpr int performPanelInset = 10;
+
+void drawPerformSurface(juce::Graphics& graphics,
+                        const juce::Rectangle<int> bounds,
+                        const juce::Colour fill = authoring::visual::surface)
+{
+    if (bounds.isEmpty())
+        return;
+
+    const auto shape = bounds.toFloat().reduced(0.5f);
+    graphics.setColour(fill);
+    graphics.fillRoundedRectangle(shape, authoring::visual::panelRadius);
+    graphics.setColour(authoring::visual::border);
+    graphics.drawRoundedRectangle(shape, authoring::visual::panelRadius,
+                                  authoring::visual::borderWidth);
+}
+
+juce::String buildInstrumentContext(const drs::engine::EnginePerformanceSnapshot& snapshot)
+{
+    juce::StringArray parts;
+    if (!snapshot.presetId.empty())
+        parts.add("Preset " + juce::String::fromUTF8(snapshot.presetId.c_str()));
+
+    const auto articulation = !snapshot.selectedArticulationName.empty()
+        ? snapshot.selectedArticulationName : snapshot.selectedArticulationId;
+    if (!articulation.empty())
+        parts.add("Articulation " + juce::String::fromUTF8(articulation.c_str()));
+
+    if (snapshot.playableRangeAvailable)
+    {
+        parts.add("Range "
+            + juce::MidiMessage::getMidiNoteName(snapshot.lowestPlayableNote, true, true, 3)
+            + " - "
+            + juce::MidiMessage::getMidiNoteName(snapshot.highestPlayableNote, true, true, 3));
+    }
+
+    return parts.isEmpty() ? juce::String("Performance workspace")
+                           : parts.joinIntoString("  |  ");
+}
 
 struct PerformanceMacroSurfaceModel
 {
@@ -138,6 +174,105 @@ juce::String buildMixerEmptyStateText(const std::size_t hiddenPublishedMacroCoun
 }
 } // namespace
 
+PerformancePanel::PerformanceControlLookAndFeel::PerformanceControlLookAndFeel()
+{
+    setColour(juce::TextButton::buttonColourId, authoring::visual::surfaceRaised);
+    setColour(juce::TextButton::buttonOnColourId, authoring::visual::information);
+    setColour(juce::TextButton::textColourOffId, authoring::visual::text);
+    setColour(juce::TextButton::textColourOnId, authoring::visual::textOnAccent);
+    setColour(juce::ToggleButton::textColourId, authoring::visual::text);
+    setColour(juce::ToggleButton::tickColourId, authoring::visual::information);
+    setColour(juce::ToggleButton::tickDisabledColourId, authoring::visual::textDisabled);
+    setColour(juce::Label::textColourId, authoring::visual::text);
+    setColour(juce::Slider::thumbColourId, authoring::visual::information);
+    setColour(juce::Slider::trackColourId, authoring::visual::information.withAlpha(0.72f));
+    setColour(juce::Slider::backgroundColourId, authoring::visual::surfaceSubtle);
+    setColour(juce::ScrollBar::backgroundColourId, authoring::visual::surfaceSubtle);
+    setColour(juce::ScrollBar::thumbColourId, authoring::visual::borderStrong);
+    setColour(juce::TooltipWindow::backgroundColourId, authoring::visual::surfaceRaised);
+    setColour(juce::TooltipWindow::textColourId, authoring::visual::text);
+    setColour(juce::TooltipWindow::outlineColourId, authoring::visual::borderStrong);
+}
+
+void PerformancePanel::PerformanceControlLookAndFeel::drawButtonBackground(
+    juce::Graphics& graphics,
+    juce::Button& button,
+    const juce::Colour& backgroundColour,
+    const bool highlighted,
+    const bool down)
+{
+    auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+    const auto focused = button.hasKeyboardFocus(true);
+    if (focused)
+    {
+        authoring::visual::drawFocusRing(graphics, bounds.reduced(1.0f));
+        bounds = bounds.reduced(3.0f);
+    }
+
+    auto fill = button.isEnabled() ? backgroundColour
+                                   : authoring::visual::disabled(backgroundColour);
+    if (down)
+        fill = fill.interpolatedWith(authoring::visual::information, 0.22f);
+    else if (highlighted)
+        fill = fill.interpolatedWith(authoring::visual::surfaceHover, 0.72f);
+
+    graphics.setColour(fill);
+    graphics.fillRoundedRectangle(bounds, authoring::visual::controlRadius);
+    graphics.setColour(focused ? authoring::visual::focus : authoring::visual::borderStrong);
+    graphics.drawRoundedRectangle(bounds, authoring::visual::controlRadius,
+                                  authoring::visual::borderWidth);
+}
+
+void PerformancePanel::PerformanceControlLookAndFeel::drawToggleButton(
+    juce::Graphics& graphics,
+    juce::ToggleButton& button,
+    const bool highlighted,
+    const bool down)
+{
+    juce::LookAndFeel_V4::drawToggleButton(graphics, button, highlighted, down);
+    if (button.hasKeyboardFocus(true))
+        authoring::visual::drawFocusRing(
+            graphics, button.getLocalBounds().toFloat().reduced(1.0f));
+}
+
+void PerformancePanel::PerformanceControlLookAndFeel::drawLinearSliderOutline(
+    juce::Graphics& graphics,
+    const int x,
+    const int y,
+    const int width,
+    const int height,
+    const juce::Slider::SliderStyle style,
+    juce::Slider& slider)
+{
+    if (slider.hasKeyboardFocus(true))
+    {
+        authoring::visual::drawFocusRing(
+            graphics, slider.getLocalBounds().toFloat().reduced(1.0f));
+        return;
+    }
+    juce::LookAndFeel_V4::drawLinearSliderOutline(
+        graphics, x, y, width, height, style, slider);
+}
+
+void PerformancePanel::PerformanceControlLookAndFeel::drawRotarySlider(
+    juce::Graphics& graphics,
+    const int x,
+    const int y,
+    const int width,
+    const int height,
+    const float sliderPosition,
+    const float rotaryStartAngle,
+    const float rotaryEndAngle,
+    juce::Slider& slider)
+{
+    juce::LookAndFeel_V4::drawRotarySlider(
+        graphics, x, y, width, height, sliderPosition,
+        rotaryStartAngle, rotaryEndAngle, slider);
+    if (slider.hasKeyboardFocus(true))
+        authoring::visual::drawFocusRing(
+            graphics, slider.getLocalBounds().toFloat().reduced(1.0f));
+}
+
 void PerformancePanel::ArtworkPanel::setArtwork(juce::Image nextArtwork, juce::String nextDescription)
 {
     artwork = std::move(nextArtwork);
@@ -150,22 +285,30 @@ void PerformancePanel::ArtworkPanel::setArtwork(juce::Image nextArtwork, juce::S
 void PerformancePanel::ArtworkPanel::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour(juce::Colour::fromRGB(46, 48, 51));
-    g.fillRoundedRectangle(bounds, 18.0f);
+    g.setColour(authoring::visual::mapSurface);
+    g.fillRoundedRectangle(bounds, authoring::visual::panelRadius);
 
     if (artwork.isValid())
     {
-        g.reduceClipRegion(getLocalBounds());
+        g.reduceClipRegion(getLocalBounds().reduced(1));
         g.drawImageWithin(artwork,
-                          getLocalBounds().getX(),
-                          getLocalBounds().getY(),
-                          getLocalBounds().getWidth(),
-                          getLocalBounds().getHeight(),
+                          getLocalBounds().getX() + 1,
+                          getLocalBounds().getY() + 1,
+                          std::max(1, getLocalBounds().getWidth() - 2),
+                          std::max(1, getLocalBounds().getHeight() - 2),
                           juce::RectanglePlacement::fillDestination);
     }
+    else
+    {
+        g.setColour(authoring::visual::textMuted);
+        g.setFont(juce::FontOptions(authoring::visual::bodyTypeSize));
+        g.drawFittedText("Artwork unavailable", getLocalBounds().reduced(12),
+                         juce::Justification::centred, 1);
+    }
 
-    g.setColour(performancePanelAccent.withAlpha(0.22f));
-    g.drawRoundedRectangle(bounds.reduced(1.0f), 18.0f, 1.5f);
+    g.setColour(authoring::visual::border);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), authoring::visual::panelRadius,
+                           authoring::visual::borderWidth);
 }
 
 PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
@@ -196,15 +339,38 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
       diagnosticsPanel(facade, onMacroValueChanged, std::move(publishCommand),
                        publishPresentationProvider)
 {
+    setLookAndFeel(&performanceLookAndFeel);
     if (instrumentControlsExpandedProvider)
         userInstrumentControlsExpandedChoice = instrumentControlsExpandedProvider();
     if (userInstrumentControlsExpandedChoice.has_value())
         instrumentControlsCollapsed = !*userInstrumentControlsExpandedChoice;
 
-    macroStripLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    instrumentNameLabel.setComponentID("performanceInstrumentNameLabel");
+    instrumentNameLabel.setFont(juce::FontOptions(authoring::visual::titleTypeSize,
+                                                   juce::Font::bold));
+    instrumentNameLabel.setColour(juce::Label::textColourId, authoring::visual::text);
+    instrumentNameLabel.setJustificationType(juce::Justification::centredLeft);
+    instrumentNameLabel.setTitle("Performance instrument");
+
+    instrumentContextLabel.setComponentID("performanceInstrumentContextLabel");
+    instrumentContextLabel.setFont(juce::FontOptions(authoring::visual::compactTypeSize));
+    instrumentContextLabel.setColour(juce::Label::textColourId, authoring::visual::textMuted);
+    instrumentContextLabel.setJustificationType(juce::Justification::centredLeft);
+    instrumentContextLabel.setTitle("Performance context");
+
+    performanceGuidanceLabel.setComponentID("performanceGuidanceLabel");
+    performanceGuidanceLabel.setFont(juce::FontOptions(authoring::visual::metadataTypeSize));
+    performanceGuidanceLabel.setColour(juce::Label::textColourId, authoring::visual::textMuted);
+    performanceGuidanceLabel.setJustificationType(juce::Justification::centredRight);
+    performanceGuidanceLabel.setTitle("Performance status guidance");
+
+    macroStripLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                               juce::Font::bold));
     macroStripLabel.setComponentID("performanceMacroStripLabel");
+    macroStripLabel.setColour(juce::Label::textColourId, authoring::visual::text);
     macroStripToggleButton.setComponentID("performanceMacroStripToggleButton");
     macroStripToggleButton.setWantsKeyboardFocus(true);
+    macroStripToggleButton.setExplicitFocusOrder(20);
     macroStripToggleButton.onClick = [this]
     {
         userInstrumentControlsExpandedChoice = instrumentControlsCollapsed;
@@ -212,35 +378,69 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
             onInstrumentControlsExpandedChanged(*userInstrumentControlsExpandedChoice);
         setInstrumentControlsCollapsed(!instrumentControlsCollapsed);
     };
-    mixerEmptyStateLabel.setFont(juce::FontOptions(15.0f));
+
+    detailsToggleButton.setComponentID("performanceDetailsToggleButton");
+    detailsToggleButton.setButtonText("Details");
+    detailsToggleButton.setTitle("Show Performance Details");
+    detailsToggleButton.setDescription(
+        "Show detailed publication, macro, and runtime diagnostics.");
+    detailsToggleButton.setTooltip(detailsToggleButton.getDescription());
+    detailsToggleButton.setWantsKeyboardFocus(true);
+    detailsToggleButton.setExplicitFocusOrder(10);
+    detailsToggleButton.onClick = [this]
+    {
+        setDiagnosticsVisible(!diagnosticsVisible);
+    };
+
+    mixerEmptyStateLabel.setFont(juce::FontOptions(authoring::visual::bodyTypeSize));
     mixerEmptyStateLabel.setComponentID("performanceMixerEmptyStateLabel");
     mixerEmptyStateLabel.setJustificationType(juce::Justification::centredLeft);
-    loadIndicatorLabel.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+    mixerEmptyStateLabel.setColour(juce::Label::textColourId, authoring::visual::textMuted);
+    loadIndicatorLabel.setFont(juce::FontOptions(authoring::visual::compactTypeSize,
+                                                  juce::Font::bold));
     loadIndicatorLabel.setComponentID("performanceLoadIndicatorLabel");
+    loadIndicatorLabel.setJustificationType(juce::Justification::centred);
     artworkPanel.setComponentID("performanceArtworkPanel");
-
-    macroStripLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(14, 20, 27));
-    mixerEmptyStateLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(52, 64, 84));
-    loadIndicatorLabel.setJustificationType(juce::Justification::centredRight);
 
     keyboardComponent.setComponentID("performanceKeyboard");
     keyboardComponent.setKeyWidth(34.0f);
     keyboardComponent.setAvailableRange(36, 96);
     keyboardComponent.setLowestVisibleKey(48);
     keyboardComponent.setWantsKeyboardFocus(true);
+    keyboardComponent.setExplicitFocusOrder(500);
+    keyboardComponent.setColour(juce::MidiKeyboardComponent::whiteNoteColourId,
+                                authoring::visual::surface);
+    keyboardComponent.setColour(juce::MidiKeyboardComponent::blackNoteColourId,
+                                authoring::visual::text);
+    keyboardComponent.setColour(juce::MidiKeyboardComponent::keySeparatorLineColourId,
+                                authoring::visual::borderStrong);
+    keyboardComponent.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId,
+                                authoring::visual::information.withAlpha(0.18f));
+    keyboardComponent.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId,
+                                authoring::visual::information.withAlpha(0.42f));
+    keyboardComponent.setColour(juce::MidiKeyboardComponent::textLabelColourId,
+                                authoring::visual::textMuted);
     keyboardState.addListener(this);
 
     diagnosticsPanel.setComponentID("performanceDiagnosticsPanel");
-    diagnosticsPanel.setVisible(false);
+    diagnosticsViewport.setComponentID("performanceDiagnosticsViewport");
+    diagnosticsViewport.setViewedComponent(&diagnosticsPanel, false);
+    diagnosticsViewport.setScrollBarsShown(true, false);
+    diagnosticsViewport.setScrollBarThickness(12);
+    diagnosticsViewport.setVisible(false);
 
+    addAndMakeVisible(instrumentNameLabel);
+    addAndMakeVisible(instrumentContextLabel);
+    addAndMakeVisible(performanceGuidanceLabel);
     addAndMakeVisible(artworkPanel);
     addAndMakeVisible(macroStripLabel);
     addAndMakeVisible(macroStripToggleButton);
+    addAndMakeVisible(detailsToggleButton);
     addAndMakeVisible(mixerEmptyStateLabel);
     addAndMakeVisible(loadIndicatorLabel);
     addAndMakeVisible(keyboardComponent);
     addChildComponent(publishedMixer);
-    addChildComponent(diagnosticsPanel);
+    addChildComponent(diagnosticsViewport);
 
     rebuildMacroControls(engineFacade.getMacroDescriptors(), false);
     refreshSurface();
@@ -249,56 +449,107 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
 
 PerformancePanel::~PerformancePanel()
 {
+    setLookAndFeel(nullptr);
     keyboardState.removeListener(this);
 }
 
 void PerformancePanel::paint(juce::Graphics& g)
 {
-    g.fillAll(performancePanelBackground);
-
-    auto bounds = getLocalBounds().toFloat().reduced(14.0f);
-    g.setColour(performancePanelAccent.withAlpha(0.25f));
-    g.fillRoundedRectangle(bounds, 20.0f);
-
-    g.setColour(performancePanelCard);
-    g.fillRoundedRectangle(bounds.reduced(4.0f), 18.0f);
+    g.fillAll(authoring::visual::shell);
+    drawPerformSurface(g, layoutSnapshot.headerBounds, authoring::visual::surfaceRaised);
+    drawPerformSurface(g, layoutSnapshot.controlsBounds, authoring::visual::surface);
+    drawPerformSurface(g, layoutSnapshot.keyboardBounds, authoring::visual::surface);
+    drawPerformSurface(g, layoutSnapshot.diagnosticsBounds, authoring::visual::surfaceSubtle);
 }
 
 void PerformancePanel::resized()
 {
-    auto area = getLocalBounds().reduced(30);
+    layoutSnapshot = {};
+    layoutSnapshot.compact = getWidth() < 820;
+    layoutSnapshot.shortHeight = getHeight() < 680;
+    layoutSnapshot.diagnosticsVisible = diagnosticsVisible;
 
-    auto statusRow = area.removeFromTop(28);
-    loadIndicatorLabel.setBounds(statusRow.removeFromRight(260));
+    auto area = getLocalBounds().reduced(performOuterMargin);
+    if (area.isEmpty())
+        return;
 
-    area.removeFromTop(14);
+    const auto headerHeight = layoutSnapshot.compact ? 64 : 68;
+    layoutSnapshot.headerBounds = area.removeFromTop(std::min(headerHeight, area.getHeight()));
+    area.removeFromTop(std::min(performGap, area.getHeight()));
 
-    const auto keyboardHeight = std::clamp(area.getHeight() / 7, 96, 124);
-    auto keyboardArea = area.removeFromBottom(keyboardHeight);
-    keyboardComponent.setBounds(keyboardArea);
+    auto header = layoutSnapshot.headerBounds.reduced(performPanelInset, 6);
+    const auto rightWidth = std::clamp(header.getWidth() / 3, 230, 390);
+    auto headerRight = header.removeFromRight(std::min(rightWidth, header.getWidth()));
+    auto statusRow = headerRight.removeFromTop(authoring::visual::controlHeight);
+    detailsToggleButton.setBounds(statusRow.removeFromRight(88));
+    statusRow.removeFromRight(6);
+    loadIndicatorLabel.setBounds(statusRow);
+    performanceGuidanceLabel.setBounds(headerRight);
+    instrumentNameLabel.setBounds(header.removeFromTop(30));
+    instrumentContextLabel.setBounds(header);
 
-    area.removeFromBottom(16);
+    const auto keyboardHeight = layoutSnapshot.shortHeight
+        ? 84 : std::clamp(area.getHeight() / 6, 96, 120);
+    layoutSnapshot.keyboardBounds = area.removeFromBottom(
+        std::min(keyboardHeight, area.getHeight()));
+    keyboardComponent.setBounds(layoutSnapshot.keyboardBounds.reduced(1));
+    area.removeFromBottom(std::min(performGap, area.getHeight()));
 
-    const auto macroRowsHeight = static_cast<int>(macroControls.size()) * 34;
-    int controlSectionHeight = 32;
-
-    if (!instrumentControlsCollapsed && showingPublishedMixer)
+    if (diagnosticsVisible && area.getHeight() > 150)
     {
-        controlSectionHeight += publishedMixer.getControlCount() == 0
-            ? 64
-            : std::min(420, std::max(220, area.getHeight() / 3));
+        const auto diagnosticsHeight = std::clamp(area.getHeight() / 3, 128, 220);
+        layoutSnapshot.diagnosticsBounds = area.removeFromBottom(diagnosticsHeight);
+        diagnosticsViewport.setBounds(layoutSnapshot.diagnosticsBounds.reduced(1));
+        const auto diagnosticsContentWidth = std::max(
+            620, diagnosticsViewport.getWidth() - diagnosticsViewport.getScrollBarThickness());
+        diagnosticsPanel.setSize(diagnosticsContentWidth, 920);
+        area.removeFromBottom(std::min(performGap, area.getHeight()));
     }
-    else if (!instrumentControlsCollapsed && !macroControls.empty())
+    else
     {
-        controlSectionHeight += macroRowsHeight + 8;
+        diagnosticsViewport.setBounds({});
     }
 
-    auto controlArea = area.removeFromBottom(std::min(controlSectionHeight, area.getHeight()));
-    auto controlHeader = controlArea.removeFromTop(24);
+    const auto wideSplit = !layoutSnapshot.compact
+        && !layoutSnapshot.shortHeight
+        && area.getWidth() >= 880
+        && !instrumentControlsCollapsed;
+    layoutSnapshot.controlsBesideArtwork = wideSplit;
+    if (wideSplit)
+    {
+        const auto controlsWidth = std::clamp(
+            static_cast<int>(std::round(area.getWidth() * 0.58)), 520,
+            std::max(520, area.getWidth() - 260));
+        layoutSnapshot.controlsBounds = area.removeFromLeft(controlsWidth);
+        area.removeFromLeft(std::min(performGap, area.getWidth()));
+        layoutSnapshot.artworkBounds = area;
+    }
+    else
+    {
+        const auto macroRowsHeight = static_cast<int>(macroControls.size()) * 34;
+        auto controlsHeight = 38;
+        if (!instrumentControlsCollapsed)
+        {
+            const auto preferred = showingPublishedMixer
+                ? (publishedMixer.getControlCount() == 0 ? 92 : 250)
+                : 44 + macroRowsHeight;
+            controlsHeight = std::clamp(preferred, 112,
+                                        std::max(112, area.getHeight() * 3 / 5));
+        }
+        layoutSnapshot.controlsBounds = area.removeFromTop(
+            std::min(controlsHeight, area.getHeight()));
+        area.removeFromTop(std::min(performGap, area.getHeight()));
+        layoutSnapshot.artworkBounds = area;
+    }
+
+    artworkPanel.setBounds(layoutSnapshot.artworkBounds);
+
+    auto controlArea = layoutSnapshot.controlsBounds.reduced(performPanelInset, 7);
+    auto controlHeader = controlArea.removeFromTop(authoring::visual::controlHeight);
     macroStripToggleButton.setBounds(controlHeader.removeFromRight(112));
     controlHeader.removeFromRight(8);
     macroStripLabel.setBounds(controlHeader);
-    controlArea.removeFromTop(8);
+    controlArea.removeFromTop(std::min(7, controlArea.getHeight()));
 
     if (instrumentControlsCollapsed)
     {
@@ -330,29 +581,17 @@ void PerformancePanel::resized()
         mixerEmptyStateLabel.setBounds({});
         for (auto& control : macroControls)
         {
-            auto macroRow = controlArea.removeFromTop(28);
-            control->nameLabel.setBounds(macroRow.removeFromLeft(110));
-            control->slider.setBounds(macroRow.removeFromLeft(220));
-            macroRow.removeFromLeft(10);
-            control->valueLabel.setBounds(macroRow.removeFromLeft(190));
+            auto macroRow = controlArea.removeFromTop(
+                std::min(authoring::visual::controlHeight, controlArea.getHeight()));
+            const auto nameWidth = std::clamp(macroRow.getWidth() / 4, 92, 160);
+            const auto valueWidth = std::clamp(macroRow.getWidth() / 4, 100, 190);
+            control->nameLabel.setBounds(macroRow.removeFromLeft(nameWidth));
+            control->valueLabel.setBounds(macroRow.removeFromRight(valueWidth));
+            macroRow.reduce(8, 0);
+            control->slider.setBounds(macroRow);
             controlArea.removeFromTop(6);
         }
     }
-
-    if (diagnosticsPanel.isVisible())
-    {
-        area.removeFromBottom(14);
-        auto diagnosticsArea = area.removeFromBottom(std::min(220, std::max(120, area.getHeight() / 3)));
-        diagnosticsPanel.setBounds(diagnosticsArea);
-        area.removeFromBottom(14);
-    }
-    else
-    {
-        diagnosticsPanel.setBounds({});
-    }
-
-    area.removeFromBottom(18);
-    artworkPanel.setBounds(area);
 }
 
 void PerformancePanel::refreshNow()
@@ -372,7 +611,7 @@ void PerformancePanel::refreshNow()
     {
         refreshMacroValues();
     }
-    if (structuralRefresh || diagnosticsPanel.isVisible())
+    if (structuralRefresh || diagnosticsVisible)
         diagnosticsPanel.refreshNow();
 }
 
@@ -444,8 +683,13 @@ void PerformancePanel::rebuildMacroControls(
         control->slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         control->slider.setRange(macro.minValue, macro.maxValue, 0.001);
         control->slider.setColour(juce::Slider::trackColourId,
-                                  performancePanelAccent.withAlpha(mixerControl ? 0.55f : 0.35f));
-        control->slider.setColour(juce::Slider::thumbColourId, performancePanelAccent);
+                                  authoring::visual::information.withAlpha(
+                                      mixerControl ? 0.72f : 0.58f));
+        control->slider.setColour(juce::Slider::thumbColourId,
+                                  authoring::visual::information);
+        control->slider.setWantsKeyboardFocus(true);
+        control->slider.setExplicitFocusOrder(
+            100 + static_cast<int>(macroControls.size()));
         control->slider.onValueChange = [this, rawControl = control.get()]
         {
             if (rawControl->slider.isMouseButtonDown())
@@ -491,6 +735,36 @@ void PerformancePanel::setInstrumentControlsCollapsed(const bool shouldCollapse)
 
     if (shouldCollapse && (focusedPublishedControl || focusedLegacyControl))
         macroStripToggleButton.grabKeyboardFocus();
+}
+
+void PerformancePanel::setDiagnosticsVisible(const bool shouldShow)
+{
+    if (diagnosticsVisible == shouldShow)
+        return;
+
+    auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
+    const auto focusedInDiagnostics = focusedComponent != nullptr
+        && (focusedComponent == &diagnosticsPanel
+            || diagnosticsPanel.isParentOf(focusedComponent));
+
+    diagnosticsVisible = shouldShow;
+    diagnosticsViewport.setVisible(diagnosticsVisible);
+    detailsToggleButton.setButtonText(diagnosticsVisible ? "Hide Details" : "Details");
+    detailsToggleButton.setTitle(diagnosticsVisible
+        ? "Hide Performance Details" : "Show Performance Details");
+    const auto description = diagnosticsVisible
+        ? juce::String("Detailed publication, macro, and runtime diagnostics are visible. Press to hide them.")
+        : juce::String("Show detailed publication, macro, and runtime diagnostics.");
+    detailsToggleButton.setDescription(description);
+    detailsToggleButton.setTooltip(description);
+
+    if (diagnosticsVisible)
+        diagnosticsPanel.refreshNow();
+    resized();
+    repaint();
+
+    if (!diagnosticsVisible && focusedInDiagnostics)
+        detailsToggleButton.grabKeyboardFocus();
 }
 
 void PerformancePanel::updateInstrumentControlsVisibility()
@@ -589,6 +863,8 @@ void PerformancePanel::refreshSurface()
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()
         : engineFacade.getPerformancePublishPresentationSnapshot();
+    audioCallbackActive = !audioCallbackActiveProvider
+        || audioCallbackActiveProvider();
     refreshArtwork();
 
     hiddenPublishedMacroCount = macroSurface.hiddenPublishedMacroCount;
@@ -607,7 +883,6 @@ void PerformancePanel::refreshSurface()
 
     juce::String loadIndicatorText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
     auto publishFailed = false;
-    auto publishDiagnostic = juce::String();
     if (publishPresentation != nullptr)
     {
         hasActivePublishedPerformance = publishPresentation->hasActivePublished;
@@ -622,24 +897,59 @@ void PerformancePanel::refreshSurface()
         loadIndicatorText = "Publish " + publishedPerformanceStateLabel;
         if (publishPresentation->hasActivePublished)
             loadIndicatorText << " r" << static_cast<juce::int64>(publishPresentation->activePublishedRevision);
-        publishDiagnostic = loadIndicatorText + ": " + publishedPerformanceGuidance;
-        if (publishedPerformanceFindingCode.isNotEmpty())
-            publishDiagnostic << " [" << publishedPerformanceFindingCode << "]";
     }
-    loadIndicatorLabel.setText(loadIndicatorText,
-                               juce::dontSendNotification);
-    loadIndicatorLabel.setTooltip(publishDiagnostic);
-    loadIndicatorLabel.setDescription(publishDiagnostic);
-    const auto hasPreviewError = !performanceSnapshot.previewPlayback.errorMessage.empty();
+    auto guidanceText = publishedPerformanceGuidance;
+    auto statusColour = authoring::visual::information;
+    if (!audioCallbackActive)
+    {
+        loadIndicatorText = "Audio Inactive";
+        guidanceText = "Open audio settings or enable host processing to audition the instrument.";
+        statusColour = authoring::visual::warning;
+    }
+    else if (publishFailed || !performanceSnapshot.loaded)
+    {
+        statusColour = authoring::visual::error;
+    }
+    else if (!performanceSnapshot.previewPlayback.errorMessage.empty())
+    {
+        statusColour = authoring::visual::warning;
+    }
+    else if (hasActivePublishedPerformance || performanceSnapshot.loaded)
+    {
+        statusColour = authoring::visual::success;
+    }
+
+    const auto instrumentName = !performanceSnapshot.instrumentDisplayName.empty()
+        ? juce::String::fromUTF8(performanceSnapshot.instrumentDisplayName.c_str())
+        : (performanceSnapshot.loaded ? juce::String("Untitled Instrument")
+                                      : juce::String("No Instrument Loaded"));
+    const auto instrumentContext = buildInstrumentContext(performanceSnapshot);
+    instrumentNameLabel.setText(instrumentName, juce::dontSendNotification);
+    instrumentNameLabel.setDescription("Loaded performance instrument: " + instrumentName + ".");
+    instrumentNameLabel.setTooltip(instrumentName);
+    instrumentContextLabel.setText(instrumentContext, juce::dontSendNotification);
+    instrumentContextLabel.setDescription(instrumentContext);
+    instrumentContextLabel.setTooltip(instrumentContext);
+
+    if (guidanceText.isEmpty())
+        guidanceText = juce::String::fromUTF8(performanceSnapshot.loadIndicator.c_str());
+    performanceGuidanceLabel.setText(guidanceText, juce::dontSendNotification);
+    performanceGuidanceLabel.setDescription(guidanceText);
+    performanceGuidanceLabel.setTooltip(guidanceText);
+
+    loadIndicatorLabel.setText(loadIndicatorText, juce::dontSendNotification);
+    auto statusDescription = loadIndicatorText;
+    if (guidanceText.isNotEmpty())
+        statusDescription << ": " << guidanceText;
+    if (publishedPerformanceFindingCode.isNotEmpty() && publishFailed)
+        statusDescription << " [" << publishedPerformanceFindingCode << "]";
+    loadIndicatorLabel.setTooltip(statusDescription);
+    loadIndicatorLabel.setDescription(statusDescription);
     loadIndicatorLabel.setColour(juce::Label::backgroundColourId,
-                                 publishFailed
-                                     ? performancePanelDanger
-                                     : (hasPreviewError
-                                            ? performancePanelWarning
-                                            : (performanceSnapshot.loaded
-                                                   ? performancePanelSuccess
-                                                   : performancePanelDanger)));
-    loadIndicatorLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+                                 statusColour.withAlpha(0.13f));
+    loadIndicatorLabel.setColour(juce::Label::textColourId, statusColour);
+    loadIndicatorLabel.setColour(juce::Label::outlineColourId,
+                                 statusColour.withAlpha(0.72f));
 
     const auto macroStripDescription = buildMacroStripDescription(macroSurface);
     macroStripLabel.setText(buildMacroStripTitle(macroSurface), juce::dontSendNotification);
@@ -722,9 +1032,7 @@ void PerformancePanel::syncKeyboardPlayableRange()
 
     keyboardComponent.setAvailableRange(lowestPlayableNote, highestPlayableNote);
 
-    const auto audioCallbackActive = !audioCallbackActiveProvider
-        || audioCallbackActiveProvider();
-    keyboardComponent.setEnabled(hasActivePublishedPerformance);
+    keyboardComponent.setEnabled(hasActivePublishedPerformance && audioCallbackActive);
 
     const auto currentLowestVisibleKey = keyboardComponent.getLowestVisibleKey();
     if (currentLowestVisibleKey < lowestPlayableNote || currentLowestVisibleKey > highestPlayableNote)

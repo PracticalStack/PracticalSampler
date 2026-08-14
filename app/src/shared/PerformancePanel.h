@@ -27,6 +27,19 @@ public:
     using InstrumentControlsExpandedProvider = std::function<std::optional<bool>()>;
     using InstrumentControlsExpandedChangedCallback = std::function<void(bool)>;
 
+    struct LayoutSnapshot
+    {
+        bool compact = false;
+        bool shortHeight = false;
+        bool controlsBesideArtwork = false;
+        bool diagnosticsVisible = false;
+        juce::Rectangle<int> headerBounds;
+        juce::Rectangle<int> controlsBounds;
+        juce::Rectangle<int> artworkBounds;
+        juce::Rectangle<int> keyboardBounds;
+        juce::Rectangle<int> diagnosticsBounds;
+    };
+
     explicit PerformancePanel(drs::engine::EngineFacade& engineFacade,
                               MacroValueChangedCallback onMacroValueChanged = {},
                               PerformanceNoteOnCallback onPerformanceNoteOn = {},
@@ -43,8 +56,41 @@ public:
     void refreshNow();
     void refreshArtworkNow();
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
+    LayoutSnapshot getLayoutSnapshot() const noexcept { return layoutSnapshot; }
 
 private:
+    class PerformanceControlLookAndFeel final : public juce::LookAndFeel_V4
+    {
+    public:
+        PerformanceControlLookAndFeel();
+
+        void drawButtonBackground(juce::Graphics& graphics,
+                                  juce::Button& button,
+                                  const juce::Colour& backgroundColour,
+                                  bool highlighted,
+                                  bool down) override;
+        void drawToggleButton(juce::Graphics& graphics,
+                              juce::ToggleButton& button,
+                              bool highlighted,
+                              bool down) override;
+        void drawLinearSliderOutline(juce::Graphics& graphics,
+                                     int x,
+                                     int y,
+                                     int width,
+                                     int height,
+                                     juce::Slider::SliderStyle style,
+                                     juce::Slider& slider) override;
+        void drawRotarySlider(juce::Graphics& graphics,
+                              int x,
+                              int y,
+                              int width,
+                              int height,
+                              float sliderPosition,
+                              float rotaryStartAngle,
+                              float rotaryEndAngle,
+                              juce::Slider& slider) override;
+    };
+
     class ArtworkPanel final : public juce::Component
     {
     public:
@@ -75,6 +121,7 @@ private:
     void refreshMacroValues();
     void updateMacroValues(const std::vector<drs::engine::EngineMacroDescriptor>& macros);
     void setInstrumentControlsCollapsed(bool shouldCollapse);
+    void setDiagnosticsVisible(bool shouldShow);
     void updateInstrumentControlsVisibility();
     void syncKeyboardPlayableRange();
 
@@ -97,6 +144,8 @@ private:
     bool initialRevisionCheckPending = true;
     bool showingPublishedMixer = false;
     bool instrumentControlsCollapsed = true;
+    bool diagnosticsVisible = false;
+    bool audioCallbackActive = true;
     std::optional<bool> userInstrumentControlsExpandedChoice;
     std::size_t hiddenPublishedMacroCount = 0;
     std::vector<std::string> visibleMacroIds;
@@ -105,11 +154,19 @@ private:
     juce::MidiKeyboardState keyboardState;
     juce::MidiKeyboardComponent keyboardComponent;
     StatusPanel diagnosticsPanel;
+    juce::Viewport diagnosticsViewport;
     ArtworkPanel artworkPanel;
     std::string loadedArtworkSourceKey;
 
+    PerformanceControlLookAndFeel performanceLookAndFeel;
+    LayoutSnapshot layoutSnapshot;
+
+    juce::Label instrumentNameLabel;
+    juce::Label instrumentContextLabel;
+    juce::Label performanceGuidanceLabel;
     juce::Label macroStripLabel;
     juce::TextButton macroStripToggleButton;
+    juce::TextButton detailsToggleButton;
     juce::Label mixerEmptyStateLabel;
     juce::Label loadIndicatorLabel;
 };

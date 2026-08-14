@@ -1,4 +1,5 @@
 #include "shared/PerformanceMixer.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <algorithm>
 #include <cmath>
@@ -7,11 +8,6 @@ namespace drs::app
 {
 namespace
 {
-const auto mixerCardColour = juce::Colour::fromRGB(235, 240, 246);
-const auto mixerTextColour = juce::Colour::fromRGB(25, 37, 53);
-const auto mixerMutedTextColour = juce::Colour::fromRGB(73, 87, 105);
-const auto mixerAccentColour = juce::Colour::fromRGB(28, 126, 214);
-
 drs::engine::ControlLawUnit controlLawUnitFor(const std::string& valueUnit)
 {
     if (valueUnit == "dB") return drs::engine::ControlLawUnit::decibels;
@@ -73,16 +69,20 @@ public:
         sectionLabel.setJustificationType(juce::Justification::centred);
         nameLabel.setJustificationType(juce::Justification::centred);
         valueLabel.setJustificationType(juce::Justification::centred);
-        sectionLabel.setColour(juce::Label::textColourId, mixerMutedTextColour);
-        nameLabel.setColour(juce::Label::textColourId, mixerTextColour);
-        valueLabel.setColour(juce::Label::textColourId, mixerTextColour);
-        nameLabel.setFont(juce::FontOptions(15.0f, juce::Font::bold));
-        valueLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+        sectionLabel.setColour(juce::Label::textColourId, authoring::visual::textMuted);
+        nameLabel.setColour(juce::Label::textColourId, authoring::visual::text);
+        valueLabel.setColour(juce::Label::textColourId, authoring::visual::information);
+        sectionLabel.setFont(juce::FontOptions(authoring::visual::metadataTypeSize));
+        nameLabel.setFont(juce::FontOptions(authoring::visual::fieldTypeSize,
+                                             juce::Font::bold));
+        valueLabel.setFont(juce::FontOptions(authoring::visual::compactTypeSize,
+                                              juce::Font::bold));
 
         slider.setComponentID("performanceMixerWidget." + juce::String::fromUTF8(view.authoredId.c_str()));
         slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        slider.setColour(juce::Slider::trackColourId, mixerAccentColour.withAlpha(0.56f));
-        slider.setColour(juce::Slider::thumbColourId, mixerAccentColour);
+        slider.setColour(juce::Slider::trackColourId,
+                         authoring::visual::information.withAlpha(0.72f));
+        slider.setColour(juce::Slider::thumbColourId, authoring::visual::information);
         slider.setWantsKeyboardFocus(true);
         slider.setExplicitFocusOrder(focusOrder);
         slider.onValueChange = [this]
@@ -206,8 +206,16 @@ public:
 
     void paint(juce::Graphics& graphics) override
     {
-        graphics.setColour(mixerCardColour);
-        graphics.fillRoundedRectangle(getLocalBounds().toFloat(), 10.0f);
+        auto bounds = getLocalBounds().toFloat().reduced(0.5f);
+        graphics.setColour(authoring::visual::surfaceSubtle);
+        graphics.fillRoundedRectangle(bounds, authoring::visual::panelRadius);
+        graphics.setColour(authoring::visual::border);
+        graphics.drawRoundedRectangle(bounds, authoring::visual::panelRadius,
+                                      authoring::visual::borderWidth);
+        if (slider.hasKeyboardFocus(true) || toggle.hasKeyboardFocus(true))
+            authoring::visual::drawFocusRing(
+                graphics, bounds.reduced(2.0f), authoring::visual::panelRadius);
+
         if (view.controlKind == drs::engine::PublishedMacroControlKind::fader
             && view.controlLaw.kind == drs::engine::ControlLawKind::mixerGainV1)
         {
@@ -217,7 +225,7 @@ public:
                 const auto sliderBounds = slider.getBounds();
                 const auto y = static_cast<float>(sliderBounds.getBottom()
                     - unityNormalized * static_cast<double>(sliderBounds.getHeight()));
-                graphics.setColour(mixerTextColour.withAlpha(0.65f));
+                graphics.setColour(authoring::visual::textMuted.withAlpha(0.72f));
                 graphics.drawLine(static_cast<float>(sliderBounds.getX() - 5), y,
                                   static_cast<float>(sliderBounds.getRight() + 5), y, 1.5f);
             }
@@ -260,6 +268,7 @@ PerformanceMixer::PerformanceMixer(ValueChangedCallback callback)
     setDescription("Published player controls in authored order.");
     viewport.setComponentID("performanceMixerViewport");
     viewport.setScrollBarsShown(true, false);
+    viewport.setScrollBarThickness(12);
     viewport.setViewedComponent(&content, false);
     addAndMakeVisible(viewport);
 }
@@ -326,6 +335,7 @@ void PerformanceMixer::resized()
 
 void PerformanceMixer::rebuildLanes()
 {
+    ++rebuildGeneration;
     lanes.clear();
     content.removeAllChildren();
     lanes.reserve(controls.size());
@@ -344,8 +354,8 @@ void PerformanceMixer::updateLayout()
     layout.rowCount = layout.columnCount == 0 ? 0
         : static_cast<int>((controls.size() + static_cast<std::size_t>(layout.columnCount) - 1)
                            / static_cast<std::size_t>(layout.columnCount));
-    constexpr int gap = 10;
-    constexpr int laneHeight = 174;
+    constexpr int gap = 8;
+    constexpr int laneHeight = 166;
     const auto contentWidth = std::max(1, viewport.getMaximumVisibleWidth());
     const auto contentHeight = layout.rowCount == 0 ? 1 : layout.rowCount * laneHeight
         + (layout.rowCount - 1) * gap;

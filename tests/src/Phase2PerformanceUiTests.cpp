@@ -2,6 +2,7 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/PerformancePanel.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -229,8 +230,9 @@ int main()
                              "Publish Failed",
                              "The compact Performance status chip should keep a failed Publish fully visible.");
         require(requireLabel(panel, "performanceLoadIndicatorLabel").findColour(
-                    juce::Label::backgroundColourId) == juce::Colour::fromRGB(172, 41, 41),
-                "A failed Publish must use the danger colour even when a fallback instrument remains loaded.");
+                    juce::Label::backgroundColourId)
+                    == drs::app::authoring::visual::error.withAlpha(0.13f),
+                "A failed Publish must use the shared error treatment even when a fallback instrument remains loaded.");
         require(requireLabel(panel, "performanceLoadIndicatorLabel").getDescription().contains(
                     "no-playable-zones"),
                 "The compact failed Publish chip must retain the structured finding in its accessible description.");

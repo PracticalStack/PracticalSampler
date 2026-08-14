@@ -1,5 +1,6 @@
 #include "shared/StatusPanel.h"
 #include "shared/MessageThreadMetrics.h"
+#include "shared/authoring/OpenWorkbenchVisualSystem.h"
 
 #include "drs/engine/RuntimeLoader.h"
 
@@ -69,7 +70,8 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
       publishPresentationProvider(std::move(presentationProvider))
 {
     titleLabel.setText("Engine Status", juce::dontSendNotification);
-    titleLabel.setFont(juce::FontOptions(24.0f, juce::Font::bold));
+    titleLabel.setFont(juce::FontOptions(authoring::visual::titleTypeSize,
+                                          juce::Font::bold));
     titleLabel.setComponentID("statusTitleLabel");
 
     modeLabel.setJustificationType(juce::Justification::centredLeft);
@@ -91,18 +93,23 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     routedZonesLabel.setJustificationType(juce::Justification::centredLeft);
     routedZonesLabel.setComponentID("statusRoutedZonesLabel");
 
-    diagnosticsHeadlineLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    diagnosticsHeadlineLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                                        juce::Font::bold));
     actionsLabel.setText("Developer actions", juce::dontSendNotification);
-    actionsLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    actionsLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                            juce::Font::bold));
     actionsLabel.setComponentID("statusActionsLabel");
     draftPlaybackLabel.setText("Draft playback", juce::dontSendNotification);
-    draftPlaybackLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    draftPlaybackLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                                  juce::Font::bold));
     draftPlaybackLabel.setComponentID("statusDraftPlaybackLabel");
     macrosLabel.setText("Macro bridge", juce::dontSendNotification);
-    macrosLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    macrosLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                           juce::Font::bold));
     macrosLabel.setComponentID("statusMacrosLabel");
     contentProbeLabel.setText("Content probes", juce::dontSendNotification);
-    contentProbeLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
+    contentProbeLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                                 juce::Font::bold));
     contentProbeLabel.setComponentID("statusContentProbeLabel");
 
     resetStateButton.setButtonText("Reset Default State");
@@ -209,7 +216,8 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     detailEditor.setPopupMenuEnabled(false);
 
     nextStepsLabel.setText("Current next steps", juce::dontSendNotification);
-    nextStepsLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    nextStepsLabel.setFont(juce::FontOptions(authoring::visual::sectionTypeSize,
+                                              juce::Font::bold));
     nextStepsLabel.setComponentID("statusNextStepsLabel");
 
     nextStepsEditor.setMultiLine(true);
@@ -218,6 +226,32 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
     nextStepsEditor.setScrollbarsShown(true);
     nextStepsEditor.setCaretVisible(false);
     nextStepsEditor.setPopupMenuEnabled(false);
+
+    const auto applyBodyLabelStyle = [](juce::Label& label)
+    {
+        label.setFont(juce::FontOptions(authoring::visual::bodyTypeSize));
+        label.setColour(juce::Label::textColourId, authoring::visual::text);
+    };
+    for (auto* label : { &modeLabel, &stateLabel, &sessionLabel, &voicesLabel,
+                         &cacheLabel, &latencyLabel, &failureLabel, &routedZonesLabel })
+        applyBodyLabelStyle(*label);
+    for (auto* label : { &actionsLabel, &draftPlaybackLabel, &macrosLabel,
+                         &contentProbeLabel, &nextStepsLabel })
+        label->setColour(juce::Label::textColourId, authoring::visual::text);
+    titleLabel.setColour(juce::Label::textColourId, authoring::visual::text);
+    diagnosticsHeadlineLabel.setColour(juce::Label::textColourId,
+                                       authoring::visual::text);
+    for (auto* editor : { &detailEditor, &nextStepsEditor })
+    {
+        editor->setColour(juce::TextEditor::backgroundColourId,
+                          authoring::visual::surface);
+        editor->setColour(juce::TextEditor::textColourId,
+                          authoring::visual::text);
+        editor->setColour(juce::TextEditor::outlineColourId,
+                          authoring::visual::border);
+        editor->setColour(juce::TextEditor::focusedOutlineColourId,
+                          authoring::visual::focus);
+    }
 
     addAndMakeVisible(titleLabel);
     addAndMakeVisible(modeLabel);
@@ -254,15 +288,11 @@ StatusPanel::StatusPanel(drs::engine::EngineFacade& facade,
 
 void StatusPanel::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
-
-    g.fillAll(juce::Colour::fromRGB(18, 22, 28));
-
-    g.setColour(juce::Colour::fromRGB(47, 84, 235));
-    g.fillRoundedRectangle(bounds.reduced(12.0f), 18.0f);
-
-    g.setColour(juce::Colour::fromRGB(247, 249, 252));
-    g.fillRoundedRectangle(bounds.reduced(16.0f), 14.0f);
+    g.fillAll(authoring::visual::surfaceSubtle);
+    g.setColour(authoring::visual::border);
+    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f),
+                           authoring::visual::panelRadius,
+                           authoring::visual::borderWidth);
 }
 
 void StatusPanel::resized()
@@ -437,7 +467,7 @@ void StatusPanel::refreshSnapshot()
                 "Publish failure [" + juce::String::fromUTF8(publish.findingCode.c_str()) + "]: "
                     + juce::String::fromUTF8(publish.guidance.c_str()),
                 juce::dontSendNotification);
-            failureLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(166, 35, 35));
+            failureLabel.setColour(juce::Label::textColourId, authoring::visual::error);
         }
     }
 
@@ -511,8 +541,8 @@ void StatusPanel::refreshSnapshot()
         failureLabel.setText(failureText, juce::dontSendNotification);
         failureLabel.setColour(juce::Label::textColourId,
                                diagnostics.failureState.empty()
-                                   ? juce::Colour::fromRGB(37, 99, 63)
-                                   : juce::Colour::fromRGB(166, 35, 35));
+                                   ? authoring::visual::success
+                                   : authoring::visual::error);
     }
     routedZonesLabel.setText("Routed zones: " + joinLines(diagnostics.routedZones), juce::dontSendNotification);
 
