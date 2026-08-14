@@ -2,6 +2,8 @@
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
 
+#include "drs/engine/PackageReaderDispatch.h"
+
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <algorithm>
@@ -148,6 +150,28 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
 
     return project;
 }
+
+void addAuthoredFxRoutingGraph(drs::engine::RuntimeProjectModel& project)
+{
+    project.authoring.groups.front().routingBusId = "bus-group-pad-core";
+
+    drs::engine::RuntimeProjectFxSlotDefinition drive;
+    drive.id = "drive";
+    drive.displayName = "Drive";
+    drive.effectType = "drs.saturator";
+    drive.effectVersion = 1;
+    drive.bypassed = true;
+    drive.parameters = {
+        { "character", 0.0 },
+        { "driveDb", 7.5 },
+        { "tone", 0.55 },
+        { "mix", 0.8 },
+        { "outputDb", -1.0 }
+    };
+    project.authoring.fxSlots.push_back(std::move(drive));
+    project.authoring.routingBuses.push_back(
+        { "bus-group-pad-core", "Pad Core Insert", "groups/pad-core", { "drive" }, true });
+}
 } // namespace
 
 int main()
@@ -164,6 +188,28 @@ int main()
         drs::standalone::MainComponent standalone(false);
         standalone.addToDesktop(0);
         standalone.setVisible(true);
+
+        auto graphProject = buildAuthoringProjectFixture();
+        addAuthoredFxRoutingGraph(graphProject);
+        require(standalone.getProcessor().replaceAuthoringProject(std::move(graphProject)),
+                "Standalone shell should accept the graph-bearing export fixture.");
+        const auto graphPackagePath = (scratchDirectory / "exported-fx-routing-fixture.drpkg")
+            .generic_string();
+        const auto graphExport = standalone.getProcessor().exportPerformancePackage(
+            juce::File(juce::String::fromUTF8(graphPackagePath.c_str())));
+        require(graphExport.exported,
+                "The shell export adapter should delegate graph-bearing export to the shared pipeline. state="
+                    + graphExport.state + " issues=" + summarizeIssues(graphExport.issues));
+        const auto graphPackage = drs::engine::loadPerformancePackageV2Metadata(graphPackagePath);
+        require(graphPackage.loaded
+                    && graphPackage.metadata.manifest.schemaVersion
+                        == drs::engine::performancePackageFxRoutingSchemaVersion
+                    && graphPackage.metadata.instrument.instrument.fxSlots.size() == 1
+                    && graphPackage.metadata.instrument.instrument.routingBuses.size() == 1
+                    && graphPackage.metadata.instrument.instrument.groups.front().routingBusId
+                        == "bus-group-pad-core",
+                "The shell adapter must emit the same graph metadata as the shared export service.");
+
         require(standalone.getProcessor().replaceAuthoringProject(buildAuthoringProjectFixture()),
                 "Standalone shell should accept the export-fixture authoring project.");
         const auto packagePath = (scratchDirectory / "exported-session-fixture.drpkg").generic_string();

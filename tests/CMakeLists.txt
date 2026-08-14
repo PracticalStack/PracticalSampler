@@ -3736,7 +3736,6 @@ target_sources(drs_px01_fx_routing_contract_red_tests
 
 target_link_libraries(drs_px01_fx_routing_contract_red_tests
     PRIVATE
-        drs_app_shared
         drs_engine_adapter
         drs_sampler_core
         drs_sample_import
@@ -3824,6 +3823,10 @@ target_link_libraries(drs_phase1_performance_package_session_tests
 )
 
 target_compile_features(drs_phase1_performance_package_session_tests PRIVATE cxx_std_17)
+
+if(MSVC)
+    target_link_options(drs_phase1_performance_package_session_tests PRIVATE /STACK:8388608)
+endif()
 
 target_include_directories(drs_phase1_performance_package_session_tests
     PRIVATE

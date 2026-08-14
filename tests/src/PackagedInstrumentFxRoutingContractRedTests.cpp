@@ -1,7 +1,6 @@
 #include "Phase1PerformancePackageSupport.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReader.h"
-#include "shared/PerformancePackageExportService.h"
 
 #include <json/json.hpp>
 
@@ -19,8 +18,7 @@ namespace
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-constexpr std::array<std::string_view, 2> redSeams {
-    "export-authored-graph",
+constexpr std::array<std::string_view, 1> redSeams {
     "package-open-authored-graph"
 };
 
@@ -36,46 +34,6 @@ void printIssues(const std::vector<std::string>& issues)
 {
     for (const auto& issue : issues)
         std::cerr << "  - " << issue << '\n';
-}
-
-int checkExportAuthoredGraph()
-{
-    drs::app::PerformancePackageExportRequest request;
-    request.project = drs::tests::performance_package::buildAuthoringProjectFixture();
-    request.project.authoring.groups.front().routingBusId = "bus-group-pad-core";
-
-    drs::engine::RuntimeProjectFxSlotDefinition slot;
-    slot.id = "room";
-    slot.displayName = "Room";
-    slot.effectType = "drs.algorithmicReverb";
-    slot.effectVersion = 1;
-    slot.parameters = { { "decaySeconds", 2.5 }, { "mix", 0.18 } };
-    request.project.authoring.fxSlots.push_back(std::move(slot));
-
-    drs::engine::RuntimeProjectRoutingBusDefinition bus;
-    bus.id = "bus-group-pad-core";
-    bus.displayName = "Pad Core Insert";
-    bus.inputSourceId = "groups/pad-core";
-    bus.fxSlotIds = { "room" };
-    request.project.authoring.routingBuses.push_back(std::move(bus));
-
-    request.sessionState.loadProfileId = "balanced";
-    request.projectId = request.project.projectId;
-    request.baseRevision = 1;
-    const auto outputPath = fs::temp_directory_path() / "drs-px01-expected-red.drpkg";
-    request.packagePath = outputPath.generic_string();
-
-    const auto result = drs::app::executePerformancePackageExport(request);
-    std::error_code cleanupError;
-    fs::remove(outputPath, cleanupError);
-    if (!result.exported)
-    {
-        std::cerr << "EXPECTED RED: authored FX/routing export is rejected by production.\n";
-        printIssues(result.issues);
-        return 1;
-    }
-
-    return 0;
 }
 
 int checkPackageOpenAuthoredGraph()
@@ -177,8 +135,6 @@ int main(const int argc, char** argv)
     }
 
     const auto seam = std::string_view(argv[1]);
-    if (seam == "export-authored-graph")
-        return checkExportAuthoredGraph();
     if (seam == "package-open-authored-graph")
         return checkPackageOpenAuthoredGraph();
 

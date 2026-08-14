@@ -2,6 +2,7 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReaderDispatch.h"
 #include "shared/PerformancePackageExportService.h"
+#include "shared/PerformancePackageProjection.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
@@ -16,6 +17,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace
 {
@@ -26,6 +28,14 @@ void require(const bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+bool containsIssue(const std::vector<std::string>& issues, const std::string_view text)
+{
+    return std::any_of(issues.begin(), issues.end(), [&](const auto& issue)
+    {
+        return issue.find(text) != std::string::npos;
+    });
 }
 
 drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPackagePath)
@@ -69,6 +79,36 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     request.baseRevision = 1;
     request.packagePath = outputPackagePath.generic_string();
     return request;
+}
+
+void addAuthoredFxRoutingGraph(drs::app::PerformancePackageExportRequest& request)
+{
+    require(!request.project.authoring.groups.empty(),
+            "The graph export fixture must contain an authored group.");
+    request.project.authoring.groups.front().routingBusId = "bus-group-pad-core";
+
+    drs::engine::RuntimeProjectFxSlotDefinition drive;
+    drive.id = "drive";
+    drive.displayName = "Drive";
+    drive.effectType = "drs.saturator";
+    drive.effectVersion = 1;
+    drive.bypassed = true;
+    drive.parameters = {
+        { "character", 0.0 },
+        { "driveDb", 7.5 },
+        { "tone", 0.55 },
+        { "mix", 0.8 },
+        { "outputDb", -1.0 }
+    };
+    request.project.authoring.fxSlots.push_back(std::move(drive));
+
+    drs::engine::RuntimeProjectRoutingBusDefinition bus;
+    bus.id = "bus-group-pad-core";
+    bus.displayName = "Pad Core Insert";
+    bus.inputSourceId = "groups/pad-core";
+    bus.fxSlotIds = { "drive" };
+    bus.chainBypassed = true;
+    request.project.authoring.routingBuses.push_back(std::move(bus));
 }
 
 void replaceRequestSamplesWithFlac(drs::app::PerformancePackageExportRequest& request)
@@ -145,6 +185,25 @@ int main()
                     && !isPerformancePackageExportStageTransitionAllowed(Stage::queued, Stage::sealingPackage)
                     && !isPerformancePackageExportStageTransitionAllowed(Stage::failed, Stage::completed),
                 "Invalid export lifecycle shortcuts must be rejected.");
+
+        auto unsupportedProject = drs::tests::performance_package::buildAuthoringProjectFixture();
+        drs::engine::RuntimeProjectMacroDefinition targetedMacro;
+        targetedMacro.id = "unsupported-target";
+        targetedMacro.name = "Unsupported Target";
+        targetedMacro.targets.push_back({});
+        unsupportedProject.authoring.macros.push_back(std::move(targetedMacro));
+        unsupportedProject.authoring.performanceBanks.push_back(
+            { "unsupported-bank", "Unsupported Bank", {}, {}, {} });
+        unsupportedProject.authoring.groups.front().pan = 0.25;
+        unsupportedProject.authoring.zones.front().loopEnabled = true;
+        const auto compatibilityProjection = projectPerformancePackage(
+            unsupportedProject, {}, PerformancePackageProjectionContext { "unsupported" });
+        require(!compatibilityProjection.projected
+                    && containsIssue(compatibilityProjection.issues, "target mappings")
+                    && containsIssue(compatibilityProjection.issues, "performance banks")
+                    && containsIssue(compatibilityProjection.issues, "non-default pan")
+                    && containsIssue(compatibilityProjection.issues, "loop settings"),
+                "FX/routing support must not loosen unrelated export compatibility blockers.");
 
         const auto tempRoot = fs::temp_directory_path() / "drs-performance-package-export-lifecycle";
         fs::remove_all(tempRoot);
@@ -234,6 +293,13 @@ int main()
         const auto packageV2 = drs::engine::loadPerformancePackageV2Metadata(completedPackage);
         require(packageV2.loaded && packageV2.package != nullptr,
                 "The exported semantic package must reopen through the package-v2 metadata path.");
+        require(packageV2.metadata.manifest.schemaVersion
+                    == drs::engine::performancePackageLegacySchemaVersion
+                    && packageV2.metadata.manifest.minimumReaderSchemaVersion
+                        == drs::engine::performancePackageLegacySchemaVersion
+                    && packageV2.metadata.instrument.instrument.schemaVersion
+                        < drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
+                "Graph-free export must retain legacy package and runtime instrument versions.");
         const auto expectedBackgroundBytes
             = drs::tests::performance_package::buildBackgroundImageJpegFixture();
         require(packageV2.metadata.backgroundImage.loaded
@@ -287,6 +353,36 @@ int main()
                     && performanceSnapshot.backgroundArtworkJpgBytes != nullptr
                     && *performanceSnapshot.backgroundArtworkJpgBytes == expectedBackgroundBytes,
                 "Prepared package activation must expose the v2 background JPEG to Performance.");
+
+        auto graphRequest = makeRequest(tempRoot / "completed-fx-routing.drpkg");
+        addAuthoredFxRoutingGraph(graphRequest);
+        const auto graphExport = executePerformancePackageExport(graphRequest);
+        require(graphExport.exported,
+                "An authored FX/routing graph must export through the shared production path.");
+        const auto graphPackage = drs::engine::loadPerformancePackageV2Metadata(
+            (tempRoot / "completed-fx-routing.drpkg").generic_string());
+        require(graphPackage.loaded
+                    && graphPackage.metadata.manifest.schemaVersion
+                        == drs::engine::performancePackageFxRoutingSchemaVersion
+                    && graphPackage.metadata.manifest.minimumReaderSchemaVersion
+                        == drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion
+                    && graphPackage.metadata.instrument.instrument.schemaVersion
+                        == drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
+                "Graph-bearing export must select package schema 2, minimum reader 2, and runtime instrument v4.");
+        const auto& graphInstrument = graphPackage.metadata.instrument.instrument;
+        require(graphInstrument.fxSlots.size() == 1
+                    && graphInstrument.fxSlots.front().id == "drive"
+                    && graphInstrument.fxSlots.front().bypassed
+                    && graphInstrument.fxSlots.front().parameters.size() == 5
+                    && graphInstrument.fxSlots.front().parameters.at(1).id == "driveDb"
+                    && graphInstrument.fxSlots.front().parameters.at(1).value == 7.5
+                    && graphInstrument.routingBuses.size() == 1
+                    && graphInstrument.routingBuses.front().id == "bus-group-pad-core"
+                    && graphInstrument.routingBuses.front().chainBypassed
+                    && graphInstrument.routingBuses.front().fxSlotIds
+                        == std::vector<std::string> { "drive" }
+                    && graphInstrument.groups.front().routingBusId == "bus-group-pad-core",
+                "Graph-bearing export must preserve slot order, parameters, bypass state, bus chains, and group assignment.");
 
         PerformancePackageExportService flacService;
         auto flacClient = flacService.openClient();
