@@ -186,6 +186,48 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
         result.metadata.backgroundImage.payload.plaintextBytes
             = std::move(backgroundImageBytes);
     }
+    if (!manifest.manifest.license.payloadId.empty())
+    {
+        std::vector<std::uint8_t> licenseBytes;
+        if (!openChunks(manifest.manifest.license.payloadId,
+                        PackageV2RecordKind::licenseText,
+                        licenseBytes,
+                        maximumPlayableInstrumentLicenseBytes))
+        {
+            result.metadata.failureCategory
+                = PerformancePackageFailureCategory::payloadCorruption;
+            result.metadata.state = "Performance package v2 license text could not be opened";
+            result.state = result.metadata.state;
+            result.issues.push_back("Required package v2 license text could not be opened.");
+            return result;
+        }
+
+        const auto validation = validatePlayableInstrumentLicenseBytes(licenseBytes);
+        if (!validation.valid)
+        {
+            result.metadata.failureCategory
+                = PerformancePackageFailureCategory::payloadCorruption;
+            result.metadata.state = "Performance package v2 license text validation failed";
+            result.state = result.metadata.state;
+            result.issues.push_back("Package v2 license text is invalid: " + validation.issue);
+            return result;
+        }
+
+        result.metadata.licenseText.found = true;
+        result.metadata.licenseText.loaded = true;
+        result.metadata.licenseText.failureCategory
+            = PerformancePackageFailureCategory::none;
+        result.metadata.licenseText.state = "Performance package v2 license text loaded";
+        result.metadata.licenseText.payload.payloadId
+            = manifest.manifest.license.payloadId;
+        result.metadata.licenseText.payload.payloadKind = "licenseText";
+        result.metadata.licenseText.payload.logicalPath
+            = playableInstrumentLicenseLogicalPath;
+        result.metadata.licenseText.payload.mediaType
+            = playableInstrumentLicenseMediaType;
+        result.metadata.licenseText.payload.plaintextSizeBytes = licenseBytes.size();
+        result.metadata.licenseText.payload.plaintextBytes = std::move(licenseBytes);
+    }
     result.metadata.packageFound = true;
     result.metadata.packagePath = packagePath;
     result.metadata.manifest = manifest.manifest;

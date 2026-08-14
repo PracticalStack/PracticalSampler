@@ -201,6 +201,7 @@ add_library(drs_engine_adapter STATIC
     src/PerformancePublishPresentation.cpp
     src/PerformanceProgram.cpp
     src/PerformanceRuleContract.cpp
+    src/PlayableInstrumentLicense.cpp
     src/PackageCrypto.cpp
     src/PackageReader.cpp
     src/PackageReaderDispatch.cpp
@@ -253,6 +254,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PerformancePublishPresentation.h
     include/drs/engine/PerformanceProgram.h
     include/drs/engine/PerformanceRuleContract.h
+    include/drs/engine/PlayableInstrumentLicense.h
     include/drs/engine/PackageCrypto.h
     include/drs/engine/PackageReader.h
     include/drs/engine/PackageReaderDispatch.h

@@ -4,6 +4,7 @@
 #include "drs/engine/PackageReader.h"
 #include "drs/engine/PackageReaderDispatch.h"
 #include "drs/engine/PackageV2StreamingExport.h"
+#include "drs/engine/PlayableInstrumentLicense.h"
 
 #include <algorithm>
 #include <cmath>
@@ -160,6 +161,54 @@ std::optional<drs::engine::PerformancePackagePayloadSource> resolveProjectBackgr
     return payload;
 }
 
+std::optional<drs::engine::PerformancePackagePayloadSource> resolveProjectLicensePayload(
+    const drs::engine::RuntimeProjectModel& project,
+    std::vector<std::string>& issues)
+{
+    if (project.contentRootPath.empty())
+        return std::nullopt;
+
+    const auto licenseFile = juce::File(juce::String::fromUTF8(project.contentRootPath.c_str()))
+        .getChildFile(drs::engine::playableInstrumentLicenseFileName);
+    if (!licenseFile.existsAsFile())
+        return std::nullopt;
+
+    const auto licenseFileBytes = licenseFile.getSize();
+    if (licenseFileBytes < 0
+        || static_cast<std::uint64_t>(licenseFileBytes)
+            > drs::engine::maximumPlayableInstrumentLicenseBytes)
+    {
+        issues.push_back("Performance license text exceeds the 1 MiB package limit.");
+        return std::nullopt;
+    }
+
+    juce::MemoryBlock data;
+    if (!licenseFile.loadFileAsData(data))
+    {
+        issues.push_back("Performance license text could not be read for export.");
+        return std::nullopt;
+    }
+
+    const auto* begin = static_cast<const std::uint8_t*>(data.getData());
+    std::vector<std::uint8_t> bytes;
+    if (data.getSize() > 0)
+        bytes.assign(begin, begin + data.getSize());
+    const auto validation = drs::engine::validatePlayableInstrumentLicenseBytes(bytes);
+    if (!validation.valid)
+    {
+        issues.push_back("Performance license text is invalid. " + validation.issue);
+        return std::nullopt;
+    }
+
+    drs::engine::PerformancePackagePayloadSource payload;
+    payload.payloadId = drs::engine::playableInstrumentLicensePayloadId;
+    payload.kind = drs::engine::PerformancePackagePayloadKind::licenseText;
+    payload.logicalPath = drs::engine::playableInstrumentLicenseLogicalPath;
+    payload.mediaType = drs::engine::playableInstrumentLicenseMediaType;
+    payload.plaintextBytes = std::move(bytes);
+    return payload;
+}
+
 struct PerformancePackageExportPreparationResult
 {
     bool ready = false;
@@ -235,6 +284,13 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
     {
         result.manifest.backgroundImage.payloadId = backgroundImagePayload->payloadId;
         result.additionalPayloads.push_back(*backgroundImagePayload);
+    }
+
+    if (const auto licensePayload = resolveProjectLicensePayload(project, result.issues);
+        licensePayload.has_value())
+    {
+        result.manifest.license.payloadId = licensePayload->payloadId;
+        result.additionalPayloads.push_back(*licensePayload);
     }
 
     if (!result.issues.empty())

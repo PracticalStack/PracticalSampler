@@ -354,6 +354,8 @@ std::string serializePackageManifestJson(const PerformancePackageManifest& manif
     root["groupRoutes"] = serializePackageGroupRoutes(manifest.groupRoutes);
     if (!manifest.backgroundImage.payloadId.empty())
         root["backgroundImage"] = ordered_json { { "payloadId", manifest.backgroundImage.payloadId } };
+    if (!manifest.license.payloadId.empty())
+        root["license"] = ordered_json { { "payloadId", manifest.license.payloadId } };
     root["notes"] = serializeStringArray(manifest.notes);
     return root.dump(2) + "\n";
 }
@@ -580,6 +582,70 @@ bool validateWritePlan(const PerformancePackageWritePlan& plan, PerformancePacka
                 addIssue(result,
                          "Performance package backgroundImage payload must use mediaType 'image/jpeg'.");
             }
+        }
+    }
+
+    const auto licensePayloadCount = std::count_if(
+        plan.payloads.begin(), plan.payloads.end(), [](const PerformancePackagePayloadSource& payload)
+        {
+            return payload.kind == PerformancePackagePayloadKind::licenseText;
+        });
+    if (plan.manifest.license.payloadId.empty())
+    {
+        if (licensePayloadCount != 0)
+        {
+            addIssue(result,
+                     "Performance package licenseText payload requires manifest.license.payloadId.");
+        }
+    }
+    else
+    {
+        if (plan.manifest.license.payloadId != playableInstrumentLicensePayloadId)
+        {
+            addIssue(result,
+                     "Performance package manifest license.payloadId must be 'license-text'.");
+        }
+
+        const auto payloadIterator = std::find_if(
+            plan.payloads.begin(), plan.payloads.end(), [&](const PerformancePackagePayloadSource& payload)
+            {
+                return payload.payloadId == plan.manifest.license.payloadId;
+            });
+        if (payloadIterator == plan.payloads.end())
+        {
+            addIssue(result,
+                     "Performance package manifest license.payloadId must reference a packaged payload.");
+        }
+        else
+        {
+            if (payloadIterator->kind != PerformancePackagePayloadKind::licenseText)
+            {
+                addIssue(result,
+                         "Performance package manifest license.payloadId must reference a licenseText payload.");
+            }
+            if (payloadIterator->mediaType != playableInstrumentLicenseMediaType)
+            {
+                addIssue(result,
+                         "Performance package licenseText payload must use mediaType 'text/plain; charset=utf-8'.");
+            }
+            if (payloadIterator->logicalPath != playableInstrumentLicenseLogicalPath)
+            {
+                addIssue(result,
+                         "Performance package licenseText payload must use logicalPath 'LICENSE.txt'.");
+            }
+
+            const auto validation = validatePlayableInstrumentLicenseBytes(
+                payloadIterator->plaintextBytes);
+            if (!validation.valid)
+            {
+                addIssue(result,
+                         "Performance package licenseText payload is invalid: " + validation.issue);
+            }
+        }
+        if (licensePayloadCount != 1)
+        {
+            addIssue(result,
+                     "Performance package manifest license requires exactly one licenseText payload.");
         }
     }
 

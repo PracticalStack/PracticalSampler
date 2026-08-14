@@ -37,6 +37,7 @@ struct PerformancePackageLoadResult
     RuntimeManifestLoadResult instrument;
     RuntimeStreamLoadResult stream;
     PerformancePackagePayloadLoadResult backgroundImage;
+    PerformancePackagePayloadLoadResult licenseText;
 };
 
 struct PerformancePackageManifestParseResult

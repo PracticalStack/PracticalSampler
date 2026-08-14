@@ -146,6 +146,15 @@ inline std::vector<std::uint8_t> buildBackgroundImageJpegFixture()
     return bytes;
 }
 
+inline std::vector<std::uint8_t> buildLicenseTextFixture()
+{
+    return {
+        0xefu, 0xbbu, 0xbfu,
+        'D', 'e', 'c', 'e', 'n', 't', ' ', 'R', 'h', 'a', 'p', 's', 'o', 'd', 'y', '\n',
+        'T', 'e', 's', 't', ' ', 'L', 'i', 'c', 'e', 'n', 's', 'e', '\n'
+    };
+}
+
 inline fs::path getReferenceContentRoot()
 {
     return fs::path(drs::engine::getPhase1ReferenceProjectManifestPath()).parent_path()
@@ -326,6 +335,7 @@ inline drs::engine::PerformancePackageCompileWritePlan buildPackagePlan(
     for (const auto& group : compileResult.instrument.groups)
         manifest.groupRoutes.push_back({ group.id, group.gainDb });
     manifest.backgroundImage.payloadId = "background-image";
+    manifest.license.payloadId = drs::engine::playableInstrumentLicensePayloadId;
     manifest.notes = {
         "Sprint 7 checked-in performance package corpus.",
         "Contains runtime-only payloads and omits the authored project manifest."
@@ -342,6 +352,13 @@ inline drs::engine::PerformancePackageCompileWritePlan buildPackagePlan(
         "images/background.jpg",
         "image/jpeg",
         buildBackgroundImageJpegFixture()
+    });
+    packagePlan.additionalPayloads.push_back({
+        drs::engine::playableInstrumentLicensePayloadId,
+        drs::engine::PerformancePackagePayloadKind::licenseText,
+        drs::engine::playableInstrumentLicenseLogicalPath,
+        drs::engine::playableInstrumentLicenseMediaType,
+        buildLicenseTextFixture()
     });
     return packagePlan;
 }

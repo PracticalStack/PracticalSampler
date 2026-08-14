@@ -294,7 +294,7 @@
           <div class="slice-id">LI-01</div>
           <div>
             <h3>Freeze contract and expected-red coverage</h3>
-            <div class="callout green"><strong>Status: complete (14 Aug 2026).</strong> The contract is frozen, compatibility tests are green, and six production seams remain intentionally red for LI-02 through LI-04.</div>
+            <div class="callout green"><strong>Status: complete (14 Aug 2026).</strong> The contract froze six production seams; project import, package export, and package reader integrity have since promoted to registered green coverage.</div>
             <p>Introduce names and failing contract tests before production behavior changes.</p>
             <ul>
               <li>Freeze menu labels, canonical filename, payload id/kind, media type, 1 MiB limit, UTF-8 policy, and no-schema-bump decision.</li>
@@ -324,6 +324,7 @@
           <div class="slice-id">LI-03</div>
           <div>
             <h3>Package compile, seal, and read</h3>
+            <div class="callout green"><strong>Status: complete (14 Aug 2026).</strong> Conventional and package-v2 paths preserve authenticated license bytes, reject malformed declarations and payloads before activation, and retain no-license compatibility without a schema bump.</div>
             <ul>
               <li>Resolve optional <code>LICENSE.txt</code> during export and append a bounded additional payload.</li>
               <li>Serialize/parse <code>license.payloadId</code> and validate manifest-to-payload kind/media references.</li>
@@ -415,12 +416,12 @@
           <li>Focused tests, package matrix, UI/smoke/responsiveness tests, realtime checks, release gate, and production VST3 build all pass.</li>
         </ol>
         <div class="callout amber">
-          <strong>Delivery order is intentional:</strong> LI-01 and LI-02 are complete. LI-03 may begin from the canonical project-root file; package and Performance behavior remain intentionally absent.
+          <strong>Delivery order is intentional:</strong> LI-01 through LI-03 are complete. LI-04 may take ownership only from authenticated reader results; viewer and activation ownership remain intentionally absent.
         </div>
       </section>
 
       <footer>
-        Prepared for the next Decent Rhapsody Studio iteration. Status: LI-01 and LI-02 complete; LI-03 production implementation not started.
+        Prepared for the next Decent Rhapsody Studio iteration. Status: LI-01 through LI-03 complete; LI-04 production implementation not started.
       </footer>
     </main>
   </div>

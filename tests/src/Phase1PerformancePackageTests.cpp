@@ -1,5 +1,6 @@
 #include "drs/engine/PackageCrypto.h"
 #include "drs/engine/PackageReader.h"
+#include "drs/engine/PackageV2StreamingExport.h"
 #include "drs/engine/PackageWriter.h"
 #include "Phase1PerformancePackageSupport.h"
 
@@ -173,8 +174,8 @@ int main()
                 "Compile result should preserve zone gain before package serialization.");
 
         const auto packageWritePlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
-        require(packageWritePlan.payloads.size() == 5,
-                "Package write planning should include the optional background-image payload.");
+        require(packageWritePlan.payloads.size() == 6,
+                "Package write planning should include optional background-image and license payloads.");
         require(std::abs(packageWritePlan.manifest.masterGainDb - packagePlan.compiledRuntime.masterGainDb) < 1.0e-9,
                 "Package write planning should source package master gain from the compile result.");
         require(packageWritePlan.manifest.groupRoutes.size() == packagePlan.compiledRuntime.instrument.groups.size(),
@@ -219,6 +220,18 @@ int main()
         require(packageManifestJson.at("backgroundImage").at("payloadId").get<std::string>()
                     == packagePlan.manifest.backgroundImage.payloadId,
                 "Generated package manifest should advertise the packaged background-image payload id.");
+        require(packageManifestJson.at("license").at("payloadId").get<std::string>()
+                    == drs::engine::playableInstrumentLicensePayloadId,
+                "Generated package manifest should advertise the canonical license payload id.");
+
+        auto invalidLicenseManifestJson = packageManifestJson;
+        invalidLicenseManifestJson["license"]["payloadId"] = "non-canonical-license";
+        const auto invalidLicenseManifest = drs::engine::parsePerformancePackageManifestJson(
+            invalidLicenseManifestJson.dump());
+        require(!invalidLicenseManifest.parsed
+                    && package_support::containsIssue(invalidLicenseManifest.issues,
+                                                      "must be 'license-text'"),
+                "Manifest parsing must reject a non-canonical license payload id.");
 
         const auto generatedInstrumentPayloadIterator = std::find_if(
             generatedInspection.payloads.begin(),
@@ -318,6 +331,114 @@ int main()
                     && backgroundImagePayloadIterator->mediaType == "image/jpeg"
                     && !backgroundImagePayloadIterator->plaintextBytes.empty(),
                 "Generated performance package should preserve packaged background-image payload metadata and bytes.");
+
+        const auto generatedLoad = drs::engine::loadPerformancePackage(
+            packagePlan.outputPackagePath, cryptoProvider,
+            drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion);
+        require(generatedLoad.loaded
+                    && generatedLoad.licenseText.loaded
+                    && generatedLoad.licenseText.payload.payloadId
+                        == drs::engine::playableInstrumentLicensePayloadId
+                    && generatedLoad.licenseText.payload.payloadKind == "licenseText"
+                    && generatedLoad.licenseText.payload.logicalPath
+                        == drs::engine::playableInstrumentLicenseLogicalPath
+                    && generatedLoad.licenseText.payload.mediaType
+                        == drs::engine::playableInstrumentLicenseMediaType
+                    && generatedLoad.licenseText.payload.plaintextBytes
+                        == package_support::buildLicenseTextFixture(),
+                "The conventional package reader must return byte-identical authenticated license text.");
+
+        const auto generatedLicensePayloadIterator = std::find_if(
+            generatedInspection.payloads.begin(), generatedInspection.payloads.end(), [](const auto& payload)
+            {
+                return payload.payloadId == drs::engine::playableInstrumentLicensePayloadId;
+            });
+        require(generatedLicensePayloadIterator != generatedInspection.payloads.end()
+                    && generatedLicensePayloadIterator->payloadKind == "licenseText"
+                    && generatedLicensePayloadIterator->logicalPath
+                        == drs::engine::playableInstrumentLicenseLogicalPath
+                    && generatedLicensePayloadIterator->mediaType
+                        == drs::engine::playableInstrumentLicenseMediaType
+                    && generatedLicensePayloadIterator->plaintextBytes
+                        == package_support::buildLicenseTextFixture(),
+                "Package inspection must preserve canonical license metadata and bytes.");
+
+        auto missingLicensePlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
+        missingLicensePlan.outputPackagePath
+            = (scratchDirectory / "missing-license-payload.drpkg").generic_string();
+        missingLicensePlan.payloads.erase(
+            std::remove_if(missingLicensePlan.payloads.begin(), missingLicensePlan.payloads.end(),
+                           [](const auto& payload)
+                           {
+                               return payload.kind
+                                   == drs::engine::PerformancePackagePayloadKind::licenseText;
+                           }),
+            missingLicensePlan.payloads.end());
+        const auto missingLicenseWrite = drs::engine::writePerformancePackage(
+            missingLicensePlan, cryptoProvider);
+        require(!missingLicenseWrite.written
+                    && package_support::containsIssue(missingLicenseWrite.issues,
+                                                      "must reference a packaged payload"),
+                "The conventional writer must reject a declared missing license payload.");
+
+        auto wrongLicenseMetadataPlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
+        wrongLicenseMetadataPlan.outputPackagePath
+            = (scratchDirectory / "wrong-license-metadata.drpkg").generic_string();
+        const auto wrongLicensePayload = std::find_if(
+            wrongLicenseMetadataPlan.payloads.begin(), wrongLicenseMetadataPlan.payloads.end(),
+            [](const auto& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::licenseText;
+            });
+        require(wrongLicensePayload != wrongLicenseMetadataPlan.payloads.end(),
+                "The wrong-license-metadata fixture requires a license payload.");
+        wrongLicensePayload->mediaType = "application/octet-stream";
+        wrongLicensePayload->logicalPath = "license.bin";
+        const auto wrongLicenseMetadataWrite = drs::engine::writePerformancePackage(
+            wrongLicenseMetadataPlan, cryptoProvider);
+        require(!wrongLicenseMetadataWrite.written
+                    && package_support::containsIssue(wrongLicenseMetadataWrite.issues,
+                                                      "mediaType 'text/plain; charset=utf-8'")
+                    && package_support::containsIssue(wrongLicenseMetadataWrite.issues,
+                                                      "logicalPath 'LICENSE.txt'"),
+                "The conventional writer must reject non-canonical license media and path metadata.");
+
+        auto wrongV2LicensePayloads = packagePlan.additionalPayloads;
+        const auto wrongV2LicensePayload = std::find_if(
+            wrongV2LicensePayloads.begin(), wrongV2LicensePayloads.end(), [](const auto& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::licenseText;
+            });
+        require(wrongV2LicensePayload != wrongV2LicensePayloads.end(),
+                "The package-v2 metadata fixture requires a license payload.");
+        wrongV2LicensePayload->mediaType = "application/octet-stream";
+        const auto wrongV2LicensePlan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
+            packagePlan.manifest,
+            packagePlan.compiledRuntime,
+            (scratchDirectory / "wrong-v2-license-metadata.drpkg").generic_string(),
+            wrongV2LicensePayloads);
+        require(!wrongV2LicensePlan.built
+                    && package_support::containsIssue(wrongV2LicensePlan.issues,
+                                                      "metadata is not canonical"),
+                "The package-v2 planner must reject non-canonical license payload metadata.");
+
+        auto invalidLicenseBytesPlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
+        invalidLicenseBytesPlan.outputPackagePath
+            = (scratchDirectory / "invalid-license-bytes.drpkg").generic_string();
+        const auto invalidLicensePayload = std::find_if(
+            invalidLicenseBytesPlan.payloads.begin(), invalidLicenseBytesPlan.payloads.end(),
+            [](const auto& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::licenseText;
+            });
+        require(invalidLicensePayload != invalidLicenseBytesPlan.payloads.end(),
+                "The invalid-license fixture requires a license payload.");
+        invalidLicensePayload->plaintextBytes = { 0xc3u, 0x28u };
+        const auto invalidLicenseBytesWrite = drs::engine::writePerformancePackage(
+            invalidLicenseBytesPlan, cryptoProvider);
+        require(!invalidLicenseBytesWrite.written
+                    && package_support::containsIssue(invalidLicenseBytesWrite.issues, "UTF-8"),
+                "The conventional writer must reject invalid UTF-8 license bytes.");
 
         auto duplicatePayloadPlan = drs::engine::buildPerformancePackageWritePlan(packagePlan);
         duplicatePayloadPlan.outputPackagePath = (scratchDirectory / "duplicate-payloads.drpkg").generic_string();

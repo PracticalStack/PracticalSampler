@@ -327,6 +327,65 @@ PackageV2StreamingExportBuildResult buildPerformancePackageV2StreamingExportPlan
         result.issues.push_back("Runtime compilation must succeed before package v2 export.");
         return result;
     }
+
+    const auto licensePayloadCount = std::count_if(
+        additionalPayloads.begin(), additionalPayloads.end(), [](const auto& payload)
+        {
+            return payload.kind == PerformancePackagePayloadKind::licenseText;
+        });
+    const auto rejectLicensePlan = [](std::string issue)
+    {
+        PackageV2StreamingExportBuildResult result;
+        result.state = "Performance package v2 export plan rejected";
+        result.issues.push_back(std::move(issue));
+        return result;
+    };
+    if (manifest.license.payloadId.empty())
+    {
+        if (licensePayloadCount != 0)
+        {
+            return rejectLicensePlan(
+                "Performance package licenseText payload requires manifest.license.payloadId.");
+        }
+    }
+    else
+    {
+        if (manifest.license.payloadId != playableInstrumentLicensePayloadId)
+        {
+            return rejectLicensePlan(
+                "Performance package manifest license.payloadId must be 'license-text'.");
+        }
+        const auto licensePayload = std::find_if(
+            additionalPayloads.begin(), additionalPayloads.end(), [&](const auto& payload)
+            {
+                return payload.payloadId == manifest.license.payloadId;
+            });
+        if (licensePayload == additionalPayloads.end()
+            || licensePayload->kind != PerformancePackagePayloadKind::licenseText)
+        {
+            return rejectLicensePlan(
+                "Performance package manifest license.payloadId must reference a licenseText payload.");
+        }
+        if (licensePayloadCount != 1)
+        {
+            return rejectLicensePlan(
+                "Performance package manifest license requires exactly one licenseText payload.");
+        }
+        if (licensePayload->mediaType != playableInstrumentLicenseMediaType
+            || licensePayload->logicalPath != playableInstrumentLicenseLogicalPath)
+        {
+            return rejectLicensePlan(
+                "Performance package licenseText payload metadata is not canonical.");
+        }
+        const auto validation = validatePlayableInstrumentLicenseBytes(
+            licensePayload->plaintextBytes);
+        if (!validation.valid)
+        {
+            return rejectLicensePlan(
+                "Performance package licenseText payload is invalid: " + validation.issue);
+        }
+    }
+
     auto packagedRuntime = buildPackageRuntimeMetadata(compiledRuntime);
     manifest.masterGainDb = packagedRuntime.masterGainDb;
     manifest.groupRoutes.clear();
@@ -357,6 +416,13 @@ PackageV2StreamingExportBuildResult buildPerformancePackageV2StreamingExportPlan
                                           payload.payloadId.empty() ? "background-image"
                                                                     : payload.payloadId,
                                           PackageV2RecordKind::backgroundImage,
+                                          payload.plaintextBytes);
+        }
+        else if (payload.kind == PerformancePackagePayloadKind::licenseText)
+        {
+            appendPackageV2MetadataChunks(metadata,
+                                          payload.payloadId,
+                                          PackageV2RecordKind::licenseText,
                                           payload.plaintextBytes);
         }
     }

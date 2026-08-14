@@ -330,6 +330,34 @@ bool parsePackageManifestPayload(const ordered_json& manifestRoot,
         }
     }
 
+    if (manifestRoot.contains("license"))
+    {
+        if (!manifestRoot.at("license").is_object())
+        {
+            addIssue(result, context + " field 'license' must be an object when present.");
+            valid = false;
+        }
+        else
+        {
+            const auto& licenseRoot = manifestRoot.at("license");
+            if (!licenseRoot.contains("payloadId") || !licenseRoot.at("payloadId").is_string())
+            {
+                addIssue(result, context + " field 'license.payloadId' must be a string when present.");
+                valid = false;
+            }
+            else
+            {
+                manifest.license.payloadId = licenseRoot.at("payloadId").get<std::string>();
+                if (manifest.license.payloadId != playableInstrumentLicensePayloadId)
+                {
+                    addIssue(result,
+                             context + " field 'license.payloadId' must be 'license-text'.");
+                    valid = false;
+                }
+            }
+        }
+    }
+
     if (manifestRoot.contains("masterGainDb"))
     {
         if (!manifestRoot.at("masterGainDb").is_number())
@@ -1032,6 +1060,59 @@ PerformancePackageLoadResult loadPerformancePackageInternal(const std::string& p
         if (result.backgroundImage.payload.payloadKind != "backgroundImage")
         {
             addIssue(result, "Performance package backgroundImage payload kind must be 'backgroundImage'.");
+        }
+    }
+
+    if (!result.manifest.license.payloadId.empty())
+    {
+        result.licenseText = openPerformancePackagePayload(result.package,
+                                                           result.manifest.license.payloadId,
+                                                           cryptoProvider);
+        appendIssues(result.issues, result.licenseText.issues);
+        if (!result.licenseText.loaded)
+        {
+            addIssue(result, "Required licenseText payload could not be opened.");
+            setFailureCategory(result, result.licenseText.failureCategory);
+            finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+            return result;
+        }
+
+        auto licenseValid = true;
+        if (result.licenseText.payload.payloadKind != "licenseText")
+        {
+            addIssue(result, "Performance package licenseText payload kind must be 'licenseText'.");
+            licenseValid = false;
+        }
+        if (result.licenseText.payload.mediaType != playableInstrumentLicenseMediaType)
+        {
+            addIssue(result,
+                     "Performance package licenseText payload must use mediaType 'text/plain; charset=utf-8'.");
+            licenseValid = false;
+        }
+        if (result.licenseText.payload.logicalPath != playableInstrumentLicenseLogicalPath)
+        {
+            addIssue(result,
+                     "Performance package licenseText payload must use logicalPath 'LICENSE.txt'.");
+            licenseValid = false;
+        }
+        if (result.licenseText.payload.plaintextBytes.size()
+            > maximumPlayableInstrumentLicenseBytes)
+        {
+            addIssue(result, "Performance package licenseText payload exceeds the 1 MiB limit.");
+            licenseValid = false;
+        }
+        const auto validation = validatePlayableInstrumentLicenseBytes(
+            result.licenseText.payload.plaintextBytes);
+        if (!validation.valid)
+        {
+            addIssue(result, "Performance package licenseText payload is invalid: " + validation.issue);
+            licenseValid = false;
+        }
+        if (!licenseValid)
+        {
+            setFailureCategory(result, PerformancePackageFailureCategory::payloadCorruption);
+            finalizeLoadFailure(result, PerformancePackageFailureCategory::payloadCorruption);
+            return result;
         }
     }
 

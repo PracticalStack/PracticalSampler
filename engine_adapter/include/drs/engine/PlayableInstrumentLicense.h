@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace drs::engine
 {
@@ -16,4 +18,13 @@ inline constexpr bool playableInstrumentLicenseAllowsUtf8Bom = true;
 inline constexpr bool playableInstrumentLicenseAllowsEmbeddedNull = false;
 inline constexpr bool playableInstrumentLicensePreservesExactBytes = true;
 inline constexpr bool playableInstrumentLicenseRequiresPackageSchemaBump = false;
+
+struct PlayableInstrumentLicenseValidationResult
+{
+    bool valid = false;
+    std::string issue;
+};
+
+PlayableInstrumentLicenseValidationResult validatePlayableInstrumentLicenseBytes(
+    const std::vector<std::uint8_t>& bytes);
 } // namespace drs::engine

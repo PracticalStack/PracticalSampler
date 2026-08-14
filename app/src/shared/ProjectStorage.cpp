@@ -582,36 +582,17 @@ ProjectLicenseFileImportResult importProjectLicenseFile(
             "The selected license file could not be read.", targetFile);
     }
 
-    const auto* bytes = static_cast<const char*>(validatedBytes.getData());
+    const auto* bytes = static_cast<const std::uint8_t*>(validatedBytes.getData());
+    std::vector<std::uint8_t> licenseBytes;
     if (validatedBytes.getSize() > 0)
+        licenseBytes.assign(bytes, bytes + validatedBytes.getSize());
+    const auto validation = drs::engine::validatePlayableInstrumentLicenseBytes(licenseBytes);
+    if (!validation.valid)
     {
-        const auto* end = bytes + validatedBytes.getSize();
-        if (std::find(bytes, end, '\0') != end)
-        {
-            return buildLicenseFileImportError(
-                "The selected license file contains an embedded NUL byte and is not valid text.",
-                targetFile);
-        }
-
-        const auto containsBinaryControlByte = std::any_of(bytes, end, [](const char byte)
-        {
-            const auto value = static_cast<unsigned char>(byte);
-            return value == 0x7fu
-                || (value < 0x20u && value != '\t' && value != '\r' && value != '\n');
-        });
-        if (containsBinaryControlByte)
-        {
-            return buildLicenseFileImportError(
-                "The selected license file contains binary control bytes and is not valid text.",
-                targetFile);
-        }
-
-        if (!juce::CharPointer_UTF8::isValidString(
-                bytes, static_cast<int>(validatedBytes.getSize())))
-        {
-            return buildLicenseFileImportError(
-                "The selected license file is not valid UTF-8 text.", targetFile);
-        }
+        return buildLicenseFileImportError(
+            "The selected license file is invalid. "
+                + juce::String::fromUTF8(validation.issue.c_str()),
+            targetFile);
     }
 
     ProjectLicenseFileImportResult result;

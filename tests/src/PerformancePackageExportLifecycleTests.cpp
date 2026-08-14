@@ -12,6 +12,7 @@
 #include <condition_variable>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -37,6 +38,46 @@ bool containsIssue(const std::vector<std::string>& issues, const std::string_vie
     {
         return issue.find(text) != std::string::npos;
     });
+}
+
+std::vector<std::uint8_t> buildExportLicenseFixture()
+{
+    auto bytes = drs::tests::performance_package::buildLicenseTextFixture();
+    bytes.resize(static_cast<std::size_t>(drs::engine::performancePackageV2MaximumRecordBytes)
+                     + 17u,
+                 static_cast<std::uint8_t>('L'));
+    return bytes;
+}
+
+void writeBytes(const fs::path& path, const std::vector<std::uint8_t>& bytes)
+{
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
+    output.close();
+    require(output.good(), "The package lifecycle fixture could not write binary bytes.");
+}
+
+void writePackageV2Variant(
+    const fs::path& sourcePath,
+    const fs::path& outputPath,
+    const std::function<void(std::vector<drs::engine::PackageV2RecordSource>&)>& mutate)
+{
+    const auto opened = drs::engine::openPackageV2(sourcePath.generic_string());
+    require(opened.opened, "The source package-v2 fixture must open before mutation.");
+
+    drs::engine::PackageV2WritePlan plan;
+    plan.packageId = opened.packageId;
+    plan.outputPath = outputPath.generic_string();
+    for (const auto& descriptor : opened.records)
+    {
+        const auto record = drs::engine::openPackageV2Record(opened, descriptor.identity);
+        require(record.opened, "Every source package-v2 record must authenticate before mutation.");
+        plan.records.push_back({ descriptor.identity, record.plaintextBytes });
+    }
+    mutate(plan.records);
+    const auto written = drs::engine::writePackageV2(plan);
+    require(written.written, "The mutated package-v2 integrity fixture must be writable.");
 }
 
 drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPackagePath)
@@ -65,6 +106,8 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     backgroundImage.close();
     require(backgroundImage.good(),
             "The package export fixture must author its background JPEG.");
+    writeBytes(contentRoot / drs::engine::playableInstrumentLicenseFileName,
+               buildExportLicenseFixture());
     request.project.contentRootPath = contentRoot.generic_string();
     require(!request.project.authoring.zones.empty(),
             "The package export fixture must contain a route.");
@@ -294,6 +337,8 @@ int main()
         require(canceled && canceled->identity.generation == accepted.identity.generation
                     && canceled->stage == Stage::canceled,
                 "The current generation must publish one typed canceled export snapshot.");
+        require(!fs::exists(tempRoot / "cancel-me.drpkg"),
+                "Canceled licensed export must not publish an incomplete package.");
 
         const auto metrics = service.getMetrics();
         require(metrics.requestedCount == 1
@@ -346,6 +391,189 @@ int main()
                     && packageV2.metadata.backgroundImage.payload.plaintextBytes
                         == expectedBackgroundBytes,
                 "The package-v2 metadata path must reconstruct the exported background JPEG.");
+        const auto expectedLicenseBytes = buildExportLicenseFixture();
+        require(packageV2.metadata.manifest.license.payloadId
+                    == drs::engine::playableInstrumentLicensePayloadId
+                    && packageV2.metadata.licenseText.loaded
+                    && packageV2.metadata.licenseText.payload.payloadId
+                        == drs::engine::playableInstrumentLicensePayloadId
+                    && packageV2.metadata.licenseText.payload.payloadKind == "licenseText"
+                    && packageV2.metadata.licenseText.payload.logicalPath
+                        == drs::engine::playableInstrumentLicenseLogicalPath
+                    && packageV2.metadata.licenseText.payload.mediaType
+                        == drs::engine::playableInstrumentLicenseMediaType
+                    && packageV2.metadata.licenseText.payload.plaintextBytes
+                        == expectedLicenseBytes,
+                "The package-v2 metadata path must reconstruct byte-identical license text.");
+        const auto licenseRecordCount = std::count_if(
+            packageV2.package->records.begin(), packageV2.package->records.end(), [](const auto& record)
+            {
+                return record.identity.kind == drs::engine::PackageV2RecordKind::licenseText;
+            });
+        require(licenseRecordCount == 2,
+                "License text larger than 64 KiB must be emitted as contiguous bounded records.");
+
+        auto noLicenseRequest = makeRequest(tempRoot / "no-license.drpkg");
+        require(fs::remove(fs::path(noLicenseRequest.project.contentRootPath)
+                               / drs::engine::playableInstrumentLicenseFileName),
+                "The no-license fixture must remove its authored license.");
+        const auto noLicenseExport = executePerformancePackageExport(noLicenseRequest);
+        require(noLicenseExport.exported,
+                "A project without LICENSE.txt must remain export-compatible.");
+        const auto noLicensePackage = drs::engine::loadPerformancePackageV2Metadata(
+            noLicenseRequest.packagePath);
+        require(noLicensePackage.loaded
+                    && noLicensePackage.metadata.manifest.license.payloadId.empty()
+                    && !noLicensePackage.metadata.licenseText.loaded,
+                "A package without a license must reopen without synthesizing license metadata.");
+        require(completed->result->payloadCount
+                    == noLicenseExport.payloadCount + static_cast<std::uint32_t>(licenseRecordCount),
+                "License record accounting must be deterministic and additive.");
+
+        auto invalidLicenseRequest = makeRequest(tempRoot / "invalid-license-export.drpkg");
+        writeBytes(fs::path(invalidLicenseRequest.project.contentRootPath)
+                       / drs::engine::playableInstrumentLicenseFileName,
+                   { 0xc3u, 0x28u });
+        const auto invalidLicenseExport = executePerformancePackageExport(invalidLicenseRequest);
+        require(!invalidLicenseExport.exported
+                    && containsIssue(invalidLicenseExport.issues, "UTF-8")
+                    && !fs::exists(invalidLicenseRequest.packagePath),
+                "Export must reject invalid authored license bytes without publishing a package.");
+
+        const auto missingLicensePath = tempRoot / "missing-declared-license.drpkg";
+        writePackageV2Variant(tempRoot / "completed.drpkg", missingLicensePath,
+                              [](auto& records)
+                              {
+                                  records.erase(
+                                      std::remove_if(records.begin(), records.end(), [](const auto& record)
+                                      {
+                                          return record.identity.kind
+                                              == drs::engine::PackageV2RecordKind::licenseText;
+                                      }),
+                                      records.end());
+                              });
+        const auto missingLicensePackage = drs::engine::loadPerformancePackageV2Metadata(
+            missingLicensePath.generic_string());
+        require(!missingLicensePackage.loaded
+                    && containsIssue(missingLicensePackage.issues, "license"),
+                "A declared missing package-v2 license must fail closed.");
+
+        const auto wrongKindLicensePath = tempRoot / "wrong-kind-license.drpkg";
+        writePackageV2Variant(tempRoot / "completed.drpkg", wrongKindLicensePath,
+                              [](auto& records)
+                              {
+                                  for (auto& record : records)
+                                      if (record.identity.kind
+                                          == drs::engine::PackageV2RecordKind::licenseText)
+                                          record.identity.kind
+                                              = drs::engine::PackageV2RecordKind::backgroundImage;
+                              });
+        const auto wrongKindLicensePackage = drs::engine::loadPerformancePackageV2Metadata(
+            wrongKindLicensePath.generic_string());
+        require(!wrongKindLicensePackage.loaded
+                    && containsIssue(wrongKindLicensePackage.issues, "license"),
+                "A declared package-v2 license with the wrong record kind must fail closed.");
+
+        const auto invalidUtf8LicensePath = tempRoot / "invalid-utf8-license.drpkg";
+        writePackageV2Variant(tempRoot / "completed.drpkg", invalidUtf8LicensePath,
+                              [](auto& records)
+                              {
+                                  auto firstLicense = true;
+                                  records.erase(
+                                      std::remove_if(records.begin(), records.end(), [&](auto& record)
+                                      {
+                                          if (record.identity.kind
+                                              != drs::engine::PackageV2RecordKind::licenseText)
+                                              return false;
+                                          if (firstLicense)
+                                          {
+                                              record.identity.pageIndex = 0;
+                                              record.plaintextBytes = { 0xc3u, 0x28u };
+                                              firstLicense = false;
+                                              return false;
+                                          }
+                                          return true;
+                                      }),
+                                      records.end());
+                              });
+        const auto invalidUtf8LicensePackage = drs::engine::loadPerformancePackageV2Metadata(
+            invalidUtf8LicensePath.generic_string());
+        require(!invalidUtf8LicensePackage.loaded
+                    && containsIssue(invalidUtf8LicensePackage.issues, "UTF-8"),
+                "Authenticated package-v2 license bytes must still pass UTF-8 validation.");
+
+        const auto oversizedLicensePath = tempRoot / "oversized-license.drpkg";
+        writePackageV2Variant(tempRoot / "completed.drpkg", oversizedLicensePath,
+                              [](auto& records)
+                              {
+                                  records.erase(
+                                      std::remove_if(records.begin(), records.end(), [](const auto& record)
+                                      {
+                                          return record.identity.kind
+                                              == drs::engine::PackageV2RecordKind::licenseText;
+                                      }),
+                                      records.end());
+                                  auto remaining = drs::engine::maximumPlayableInstrumentLicenseBytes + 1u;
+                                  std::uint64_t pageIndex = 0;
+                                  while (remaining > 0)
+                                  {
+                                      const auto chunkBytes = std::min(
+                                          remaining,
+                                          drs::engine::performancePackageV2MaximumRecordBytes);
+                                      drs::engine::PackageV2RecordSource record;
+                                      record.identity = {
+                                          drs::engine::playableInstrumentLicensePayloadId,
+                                          drs::engine::PackageV2RecordKind::licenseText,
+                                          pageIndex++, 1
+                                      };
+                                      record.plaintextBytes.assign(
+                                          static_cast<std::size_t>(chunkBytes),
+                                          static_cast<std::uint8_t>('x'));
+                                      records.push_back(std::move(record));
+                                      remaining -= chunkBytes;
+                                  }
+                              });
+        const auto oversizedLicensePackage = drs::engine::loadPerformancePackageV2Metadata(
+            oversizedLicensePath.generic_string());
+        require(!oversizedLicensePackage.loaded
+                    && containsIssue(oversizedLicensePackage.issues, "size limit"),
+                "A declared package-v2 license larger than 1 MiB must fail before activation.");
+
+        const auto tamperedLicensePath = tempRoot / "tampered-license.drpkg";
+        require(fs::copy_file(tempRoot / "completed.drpkg", tamperedLicensePath,
+                              fs::copy_options::overwrite_existing),
+                "The license authentication fixture must copy the valid package.");
+        const auto firstLicenseRecord = std::find_if(
+            packageV2.package->records.begin(), packageV2.package->records.end(), [](const auto& record)
+            {
+                return record.identity.kind == drs::engine::PackageV2RecordKind::licenseText;
+            });
+        require(firstLicenseRecord != packageV2.package->records.end(),
+                "The tamper fixture requires a license record.");
+        {
+            std::fstream file(tamperedLicensePath,
+                              std::ios::binary | std::ios::in | std::ios::out);
+            const auto tamperOffset = firstLicenseRecord->sealedOffsetBytes + 16u;
+            file.seekg(static_cast<std::streamoff>(tamperOffset));
+            char value = 0;
+            file.read(&value, 1);
+            value ^= 0x01;
+            file.seekp(static_cast<std::streamoff>(tamperOffset));
+            file.write(&value, 1);
+            require(file.good(), "The license authentication fixture must alter one sealed byte.");
+        }
+        const auto tamperedLicensePackage = drs::engine::loadPerformancePackageV2Metadata(
+            tamperedLicensePath.generic_string());
+        if (tamperedLicensePackage.loaded
+            || !containsIssue(tamperedLicensePackage.issues, "authentication"))
+        {
+            for (const auto& issue : tamperedLicensePackage.issues)
+                std::cerr << "Tampered license issue: " << issue << std::endl;
+        }
+        require(!tamperedLicensePackage.loaded
+                    && containsIssue(tamperedLicensePackage.issues, "authentication"),
+                "Tampered sealed license bytes must fail authentication.");
+
         auto preparedActivation = drs::engine::preparePerformancePackageV2Activation(
             packageV2.metadata, packageV2.package, packageV2.sampleDescriptors);
         require(preparedActivation.prepared
