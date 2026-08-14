@@ -613,6 +613,12 @@ int main()
             std::move(preparedActivation));
         require(activated.activated,
                 "The reconstructed semantic package must activate through the production engine facade.");
+        const auto activeLicenseText = facade.getPerformancePackageLicenseText();
+        const std::string expectedDisplayLicense(expectedLicenseBytes.begin() + 3,
+                                                 expectedLicenseBytes.end());
+        require(activeLicenseText != nullptr
+                    && *activeLicenseText == expectedDisplayLicense,
+                "Prepared package activation must retain immutable display text without a UTF-8 BOM.");
         const auto performanceSnapshot = facade.getPerformanceSnapshot();
         require(performanceSnapshot.backgroundArtworkSourceKey == "package://background-image"
                     && performanceSnapshot.backgroundArtworkJpgBytes != nullptr
@@ -761,8 +767,11 @@ int main()
                 "Package activation must compile the restored structured macro target binding.");
         const auto activeGraphPayload = facade.getPerformancePackageActivationPayload();
         const auto activeGraphModel = facade.getPerformancePackageRenderModel();
-        require(activeGraphPayload != nullptr && activeGraphModel != nullptr,
-                "Successful graph activation must publish both immutable package artifacts.");
+        const auto activeGraphLicense = facade.getPerformancePackageLicenseText();
+        require(activeGraphPayload != nullptr && activeGraphModel != nullptr
+                    && activeGraphLicense != nullptr
+                    && *activeGraphLicense == expectedDisplayLicense,
+                "Successful graph activation must publish package artifacts and license ownership.");
 
         auto malformedMetadata = graphPackage.metadata;
         malformedMetadata.instrument.instrument.routingBuses.front().fxSlotIds.push_back(
@@ -776,8 +785,21 @@ int main()
             std::move(malformedActivation));
         require(!rejectedReplacement.activated
                     && facade.getPerformancePackageActivationPayload() == activeGraphPayload
-                    && facade.getPerformancePackageRenderModel() == activeGraphModel,
-                "A malformed replacement package must preserve the currently active package generation.");
+                    && facade.getPerformancePackageRenderModel() == activeGraphModel
+                    && facade.getPerformancePackageLicenseText() == activeGraphLicense,
+                "A malformed replacement package must preserve the active generation and license.");
+
+        auto noLicenseActivation = drs::engine::preparePerformancePackageV2Activation(
+            noLicensePackage.metadata, noLicensePackage.package,
+            noLicensePackage.sampleDescriptors);
+        require(noLicenseActivation.prepared
+                    && facade.activatePreparedPerformancePackageSession(
+                        std::move(noLicenseActivation)).activated
+                    && facade.getPerformancePackageLicenseText() == nullptr,
+                "A successful package replacement without a license must clear prior license ownership.");
+        facade.restoreBundledReferenceRuntimeSession();
+        require(facade.getPerformancePackageLicenseText() == nullptr,
+                "Closing the prepared package session must leave no retained license text.");
 
         PerformancePackageExportService flacService;
         auto flacClient = flacService.openClient();

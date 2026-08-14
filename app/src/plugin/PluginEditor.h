@@ -39,6 +39,7 @@ private:
         importSfzCommandId,
         importBackgroundImageCommandId,
         importLicenseFileCommandId,
+        viewLicenseCommandId,
         preferencesCommandId
     };
 
@@ -57,6 +58,7 @@ private:
     void importSfzFile();
     void importBackgroundImage();
     void importLicenseFile();
+    void viewLicense();
     void importSampleFiles(std::vector<juce::File> selectedFiles);
     void reviewSfzImportFile(const juce::File& selectedFile);
     void showPreferencesDialog();

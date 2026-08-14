@@ -59,6 +59,11 @@ int main()
                     == "Import License File..."
                     && std::string(drs::app::viewLicenseMenuLabel) == "View License",
                 "The authoring and Performance File-menu labels changed.");
+        require(drs::app::shouldShowViewLicenseMenuItem(true, true)
+                    && !drs::app::shouldShowViewLicenseMenuItem(true, false)
+                    && !drs::app::shouldShowViewLicenseMenuItem(false, true)
+                    && !drs::app::shouldShowViewLicenseMenuItem(false, false),
+                "View License must appear only for an active package with authenticated text.");
 
         static_assert(std::is_default_constructible_v<drs::app::ProjectLicenseFileImportResult>,
                       "The shared project license import result must be default constructible.");

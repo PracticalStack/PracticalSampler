@@ -18,6 +18,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformancePackageExportService.h
     src/shared/PerformancePackageProjection.cpp
     src/shared/PerformancePackageProjection.h
+    src/shared/PlayableInstrumentLicenseViewer.cpp
+    src/shared/PlayableInstrumentLicenseViewer.h
     src/shared/ProjectSourceValidationService.cpp
     src/shared/ProjectSourceValidationService.h
     src/shared/ProjectStorage.cpp

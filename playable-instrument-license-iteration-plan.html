@@ -339,6 +339,7 @@
           <div class="slice-id">LI-04</div>
           <div>
             <h3>Activation ownership and View License UX</h3>
+            <div class="callout green"><strong>Status: complete (14 Aug 2026).</strong> Both activation paths retain authenticated immutable text transactionally, both Performance menus use the same license-availability policy, and the shared viewer implements accessibility, selection, scrolling, Escape/Close behavior, and compact sizing.</div>
             <ul>
               <li>Hydrate package-owned immutable license text in <code>EngineFacade</code> only after preparation succeeds.</li>
               <li>Clear it on package close, bundled-runtime restore, and successful replacement by a package without a license.</li>
@@ -415,13 +416,13 @@
           <li>Package replacement, close, restore, cancellation, and failure paths cannot leak stale license text.</li>
           <li>Focused tests, package matrix, UI/smoke/responsiveness tests, realtime checks, release gate, and production VST3 build all pass.</li>
         </ol>
-        <div class="callout amber">
-          <strong>Delivery order is intentional:</strong> LI-01 through LI-03 are complete. LI-04 may take ownership only from authenticated reader results; viewer and activation ownership remain intentionally absent.
+        <div class="callout green">
+          <strong>Iteration complete:</strong> LI-01 through LI-04 are delivered. Package activation takes ownership only from authenticated reader results, and failed replacement preserves the complete active package generation including its license.
         </div>
       </section>
 
       <footer>
-        Prepared for the next Decent Rhapsody Studio iteration. Status: LI-01 through LI-03 complete; LI-04 production implementation not started.
+        Prepared and delivered for Decent Rhapsody Studio. Status: LI-01 through LI-04 complete on 14 August 2026.
       </footer>
     </main>
   </div>

@@ -3682,6 +3682,7 @@ target_sources(drs_phase1_performance_package_tests
 target_link_libraries(drs_phase1_performance_package_tests
     PRIVATE
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
     PUBLIC
@@ -3983,6 +3984,35 @@ add_test(
 )
 
 set_target_properties(drs_playable_instrument_license_project_import_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+juce_add_console_app(drs_playable_instrument_license_viewer_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Playable Instrument License Viewer Tests"
+)
+
+target_sources(drs_playable_instrument_license_viewer_tests
+    PRIVATE
+        src/PlayableInstrumentLicenseViewerTests.cpp
+)
+
+target_link_libraries(drs_playable_instrument_license_viewer_tests
+    PRIVATE
+        drs_app_shared
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_playable_instrument_license_viewer_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.playable_instrument_license.viewer
+    COMMAND drs_playable_instrument_license_viewer_tests
+)
+
+set_target_properties(drs_playable_instrument_license_viewer_tests PROPERTIES
     FOLDER "Tests"
 )
 
@@ -4511,6 +4541,7 @@ add_dependencies(drs_all_tests
     drs_phase1_performance_package_host_validation_tests
     drs_playable_instrument_license_contract_tests
     drs_playable_instrument_license_project_import_tests
+    drs_playable_instrument_license_viewer_tests
     drs_phase1_performance_package_release_gate
 )
 

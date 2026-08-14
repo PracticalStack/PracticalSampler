@@ -431,6 +431,10 @@ public:
     {
         return packagePerformanceRenderModel;
     }
+    std::shared_ptr<const std::string> getPerformancePackageLicenseText() const
+    {
+        return packageLicenseText;
+    }
     PerformancePublishActivationPayloadPtr authorizePerformanceActivation(
         std::uint64_t nowMicros = 0);
     bool rejectPerformanceActivationStaging(
@@ -560,6 +564,7 @@ private:
     ImmutablePublishedMacroBindingTablePtr packagePublishedMacroBindings;
     std::string packageBackgroundArtworkPayloadId;
     std::shared_ptr<const std::vector<std::uint8_t>> packageBackgroundArtworkJpgBytes;
+    std::shared_ptr<const std::string> packageLicenseText;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;

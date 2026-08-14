@@ -2,6 +2,7 @@
 
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
+#include "shared/PlayableInstrumentLicenseViewer.h"
 #include "shared/ProjectStorage.h"
 #include "shared/MessageThreadMetrics.h"
 #include "shared/SfzImportWorkflow.h"
@@ -689,6 +690,13 @@ void Editor::showFileMenu()
     menu.addItem(openPerformancePackageCommandId, drs::app::openPerformancePackageMenuLabel);
     menu.addItem(closeProjectCommandId, packageSession ? drs::app::closePackageMenuLabel
                                                        : drs::app::closeWorkspaceMenuLabel);
+    if (drs::app::shouldShowViewLicenseMenuItem(
+            packageSession,
+            processor.getEngineFacade().getPerformancePackageLicenseText() != nullptr))
+    {
+        menu.addSeparator();
+        menu.addItem(viewLicenseCommandId, drs::app::viewLicenseMenuLabel);
+    }
     if (authoringAvailable)
     {
         menu.addSeparator();
@@ -764,6 +772,9 @@ void Editor::handleMenuCommand(int menuItemId)
             break;
         case importLicenseFileCommandId:
             importLicenseFile();
+            break;
+        case viewLicenseCommandId:
+            viewLicense();
             break;
         case preferencesCommandId:
             showPreferencesDialog();
@@ -1162,6 +1173,19 @@ void Editor::importLicenseFile()
 
         performImport();
     });
+}
+
+void Editor::viewLicense()
+{
+    if (processor.getWorkspaceDocumentState().kind
+        != drs::engine::WorkspaceDocumentKind::performancePackage)
+    {
+        return;
+    }
+
+    const auto licenseText = processor.getEngineFacade().getPerformancePackageLicenseText();
+    if (licenseText != nullptr)
+        drs::app::showPlayableInstrumentLicenseViewerDialog(this, licenseText);
 }
 
 void Editor::importSampleFiles(std::vector<juce::File> selectedFiles)

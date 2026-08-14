@@ -37,6 +37,28 @@ namespace drs::engine
 {
 namespace
 {
+std::shared_ptr<const std::string> buildPackageLicenseText(
+    const PerformancePackagePayloadLoadResult& licenseLoad)
+{
+    if (!licenseLoad.loaded)
+        return {};
+
+    const auto& licenseText = licenseLoad.payload;
+    const auto& bytes = licenseText.plaintextBytes;
+    auto offset = std::size_t { 0 };
+    if (bytes.size() >= 3
+        && bytes[0] == 0xefu && bytes[1] == 0xbbu && bytes[2] == 0xbfu)
+    {
+        offset = 3;
+    }
+
+    if (offset == bytes.size())
+        return std::make_shared<const std::string>();
+
+    return std::make_shared<const std::string>(
+        reinterpret_cast<const char*>(bytes.data() + offset), bytes.size() - offset);
+}
+
 using Clock = std::chrono::steady_clock;
 namespace fs = std::filesystem;
 using ordered_json = nlohmann::ordered_json;
@@ -1655,6 +1677,8 @@ EnginePerformancePackageActivationResult EngineFacade::openPerformancePackageSes
         return result;
     }
 
+    const auto nextPackageLicenseText = buildPackageLicenseText(packageLoad.licenseText);
+
     clearPendingPreparedCompletions();
     ++performancePublishProjectGeneration;
     performancePublishController.reset(true, true);
@@ -1666,6 +1690,7 @@ EnginePerformancePackageActivationResult EngineFacade::openPerformancePackageSes
     packagePublishedMacroBindings.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
+    packageLicenseText = nextPackageLicenseText;
     referenceManifest = packageLoad.instrument;
     referenceStream = packageLoad.stream;
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
@@ -1802,6 +1827,8 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
             : macroBindingResult.findings.front().message);
         return result;
     }
+    const auto nextPackageLicenseText = buildPackageLicenseText(
+        preparedActivation.packageLoad.licenseText);
     if (nextActivationPayload->prepared != nullptr)
         for (const auto& sample : nextActivationPayload->prepared->samples)
             preparedPlaybackService.registerPageServiceSource(sample.dataSource);
@@ -1818,6 +1845,7 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
     packagePublishedMacroBindings = macroBindingResult.table;
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
+    packageLicenseText = nextPackageLicenseText;
     referenceManifest = std::move(packageLoad.instrument);
     referenceStream = std::move(packageLoad.stream);
     referenceInstrumentActive = true;
@@ -1857,6 +1885,7 @@ void EngineFacade::restoreBundledReferenceRuntimeSession()
     packagePublishedMacroBindings.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
+    packageLicenseText.reset();
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
 
     if (referenceManifest.loaded)
@@ -3090,6 +3119,7 @@ bool EngineFacade::replaceDraftPlaybackAuthoringProject(RuntimeProjectModel proj
     authoringProjectPublication = std::make_shared<const RuntimeProjectModel>(authoringProject.project);
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
+    packageLicenseText.reset();
     currentSessionState.selectedArticulationId = resolveAuthoredArticulationSelection(
         authoringProject.project,
         currentSessionState.selectedArticulationId);
@@ -4096,6 +4126,7 @@ void EngineFacade::resetSessionStateToDefault()
     packagePublishedMacroBindings.reset();
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
+    packageLicenseText.reset();
     preparedPlaybackService.setBackgroundWorkerStream(referenceStream);
 
     if (!referenceManifest.loaded)

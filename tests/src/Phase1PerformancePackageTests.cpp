@@ -1,3 +1,4 @@
+#include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageCrypto.h"
 #include "drs/engine/PackageReader.h"
 #include "drs/engine/PackageV2StreamingExport.h"
@@ -347,6 +348,22 @@ int main()
                     && generatedLoad.licenseText.payload.plaintextBytes
                         == package_support::buildLicenseTextFixture(),
                 "The conventional package reader must return byte-identical authenticated license text.");
+
+        drs::engine::EngineFacade conventionalFacade;
+        const auto conventionalActivation
+            = conventionalFacade.activatePerformancePackageSession(generatedLoad);
+        const auto conventionalLicenseText
+            = conventionalFacade.getPerformancePackageLicenseText();
+        const auto expectedLicenseBytes = package_support::buildLicenseTextFixture();
+        const std::string expectedLicenseText(expectedLicenseBytes.begin() + 3,
+                                              expectedLicenseBytes.end());
+        require(conventionalActivation.activated
+                    && conventionalLicenseText != nullptr
+                    && *conventionalLicenseText == expectedLicenseText,
+                "Conventional package activation must retain immutable display text without a UTF-8 BOM.");
+        conventionalFacade.restoreBundledReferenceRuntimeSession();
+        require(conventionalFacade.getPerformancePackageLicenseText() == nullptr,
+                "Closing a conventional package must clear its retained license text.");
 
         const auto generatedLicensePayloadIterator = std::find_if(
             generatedInspection.payloads.begin(), generatedInspection.payloads.end(), [](const auto& payload)

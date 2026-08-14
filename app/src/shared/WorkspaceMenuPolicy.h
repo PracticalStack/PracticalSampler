@@ -15,6 +15,11 @@ inline constexpr const char* importSfzMenuLabel = "Import SFZ...";
 inline constexpr const char* importBackgroundImageMenuLabel = "Import Background Image...";
 inline constexpr const char* importLicenseFileMenuLabel = "Import License File...";
 inline constexpr const char* viewLicenseMenuLabel = "View License";
+inline constexpr bool shouldShowViewLicenseMenuItem(bool packageSession,
+                                                    bool packageHasLicense) noexcept
+{
+    return packageSession && packageHasLicense;
+}
 inline constexpr const char* projectDirectoryHelpText
     = "Open/Save Project edits .drsproj files; Export Playable Instrument creates a separate read-only .drpkg package.";
 } // namespace drs::app
