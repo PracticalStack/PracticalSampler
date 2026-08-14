@@ -3725,16 +3725,16 @@ set_target_properties(drs_packaged_instrument_fx_routing_contract_tests PROPERTI
     FOLDER "Tests"
 )
 
-juce_add_console_app(drs_px01_fx_routing_contract_red_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Packaged Instrument FX Routing Expected Red Tests"
+juce_add_console_app(drs_packaged_instrument_fx_routing_activation_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Packaged Instrument FX Routing Activation Tests"
 )
 
-target_sources(drs_px01_fx_routing_contract_red_tests
+target_sources(drs_packaged_instrument_fx_routing_activation_tests
     PRIVATE
         src/PackagedInstrumentFxRoutingContractRedTests.cpp
 )
 
-target_link_libraries(drs_px01_fx_routing_contract_red_tests
+target_link_libraries(drs_packaged_instrument_fx_routing_activation_tests
     PRIVATE
         drs_engine_adapter
         drs_sampler_core
@@ -3746,22 +3746,25 @@ target_link_libraries(drs_px01_fx_routing_contract_red_tests
         juce::juce_recommended_warning_flags
 )
 
-target_compile_features(drs_px01_fx_routing_contract_red_tests PRIVATE cxx_std_17)
+target_compile_features(drs_packaged_instrument_fx_routing_activation_tests PRIVATE cxx_std_17)
 
-target_compile_definitions(drs_px01_fx_routing_contract_red_tests
+target_compile_definitions(drs_packaged_instrument_fx_routing_activation_tests
     PRIVATE
         DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/packaged-instrument-fx-routing"
 )
 
-target_include_directories(drs_px01_fx_routing_contract_red_tests
+target_include_directories(drs_packaged_instrument_fx_routing_activation_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
         ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
-# PX-01 expected-red seams are invoked directly by name. They are deliberately
-# excluded from CTest and drs_all_tests until their production slices land.
-set_target_properties(drs_px01_fx_routing_contract_red_tests PROPERTIES
+add_test(
+    NAME drs.packaged_instrument_fx_routing.activation
+    COMMAND drs_packaged_instrument_fx_routing_activation_tests
+)
+
+set_target_properties(drs_packaged_instrument_fx_routing_activation_tests PROPERTIES
     FOLDER "Tests"
 )
 

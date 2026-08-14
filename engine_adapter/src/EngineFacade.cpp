@@ -1138,6 +1138,20 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
     const auto& instrument = packageLoad.instrument.instrument;
     const auto& stream = packageLoad.stream.container;
 
+    const auto instrumentValidation = validateRuntimeInstrumentModel(instrument);
+    if (!instrumentValidation.valid)
+    {
+        for (const auto& issue : instrumentValidation.issues)
+        {
+            addSnapshotFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               "package-runtime-instrument-invalid",
+                               "instrument",
+                               issue);
+        }
+        return result;
+    }
+
     result.snapshot.schemaName = "drs.playbackSnapshot";
     result.snapshot.schemaVersion = 1;
     result.snapshot.projectId = manifest.packageId;
@@ -1196,6 +1210,43 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         });
     }
 
+    result.snapshot.fxSlots.reserve(instrument.fxSlots.size());
+    for (const auto& fxSlot : instrument.fxSlots)
+    {
+        PlaybackSnapshotFxSlotReference snapshotSlot;
+        snapshotSlot.id = fxSlot.id;
+        snapshotSlot.displayName = fxSlot.displayName;
+        snapshotSlot.effectType = fxSlot.effectType;
+        snapshotSlot.bypassed = fxSlot.bypassed;
+        snapshotSlot.effectVersion = fxSlot.effectVersion;
+        snapshotSlot.unavailable = fxSlot.unavailable;
+        snapshotSlot.legacyInert = fxSlot.legacyInert;
+        if (const auto* catalogEffect = findCuratedDspEffect(fxSlot.effectType,
+                                                             fxSlot.effectVersion))
+        {
+            snapshotSlot.catalogResolved = true;
+            snapshotSlot.supportedScopes = catalogEffect->supportedScopes;
+            snapshotSlot.stateClass = catalogEffect->stateClass;
+            snapshotSlot.cost = catalogEffect->cost;
+        }
+        snapshotSlot.parameters.reserve(fxSlot.parameters.size());
+        for (const auto& parameter : fxSlot.parameters)
+            snapshotSlot.parameters.push_back({ parameter.id, parameter.value });
+        result.snapshot.fxSlots.push_back(std::move(snapshotSlot));
+    }
+
+    result.snapshot.routingBuses.reserve(instrument.routingBuses.size());
+    for (const auto& routingBus : instrument.routingBuses)
+    {
+        result.snapshot.routingBuses.push_back({
+            routingBus.id,
+            routingBus.displayName,
+            routingBus.inputSourceId,
+            routingBus.fxSlotIds,
+            routingBus.chainBypassed
+        });
+    }
+
     std::unordered_map<std::string, double> manifestGroupGainById;
     manifestGroupGainById.reserve(manifest.groupRoutes.size());
     for (const auto& route : manifest.groupRoutes)
@@ -1209,12 +1260,12 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         route.groupId = group.id;
         route.displayName = group.name;
         route.articulationIds = group.articulationIds;
-        route.routingSourceId = "master";
+        route.routingSourceId = "groups/" + group.id;
         route.workspaceVisible = true;
         route.gainDb = manifestGroupGainById.count(group.id) != 0
             ? manifestGroupGainById.at(group.id)
             : group.gainDb;
-        route.routingBusId = "master";
+        route.routingBusId = group.routingBusId.empty() ? "master" : group.routingBusId;
         groupRouteIndices.emplace(group.id, result.snapshot.groupRoutes.size());
         result.snapshot.groupRoutes.push_back(std::move(route));
     }
@@ -1351,16 +1402,32 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
                            "A playable package requires at least one runtime zone.");
     }
 
-    const auto hasErrors = std::any_of(result.findings.begin(),
-                                       result.findings.end(),
-                                       [](const auto& finding)
-                                       {
-                                           return finding.severity
-                                               == PlaybackSnapshotFindingSeverity::error;
-                                       });
+    auto hasErrors = std::any_of(result.findings.begin(),
+                                 result.findings.end(),
+                                 [](const auto& finding)
+                                 {
+                                     return finding.severity
+                                         == PlaybackSnapshotFindingSeverity::error;
+                                 });
     if (!hasErrors)
     {
         result.snapshot.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(result.snapshot);
+        const auto graphPlan = compileDspGraphPlan(result.snapshot);
+        if (!graphPlan.compiled)
+        {
+            for (const auto& finding : graphPlan.findings)
+            {
+                addSnapshotFinding(result,
+                                   PlaybackSnapshotFindingSeverity::error,
+                                   "package-dsp-graph-" + finding.code,
+                                   finding.path,
+                                   finding.message);
+            }
+            hasErrors = true;
+        }
+    }
+    if (!hasErrors)
+    {
         result.snapshot.contentDigest = "fnv1a64:"
             + computeFnv1a64Digest(serializeImmutablePlaybackSnapshot(result.snapshot));
         result.built = true;
@@ -1561,6 +1628,24 @@ EnginePerformancePackageActivationResult EngineFacade::openPerformancePackageSes
     if (!packageLoad.loaded)
         return result;
 
+    const auto snapshotResult = buildPerformancePackagePlaybackSnapshot(packageLoad);
+    if (!snapshotResult.built || !snapshotResult.activationEligible)
+    {
+        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+        result.state = snapshotResult.state.empty()
+            ? std::string("Performance package open failed")
+            : snapshotResult.state;
+        result.issues = snapshotResult.findings.empty()
+            ? std::vector<std::string> { "The performance package snapshot could not be activated." }
+            : std::vector<std::string> {};
+        for (const auto& finding : snapshotResult.findings)
+        {
+            if (finding.severity == PlaybackSnapshotFindingSeverity::error)
+                result.issues.push_back(finding.message);
+        }
+        return result;
+    }
+
     clearPendingPreparedCompletions();
     ++performancePublishProjectGeneration;
     performancePublishController.reset(true, true);
@@ -1583,29 +1668,6 @@ EnginePerformancePackageActivationResult EngineFacade::openPerformancePackageSes
         packageBackgroundArtworkPayloadId = packageLoad.backgroundImage.payload.payloadId;
         packageBackgroundArtworkJpgBytes = std::make_shared<const std::vector<std::uint8_t>>(
             packageLoad.backgroundImage.payload.plaintextBytes);
-    }
-
-    const auto snapshotResult = buildPerformancePackagePlaybackSnapshot(packageLoad);
-    if (!snapshotResult.built || !snapshotResult.activationEligible)
-    {
-        currentSessionState.transientMetrics.integrationState = "Performance package open failed";
-        currentSessionState.transientMetrics.lastFailure =
-            summarizeSnapshotFindings(snapshotResult.findings);
-        refreshDiagnosticsSnapshot();
-        markStateChanged();
-        result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
-        result.state = snapshotResult.state.empty()
-            ? std::string("Performance package open failed")
-            : snapshotResult.state;
-        result.issues = snapshotResult.findings.empty()
-            ? std::vector<std::string> { "The performance package snapshot could not be activated." }
-            : std::vector<std::string> {};
-        for (const auto& finding : snapshotResult.findings)
-        {
-            if (finding.severity == PlaybackSnapshotFindingSeverity::error)
-                result.issues.push_back(finding.message);
-        }
-        return result;
     }
 
     const auto canQueuePreparedBuild = packageLoad.stream.container.payloadEmbedded;
@@ -1654,26 +1716,24 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
     if (!preparedActivation.prepared)
         return result;
 
-    packagePerformanceActivationPayload = preparedActivation.activationPayload;
-    packagePerformanceRenderModel = preparedActivation.renderModel;
-    if (packagePerformanceActivationPayload == nullptr)
+    const auto nextActivationPayload = preparedActivation.activationPayload;
+    const auto nextRenderModel = preparedActivation.renderModel;
+    if (nextActivationPayload == nullptr)
     {
         result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
         result.state = "Performance package activation failed";
         result.issues.push_back("The performance package activation payload could not be constructed.");
         return result;
     }
-    if (packagePerformanceRenderModel == nullptr)
+    if (nextRenderModel == nullptr)
     {
         result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
         result.state = "Performance package activation failed";
         result.issues.push_back("The prepared performance package render model is unavailable.");
-        packagePerformanceActivationPayload.reset();
-        packagePerformanceRenderModel.reset();
         return result;
     }
-    if (packagePerformanceActivationPayload->prepared != nullptr)
-        for (const auto& sample : packagePerformanceActivationPayload->prepared->samples)
+    if (nextActivationPayload->prepared != nullptr)
+        for (const auto& sample : nextActivationPayload->prepared->samples)
             preparedPlaybackService.registerPageServiceSource(sample.dataSource);
 
     auto& packageLoad = preparedActivation.packageLoad;
@@ -1683,6 +1743,8 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
     draftPlaybackContract.closeProject();
     authoringProject = {};
     authoringProjectPublication.reset();
+    packagePerformanceActivationPayload = nextActivationPayload;
+    packagePerformanceRenderModel = nextRenderModel;
     packageBackgroundArtworkPayloadId.clear();
     packageBackgroundArtworkJpgBytes.reset();
     referenceManifest = std::move(packageLoad.instrument);

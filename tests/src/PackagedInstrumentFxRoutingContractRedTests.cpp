@@ -1,26 +1,21 @@
 #include "Phase1PerformancePackageSupport.h"
+#include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReader.h"
 
 #include <json/json.hpp>
 
 #include <algorithm>
-#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <string>
-#include <string_view>
 
 namespace
 {
 namespace fs = std::filesystem;
 using json = nlohmann::json;
-
-constexpr std::array<std::string_view, 1> redSeams {
-    "package-open-authored-graph"
-};
 
 std::string readText(const fs::path& path)
 {
@@ -43,7 +38,7 @@ int checkPackageOpenAuthoredGraph()
     fs::remove_all(tempRoot, cleanupError);
     fs::create_directories(tempRoot);
 
-    const auto outputPath = tempRoot / "graph-bearing-v3-characterization.drpkg";
+    const auto outputPath = tempRoot / "graph-bearing-v4-package.drpkg";
     const auto compileWritePlan = drs::tests::performance_package::buildPackagePlan(
         tempRoot / "compiled", outputPath);
     auto writePlan = drs::engine::buildPerformancePackageWritePlan(compileWritePlan);
@@ -66,9 +61,7 @@ int checkPackageOpenAuthoredGraph()
         fs::path(DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT)
             / "runtime-instrument-v4-ordered-graph.json"));
 
-    // Characterize today's additive-field loss through a schema version the
-    // current reader accepts, so the check reaches snapshot reconstruction.
-    runtimeJson["schemaVersion"] = 3;
+    runtimeJson["schemaVersion"] = drs::engine::runtimeInstrumentFxRoutingSchemaVersion;
     runtimeJson["fxSlots"] = graphFixture.at("fxSlots");
     auto buses = graphFixture.at("routingBuses");
     buses.at(0)["id"] = "bus-zone-pad-a3";
@@ -85,6 +78,28 @@ int checkPackageOpenAuthoredGraph()
     runtimePayload->plaintextBytes = drs::tests::performance_package::toBytes(
         runtimeJson.dump(2) + "\n");
 
+    writePlan.manifest.schemaVersion = drs::engine::performancePackageFxRoutingSchemaVersion;
+    writePlan.manifest.minimumReaderSchemaVersion
+        = drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion;
+    const auto manifestPayload = std::find_if(
+        writePlan.payloads.begin(), writePlan.payloads.end(), [](const auto& payload)
+        {
+            return payload.kind == drs::engine::PerformancePackagePayloadKind::packageManifest;
+        });
+    if (manifestPayload == writePlan.payloads.end())
+    {
+        std::cerr << "PX-04 setup error: package plan did not contain a package manifest payload.\n";
+        fs::remove_all(tempRoot, cleanupError);
+        return 2;
+    }
+    auto manifestJson = json::parse(std::string(manifestPayload->plaintextBytes.begin(),
+                                                manifestPayload->plaintextBytes.end()));
+    manifestJson["schemaVersion"] = drs::engine::performancePackageFxRoutingSchemaVersion;
+    manifestJson["minimumReaderSchemaVersion"]
+        = drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion;
+    manifestPayload->plaintextBytes = drs::tests::performance_package::toBytes(
+        manifestJson.dump(2) + "\n");
+
     const auto writeResult = drs::engine::writePerformancePackage(writePlan);
     if (!writeResult.written)
     {
@@ -94,7 +109,10 @@ int checkPackageOpenAuthoredGraph()
         return 2;
     }
 
-    const auto packageLoad = drs::engine::loadPerformancePackage(outputPath.generic_string());
+    const auto packageLoad = drs::engine::loadPerformancePackage(
+        outputPath.generic_string(),
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion);
     if (!packageLoad.loaded)
     {
         std::cerr << "PX-01 setup error: graph-bearing characterization package did not load.\n";
@@ -104,40 +122,48 @@ int checkPackageOpenAuthoredGraph()
     }
 
     const auto prepared = drs::engine::preparePerformancePackageActivation(packageLoad);
-    const auto& snapshot = prepared.snapshotResult.snapshot;
-    const auto masterOnly = prepared.prepared
-        && snapshot.fxSlots.empty()
-        && snapshot.routingBuses.empty()
-        && std::all_of(snapshot.groupRoutes.begin(), snapshot.groupRoutes.end(), [](const auto& route)
-        {
-            return route.routingSourceId == "master" && route.routingBusId == "master";
-        });
-    fs::remove_all(tempRoot, cleanupError);
-
-    if (masterOnly)
+    if (!prepared.prepared || prepared.activationPayload == nullptr
+        || prepared.activationPayload->snapshot == nullptr)
     {
-        std::cerr << "EXPECTED RED: package open accepted additive graph fields but reconstructed an empty, master-only snapshot.\n";
+        std::cerr << "PX-04 failure: graph-bearing package did not prepare for activation.\n";
+        printIssues(prepared.issues);
+        fs::remove_all(tempRoot, cleanupError);
         return 1;
     }
 
+    const auto& snapshot = *prepared.activationPayload->snapshot;
+    const auto padRoute = std::find_if(
+        snapshot.groupRoutes.begin(), snapshot.groupRoutes.end(), [](const auto& route)
+        {
+            return route.groupId == "pad-core";
+        });
+    const auto graphPlan = drs::engine::compileDspGraphPlan(snapshot);
+    const auto hydrated = snapshot.fxSlots.size() == 3
+        && snapshot.routingBuses.size() == 3
+        && std::all_of(snapshot.fxSlots.begin(), snapshot.fxSlots.end(), [](const auto& slot)
+        {
+            return slot.catalogResolved;
+        })
+        && padRoute != snapshot.groupRoutes.end()
+        && padRoute->routingSourceId == "groups/pad-core"
+        && padRoute->routingBusId == "bus-group-pad-core"
+        && graphPlan.compiled
+        && graphPlan.plan.nodes.size() == 2
+        && !graphPlan.plan.directFastPath;
+    fs::remove_all(tempRoot, cleanupError);
+
+    if (!hydrated)
+    {
+        std::cerr << "PX-04 failure: package open did not reconstruct the authored executable graph.\n";
+        return 1;
+    }
+
+    std::cout << "Packaged instrument FX/routing activation regression passed.\n";
     return 0;
 }
 } // namespace
 
-int main(const int argc, char** argv)
+int main()
 {
-    if (argc != 2)
-    {
-        std::cerr << "Usage: drs_px01_fx_routing_contract_red_tests <named-missing-seam>\n";
-        for (const auto seam : redSeams)
-            std::cerr << "  " << seam << '\n';
-        return 2;
-    }
-
-    const auto seam = std::string_view(argv[1]);
-    if (seam == "package-open-authored-graph")
-        return checkPackageOpenAuthoredGraph();
-
-    std::cerr << "Unknown PX-01 expected-red seam '" << seam << "'.\n";
-    return 2;
+    return checkPackageOpenAuthoredGraph();
 }

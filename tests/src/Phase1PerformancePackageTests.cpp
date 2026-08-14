@@ -242,7 +242,20 @@ int main()
 
         auto guardedV4WritePlan = packageWritePlan;
         guardedV4WritePlan.outputPackagePath
-            = (scratchDirectory / "v4-before-package-hydration.drpkg").generic_string();
+            = (scratchDirectory / "v4-package-hydration.drpkg").generic_string();
+        guardedV4WritePlan.manifest.schemaVersion
+            = drs::engine::performancePackageFxRoutingSchemaVersion;
+        guardedV4WritePlan.manifest.minimumReaderSchemaVersion
+            = drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion;
+        const auto guardedManifestPayload = std::find_if(
+            guardedV4WritePlan.payloads.begin(), guardedV4WritePlan.payloads.end(), [](const auto& payload)
+            {
+                return payload.kind == drs::engine::PerformancePackagePayloadKind::packageManifest;
+            });
+        require(guardedManifestPayload != guardedV4WritePlan.payloads.end(),
+                "The package hydration fixture must contain a package manifest payload.");
+        guardedManifestPayload->plaintextBytes = package_support::toBytes(
+            drs::engine::serializePerformancePackageManifest(guardedV4WritePlan.manifest));
         const auto guardedRuntimePayload = std::find_if(
             guardedV4WritePlan.payloads.begin(), guardedV4WritePlan.payloads.end(), [](const auto& payload)
             {
@@ -278,16 +291,19 @@ int main()
         const auto guardedV4Write = drs::engine::writePerformancePackage(
             guardedV4WritePlan, cryptoProvider);
         require(guardedV4Write.written,
-                "The fail-closed package fixture must write before reader behavior is checked.");
+                "The graph-bearing package fixture must write before reader behavior is checked.");
         const auto guardedV4Load = drs::engine::loadPerformancePackage(
             guardedV4WritePlan.outputPackagePath, cryptoProvider,
             drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion);
-        require(!guardedV4Load.loaded
-                    && guardedV4Load.failureCategory
-                        == drs::engine::PerformancePackageFailureCategory::playbackCompatibilityFailure
-                    && package_support::containsIssue(
-                        guardedV4Load.issues, "v4 FX/routing activation is not enabled"),
-                "PX-02 package loading must fail closed until package graph hydration ships.");
+        require(guardedV4Load.loaded
+                    && guardedV4Load.manifest.schemaVersion
+                        == drs::engine::performancePackageFxRoutingSchemaVersion
+                    && guardedV4Load.instrument.instrument.fxSlots.size() == 1
+                    && guardedV4Load.instrument.instrument.fxSlots.front().id == "room"
+                    && guardedV4Load.instrument.instrument.routingBuses.size() == 1
+                    && guardedV4Load.instrument.instrument.routingBuses.front().inputSourceId
+                        == "master",
+                "PX-04 package loading must accept and retain a valid schema-2/runtime-v4 graph.");
 
         const auto backgroundImagePayloadIterator = std::find_if(
             generatedInspection.payloads.begin(),

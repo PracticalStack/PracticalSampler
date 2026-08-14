@@ -1,4 +1,5 @@
 #include "Phase1PerformancePackageSupport.h"
+#include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReaderDispatch.h"
 #include "shared/PerformancePackageExportService.h"
@@ -92,7 +93,7 @@ void addAuthoredFxRoutingGraph(drs::app::PerformancePackageExportRequest& reques
     drive.displayName = "Drive";
     drive.effectType = "drs.saturator";
     drive.effectVersion = 1;
-    drive.bypassed = true;
+    drive.bypassed = false;
     drive.parameters = {
         { "character", 0.0 },
         { "driveDb", 7.5 },
@@ -107,7 +108,7 @@ void addAuthoredFxRoutingGraph(drs::app::PerformancePackageExportRequest& reques
     bus.displayName = "Pad Core Insert";
     bus.inputSourceId = "groups/pad-core";
     bus.fxSlotIds = { "drive" };
-    bus.chainBypassed = true;
+    bus.chainBypassed = false;
     request.project.authoring.routingBuses.push_back(std::move(bus));
 }
 
@@ -356,6 +357,16 @@ int main()
 
         auto graphRequest = makeRequest(tempRoot / "completed-fx-routing.drpkg");
         addAuthoredFxRoutingGraph(graphRequest);
+        drs::engine::PlaybackSnapshotBuilder sourceSnapshotBuilder;
+        const auto sourceSnapshotRequest = sourceSnapshotBuilder.requestBuild(1, true);
+        const auto sourceSnapshot = sourceSnapshotBuilder.buildSnapshot(
+            sourceSnapshotRequest, graphRequest.project);
+        require(sourceSnapshot.built && sourceSnapshot.activationEligible,
+                "The authored FX/routing source must produce an activation-eligible snapshot.");
+        const auto sourceGraphPlan = drs::engine::compileDspGraphPlan(sourceSnapshot.snapshot);
+        require(sourceGraphPlan.compiled && sourceGraphPlan.plan.nodes.size() == 1
+                    && !sourceGraphPlan.plan.directFastPath,
+                "The authored FX/routing source must compile one executable DSP node.");
         const auto graphExport = executePerformancePackageExport(graphRequest);
         require(graphExport.exported,
                 "An authored FX/routing graph must export through the shared production path.");
@@ -372,17 +383,70 @@ int main()
         const auto& graphInstrument = graphPackage.metadata.instrument.instrument;
         require(graphInstrument.fxSlots.size() == 1
                     && graphInstrument.fxSlots.front().id == "drive"
-                    && graphInstrument.fxSlots.front().bypassed
+                    && !graphInstrument.fxSlots.front().bypassed
                     && graphInstrument.fxSlots.front().parameters.size() == 5
                     && graphInstrument.fxSlots.front().parameters.at(1).id == "driveDb"
                     && graphInstrument.fxSlots.front().parameters.at(1).value == 7.5
                     && graphInstrument.routingBuses.size() == 1
                     && graphInstrument.routingBuses.front().id == "bus-group-pad-core"
-                    && graphInstrument.routingBuses.front().chainBypassed
+                    && !graphInstrument.routingBuses.front().chainBypassed
                     && graphInstrument.routingBuses.front().fxSlotIds
                         == std::vector<std::string> { "drive" }
                     && graphInstrument.groups.front().routingBusId == "bus-group-pad-core",
                 "Graph-bearing export must preserve slot order, parameters, bypass state, bus chains, and group assignment.");
+
+        auto graphActivation = drs::engine::preparePerformancePackageV2Activation(
+            graphPackage.metadata, graphPackage.package, graphPackage.sampleDescriptors);
+        require(graphActivation.prepared
+                    && graphActivation.activationPayload != nullptr
+                    && graphActivation.activationPayload->snapshot != nullptr
+                    && graphActivation.renderModel != nullptr,
+                "A reopened graph-bearing package must prepare an immutable activation payload.");
+        const auto& reopenedSnapshot = *graphActivation.activationPayload->snapshot;
+        const auto reopenedGroup = std::find_if(
+            reopenedSnapshot.groupRoutes.begin(), reopenedSnapshot.groupRoutes.end(),
+            [](const auto& group) { return group.groupId == "pad-core"; });
+        require(reopenedSnapshot.fxSlots.size() == 1
+                    && reopenedSnapshot.fxSlots.front().catalogResolved
+                    && reopenedSnapshot.routingBuses.size() == 1
+                    && reopenedGroup != reopenedSnapshot.groupRoutes.end()
+                    && reopenedGroup->routingSourceId == "groups/pad-core"
+                    && reopenedGroup->routingBusId == "bus-group-pad-core"
+                    && reopenedSnapshot.dspGraphDigest == sourceSnapshot.snapshot.dspGraphDigest,
+                "Package preparation must hydrate catalog metadata, buses, group routing, and the authored graph digest.");
+        const auto reopenedGraphPlan = drs::engine::compileDspGraphPlan(reopenedSnapshot);
+        require(reopenedGraphPlan.compiled
+                    && reopenedGraphPlan.plan.planDigest == sourceGraphPlan.plan.planDigest
+                    && reopenedGraphPlan.plan.nodes.size() == sourceGraphPlan.plan.nodes.size()
+                    && reopenedGraphPlan.plan.parameters.size()
+                        == sourceGraphPlan.plan.parameters.size()
+                    && reopenedGraphPlan.plan.nodes.front().slotId
+                        == sourceGraphPlan.plan.nodes.front().slotId,
+                "The reopened package must compile the same immutable DSP plan as its authoring source.");
+
+        const auto graphActivated = facade.activatePreparedPerformancePackageSession(
+            std::move(graphActivation));
+        require(graphActivated.activated,
+                "The graph-bearing package must activate through the production facade.");
+        const auto activeGraphPayload = facade.getPerformancePackageActivationPayload();
+        const auto activeGraphModel = facade.getPerformancePackageRenderModel();
+        require(activeGraphPayload != nullptr && activeGraphModel != nullptr,
+                "Successful graph activation must publish both immutable package artifacts.");
+
+        auto malformedMetadata = graphPackage.metadata;
+        malformedMetadata.instrument.instrument.routingBuses.front().fxSlotIds.push_back(
+            "missing-slot");
+        auto malformedActivation = drs::engine::preparePerformancePackageV2Activation(
+            malformedMetadata, graphPackage.package, graphPackage.sampleDescriptors);
+        require(!malformedActivation.prepared
+                    && containsIssue(malformedActivation.issues, "unknown FX slot"),
+                "Malformed package graphs must fail before activation payload publication.");
+        const auto rejectedReplacement = facade.activatePreparedPerformancePackageSession(
+            std::move(malformedActivation));
+        require(!rejectedReplacement.activated
+                    && facade.getPerformancePackageActivationPayload() == activeGraphPayload
+                    && facade.getPerformancePackageRenderModel() == activeGraphModel,
+                "A malformed replacement package must preserve the currently active package generation.");
 
         PerformancePackageExportService flacService;
         auto flacClient = flacService.openClient();
