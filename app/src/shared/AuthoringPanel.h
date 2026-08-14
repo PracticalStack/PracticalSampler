@@ -2,6 +2,7 @@
 
 #include "shared/authoring/AuthoringSummaryStrip.h"
 #include "shared/authoring/AuthoringViewModels.h"
+#include "shared/authoring/MacroWorkbenchView.h"
 #include "shared/authoring/RepeatedStructureList.h"
 #include "shared/authoring/ZoneMappingEditor.h"
 #include "shared/authoring/ZoneMapCanvas.h"
@@ -69,6 +70,10 @@ public:
     // Shells can forward a learned MIDI note here while the Articulations workbench
     // is listening. The value is validated through the normal project transaction.
     bool applyLearnedKeySwitchMidiNote(int midiNote);
+    authoring::MacroWorkbenchView::LayoutSnapshot getMacroWorkbenchLayoutSnapshot() const noexcept
+    {
+        return macroWorkbenchContent.getLayoutSnapshot();
+    }
 
 private:
     class AuthoringControlLookAndFeel final : public juce::LookAndFeel_V4
@@ -106,6 +111,7 @@ private:
     void rebuildZoneSelector();
     void rebuildGroupList();
     void rebuildMacroList();
+    void rebuildMacroAssignmentList();
     void rebuildFxSelector();
     void rebuildDspScopeSelector();
     void rebuildRoutingBusSelector();
@@ -136,6 +142,8 @@ private:
     void duplicateSelectedMacro();
     void deleteSelectedMacro();
     void moveSelectedMacro(int direction);
+    void addMacroAssignment();
+    void removeSelectedMacroAssignment();
     void applySelectedFxSlotEdit(const juce::String& label);
     void createScopedFxSlot();
     void duplicateSelectedFxSlot();
@@ -226,6 +234,7 @@ private:
     std::size_t observedWorkspaceSelectionRevision = 0;
     int selectedGroupIndex = 0;
     int selectedMacroIndex = 0;
+    int selectedMacroTargetIndex = 0;
     int selectedFxSlotIndex = 0;
     int selectedDspScopeIndex = 2;
     int selectedFxParameterIndex = 0;
@@ -290,12 +299,15 @@ private:
     juce::TextButton groupVisibilityButton;
     juce::Label groupVisibilityHintLabel;
 
-    juce::Component macroWorkbenchContent;
+    authoring::MacroWorkbenchView macroWorkbenchContent;
     juce::Viewport macroWorkbenchViewport;
     authoring::RepeatedStructureList macroList;
+    authoring::RepeatedStructureList macroAssignmentList;
     juce::TextButton macroCreateButton;
     juce::TextButton macroDuplicateButton;
     juce::TextButton macroDeleteButton;
+    juce::TextButton macroAssignmentAddButton;
+    juce::TextButton macroAssignmentRemoveButton;
     juce::Label macroNameLabel;
     juce::TextEditor macroNameEditor;
     juce::Label macroExposeLabel;
