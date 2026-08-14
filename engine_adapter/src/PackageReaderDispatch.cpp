@@ -65,7 +65,8 @@ PerformancePackageDispatchResult dispatchPerformancePackageReader(
 
 PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     const std::string& packagePath,
-    const PackageCryptoProvider& crypto)
+    const PackageCryptoProvider& crypto,
+    const int supportedReaderSchemaVersion)
 {
     PerformancePackageV2MetadataLoadResult result;
     result.state = "Performance package v2 metadata load failed";
@@ -141,6 +142,20 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     if (!manifest.parsed)
     {
         result.issues = manifest.issues;
+        return result;
+    }
+    if (manifest.manifest.minimumReaderSchemaVersion > supportedReaderSchemaVersion)
+    {
+        result.metadata.failureCategory
+            = PerformancePackageFailureCategory::playbackCompatibilityFailure;
+        result.metadata.state = "Performance package requires a newer reader schema";
+        result.metadata.issues.push_back(
+            "Performance package requires reader schema "
+            + std::to_string(manifest.manifest.minimumReaderSchemaVersion)
+            + ", but this reader supports schema "
+            + std::to_string(supportedReaderSchemaVersion) + ".");
+        result.issues = result.metadata.issues;
+        result.state = result.metadata.state;
         return result;
     }
     if (!manifest.manifest.backgroundImage.payloadId.empty())

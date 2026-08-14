@@ -1,10 +1,18 @@
+#include "drs/engine/DspGraphPlan.h"
+#include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReader.h"
+#include "drs/engine/PackageReaderDispatch.h"
 #include "drs/engine/PerformancePackage.h"
+#include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/PreparedPlayback.h"
+#include "drs/engine/SamplerRenderModel.h"
 #include "plugin/PluginEditor.h"
 #include "plugin/PluginProcessor.h"
+#include "shared/PerformancePackageExportService.h"
 #include "shared/WorkspaceMenuPolicy.h"
 #include "standalone/MainComponent.h"
 #include "Phase1PerformancePackageSupport.h"
+#include "Sprint4OfflineRenderHarness.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
@@ -199,6 +207,345 @@ ordered_json buildMenuCutoverSection()
     return section;
 }
 
+drs::engine::RuntimeProjectFxSlotDefinition makeFxSlot(
+    std::string id,
+    std::string displayName,
+    std::string effectType,
+    std::vector<drs::engine::RuntimeProjectFxSlotDefinition::ParameterValue> parameters,
+    const bool bypassed = false)
+{
+    drs::engine::RuntimeProjectFxSlotDefinition slot;
+    slot.id = std::move(id);
+    slot.displayName = std::move(displayName);
+    slot.effectType = std::move(effectType);
+    slot.effectVersion = 1;
+    slot.bypassed = bypassed;
+    slot.parameters = std::move(parameters);
+    return slot;
+}
+
+void addFxRoutingParityGraph(drs::engine::RuntimeProjectModel& project)
+{
+    require(project.authoring.groups.size() == 2 && project.authoring.zones.size() == 2,
+            "FX/routing parity fixture requires two groups and two zones.");
+
+    // Both channel-layout routes use the default articulation so one deterministic
+    // MIDI timeline can address mono Pad A3 and stereo Lead A4 independently.
+    project.authoring.zones[0].keyHigh = 59;
+    project.authoring.zones[1].keyLow = 60;
+    project.authoring.zones[1].articulationId = "sustain";
+    project.authoring.groups[0].routingBusId = "bus-group-pad-core";
+    project.authoring.groups[1].routingBusId = "bus-group-lead-core";
+
+    project.authoring.fxSlots = {
+        makeFxSlot("pad-eq", "Pad EQ", "drs.compactEq",
+                   { { "mode", 1.0 }, { "frequencyHz", 1800.0 }, { "q", 0.8 },
+                     { "gainDb", 3.0 }, { "mix", 1.0 } }),
+        makeFxSlot("pad-bypassed-gain", "Bypassed Pad Gain", "drs.gain",
+                   { { "gainDb", 12.0 }, { "polarity", 0.0 }, { "mute", 0.0 } }, true),
+        makeFxSlot("lead-eq", "Lead EQ", "drs.compactEq",
+                   { { "mode", 2.0 }, { "frequencyHz", 4200.0 }, { "q", 0.65 },
+                     { "gainDb", -2.0 }, { "mix", 0.8 } }),
+        makeFxSlot("pad-chorus", "Pad Chorus", "drs.chorus",
+                   { { "rateHz", 0.7 }, { "depthMs", 3.5 }, { "baseDelayMs", 14.0 },
+                     { "width", 0.9 }, { "mix", 0.35 } }),
+        makeFxSlot("lead-bypassed-gain", "Bypassed Lead Chain Gain", "drs.gain",
+                   { { "gainDb", -9.0 }, { "polarity", 0.0 }, { "mute", 0.0 } }),
+        makeFxSlot("master-delay", "Master Delay", "drs.stereoDelay",
+                   { { "timeMs", 70.0 }, { "sync", 0.0 }, { "divisionBeats", 0.5 },
+                     { "feedback", 0.3 }, { "pingPong", 1.0 }, { "tone", 0.75 },
+                     { "width", 1.0 }, { "mix", 0.22 } }),
+        makeFxSlot("master-room", "Master Room", "drs.algorithmicReverb",
+                   { { "preDelayMs", 8.0 }, { "size", 0.45 }, { "decaySeconds", 0.8 },
+                     { "damping", 0.55 }, { "width", 1.0 }, { "mix", 0.2 } })
+    };
+    project.authoring.routingBuses = {
+        { "bus-zone-pad-a3", "Pad Zone Insert", "zones/pad-a3",
+          { "pad-eq", "pad-bypassed-gain" }, false },
+        { "bus-zone-lead-a4", "Lead Zone Insert", "zones/lead-a4",
+          { "lead-eq" }, false },
+        { "bus-group-pad-core", "Pad Group Insert", "groups/pad-core",
+          { "pad-chorus" }, false },
+        { "bus-group-lead-core", "Lead Group Insert", "groups/lead-core",
+          { "lead-bypassed-gain" }, true },
+        { "bus-master", "Master Insert", "master",
+          { "master-delay", "master-room" }, false }
+    };
+}
+
+drs::app::PerformancePackageExportRequest buildFxRoutingParityRequest(
+    const fs::path& scratchDirectory)
+{
+    drs::app::PerformancePackageExportRequest request;
+    request.project = package_support::buildAuthoringProjectFixture();
+    const auto sourceContentRoot = fs::path(request.project.contentRootPath);
+    const auto contentRoot = scratchDirectory / "content";
+    fs::create_directories(contentRoot / "Images");
+    for (const auto& sample : request.project.sampleSources)
+    {
+        const auto source = sourceContentRoot / sample.path;
+        const auto destination = contentRoot / sample.path;
+        fs::create_directories(destination.parent_path());
+        require(fs::copy_file(source, destination, fs::copy_options::overwrite_existing),
+                "FX/routing parity fixture could not stage a source sample.");
+    }
+    package_support::writeBinaryFile(
+        contentRoot / "Images" / "background.jpg",
+        package_support::buildBackgroundImageJpegFixture());
+    request.project.contentRootPath = contentRoot.generic_string();
+    addFxRoutingParityGraph(request.project);
+    request.sessionState.loadProfileId = "balanced";
+    request.projectId = request.project.projectId;
+    request.baseRevision = 1;
+    request.packagePath = (scratchDirectory / "fx-routing-parity.drpkg").generic_string();
+    return request;
+}
+
+struct FxRoutingSourceArtifacts
+{
+    drs::engine::PlaybackSnapshotBuildResult snapshot;
+    drs::engine::PlaybackActivationPayloadPtr payload;
+    drs::engine::SamplerRenderModelPtr model;
+    drs::engine::ImmutableDspGraphPlan graphPlan;
+};
+
+FxRoutingSourceArtifacts buildFxRoutingSourceArtifacts(
+    const drs::engine::RuntimeProjectModel& project)
+{
+    drs::engine::PlaybackSnapshotBuilder snapshotBuilder;
+    const auto snapshotRequest = snapshotBuilder.requestBuild(1, true);
+    auto snapshot = snapshotBuilder.buildSnapshot(snapshotRequest, project);
+    require(snapshot.built && snapshot.activationEligible,
+            "FX/routing source snapshot did not build.");
+
+    drs::engine::PreparedPlaybackService preparedService("px05-source-parity", 1, false);
+    const drs::engine::RuntimeStreamLoadResult noCompiledStream;
+    const auto preparedRequest = preparedService.requestBuild(snapshot, noCompiledStream);
+    require(preparedRequest.accepted,
+            "FX/routing source preparation request was rejected.");
+    auto prepared = preparedService.prepare(preparedRequest, snapshot, noCompiledStream);
+    require(prepared.built && prepared.activationEligible,
+            "FX/routing source preparation failed: " + prepared.state);
+    auto payload = drs::engine::buildPlaybackActivationPayload(
+        drs::engine::PlaybackActivationLane::performance,
+        snapshot.requestedDraftRevision,
+        &snapshot,
+        &prepared);
+    const auto model = drs::engine::buildSamplerRenderModel(payload);
+    require(model.built && model.model != nullptr,
+            "FX/routing source render model did not build.");
+    const auto graphPlan = drs::engine::compileDspGraphPlan(snapshot.snapshot);
+    require(graphPlan.compiled,
+            "FX/routing source graph plan did not compile.");
+    return { std::move(snapshot), std::move(payload), model.model, graphPlan.plan };
+}
+
+bool sameGraphParameters(const drs::engine::ImmutableDspGraphPlan& left,
+                         const drs::engine::ImmutableDspGraphPlan& right)
+{
+    if (left.parameters.size() != right.parameters.size())
+        return false;
+    for (std::size_t index = 0; index < left.parameters.size(); ++index)
+    {
+        if (left.parameters[index].id != right.parameters[index].id
+            || left.parameters[index].value != right.parameters[index].value)
+            return false;
+    }
+    return true;
+}
+
+drs::tests::OfflineRenderArtifact renderFxRoutingParityCase(
+    std::string scenarioId,
+    const drs::engine::SamplerRenderModelPtr& model,
+    const drs::engine::ImmutableDspGraphPlan& graphPlan,
+    const std::uint8_t midiNote,
+    const bool withGraph = true)
+{
+    drs::tests::OfflineRenderRequest request;
+    request.scenarioId = std::move(scenarioId);
+    request.model = model;
+    request.sampleRate = 48000.0;
+    request.frameCount = 144000;
+    request.partitionSize = 128;
+    request.events = {
+        { 0, drs::engine::SamplerRenderEventType::noteOn, midiNote, 0.8f },
+        { 12000, drs::engine::SamplerRenderEventType::noteOff, midiNote, 0.0f }
+    };
+    if (withGraph)
+        request.dspGraphPlan = graphPlan;
+    return drs::tests::renderOffline(request);
+}
+
+ordered_json buildFxRoutingParitySection(const fs::path& scratchDirectory)
+{
+    auto request = buildFxRoutingParityRequest(scratchDirectory);
+    const auto source = buildFxRoutingSourceArtifacts(request.project);
+    const auto exported = drs::app::executePerformancePackageExport(request);
+    require(exported.exported,
+            "FX/routing parity package export failed: " + summarizeIssues(exported.issues));
+    const auto package = drs::engine::loadPerformancePackageV2Metadata(request.packagePath);
+    require(package.loaded && package.package != nullptr,
+            "FX/routing parity package metadata did not reopen: " + summarizeIssues(package.issues));
+    auto activation = drs::engine::preparePerformancePackageV2Activation(
+        package.metadata, package.package, package.sampleDescriptors);
+    require(activation.prepared && activation.activationPayload != nullptr
+                && activation.activationPayload->snapshot != nullptr
+                && activation.renderModel != nullptr,
+            "FX/routing parity package did not prepare: " + summarizeIssues(activation.issues));
+    const auto packagePlanResult = drs::engine::compileDspGraphPlan(
+        *activation.activationPayload->snapshot);
+    require(packagePlanResult.compiled,
+            "FX/routing parity package graph plan did not compile.");
+    const auto& packagePlan = packagePlanResult.plan;
+    const auto planEquivalent = source.graphPlan.planDigest == packagePlan.planDigest
+        && source.graphPlan.nodes.size() == packagePlan.nodes.size()
+        && sameGraphParameters(source.graphPlan, packagePlan);
+    require(planEquivalent,
+            "Source and reopened package graph plans or parameter vectors differ.");
+    require(package.metadata.manifest.schemaVersion
+                == drs::engine::performancePackageFxRoutingSchemaVersion
+            && package.metadata.manifest.minimumReaderSchemaVersion
+                == drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion
+            && package.metadata.instrument.instrument.schemaVersion
+                == drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
+            "FX/routing parity package did not retain its compatibility versions.");
+
+    drs::engine::SamplerRenderModelBuildOptions sourceModelOptions;
+    sourceModelOptions.midiNoteOffset = activation.renderModel->getMidiNoteOffset();
+    sourceModelOptions.fixedVelocity = activation.renderModel->getFixedVelocity();
+    const auto normalizedSourceModel = drs::engine::buildSamplerRenderModel(
+        source.payload, sourceModelOptions);
+    require(normalizedSourceModel.built && normalizedSourceModel.model != nullptr,
+            "The source parity model could not apply the package performance options.");
+
+    const auto oldReader = drs::engine::loadPerformancePackageV2Metadata(
+        request.packagePath,
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageLegacySchemaVersion);
+    const auto oldReaderRejected = !oldReader.loaded
+        && oldReader.metadata.failureCategory
+            == drs::engine::PerformancePackageFailureCategory::playbackCompatibilityFailure;
+    require(oldReaderRejected,
+            "A reader limited to schema v1 accepted a graph-bearing package.");
+    const auto corpus = package_support::getCheckedInCorpusPaths();
+    const auto legacyPackage = drs::engine::loadPerformancePackage(
+        corpus.valid.generic_string(),
+        drs::engine::getDeterministicPackageCryptoProvider(),
+        drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion);
+    require(legacyPackage.loaded,
+            "The current reader no longer accepts the checked-in package-v1 corpus fixture.");
+
+    const auto monoSource = renderFxRoutingParityCase(
+        "px05-mono-source", normalizedSourceModel.model, source.graphPlan, 57);
+    const auto monoPackage = renderFxRoutingParityCase(
+        "px05-mono-package", activation.renderModel, packagePlan, 57);
+    const auto monoRepeat = renderFxRoutingParityCase(
+        "px05-mono-package-repeat", activation.renderModel, packagePlan, 57);
+    const auto stereoSource = renderFxRoutingParityCase(
+        "px05-stereo-source", normalizedSourceModel.model, source.graphPlan, 69);
+    const auto stereoPackage = renderFxRoutingParityCase(
+        "px05-stereo-package", activation.renderModel, packagePlan, 69);
+    const auto stereoRepeat = renderFxRoutingParityCase(
+        "px05-stereo-package-repeat", activation.renderModel, packagePlan, 69);
+    const auto monoDry = renderFxRoutingParityCase(
+        "px05-mono-dry-oracle", activation.renderModel, packagePlan, 57, false);
+    const auto monoSourceDry = renderFxRoutingParityCase(
+        "px05-mono-source-dry", normalizedSourceModel.model, source.graphPlan, 57, false);
+    const auto stereoSourceDry = renderFxRoutingParityCase(
+        "px05-stereo-source-dry", normalizedSourceModel.model, source.graphPlan, 69, false);
+    const auto stereoPackageDry = renderFxRoutingParityCase(
+        "px05-stereo-package-dry", activation.renderModel, packagePlan, 69, false);
+    const auto monoComparison = drs::tests::compareOfflineArtifacts(monoSource, monoPackage);
+    const auto monoRepeatComparison = drs::tests::compareOfflineArtifacts(monoPackage, monoRepeat);
+    const auto stereoComparison = drs::tests::compareOfflineArtifacts(stereoSource, stereoPackage);
+    const auto stereoRepeatComparison = drs::tests::compareOfflineArtifacts(stereoPackage, stereoRepeat);
+    const auto dryComparison = drs::tests::compareOfflineArtifacts(monoPackage, monoDry);
+    const auto monoSamplerComparison = drs::tests::compareOfflineArtifacts(
+        monoSourceDry, monoDry);
+    const auto stereoSamplerComparison = drs::tests::compareOfflineArtifacts(
+        stereoSourceDry, stereoPackageDry);
+    constexpr std::int64_t tailEvidenceFrame = 12000 + 24000;
+    const auto tailsPresent = monoPackage.summary.lastNonZeroFrame > tailEvidenceFrame
+        && stereoPackage.summary.lastNonZeroFrame > tailEvidenceFrame;
+    const auto audioPassed = monoComparison.equivalent
+        && monoRepeatComparison.equivalent
+        && stereoComparison.equivalent
+        && stereoRepeatComparison.equivalent
+        && !dryComparison.equivalent
+        && monoPackage.summary.peak > 1.0e-5
+        && stereoPackage.summary.peak > 1.0e-5
+        && tailsPresent;
+    require(audioPassed,
+            "Source/package DSP audio evidence failed: mono="
+                + std::to_string(monoComparison.equivalent)
+                + " monoRepeat=" + std::to_string(monoRepeatComparison.equivalent)
+                + " stereo=" + std::to_string(stereoComparison.equivalent)
+                + " stereoRepeat=" + std::to_string(stereoRepeatComparison.equivalent)
+                + " dryDifferent=" + std::to_string(!dryComparison.equivalent)
+                + " monoSampler=" + std::to_string(monoSamplerComparison.equivalent)
+                + " stereoSampler=" + std::to_string(stereoSamplerComparison.equivalent)
+                + " monoPeak=" + std::to_string(monoPackage.summary.peak)
+                + " stereoPeak=" + std::to_string(stereoPackage.summary.peak)
+                + " monoLast=" + std::to_string(monoPackage.summary.lastNonZeroFrame)
+                + " stereoLast=" + std::to_string(stereoPackage.summary.lastNonZeroFrame)
+                + " monoMismatch='" + monoComparison.message + "' channel="
+                + std::to_string(monoComparison.channel) + " frame="
+                + std::to_string(monoComparison.frame) + " expected="
+                + std::to_string(monoComparison.expected) + " actual="
+                + std::to_string(monoComparison.actual)
+                + " stereoMismatch='" + stereoComparison.message + "' channel="
+                + std::to_string(stereoComparison.channel) + " frame="
+                + std::to_string(stereoComparison.frame) + " expected="
+                + std::to_string(stereoComparison.expected) + " actual="
+                + std::to_string(stereoComparison.actual)
+                + " monoSamplerMismatch='" + monoSamplerComparison.message + "' frame="
+                + std::to_string(monoSamplerComparison.frame)
+                + " stereoSamplerMismatch='" + stereoSamplerComparison.message + "' frame="
+                + std::to_string(stereoSamplerComparison.frame) + ".");
+
+    ordered_json cases = ordered_json::array();
+    const auto appendCase = [&](const char* id,
+                                const drs::tests::OfflineRenderArtifact& sourceArtifact,
+                                const drs::tests::OfflineRenderArtifact& packageArtifact,
+                                const bool passed)
+    {
+        cases.push_back({
+            { "id", id },
+            { "sourceChecksum", sourceArtifact.summary.quantizedChecksum },
+            { "packageChecksum", packageArtifact.summary.quantizedChecksum },
+            { "sourcePeak", sourceArtifact.summary.peak },
+            { "packagePeak", packageArtifact.summary.peak },
+            { "packageLastNonZeroFrame", packageArtifact.summary.lastNonZeroFrame },
+            { "passed", passed }
+        });
+    };
+    appendCase("mono-zone-group-master", monoSource, monoPackage,
+               monoComparison.equivalent && monoRepeatComparison.equivalent);
+    appendCase("stereo-zone-bypassed-group-master", stereoSource, stereoPackage,
+               stereoComparison.equivalent && stereoRepeatComparison.equivalent);
+
+    ordered_json section;
+    section["packagePath"] = request.packagePath;
+    section["packageSchemaVersion"] = package.metadata.manifest.schemaVersion;
+    section["minimumReaderSchemaVersion"]
+        = package.metadata.manifest.minimumReaderSchemaVersion;
+    section["runtimeInstrumentSchemaVersion"]
+        = package.metadata.instrument.instrument.schemaVersion;
+    section["graphDigest"] = packagePlan.authoredGraphDigest;
+    section["planDigest"] = packagePlan.planDigest;
+    section["nodeCount"] = packagePlan.nodes.size();
+    section["parameterCount"] = packagePlan.parameters.size();
+    section["authoredSlotCount"] = request.project.authoring.fxSlots.size();
+    section["authoredBusCount"] = request.project.authoring.routingBuses.size();
+    section["oldReaderRejected"] = oldReaderRejected;
+    section["legacyPackageLoaded"] = legacyPackage.loaded;
+    section["dryFallbackPrevented"] = !dryComparison.equivalent;
+    section["statefulTailsPresent"] = tailsPresent;
+    section["cases"] = std::move(cases);
+    section["passed"] = planEquivalent && oldReaderRejected && legacyPackage.loaded && audioPassed;
+    return section;
+}
+
 ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
 {
     juce::ScopedJuceInitialiser_GUI gui;
@@ -327,15 +674,24 @@ int main(int argc, char* argv[])
         report["schemaName"] = "drs.performancePackageReleaseGate";
         report["schemaVersion"] = 1;
         report["capturedOn"] = currentIsoDate();
+        std::cout << "Release gate: compatibility policy" << std::endl;
         report["compatibilityPolicy"] = buildCompatibilityPolicySection();
+        std::cout << "Release gate: deterministic package bytes" << std::endl;
         report["determinism"] = buildDeterminismSection(scratchDirectory / "determinism");
+        std::cout << "Release gate: failure reporting" << std::endl;
         report["failureReporting"] = buildFailureReportingSection();
+        std::cout << "Release gate: menu cutover" << std::endl;
         report["menuCutover"] = buildMenuCutoverSection();
+        std::cout << "Release gate: reopen and performance-only UX" << std::endl;
         report["reopenAndPerformanceOnlyUx"] = buildReopenAndUxSection(scratchDirectory / "reopen");
+        std::cout << "Release gate: FX-routing parity" << std::endl;
+        report["fxRoutingParity"] = buildFxRoutingParitySection(
+            scratchDirectory / "fx-routing-parity");
         report["passed"] = report["compatibilityPolicy"].at("passed").get<bool>()
             && report["determinism"].at("passed").get<bool>()
             && report["failureReporting"].at("passed").get<bool>()
             && report["menuCutover"].at("passed").get<bool>()
+            && report["fxRoutingParity"].at("passed").get<bool>()
             && report["reopenAndPerformanceOnlyUx"].at("passed").get<bool>();
 
         writeTextFile(outputPath, report.dump(2) + "\n");

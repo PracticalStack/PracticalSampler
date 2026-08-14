@@ -117,6 +117,26 @@ OfflineRenderArtifact renderOffline(const OfflineRenderRequest& request)
         throw std::invalid_argument("Offline render request is incomplete.");
     }
 
+    // Deterministic package renders cannot depend on worker scheduling. Materialize
+    // package pages before entering the callback loop, using the same authenticated
+    // off-audio preparation API as the runtime page service.
+    for (const auto& sample : request.model->getSamples())
+    {
+        const auto constPackageSource
+            = std::dynamic_pointer_cast<const engine::PackagePagedSampleDataSource>(sample.dataSource);
+        if (constPackageSource == nullptr)
+            continue;
+        const auto packageSource
+            = std::const_pointer_cast<engine::PackagePagedSampleDataSource>(constPackageSource);
+        if (!packageSource->prepareHead())
+            throw std::runtime_error("Offline package source head could not be prepared.");
+        for (std::uint64_t page = 0; page < packageSource->pageCount(); ++page)
+        {
+            if (!packageSource->preparePage(page))
+                throw std::runtime_error("Offline package source page could not be prepared.");
+        }
+    }
+
     auto events = request.events;
     std::stable_sort(events.begin(), events.end(), [](const auto& left, const auto& right)
     {
@@ -126,8 +146,22 @@ OfflineRenderArtifact renderOffline(const OfflineRenderRequest& request)
         throw std::invalid_argument("Offline timeline event lies outside the requested render length.");
 
     engine::SamplerPlaybackContext context(request.model->getLane());
+    std::shared_ptr<engine::DspRenderGeneration> dspGeneration;
+    if (request.dspGraphPlan.has_value())
+    {
+        std::string generationFailure;
+        dspGeneration = engine::createDspRenderGeneration(
+            request.model, *request.dspGraphPlan, request.partitionSize, &generationFailure);
+        if (dspGeneration == nullptr)
+        {
+            throw std::runtime_error("Offline render DSP generation could not be created: "
+                                     + generationFailure);
+        }
+    }
     if (!context.prepare(request.sampleRate)
-        || !context.stageActivation(request.model)
+        || !(dspGeneration != nullptr
+                 ? context.stageActivation(request.model, dspGeneration)
+                 : context.stageActivation(request.model))
         || !context.activatePendingForPreparation())
     {
         throw std::runtime_error("Offline render context could not activate its immutable model.");

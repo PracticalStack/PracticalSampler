@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,7 @@ struct OfflineRenderRequest
     std::uint64_t frameCount = 0;
     std::uint32_t partitionSize = 64;
     std::vector<OfflineTimelineEvent> events;
+    std::optional<engine::ImmutableDspGraphPlan> dspGraphPlan;
 };
 
 struct OfflineRenderSummary

@@ -47,5 +47,6 @@ struct PerformancePackageV2MetadataLoadResult
 
 PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     const std::string& packagePath,
-    const PackageCryptoProvider& crypto = getDeterministicPackageCryptoProvider());
+    const PackageCryptoProvider& crypto = getDeterministicPackageCryptoProvider(),
+    int supportedReaderSchemaVersion = performancePackageFxRoutingMinimumReaderSchemaVersion);
 } // namespace drs::engine

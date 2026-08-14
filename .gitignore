@@ -19,3 +19,4 @@ CMakeUserPresets.json
 # Test and debug artifacts
 *.log
 *.dmp
+/validation/reaper/package-fx-routing-qualification-evidence/

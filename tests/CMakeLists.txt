@@ -3921,13 +3921,17 @@ juce_add_console_app(drs_phase1_performance_package_release_gate
 target_sources(drs_phase1_performance_package_release_gate
     PRIVATE
         src/Phase1PerformancePackageReleaseGate.cpp
+        support/Sprint4OfflineRenderHarness.cpp
+        support/Sprint4OfflineRenderHarness.h
 )
 
 target_link_libraries(drs_phase1_performance_package_release_gate
     PRIVATE
         drs_plugin_shell
         drs_standalone_shell
+        drs_app_shared
         drs_engine_adapter
+        drs_sampler_core
         drs_sample_import
         juce::juce_audio_formats
         juce::juce_audio_processors_headless
@@ -3939,8 +3943,13 @@ target_link_libraries(drs_phase1_performance_package_release_gate
 
 target_compile_features(drs_phase1_performance_package_release_gate PRIVATE cxx_std_17)
 
+if(MSVC)
+    target_link_options(drs_phase1_performance_package_release_gate PRIVATE /STACK:8388608)
+endif()
+
 target_include_directories(drs_phase1_performance_package_release_gate
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
         ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )

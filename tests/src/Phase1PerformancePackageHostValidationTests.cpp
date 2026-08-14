@@ -2,11 +2,14 @@
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
 #include "Phase1PerformancePackageSupport.h"
+#include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/PackageV2StreamingExport.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
 #include <chrono>
+#include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -110,6 +113,22 @@ fs::path buildSemanticPackageV2Fixture(const fs::path& scratchDirectory)
     const auto packagePath = scratchDirectory / "semantic-route-v2.drpkg";
     auto packagePlan = package_support::buildPackagePlan(
         scratchDirectory / "runtime", packagePath);
+    packagePlan.manifest.schemaVersion
+        = drs::engine::performancePackageFxRoutingSchemaVersion;
+    packagePlan.manifest.minimumReaderSchemaVersion
+        = drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion;
+    packagePlan.compiledRuntime.instrument.schemaVersion
+        = drs::engine::runtimeInstrumentFxRoutingSchemaVersion;
+    for (auto& group : packagePlan.compiledRuntime.instrument.groups)
+        group.routingBusId = "master";
+    packagePlan.compiledRuntime.instrument.fxSlots = {
+        { "host-master-gain", "Host Master Gain", "drs.gain", false, 1,
+          { { "gainDb", -3.0 }, { "polarity", 0.0 }, { "mute", 0.0 } } }
+    };
+    packagePlan.compiledRuntime.instrument.routingBuses = {
+        { "host-master-bus", "Host Master Bus", "master",
+          { "host-master-gain" }, false }
+    };
     const auto v2Plan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
         packagePlan.manifest,
         packagePlan.compiledRuntime,
@@ -128,8 +147,15 @@ int main(int argc, char** argv)
 {
     try
     {
-        const auto generatedFixtureRoot = fs::temp_directory_path()
-            / "drs-semantic-package-v2-host-validation";
+        const auto* captureStatePathValue
+            = std::getenv("DRS_PACKAGE_HOST_STATE_CAPTURE_PATH");
+        const auto captureStatePath = captureStatePathValue != nullptr
+                && *captureStatePathValue != '\0'
+            ? fs::absolute(fs::path(captureStatePathValue))
+            : fs::path {};
+        const auto generatedFixtureRoot = captureStatePath.empty()
+            ? fs::temp_directory_path() / "drs-semantic-package-v2-host-validation"
+            : captureStatePath.parent_path() / "fx-routing-package-fixture";
         const auto selectedPackage = argc >= 2
             ? std::filesystem::absolute(std::filesystem::path(argv[1]))
             : buildSemanticPackageV2Fixture(generatedFixtureRoot);
@@ -158,6 +184,15 @@ int main(int argc, char** argv)
                                         "Standalone host validation");
         standalone->getProcessor().prepareToPlay(44100.0, 512);
         standalone->getProcessor().serviceMessageThreadWork();
+        const auto standalonePayload
+            = standalone->getEngineFacade().getPerformancePackageActivationPayload();
+        require(standalonePayload != nullptr && standalonePayload->snapshot != nullptr,
+                "Standalone host validation did not retain the package graph snapshot.");
+        const auto standaloneGraph = drs::engine::compileDspGraphPlan(
+            *standalonePayload->snapshot);
+        require(standaloneGraph.compiled && standaloneGraph.plan.nodes.size() == 1
+                    && standaloneGraph.plan.nodes.front().slotId == "host-master-gain",
+                "Standalone host validation did not compile the package DSP graph.");
 
         const auto standalonePlaybackStarted = Clock::now();
         const auto standaloneMagnitude = renderQueuedPerformanceSurfaceMagnitude(
@@ -203,6 +238,14 @@ int main(int argc, char** argv)
                                         "Plugin host validation");
         processor->prepareToPlay(44100.0, 512);
         processor->serviceMessageThreadWork();
+        const auto pluginPayload
+            = processor->getEngineFacade().getPerformancePackageActivationPayload();
+        require(pluginPayload != nullptr && pluginPayload->snapshot != nullptr,
+                "Plugin host validation did not retain the package graph snapshot.");
+        const auto pluginGraph = drs::engine::compileDspGraphPlan(*pluginPayload->snapshot);
+        require(pluginGraph.compiled
+                    && pluginGraph.plan.planDigest == standaloneGraph.plan.planDigest,
+                "Plugin and standalone hosts did not compile the same package DSP graph.");
 
         const auto pluginPlaybackStarted = Clock::now();
         const auto pluginMagnitude = renderQueuedPerformanceSurfaceMagnitude(
@@ -252,6 +295,17 @@ int main(int argc, char** argv)
                     && savedStateText.find(selectedPackage.filename().generic_string())
                         != std::string::npos,
                 "Package host state did not persist its explicit package locator binding.");
+        if (!captureStatePath.empty())
+        {
+            fs::create_directories(captureStatePath.parent_path());
+            std::ofstream capture(captureStatePath, std::ios::binary | std::ios::trunc);
+            require(static_cast<bool>(capture),
+                    "Package host-state capture output could not be opened.");
+            capture.write(savedStateText.data(),
+                          static_cast<std::streamsize>(savedStateText.size()));
+            require(static_cast<bool>(capture),
+                    "Package host-state capture output could not be written.");
+        }
 
         const auto restoreStarted = Clock::now();
         auto restoredProcessor = std::make_unique<drs::plugin::Processor>();
@@ -282,6 +336,12 @@ int main(int argc, char** argv)
                     *restoredProcessor, 69, 0.8f, largeV2Qualification ? 64 : 8,
                     largeV2Qualification) > 0.0001f,
                 "Editor-closed host recall did not restore audible package playback.");
+        const auto restoredPayload
+            = restoredProcessor->getEngineFacade().getPerformancePackageActivationPayload();
+        require(restoredPayload != nullptr && restoredPayload->snapshot != nullptr
+                    && drs::engine::compileDspGraphPlan(*restoredPayload->snapshot).plan.planDigest
+                        == pluginGraph.plan.planDigest,
+                "Editor-closed host recall did not restore the active package DSP graph.");
         std::unique_ptr<juce::AudioProcessorEditor> restoredEditor(
             restoredProcessor->createEditor());
         require(restoredEditor != nullptr,
@@ -321,7 +381,7 @@ int main(int argc, char** argv)
         editor.reset();
         processor.reset();
         standalone.reset();
-        if (argc < 2)
+        if (argc < 2 && captureStatePath.empty())
             fs::remove_all(generatedFixtureRoot);
         return 0;
     }
