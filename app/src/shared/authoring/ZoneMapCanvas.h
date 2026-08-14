@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/AuthoringSession.h"
+#include "shared/authoring/ZoneMapViewState.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -75,8 +76,8 @@ public:
     bool requestZoomAt(juce::Point<float> position, float wheelDelta);
     bool requestPanBy(juce::Point<float> pixelDelta);
     void resetViewport();
-    float getZoomFactor() const noexcept { return viewportZoom; }
-    juce::Point<float> getViewportOrigin() const noexcept { return viewportOrigin; }
+    float getZoomFactor() const noexcept { return viewport.getZoom(); }
+    juce::Point<float> getViewportOrigin() const noexcept { return viewport.getOrigin(); }
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
@@ -126,11 +127,10 @@ private:
     struct PanGesture
     {
         juce::Point<float> start;
-        juce::Point<float> initialViewportOrigin;
+        ZoneMapViewState initialViewport;
     };
 
     juce::Rectangle<float> getInnerBounds() const;
-    juce::Point<float> clampViewportOrigin(juce::Point<float> origin) const;
     juce::Point<float> normalizedContentToCanvas(juce::Point<float> position) const;
     drs::engine::AuthoringZoneSummary getDisplayZoneSummary(std::size_t index) const;
     juce::Rectangle<float> computeZoneBounds(const drs::engine::AuthoringZoneSummary& zone) const;
@@ -178,8 +178,7 @@ private:
     std::optional<CrossfadeGesture> focusedCrossfadeGesture;
     std::optional<MarqueeGesture> activeMarqueeGesture;
     std::optional<PanGesture> activePanGesture;
-    float viewportZoom = 1.0f;
-    juce::Point<float> viewportOrigin;
+    ZoneMapViewState viewport;
     bool sampleFileDragActive = false;
 };
 } // namespace drs::app::authoring

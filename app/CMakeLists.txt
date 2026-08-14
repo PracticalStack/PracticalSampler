@@ -48,6 +48,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/authoring/ZoneMappingEditor.h
     src/shared/authoring/ZoneMapCanvas.cpp
     src/shared/authoring/ZoneMapCanvas.h
+    src/shared/authoring/ZoneMapViewState.cpp
+    src/shared/authoring/ZoneMapViewState.h
 )
 
 set(DRS_STANDALONE_SOURCES

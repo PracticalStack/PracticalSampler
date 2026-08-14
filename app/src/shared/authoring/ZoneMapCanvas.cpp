@@ -28,9 +28,6 @@ constexpr float rangeHandleHitRadius = 12.0f;
 constexpr float crossfadeHandleRadius = 7.0f;
 constexpr float crossfadeHandleHitRadius = 14.0f;
 constexpr float marqueeDragThreshold = 4.0f;
-constexpr float minimumViewportZoom = 1.0f;
-constexpr float maximumViewportZoom = 8.0f;
-constexpr float viewportZoomSensitivity = 1.5f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
 
 bool isSupportedSampleFile(const juce::String& path)
@@ -249,57 +246,28 @@ bool ZoneMapCanvas::requestZoomAt(juce::Point<float> position, float wheelDelta)
         return false;
     }
 
-    const auto nextZoom = juce::jlimit(
-        minimumViewportZoom,
-        maximumViewportZoom,
-        viewportZoom * std::exp(wheelDelta * viewportZoomSensitivity));
-    if (juce::approximatelyEqual(nextZoom, viewportZoom))
-        return false;
-
     const auto pointerProportion = juce::Point<float> {
         juce::jlimit(0.0f, 1.0f, (position.x - inner.getX()) / inner.getWidth()),
         juce::jlimit(0.0f, 1.0f, (position.y - inner.getY()) / inner.getHeight())
     };
-    const auto contentAtPointer = viewportOrigin + pointerProportion / viewportZoom;
-    viewportZoom = nextZoom;
-    viewportOrigin = clampViewportOrigin(contentAtPointer - pointerProportion / viewportZoom);
-    if (juce::approximatelyEqual(viewportZoom, minimumViewportZoom))
-    {
-        viewportZoom = minimumViewportZoom;
-        viewportOrigin = {};
-    }
+    if (!viewport.zoomAt(pointerProportion, wheelDelta))
+        return false;
     repaint();
     return true;
 }
 
 bool ZoneMapCanvas::requestPanBy(juce::Point<float> pixelDelta)
 {
-    if (viewportZoom <= minimumViewportZoom
-        || (juce::approximatelyEqual(pixelDelta.x, 0.0f)
-            && juce::approximatelyEqual(pixelDelta.y, 0.0f)))
-    {
-        return false;
-    }
-
     const auto inner = getInnerBounds();
-    const auto nextOrigin = clampViewportOrigin(
-        viewportOrigin
-        - juce::Point<float> {
-            pixelDelta.x / (inner.getWidth() * viewportZoom),
-            pixelDelta.y / (inner.getHeight() * viewportZoom)
-        });
-    if (nextOrigin == viewportOrigin)
+    if (!viewport.panByPixels(pixelDelta, { inner.getWidth(), inner.getHeight() }))
         return false;
-
-    viewportOrigin = nextOrigin;
     repaint();
     return true;
 }
 
 void ZoneMapCanvas::resetViewport()
 {
-    viewportZoom = minimumViewportZoom;
-    viewportOrigin = {};
+    viewport.reset();
     activePanGesture.reset();
     setMouseCursor(juce::MouseCursor::NormalCursor);
     repaint();
@@ -480,12 +448,12 @@ void ZoneMapCanvas::paint(juce::Graphics& g)
         g.drawRoundedRectangle(marqueeBounds, 6.0f, 1.5f);
     }
 
-    const auto zoomText = viewportZoom > minimumViewportZoom
-        ? juce::String(std::lround(viewportZoom * 100.0f)) + "%  |  Drag empty space to pan"
+    const auto zoomText = viewport.getZoom() > ZoneMapViewState::minimumZoom
+        ? juce::String(std::lround(viewport.getZoom() * 100.0f)) + "%  |  Drag empty space to pan"
         : juce::String("Ctrl + scroll to zoom");
     g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
     const auto zoomTextWidth = std::min(getWidth() - 24,
-                                        viewportZoom > minimumViewportZoom ? 220 : 142);
+                                        viewport.getZoom() > ZoneMapViewState::minimumZoom ? 220 : 142);
     auto zoomBounds = getLocalBounds().reduced(12).removeFromTop(22).removeFromRight(zoomTextWidth);
     g.setColour(zoneMapLabelFill);
     g.fillRoundedRectangle(zoomBounds.toFloat(), 6.0f);
@@ -535,11 +503,11 @@ void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
     if (beginRangeGestureAt(event.position))
         return;
 
-    if (viewportZoom > minimumViewportZoom
+    if (viewport.getZoom() > ZoneMapViewState::minimumZoom
         && event.mods.isLeftButtonDown()
         && !findZoneIndexAt(event.position).has_value())
     {
-        activePanGesture = PanGesture { event.position, viewportOrigin };
+        activePanGesture = PanGesture { event.position, viewport };
         setMouseCursor(juce::MouseCursor::DraggingHandCursor);
         return;
     }
@@ -584,14 +552,10 @@ void ZoneMapCanvas::mouseDrag(const juce::MouseEvent& event)
 
     if (activePanGesture.has_value())
     {
-        const auto inner = getInnerBounds();
         const auto pixelDelta = event.position - activePanGesture->start;
-        viewportOrigin = clampViewportOrigin(
-            activePanGesture->initialViewportOrigin
-            - juce::Point<float> {
-                pixelDelta.x / (inner.getWidth() * viewportZoom),
-                pixelDelta.y / (inner.getHeight() * viewportZoom)
-            });
+        viewport = activePanGesture->initialViewport;
+        const auto inner = getInnerBounds();
+        viewport.panByPixels(pixelDelta, { inner.getWidth(), inner.getHeight() });
         repaint();
         return;
     }
@@ -714,21 +678,13 @@ juce::Rectangle<float> ZoneMapCanvas::getInnerBounds() const
     return getLocalBounds().toFloat().reduced(12.0f);
 }
 
-juce::Point<float> ZoneMapCanvas::clampViewportOrigin(juce::Point<float> origin) const
-{
-    const auto maximumOrigin = 1.0f - 1.0f / viewportZoom;
-    return {
-        juce::jlimit(0.0f, maximumOrigin, origin.x),
-        juce::jlimit(0.0f, maximumOrigin, origin.y)
-    };
-}
-
 juce::Point<float> ZoneMapCanvas::normalizedContentToCanvas(juce::Point<float> position) const
 {
     const auto inner = getInnerBounds();
+    const auto viewportPosition = viewport.contentToViewport(position);
     return {
-        inner.getX() + (position.x - viewportOrigin.x) * viewportZoom * inner.getWidth(),
-        inner.getY() + (position.y - viewportOrigin.y) * viewportZoom * inner.getHeight()
+        inner.getX() + viewportPosition.x * inner.getWidth(),
+        inner.getY() + viewportPosition.y * inner.getHeight()
     };
 }
 
@@ -778,10 +734,11 @@ juce::Rectangle<float> ZoneMapCanvas::computeZoneBounds(const drs::engine::Autho
     });
     const auto x = topLeft.x;
     const auto width = std::max(10.0f,
-                                inner.getWidth() * viewportZoom
+                                inner.getWidth() * viewport.getZoom()
                                     * (static_cast<float>(zone.keyHigh - zone.keyLow + 1) / 128.0f));
     const auto normalizedVelocityHeight = static_cast<float>(zone.velocityHigh - zone.velocityLow) / 127.0f;
-    const auto height = std::max(14.0f, inner.getHeight() * viewportZoom * normalizedVelocityHeight);
+    const auto height = std::max(14.0f,
+                                 inner.getHeight() * viewport.getZoom() * normalizedVelocityHeight);
     return {x, topLeft.y, width, height};
 }
 
@@ -1166,7 +1123,7 @@ int ZoneMapCanvas::positionToMidiKey(juce::Point<float> position) const
     const auto inner = getInnerBounds();
     const auto viewportProportion = juce::jlimit(
         0.0f, 1.0f, (position.x - inner.getX()) / inner.getWidth());
-    const auto contentProportion = viewportOrigin.x + viewportProportion / viewportZoom;
+    const auto contentProportion = viewport.viewportToContent({ viewportProportion, 0.0f }).x;
     return juce::jlimit(0, 127, static_cast<int>(std::lround(contentProportion * 127.0f)));
 }
 
@@ -1175,7 +1132,7 @@ int ZoneMapCanvas::positionToMidiVelocity(juce::Point<float> position) const
     const auto inner = getInnerBounds();
     const auto viewportProportion = juce::jlimit(
         0.0f, 1.0f, (position.y - inner.getY()) / inner.getHeight());
-    const auto contentProportion = viewportOrigin.y + viewportProportion / viewportZoom;
+    const auto contentProportion = viewport.viewportToContent({ 0.0f, viewportProportion }).y;
     return juce::jlimit(1, 127, static_cast<int>(std::lround((1.0f - contentProportion) * 127.0f)));
 }
 
