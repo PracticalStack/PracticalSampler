@@ -1,0 +1,50 @@
+{
+  "policyId": "drs.performancePackage.fxRouting.v1",
+  "cases": [
+    {
+      "id": "legacy-package-legacy-reader",
+      "packageSchemaVersion": 1,
+      "instrumentSchemaVersions": [1, 2, 3],
+      "minimumReaderSchemaVersion": 1,
+      "readerSchemaVersion": 1,
+      "graphState": "absent",
+      "expectedResult": "load-empty-graph"
+    },
+    {
+      "id": "legacy-package-new-reader",
+      "packageSchemaVersion": 1,
+      "instrumentSchemaVersions": [1, 2, 3],
+      "minimumReaderSchemaVersion": 1,
+      "readerSchemaVersion": 2,
+      "graphState": "absent",
+      "expectedResult": "load-empty-graph"
+    },
+    {
+      "id": "dsp-package-legacy-reader",
+      "packageSchemaVersion": 2,
+      "instrumentSchemaVersions": [4],
+      "minimumReaderSchemaVersion": 2,
+      "readerSchemaVersion": 1,
+      "graphState": "valid",
+      "expectedResult": "reject-before-activation"
+    },
+    {
+      "id": "dsp-package-new-reader",
+      "packageSchemaVersion": 2,
+      "instrumentSchemaVersions": [4],
+      "minimumReaderSchemaVersion": 2,
+      "readerSchemaVersion": 2,
+      "graphState": "valid",
+      "expectedResult": "load-compiled-graph"
+    },
+    {
+      "id": "invalid-dsp-package-new-reader",
+      "packageSchemaVersion": 2,
+      "instrumentSchemaVersions": [4],
+      "minimumReaderSchemaVersion": 2,
+      "readerSchemaVersion": 2,
+      "graphState": "invalid",
+      "expectedResult": "playback-compatibility-failure"
+    }
+  ]
+}

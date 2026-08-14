@@ -1,0 +1,9 @@
+{
+  "fixture": "runtime-instrument-v4-invalid-graph.json",
+  "expectedFindingCodes": [
+    "graph-invalid-owner-source",
+    "graph-unknown-group-bus",
+    "graph-duplicate-slot-owner",
+    "graph-unknown-slot"
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "schemaName": "drs.instrument",
+  "schemaVersion": 4,
+  "instrumentId": "drs.px01.invalid-graph",
+  "displayName": "PX-01 Invalid Graph",
+  "sourceProject": "package://authoring/unavailable",
+  "compiledStreamAsset": "package://payload/runtime-stream-index",
+  "defaultLoadProfile": "balanced",
+  "macros": [],
+  "articulations": [
+    { "id": "sustain", "name": "Sustain", "isDefault": true }
+  ],
+  "groups": [
+    {
+      "id": "piano",
+      "name": "Piano",
+      "articulationIds": ["sustain"],
+      "gainDb": 0.0,
+      "routingBusId": "missing-group-bus"
+    }
+  ],
+  "zones": [
+    {
+      "id": "piano-c4",
+      "groupId": "piano",
+      "articulationId": "sustain",
+      "samplePath": "package://sample/piano-c4",
+      "streamAssetPath": "package://payload/runtime-stream-index",
+      "rootKey": 60,
+      "keyLow": 0,
+      "keyHigh": 127,
+      "velocityLow": 1,
+      "velocityHigh": 127,
+      "gainDb": 0.0,
+      "sampleStartFrame": 0,
+      "streamOffsetBytes": 0,
+      "prefetchBytes": 16384,
+      "releaseSeconds": 0.25,
+      "roundRobinLength": 0,
+      "roundRobinPosition": 0
+    }
+  ],
+  "fxSlots": [
+    {
+      "id": "drive",
+      "displayName": "Drive",
+      "effectType": "drs.saturator",
+      "effectVersion": 1,
+      "bypassed": false,
+      "parameters": [
+        { "id": "driveDb", "value": 7.5 }
+      ]
+    }
+  ],
+  "routingBuses": [
+    {
+      "id": "bad-owner",
+      "displayName": "Bad Owner",
+      "inputSourceId": "group/piano",
+      "fxSlotIds": ["drive"],
+      "chainBypassed": false
+    },
+    {
+      "id": "duplicate-owner",
+      "displayName": "Duplicate Owner",
+      "inputSourceId": "master",
+      "fxSlotIds": ["drive", "missing-slot"],
+      "chainBypassed": false
+    }
+  ],
+  "roundRobinResetRules": [],
+  "controllerDefaults": [],
+  "validationNotes": [
+    "PX-01 validation fixture: non-canonical owner, missing group bus, duplicate slot ownership, and unknown slot reference must fail closed."
+  ]
+}

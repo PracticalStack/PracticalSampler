@@ -3690,6 +3690,77 @@ add_test(
     COMMAND drs_phase1_performance_package_tests
 )
 
+add_executable(drs_packaged_instrument_fx_routing_contract_tests
+    src/PackagedInstrumentFxRoutingContractTests.cpp
+)
+
+target_link_libraries(drs_packaged_instrument_fx_routing_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_packaged_instrument_fx_routing_contract_tests PRIVATE cxx_std_17)
+
+target_compile_definitions(drs_packaged_instrument_fx_routing_contract_tests
+    PRIVATE
+        DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/packaged-instrument-fx-routing"
+)
+
+target_include_directories(drs_packaged_instrument_fx_routing_contract_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+add_test(
+    NAME drs.packaged_instrument_fx_routing.contract
+    COMMAND drs_packaged_instrument_fx_routing_contract_tests
+)
+
+set_target_properties(drs_packaged_instrument_fx_routing_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+juce_add_console_app(drs_px01_fx_routing_contract_red_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Packaged Instrument FX Routing Expected Red Tests"
+)
+
+target_sources(drs_px01_fx_routing_contract_red_tests
+    PRIVATE
+        src/PackagedInstrumentFxRoutingContractRedTests.cpp
+)
+
+target_link_libraries(drs_px01_fx_routing_contract_red_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        drs_sampler_core
+        drs_sample_import
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_px01_fx_routing_contract_red_tests PRIVATE cxx_std_17)
+
+target_compile_definitions(drs_px01_fx_routing_contract_red_tests
+    PRIVATE
+        DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/packaged-instrument-fx-routing"
+)
+
+target_include_directories(drs_px01_fx_routing_contract_red_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
+)
+
+# PX-01 expected-red seams are invoked directly by name. They are deliberately
+# excluded from CTest and drs_all_tests until their production slices land.
+set_target_properties(drs_px01_fx_routing_contract_red_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 juce_add_console_app(drs_phase1_performance_package_loader_tests
     PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Loader Tests"
 )
@@ -4325,6 +4396,7 @@ add_dependencies(drs_all_tests
     drs_phase1_runtime_baseline_guard
     drs_phase1_runtime_fixture_tool
     drs_phase1_performance_package_tests
+    drs_packaged_instrument_fx_routing_contract_tests
     drs_phase1_performance_package_loader_tests
     drs_phase1_performance_package_session_tests
     drs_performance_package_export_lifecycle_tests

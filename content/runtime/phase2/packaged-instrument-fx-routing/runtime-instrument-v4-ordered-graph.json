@@ -1,0 +1,120 @@
+{
+  "schemaName": "drs.instrument",
+  "schemaVersion": 4,
+  "instrumentId": "drs.px01.ordered-graph",
+  "displayName": "PX-01 Ordered Graph",
+  "sourceProject": "package://authoring/unavailable",
+  "compiledStreamAsset": "package://payload/runtime-stream-index",
+  "defaultLoadProfile": "balanced",
+  "macros": [],
+  "articulations": [
+    {
+      "id": "sustain",
+      "name": "Sustain",
+      "isDefault": true
+    }
+  ],
+  "groups": [
+    {
+      "id": "piano",
+      "name": "Piano",
+      "articulationIds": ["sustain"],
+      "gainDb": 0.0,
+      "routingBusId": "bus-group-piano"
+    }
+  ],
+  "zones": [
+    {
+      "id": "piano-c4",
+      "groupId": "piano",
+      "articulationId": "sustain",
+      "samplePath": "package://sample/piano-c4",
+      "streamAssetPath": "package://payload/runtime-stream-index",
+      "rootKey": 60,
+      "keyLow": 0,
+      "keyHigh": 127,
+      "velocityLow": 1,
+      "velocityHigh": 127,
+      "gainDb": 0.0,
+      "sampleStartFrame": 0,
+      "streamOffsetBytes": 0,
+      "prefetchBytes": 16384,
+      "releaseSeconds": 0.25,
+      "roundRobinLength": 0,
+      "roundRobinPosition": 0
+    }
+  ],
+  "fxSlots": [
+    {
+      "id": "air",
+      "displayName": "Air",
+      "effectType": "drs.compactEq",
+      "effectVersion": 1,
+      "bypassed": true,
+      "parameters": [
+        { "id": "mode", "value": 1.0 },
+        { "id": "frequencyHz", "value": 8000.0 },
+        { "id": "q", "value": 0.707 },
+        { "id": "gainDb", "value": 1.5 },
+        { "id": "mix", "value": 1.0 }
+      ]
+    },
+    {
+      "id": "drive",
+      "displayName": "Drive",
+      "effectType": "drs.saturator",
+      "effectVersion": 1,
+      "bypassed": false,
+      "parameters": [
+        { "id": "character", "value": 0.0 },
+        { "id": "driveDb", "value": 7.5 },
+        { "id": "tone", "value": 0.55 },
+        { "id": "mix", "value": 0.8 },
+        { "id": "outputDb", "value": -1.0 }
+      ]
+    },
+    {
+      "id": "room",
+      "displayName": "Room",
+      "effectType": "drs.algorithmicReverb",
+      "effectVersion": 1,
+      "bypassed": false,
+      "parameters": [
+        { "id": "preDelayMs", "value": 18.0 },
+        { "id": "size", "value": 0.62 },
+        { "id": "decaySeconds", "value": 2.5 },
+        { "id": "damping", "value": 0.45 },
+        { "id": "width", "value": 1.0 },
+        { "id": "mix", "value": 0.18 }
+      ]
+    }
+  ],
+  "routingBuses": [
+    {
+      "id": "bus-zone-piano-c4",
+      "displayName": "C4 Insert",
+      "inputSourceId": "zones/piano-c4",
+      "fxSlotIds": ["air"],
+      "chainBypassed": true
+    },
+    {
+      "id": "bus-group-piano",
+      "displayName": "Piano Insert",
+      "inputSourceId": "groups/piano",
+      "fxSlotIds": ["drive"],
+      "chainBypassed": false
+    },
+    {
+      "id": "bus-master",
+      "displayName": "Master Insert",
+      "inputSourceId": "master",
+      "fxSlotIds": ["room"],
+      "chainBypassed": false
+    }
+  ],
+  "roundRobinResetRules": [],
+  "controllerDefaults": [],
+  "validationNotes": [
+    "PX-01 canonical parse and serialization fixture."
+  ]
+}
