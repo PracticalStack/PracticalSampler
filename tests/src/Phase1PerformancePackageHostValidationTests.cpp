@@ -4,6 +4,8 @@
 #include "Phase1PerformancePackageSupport.h"
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/PackageV2StreamingExport.h"
+#include "shared/PlayableInstrumentLicenseViewer.h"
+#include "shared/WorkspaceMenuPolicy.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
@@ -140,6 +142,30 @@ void requirePerformanceOnlyWorkspace(const drs::engine::WorkspaceDocumentState& 
             context + " should suppress authoring controls.");
 }
 
+std::string expectedLicenseDisplayText()
+{
+    const auto bytes = package_support::buildLicenseTextFixture();
+    return { bytes.begin() + 3, bytes.end() };
+}
+
+void requireLicenseViewerContract(const std::shared_ptr<const std::string>& licenseText,
+                                  const std::string& context)
+{
+    require(licenseText != nullptr && *licenseText == expectedLicenseDisplayText(),
+            context + " should retain the authenticated license display text.");
+    drs::app::PlayableInstrumentLicenseViewer viewer(licenseText);
+    viewer.setSize(280, 240);
+    viewer.resized();
+    auto* editor = dynamic_cast<juce::TextEditor*>(
+        findDescendantById(viewer, "playableInstrumentLicenseText"));
+    auto* closeButton = dynamic_cast<juce::TextButton*>(
+        findDescendantById(viewer, "playableInstrumentLicenseCloseButton"));
+    require(editor != nullptr && editor->isReadOnly() && editor->isMultiLine()
+                && editor->getText().toStdString() == *licenseText
+                && closeButton != nullptr && closeButton->getButtonText() == "Close",
+            context + " should expose the shared read-only license viewer contract.");
+}
+
 fs::path buildSemanticPackageV2Fixture(const fs::path& scratchDirectory)
 {
     fs::remove_all(scratchDirectory);
@@ -231,6 +257,11 @@ int main(int argc, char** argv)
                 "Standalone host validation should not publish a package failure category for the valid fixture.");
         requirePerformanceOnlyWorkspace(standalone->getProcessor().getWorkspaceDocumentState(),
                                         "Standalone host validation");
+        const auto standaloneLicense
+            = standalone->getEngineFacade().getPerformancePackageLicenseText();
+        require(drs::app::shouldShowViewLicenseMenuItem(true, standaloneLicense != nullptr),
+                "Standalone Performance File menu should expose View License.");
+        requireLicenseViewerContract(standaloneLicense, "Standalone host validation");
         standalone->getProcessor().prepareToPlay(44100.0, 512);
         standalone->getProcessor().serviceMessageThreadWork();
         const auto standalonePayload
@@ -294,6 +325,11 @@ int main(int argc, char** argv)
                 "Plugin host validation should not publish a package failure category for the valid fixture.");
         requirePerformanceOnlyWorkspace(processor->getWorkspaceDocumentState(),
                                         "Plugin host validation");
+        const auto pluginLicense
+            = processor->getEngineFacade().getPerformancePackageLicenseText();
+        require(drs::app::shouldShowViewLicenseMenuItem(true, pluginLicense != nullptr),
+                "Plugin Performance File menu should expose View License.");
+        requireLicenseViewerContract(pluginLicense, "Plugin host validation");
         processor->prepareToPlay(44100.0, 512);
         processor->serviceMessageThreadWork();
         initialPerformancePanel->refreshNow();
@@ -324,6 +360,8 @@ int main(int argc, char** argv)
         require(reopenedControlsToggle->getButtonText() == "Show Controls"
                     && !reopenedPackageMixer->isVisible(),
                 "Instrument Controls should retain the user's hidden choice while the plugin session remains active.");
+        require(processor->getEngineFacade().getPerformancePackageLicenseText() == pluginLicense,
+                "Reopening the plugin editor must preserve the package-owned immutable license pointer.");
         const auto pluginPayload
             = processor->getEngineFacade().getPerformancePackageActivationPayload();
         require(pluginPayload != nullptr && pluginPayload->snapshot != nullptr,
@@ -384,9 +422,8 @@ int main(int argc, char** argv)
         require(pluginPlaybackElapsed <= (largeV2Qualification
                     ? std::chrono::milliseconds(6000) : std::chrono::milliseconds(1000)),
                 "Plugin initial package playback exceeded the reviewed host-validation budget.");
-        require(!largeV2Qualification
-                    || (standaloneActivationElapsed <= std::chrono::milliseconds(16)
-                        && pluginActivationElapsed <= std::chrono::milliseconds(16)),
+        require(standaloneActivationElapsed <= std::chrono::milliseconds(16)
+                    && pluginActivationElapsed <= std::chrono::milliseconds(16),
                 "Prepared package activation exceeded the 16 ms message-thread budget: standalone="
                     + std::to_string(standaloneActivationElapsed.count()) + " us, plugin="
                     + std::to_string(pluginActivationElapsed.count()) + " us.");
@@ -455,6 +492,14 @@ int main(int argc, char** argv)
                     && drs::engine::compileDspGraphPlan(*restoredPayload->snapshot).plan.planDigest
                         == pluginGraph.plan.planDigest,
                 "Editor-closed host recall did not restore the active package DSP graph.");
+        const auto restoredLicense
+            = restoredProcessor->getEngineFacade().getPerformancePackageLicenseText();
+        require(drs::app::shouldShowViewLicenseMenuItem(true, restoredLicense != nullptr),
+                "Package locator restore should restore View License availability.");
+        requireLicenseViewerContract(restoredLicense, "Package locator restore");
+        const auto restoredRealtime = restoredProcessor->getRealtimeSafetySnapshot();
+        require(restoredRealtime.getAudioThreadViolationCount() == 0,
+                "License-enabled package locator restore reported audio-thread I/O or allocation.");
         std::unique_ptr<juce::AudioProcessorEditor> restoredEditor(
             restoredProcessor->createEditor());
         require(restoredEditor != nullptr,

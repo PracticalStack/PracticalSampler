@@ -2,13 +2,16 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReader.h"
 #include "drs/engine/PackageReaderDispatch.h"
+#include "drs/engine/PackageV2.h"
 #include "drs/engine/PerformancePackage.h"
+#include "drs/engine/PlayableInstrumentLicense.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/SamplerRenderModel.h"
 #include "plugin/PluginEditor.h"
 #include "plugin/PluginProcessor.h"
 #include "shared/PerformancePackageExportService.h"
+#include "shared/PlayableInstrumentLicenseViewer.h"
 #include "shared/WorkspaceMenuPolicy.h"
 #include "standalone/MainComponent.h"
 #include "Phase1PerformancePackageSupport.h"
@@ -64,6 +67,16 @@ void writeTextFile(const fs::path& path, const std::string& text)
     require(output.good(), "Could not finish writing performance package release gate artifact: " + path.generic_string());
 }
 
+void writeBinaryFile(const fs::path& path, const std::vector<std::uint8_t>& bytes)
+{
+    fs::create_directories(path.parent_path());
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    require(output.good(), "Could not open release-gate binary fixture: " + path.generic_string());
+    output.write(reinterpret_cast<const char*>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
+    require(output.good(), "Could not finish release-gate binary fixture: " + path.generic_string());
+}
+
 juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
 {
     if (root.getComponentID() == componentId)
@@ -76,6 +89,56 @@ juce::Component* findDescendantById(juce::Component& root, const juce::String& c
     }
 
     return nullptr;
+}
+
+std::string expectedLicenseDisplayText()
+{
+    const auto bytes = package_support::buildLicenseTextFixture();
+    return { bytes.begin() + 3, bytes.end() };
+}
+
+bool validateLicenseViewer(const std::shared_ptr<const std::string>& licenseText)
+{
+    if (licenseText == nullptr || *licenseText != expectedLicenseDisplayText())
+        return false;
+
+    drs::app::PlayableInstrumentLicenseViewer viewer(licenseText);
+    viewer.setSize(280, 240);
+    viewer.resized();
+    auto* editor = dynamic_cast<juce::TextEditor*>(
+        findDescendantById(viewer, "playableInstrumentLicenseText"));
+    auto* closeButton = dynamic_cast<juce::TextButton*>(
+        findDescendantById(viewer, "playableInstrumentLicenseCloseButton"));
+    if (editor == nullptr || closeButton == nullptr || !editor->isReadOnly()
+        || !editor->isMultiLine() || editor->getText().toStdString() != *licenseText
+        || closeButton->getButtonText() != "Close")
+    {
+        return false;
+    }
+
+    editor->selectAll();
+    return editor->getHighlightedText() == editor->getText()
+        && viewer.getLocalBounds().contains(editor->getBounds())
+        && viewer.getLocalBounds().contains(closeButton->getBounds());
+}
+
+drs::engine::RuntimeProjectModel buildLicensedAuthoringProjectFixture(
+    const fs::path& contentRoot)
+{
+    auto project = package_support::buildAuthoringProjectFixture();
+    const auto sourceRoot = fs::path(project.contentRootPath);
+    for (const auto& sample : project.sampleSources)
+    {
+        const auto source = sourceRoot / sample.path;
+        const auto destination = contentRoot / sample.path;
+        fs::create_directories(destination.parent_path());
+        require(fs::copy_file(source, destination, fs::copy_options::overwrite_existing),
+                "Could not stage the licensed release-gate sample fixture.");
+    }
+    writeBinaryFile(contentRoot / drs::engine::playableInstrumentLicenseFileName,
+                    package_support::buildLicenseTextFixture());
+    project.contentRootPath = contentRoot.generic_string();
+    return project;
 }
 
 float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
@@ -546,6 +609,76 @@ ordered_json buildFxRoutingParitySection(const fs::path& scratchDirectory)
     return section;
 }
 
+ordered_json buildLicenseEvidenceSection(
+    const fs::path& packagePath,
+    const drs::plugin::PerformancePackageExportResult& exportResult)
+{
+    const auto loaded = drs::engine::loadPerformancePackageV2Metadata(
+        packagePath.generic_string());
+    require(loaded.loaded && loaded.package != nullptr,
+            "The licensed release-gate package did not reopen.");
+
+    const auto expectedBytes = package_support::buildLicenseTextFixture();
+    const auto licenseRecordCount = std::count_if(
+        loaded.package->records.begin(), loaded.package->records.end(), [](const auto& record)
+        {
+            return record.identity.kind == drs::engine::PackageV2RecordKind::licenseText;
+        });
+    const auto firstLicenseRecord = std::find_if(
+        loaded.package->records.begin(), loaded.package->records.end(), [](const auto& record)
+        {
+            return record.identity.kind == drs::engine::PackageV2RecordKind::licenseText;
+        });
+    require(firstLicenseRecord != loaded.package->records.end(),
+            "The licensed release-gate package did not contain a license record.");
+
+    const auto tamperedPath = packagePath.parent_path() / "release-gate-license-tampered.drpkg";
+    require(fs::copy_file(packagePath, tamperedPath, fs::copy_options::overwrite_existing),
+            "Could not copy the release-gate package for license corruption.");
+    {
+        std::fstream file(tamperedPath, std::ios::binary | std::ios::in | std::ios::out);
+        const auto offset = firstLicenseRecord->sealedOffsetBytes + 16u;
+        file.seekg(static_cast<std::streamoff>(offset));
+        char value = 0;
+        file.read(&value, 1);
+        value ^= 0x01;
+        file.seekp(static_cast<std::streamoff>(offset));
+        file.write(&value, 1);
+        require(file.good(), "Could not corrupt the authenticated license record.");
+    }
+    const auto tampered = drs::engine::loadPerformancePackageV2Metadata(
+        tamperedPath.generic_string());
+    const auto corruptionRejected = !tampered.loaded
+        && package_support::containsIssue(tampered.issues, "authentication");
+
+    ordered_json section;
+    section["declared"] = loaded.metadata.manifest.license.payloadId
+        == drs::engine::playableInstrumentLicensePayloadId;
+    section["loaded"] = loaded.metadata.licenseText.loaded;
+    section["payloadId"] = loaded.metadata.licenseText.payload.payloadId;
+    section["mediaType"] = loaded.metadata.licenseText.payload.mediaType;
+    section["logicalPath"] = loaded.metadata.licenseText.payload.logicalPath;
+    section["licenseBytes"] = loaded.metadata.licenseText.payload.plaintextBytes.size();
+    section["licenseRecordCount"] = licenseRecordCount;
+    section["exportedPackageBytes"] = exportResult.packageBytes;
+    section["filesystemPackageBytes"] = fs::file_size(packagePath);
+    section["exportedPayloadCount"] = exportResult.payloadCount;
+    section["exactBytes"] = loaded.metadata.licenseText.payload.plaintextBytes == expectedBytes;
+    section["schemaUnchanged"] = loaded.metadata.manifest.schemaVersion
+        == drs::engine::performancePackageLegacySchemaVersion;
+    section["corruptionRejected"] = corruptionRejected;
+    section["corruptionFailureCategory"]
+        = drs::engine::toString(tampered.metadata.failureCategory);
+    section["passed"] = section["declared"].get<bool>()
+        && section["loaded"].get<bool>()
+        && section["exactBytes"].get<bool>()
+        && section["schemaUnchanged"].get<bool>()
+        && corruptionRejected
+        && licenseRecordCount == 1
+        && exportResult.packageBytes == fs::file_size(packagePath);
+    return section;
+}
+
 ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
 {
     juce::ScopedJuceInitialiser_GUI gui;
@@ -556,7 +689,8 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     drs::standalone::MainComponent standalone(false);
     standalone.addToDesktop(0);
     standalone.setVisible(true);
-    require(standalone.getProcessor().replaceAuthoringProject(package_support::buildAuthoringProjectFixture()),
+    require(standalone.getProcessor().replaceAuthoringProject(
+                buildLicensedAuthoringProjectFixture(scratchDirectory / "licensed-content")),
             "Release gate standalone shell should accept the authoring export fixture.");
 
     const auto standaloneExportStarted = Clock::now();
@@ -566,6 +700,8 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     require(exportResult.exported,
             "Release gate package export should succeed. state="
                 + exportResult.state + " issues=" + summarizeIssues(exportResult.issues));
+    const auto licenseEvidence = buildLicenseEvidenceSection(
+        exportedPackagePath, exportResult);
 
     const auto standaloneOpenStarted = Clock::now();
     const auto standaloneLoad = standalone.getProcessor().loadPerformancePackageWorkspace(packageFile);
@@ -574,11 +710,17 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     require(standaloneLoad.loaded,
             "Release gate standalone reopen should succeed. state="
                 + standaloneLoad.state + " issues=" + summarizeIssues(standaloneLoad.issues));
+    const auto standaloneLicense
+        = standalone.getEngineFacade().getPerformancePackageLicenseText();
+    const auto standaloneViewLicenseAvailable = drs::app::shouldShowViewLicenseMenuItem(
+        true, standaloneLicense != nullptr);
+    const auto standaloneViewerValid = validateLicenseViewer(standaloneLicense);
 
     standalone.resized();
     standalone.getProcessor().prepareToPlay(44100.0, 512);
     standalone.getProcessor().serviceMessageThreadWork();
     const auto standaloneMagnitude = renderQueuedPerformanceSurfaceMagnitude(standalone.getProcessor(), 69, 0.8f);
+    const auto standaloneRealtime = standalone.getProcessor().getRealtimeSafetySnapshot();
     auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(standalone, "workspaceTabs"));
     const bool standaloneProjectBindingSuppressed
         = standalone.exportStateJson().find("\"projectBinding\"") == std::string::npos;
@@ -596,11 +738,21 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     require(pluginLoad.loaded,
             "Release gate plugin reopen should succeed. state="
                 + pluginLoad.state + " issues=" + summarizeIssues(pluginLoad.issues));
+    const auto pluginLicense = processor.getEngineFacade().getPerformancePackageLicenseText();
+    const auto pluginViewLicenseAvailable = drs::app::shouldShowViewLicenseMenuItem(
+        true, pluginLicense != nullptr);
+    const auto pluginViewerValid = validateLicenseViewer(pluginLicense);
+    editor.reset();
+    editor.reset(processor.createEditor());
+    require(editor != nullptr
+                && processor.getEngineFacade().getPerformancePackageLicenseText() == pluginLicense,
+            "Release gate plugin editor reopen must preserve immutable license ownership.");
 
     editor->resized();
     processor.prepareToPlay(44100.0, 512);
     processor.serviceMessageThreadWork();
     const auto pluginMagnitude = renderQueuedPerformanceSurfaceMagnitude(processor, 69, 0.8f);
+    const auto pluginRealtime = processor.getRealtimeSafetySnapshot();
     auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
     juce::MemoryBlock pluginState;
     require(processor.waitForHostStatePublication(),
@@ -613,6 +765,7 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     section["exportedPackagePath"] = exportedPackagePath.generic_string();
     section["exportedPackageBytes"] = exportResult.packageBytes;
     section["payloadCount"] = exportResult.payloadCount;
+    section["license"] = licenseEvidence;
     section["standaloneExportMs"] = standaloneExportElapsed.count();
     section["standaloneOpenMs"] = standaloneOpenElapsed.count();
     section["standaloneAudibleMagnitude"] = standaloneMagnitude;
@@ -622,6 +775,10 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     section["standaloneTabCount"] = standaloneTabs != nullptr ? standaloneTabs->getNumTabs() : 0;
     section["standaloneHasAuthoringZoneSelector"] = findDescendantById(standalone, "authoringZoneSelector") != nullptr;
     section["standaloneProjectBindingSuppressed"] = standaloneProjectBindingSuppressed;
+    section["standaloneViewLicenseAvailable"] = standaloneViewLicenseAvailable;
+    section["standaloneViewerValid"] = standaloneViewerValid;
+    section["standaloneRealtimeViolations"]
+        = standaloneRealtime.getAudioThreadViolationCount();
     section["pluginOpenMs"] = pluginOpenElapsed.count();
     section["pluginAudibleMagnitude"] = pluginMagnitude;
     section["pluginPerformanceOnly"] = processor.getWorkspaceDocumentState().workspaceMode
@@ -630,6 +787,11 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     section["pluginTabCount"] = pluginTabs != nullptr ? pluginTabs->getNumTabs() : 0;
     section["pluginHasAuthoringZoneSelector"] = findDescendantById(*editor, "authoringZoneSelector") != nullptr;
     section["pluginProjectBindingSuppressed"] = pluginProjectBindingSuppressed;
+    section["pluginViewLicenseAvailable"] = pluginViewLicenseAvailable;
+    section["pluginViewerValid"] = pluginViewerValid;
+    section["pluginEditorReopenRetainedLicense"]
+        = processor.getEngineFacade().getPerformancePackageLicenseText() == pluginLicense;
+    section["pluginRealtimeViolations"] = pluginRealtime.getAudioThreadViolationCount();
     section["passed"] = standaloneMagnitude > 0.0001f
         && pluginMagnitude > 0.0001f
         && section["standalonePerformanceOnly"].get<bool>()
@@ -641,7 +803,14 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
         && !section["standaloneHasAuthoringZoneSelector"].get<bool>()
         && !section["pluginHasAuthoringZoneSelector"].get<bool>()
         && standaloneProjectBindingSuppressed
-        && pluginProjectBindingSuppressed;
+        && pluginProjectBindingSuppressed
+        && licenseEvidence.at("passed").get<bool>()
+        && standaloneViewLicenseAvailable
+        && pluginViewLicenseAvailable
+        && standaloneViewerValid
+        && pluginViewerValid
+        && standaloneRealtime.getAudioThreadViolationCount() == 0
+        && pluginRealtime.getAudioThreadViolationCount() == 0;
     return section;
 }
 

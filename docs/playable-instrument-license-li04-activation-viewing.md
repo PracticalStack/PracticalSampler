@@ -1,6 +1,6 @@
 # Playable Instrument License LI-04 Activation and Viewing
 
-Status: complete on 2026-08-14. This closes the playable-instrument license iteration.
+Status: complete on 2026-08-14. Host and release qualification follows in LI-05.
 
 ## Delivered behavior
 
