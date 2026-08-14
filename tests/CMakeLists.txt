@@ -3957,6 +3957,35 @@ set_target_properties(drs_playable_instrument_license_contract_tests PROPERTIES
     FOLDER "Tests"
 )
 
+juce_add_console_app(drs_playable_instrument_license_project_import_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Playable Instrument License Project Import Tests"
+)
+
+target_sources(drs_playable_instrument_license_project_import_tests
+    PRIVATE
+        src/PlayableInstrumentLicenseProjectImportTests.cpp
+)
+
+target_link_libraries(drs_playable_instrument_license_project_import_tests
+    PRIVATE
+        drs_app_shared
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_playable_instrument_license_project_import_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.playable_instrument_license.project_import
+    COMMAND drs_playable_instrument_license_project_import_tests
+)
+
+set_target_properties(drs_playable_instrument_license_project_import_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_playable_instrument_license_contract_red_tests
     src/PlayableInstrumentLicenseContractRedTests.cpp
 )
@@ -4481,6 +4510,7 @@ add_dependencies(drs_all_tests
     drs_performance_package_export_lifecycle_tests
     drs_phase1_performance_package_host_validation_tests
     drs_playable_instrument_license_contract_tests
+    drs_playable_instrument_license_project_import_tests
     drs_phase1_performance_package_release_gate
 )
 

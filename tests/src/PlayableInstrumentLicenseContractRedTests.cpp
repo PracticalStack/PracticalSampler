@@ -51,7 +51,7 @@ bool seamImplemented(const fs::path& root, const std::string_view seam)
     if (seam == "project-import-storage")
     {
         return containsAll(readText(root / "app/src/shared/ProjectStorage.cpp"),
-                           { "importProjectLicenseFile(", "LICENSE.txt",
+                           { "importProjectLicenseFile(", "playableInstrumentLicenseFileName",
                              "maximumPlayableInstrumentLicenseBytes" });
     }
     if (seam == "package-export-persistence")

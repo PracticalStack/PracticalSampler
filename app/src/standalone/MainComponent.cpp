@@ -716,6 +716,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
             menu.addItem(importWavCommandId, drs::app::importWavMenuLabel);
             menu.addItem(importSfzCommandId, drs::app::importSfzMenuLabel);
             menu.addItem(importBackgroundImageCommandId, drs::app::importBackgroundImageMenuLabel);
+            menu.addItem(importLicenseFileCommandId, drs::app::importLicenseFileMenuLabel);
         }
         menu.addSeparator();
         menu.addItem(exitApplicationCommandId, "Exit");
@@ -763,6 +764,9 @@ void MainComponent::menuItemSelected(int menuItemID, int)
             break;
         case importBackgroundImageCommandId:
             importBackgroundImage();
+            break;
+        case importLicenseFileCommandId:
+            importLicenseFile();
             break;
         case audioDeviceSettingsCommandId:
             showAudioDeviceSettingsDialog();
@@ -1222,6 +1226,72 @@ void MainComponent::importBackgroundImage()
                                                "Background Image Imported",
                                                "Imported background image to:\n"
                                                    + importResult.targetFile.getFullPathName());
+    });
+}
+
+void MainComponent::importLicenseFile()
+{
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return;
+
+    if (currentProjectFile == juce::File())
+    {
+        auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+        saveProjectAs([safeThis](bool saved)
+        {
+            if (saved && safeThis != nullptr)
+                safeThis->importLicenseFile();
+        });
+        return;
+    }
+
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    launchImportLicenseFileChooser([safeThis](juce::File selectedFile)
+    {
+        if (safeThis == nullptr || selectedFile == juce::File())
+            return;
+
+        const auto projectFile = safeThis->currentProjectFile;
+        const auto targetFile = drs::app::getProjectLicenseFile(projectFile);
+        auto performImport = [safeThis, selectedFile, projectFile]()
+        {
+            if (safeThis == nullptr)
+                return;
+
+            const auto importResult = drs::app::importProjectLicenseFile(selectedFile, projectFile);
+            if (!importResult.imported)
+            {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                                       "Import License File Failed",
+                                                       importResult.errorMessage);
+                return;
+            }
+
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                                   "License File Imported",
+                                                   "Imported license file to:\n"
+                                                       + importResult.targetFile.getFullPathName());
+        };
+
+        if (targetFile.existsAsFile() && selectedFile != targetFile)
+        {
+            const auto options = juce::MessageBoxOptions::makeOptionsOkCancel(
+                juce::MessageBoxIconType::WarningIcon,
+                "Replace License File?",
+                "This project already contains LICENSE.txt. Replace it with the selected file?",
+                "Replace",
+                "Cancel",
+                safeThis.getComponent());
+            juce::AlertWindow::showAsync(options,
+                                         [performImport = std::move(performImport)](int result) mutable
+                                         {
+                                             if (result == saveButtonResult)
+                                                 performImport();
+                                         });
+            return;
+        }
+
+        performImport();
     });
 }
 
@@ -2408,6 +2478,33 @@ void MainComponent::launchImportBackgroundImageChooser(std::function<void(juce::
     activeFileChooser = std::make_unique<juce::FileChooser>("Import background image into the current project",
                                                             initialDirectory,
                                                             "*.jpg;*.jpeg",
+                                                            true,
+                                                            false,
+                                                            this);
+    auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    activeFileChooser->launchAsync(juce::FileBrowserComponent::openMode
+                                       | juce::FileBrowserComponent::canSelectFiles,
+                                   [safeThis, completion = std::move(completion)](const juce::FileChooser& chooser) mutable
+                                   {
+                                       if (safeThis == nullptr)
+                                           return;
+
+                                       const auto selectedFile = chooser.getResult();
+                                       safeThis->activeFileChooser.reset();
+                                       if (completion)
+                                           completion(selectedFile);
+                                   });
+}
+
+void MainComponent::launchImportLicenseFileChooser(std::function<void(juce::File)> completion)
+{
+    auto initialDirectory = buildChooserBaseDirectory();
+    if (currentProjectFile != juce::File())
+        initialDirectory = currentProjectFile.getParentDirectory();
+
+    activeFileChooser = std::make_unique<juce::FileChooser>("Import license file into the current project",
+                                                            initialDirectory,
+                                                            "*.txt",
                                                             true,
                                                             false,
                                                             this);

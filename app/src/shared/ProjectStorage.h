@@ -52,6 +52,16 @@ struct ProjectLicenseFileImportResult
     juce::String errorMessage;
 };
 
+enum class ProjectLicenseFileImportCheckpoint
+{
+    beforeCommit
+};
+
+struct ProjectLicenseFileImportOptions
+{
+    std::function<bool(ProjectLicenseFileImportCheckpoint)> allowCommitAtCheckpoint;
+};
+
 drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
     const drs::engine::RuntimeProjectModel& project,
     const juce::File& projectFile);
@@ -63,6 +73,10 @@ ProjectFilesSaveResult saveProjectFiles(const drs::engine::RuntimeProjectModel& 
 ProjectFilesRecoveryResult recoverProjectFilesTransaction(const juce::File& projectFile);
 ProjectBackgroundImageImportResult importProjectBackgroundImage(const juce::File& sourceImageFile,
                                                                const juce::File& projectFile);
+juce::File getProjectLicenseFile(const juce::File& projectFile);
 ProjectLicenseFileImportResult importProjectLicenseFile(const juce::File& sourceTextFile,
                                                         const juce::File& projectFile);
+ProjectLicenseFileImportResult importProjectLicenseFile(const juce::File& sourceTextFile,
+                                                        const juce::File& projectFile,
+                                                        const ProjectLicenseFileImportOptions& options);
 } // namespace drs::app

@@ -1,5 +1,6 @@
 #include "shared/ProjectStorage.h"
 
+#include "drs/engine/PlayableInstrumentLicense.h"
 #include "drs/engine/RuntimeLoader.h"
 
 #include <juce_graphics/juce_graphics.h>
@@ -189,6 +190,15 @@ bool checkpointAllowed(const ProjectFilesSaveOptions& options,
 ProjectBackgroundImageImportResult buildBackgroundImageImportError(const juce::String& message)
 {
     ProjectBackgroundImageImportResult result;
+    result.errorMessage = message;
+    return result;
+}
+
+ProjectLicenseFileImportResult buildLicenseFileImportError(const juce::String& message,
+                                                           const juce::File& targetFile = {})
+{
+    ProjectLicenseFileImportResult result;
+    result.targetFile = targetFile;
     result.errorMessage = message;
     return result;
 }
@@ -508,6 +518,131 @@ ProjectBackgroundImageImportResult importProjectBackgroundImage(const juce::File
     {
         return buildBackgroundImageImportError(
             "The background image could not be copied into the project.");
+    }
+
+    result.imported = true;
+    return result;
+}
+
+juce::File getProjectLicenseFile(const juce::File& projectFile)
+{
+    const auto targetProjectFile = ensureProjectFileExtension(projectFile);
+    if (targetProjectFile == juce::File())
+        return {};
+
+    return targetProjectFile.getParentDirectory().getChildFile(
+        drs::engine::playableInstrumentLicenseFileName);
+}
+
+ProjectLicenseFileImportResult importProjectLicenseFile(const juce::File& sourceTextFile,
+                                                        const juce::File& projectFile)
+{
+    return importProjectLicenseFile(sourceTextFile, projectFile, {});
+}
+
+ProjectLicenseFileImportResult importProjectLicenseFile(
+    const juce::File& sourceTextFile,
+    const juce::File& projectFile,
+    const ProjectLicenseFileImportOptions& options)
+{
+    const auto targetProjectFile = ensureProjectFileExtension(projectFile);
+    if (targetProjectFile == juce::File() || !targetProjectFile.existsAsFile())
+    {
+        return buildLicenseFileImportError(
+            "Save the project before importing a license file.");
+    }
+
+    const auto targetFile = getProjectLicenseFile(targetProjectFile);
+    if (!sourceTextFile.existsAsFile())
+    {
+        return buildLicenseFileImportError(
+            "The selected license file does not exist.", targetFile);
+    }
+
+    if (!sourceTextFile.hasFileExtension(".txt"))
+    {
+        return buildLicenseFileImportError(
+            "The selected license file must use a .txt extension.", targetFile);
+    }
+
+    const auto sourceBytes = sourceTextFile.getSize();
+    if (sourceBytes < 0
+        || static_cast<std::uint64_t>(sourceBytes)
+            > drs::engine::maximumPlayableInstrumentLicenseBytes)
+    {
+        return buildLicenseFileImportError(
+            "The selected license file exceeds the 1 MiB limit.", targetFile);
+    }
+
+    juce::MemoryBlock validatedBytes;
+    if (!sourceTextFile.loadFileAsData(validatedBytes)
+        || validatedBytes.getSize() != static_cast<std::size_t>(sourceBytes))
+    {
+        return buildLicenseFileImportError(
+            "The selected license file could not be read.", targetFile);
+    }
+
+    const auto* bytes = static_cast<const char*>(validatedBytes.getData());
+    if (validatedBytes.getSize() > 0)
+    {
+        const auto* end = bytes + validatedBytes.getSize();
+        if (std::find(bytes, end, '\0') != end)
+        {
+            return buildLicenseFileImportError(
+                "The selected license file contains an embedded NUL byte and is not valid text.",
+                targetFile);
+        }
+
+        const auto containsBinaryControlByte = std::any_of(bytes, end, [](const char byte)
+        {
+            const auto value = static_cast<unsigned char>(byte);
+            return value == 0x7fu
+                || (value < 0x20u && value != '\t' && value != '\r' && value != '\n');
+        });
+        if (containsBinaryControlByte)
+        {
+            return buildLicenseFileImportError(
+                "The selected license file contains binary control bytes and is not valid text.",
+                targetFile);
+        }
+
+        if (!juce::CharPointer_UTF8::isValidString(
+                bytes, static_cast<int>(validatedBytes.getSize())))
+        {
+            return buildLicenseFileImportError(
+                "The selected license file is not valid UTF-8 text.", targetFile);
+        }
+    }
+
+    ProjectLicenseFileImportResult result;
+    result.targetFile = targetFile;
+    if (sourceTextFile == targetFile)
+    {
+        result.imported = true;
+        return result;
+    }
+
+    juce::TemporaryFile temporaryTarget(targetFile);
+    if (!temporaryTarget.getFile().replaceWithData(validatedBytes.getData(),
+                                                   validatedBytes.getSize()))
+    {
+        return buildLicenseFileImportError(
+            "The license file could not be staged in the project directory.", targetFile);
+    }
+
+    if (options.allowCommitAtCheckpoint
+        && !options.allowCommitAtCheckpoint(ProjectLicenseFileImportCheckpoint::beforeCommit))
+    {
+        return buildLicenseFileImportError(
+            "The license replacement was interrupted before commit; the existing license was preserved.",
+            targetFile);
+    }
+
+    if (!temporaryTarget.overwriteTargetFileWithTemporary())
+    {
+        return buildLicenseFileImportError(
+            "The existing license could not be replaced; its previous contents were preserved.",
+            targetFile);
     }
 
     result.imported = true;
