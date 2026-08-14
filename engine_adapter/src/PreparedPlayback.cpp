@@ -324,6 +324,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["releaseShape"] = zone.releaseShape;
         if (zone.roundRobin.has_value())
             zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
@@ -1551,6 +1552,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.loopStartFrame,
             zone.loopEndFrame,
             zone.releaseSeconds,
+            zone.releaseShape,
             zone.roundRobin,
             zone.roundRobinLength,
             zone.roundRobinPosition,
@@ -2477,6 +2479,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopStartFrame"] = zone.loopStartFrame;
         value["loopEndFrame"] = zone.loopEndFrame;
         value["releaseSeconds"] = zone.releaseSeconds;
+        value["releaseShape"] = zone.releaseShape;
         if (zone.roundRobin.has_value())
             value["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
@@ -2521,6 +2524,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopStartFrame"] = handle.loopStartFrame;
         value["loopEndFrame"] = handle.loopEndFrame;
         value["releaseSeconds"] = handle.releaseSeconds;
+        value["releaseShape"] = handle.releaseShape;
         if (handle.roundRobin.has_value())
             value["roundRobin"] = serializeRoundRobin(*handle.roundRobin);
         if (handle.triggerMode == ZoneTriggerMode::oneShot)
@@ -2777,6 +2781,7 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
         && left.releaseSeconds == right.releaseSeconds
+        && left.releaseShape == right.releaseShape
         && left.roundRobin == right.roundRobin
         && left.roundRobinLength == right.roundRobinLength
         && left.roundRobinPosition == right.roundRobinPosition

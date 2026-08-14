@@ -1,6 +1,7 @@
 #include "shared/authoring/ZoneMappingEditor.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace drs::app::authoring
 {
@@ -63,6 +64,8 @@ ZoneMappingEditor::ZoneMappingEditor()
       panRow("Pan", "authoringPanRow", -1.0, 1.0, 0.01),
       loopToggleRow("Loop", "authoringLoopRow", "Enabled"),
       releaseRow("Release (s)", "authoringReleaseRow", 0.0, 30.0, 0.01),
+      releaseCurveRow("Release curve", "authoringReleaseCurveRow"),
+      releaseShapeRow("Shape", "authoringReleaseShapeRow", -12.0, 12.0, 0.0001),
       triggerModeRow("Trigger mode", "authoringTriggerModeRow"),
       performanceEventRow("Event", "authoringPerformanceEventRow"),
       sustainConditionRow("Sustain", "authoringSustainConditionRow"),
@@ -101,6 +104,8 @@ ZoneMappingEditor::ZoneMappingEditor()
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
     releaseRow.getSlider().setComponentID("authoringReleaseSecondsSlider");
+    releaseCurveRow.getComboBox().setComponentID("authoringReleaseCurveSelector");
+    releaseShapeRow.getSlider().setComponentID("authoringReleaseShapeSlider");
     triggerModeRow.getComboBox().setComponentID("authoringTriggerModeSelector");
     performanceEventRow.getComboBox().setComponentID("authoringPerformanceEventSelector");
     sustainConditionRow.getComboBox().setComponentID("authoringPerformanceSustainSelector");
@@ -153,19 +158,29 @@ ZoneMappingEditor::ZoneMappingEditor()
     advancedSection.getDisclosureButton().setExplicitFocusOrder(62);
     loopToggleRow.getToggle().setExplicitFocusOrder(63);
     releaseRow.getSlider().setExplicitFocusOrder(64);
-    triggerModeRow.getComboBox().setExplicitFocusOrder(65);
-    previewZoneRow.getButton().setExplicitFocusOrder(66);
-    restoreRootKeyRow.getButton().setExplicitFocusOrder(67);
-    performanceSection.getDisclosureButton().setExplicitFocusOrder(68);
-    performanceEventRow.getComboBox().setExplicitFocusOrder(69);
-    sustainConditionRow.getComboBox().setExplicitFocusOrder(70);
-    pitchSourceRow.getComboBox().setExplicitFocusOrder(71);
-    chokeGroupRow.getComboBox().setExplicitFocusOrder(72);
-    chokeTargetRow.getComboBox().setExplicitFocusOrder(73);
-    chokeFadeRow.getSlider().setExplicitFocusOrder(74);
-    createChokeGroupRow.getButton().setExplicitFocusOrder(75);
+    releaseCurveRow.getComboBox().setExplicitFocusOrder(65);
+    releaseShapeRow.getSlider().setExplicitFocusOrder(66);
+    triggerModeRow.getComboBox().setExplicitFocusOrder(67);
+    previewZoneRow.getButton().setExplicitFocusOrder(68);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(69);
+    performanceSection.getDisclosureButton().setExplicitFocusOrder(70);
+    performanceEventRow.getComboBox().setExplicitFocusOrder(71);
+    sustainConditionRow.getComboBox().setExplicitFocusOrder(72);
+    pitchSourceRow.getComboBox().setExplicitFocusOrder(73);
+    chokeGroupRow.getComboBox().setExplicitFocusOrder(74);
+    chokeTargetRow.getComboBox().setExplicitFocusOrder(75);
+    chokeFadeRow.getSlider().setExplicitFocusOrder(76);
+    createChokeGroupRow.getButton().setExplicitFocusOrder(77);
     releaseRow.getSlider().setHelpText(
         "Sets the selected zone's amplitude release time after note-off, in seconds.");
+    releaseCurveRow.getComboBox().addItem("Natural / SFZ", 1);
+    releaseCurveRow.getComboBox().addItem("Linear", 2);
+    releaseCurveRow.getComboBox().addItem("Slow", 3);
+    releaseCurveRow.getComboBox().addItem("Custom", 4);
+    releaseCurveRow.getComboBox().setHelpText(
+        "Selects a release-envelope curve preset. Natural / SFZ matches the traditional ARIA-style decay.");
+    releaseShapeRow.getSlider().setHelpText(
+        "Adjusts the release curve: negative values decay sooner, zero is linear, and positive values decay later.");
     triggerModeRow.getComboBox().setHelpText(
         "Gated samples release on note-off. One-shot samples play to their natural end.");
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
@@ -224,12 +239,14 @@ ZoneMappingEditor::ZoneMappingEditor()
 
     addOwnedRow(advancedSectionContent, loopToggleRow, toggleRowHeight);
     addOwnedRow(advancedSectionContent, releaseRow, sliderRowHeight);
+    addOwnedRow(advancedSectionContent, releaseCurveRow, comboRowHeight);
+    addOwnedRow(advancedSectionContent, releaseShapeRow, sliderRowHeight);
     addOwnedRow(advancedSectionContent, triggerModeRow, comboRowHeight);
     addOwnedRow(advancedSectionContent, previewZoneRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, restoreRootKeyRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
-    advancedSectionContent.setSize(0, toggleRowHeight + 6 + sliderRowHeight + 6 + comboRowHeight + 6 + actionRowHeight + 6
-                                      + actionRowHeight + 6 + messageRowHeight);
+    advancedSectionContent.setSize(0, toggleRowHeight + sliderRowHeight * 2 + comboRowHeight * 2
+                                      + actionRowHeight * 2 + messageRowHeight + 7 * 6);
     addOwnedRow(performanceSectionContent, performanceEventRow, comboRowHeight);
     addOwnedRow(performanceSectionContent, sustainConditionRow, comboRowHeight);
     addOwnedRow(performanceSectionContent, pitchSourceRow, comboRowHeight);
@@ -272,10 +289,23 @@ ZoneMappingEditor::ZoneMappingEditor()
     bindCommitOnGestureFinished(gainRow.getSlider(), "Update zone gain");
     bindCommitOnGestureFinished(panRow.getSlider(), "Update zone pan");
     bindCommitOnGestureFinished(releaseRow.getSlider(), "Update zone release");
+    bindCommitOnGestureFinished(releaseShapeRow.getSlider(), "Update zone release shape");
 
     loopToggleRow.getToggle().onClick = [this]
     {
         commitCurrentValues("Toggle zone loop");
+    };
+
+    releaseCurveRow.getComboBox().onChange = [this]
+    {
+        const auto presetId = releaseCurveRow.getComboBox().getSelectedId();
+        if (presetId == 4)
+            return;
+
+        const auto shape = presetId == 1 ? drs::engine::sfzDefaultReleaseShape
+            : presetId == 3 ? drs::engine::slowReleaseShape : 0.0;
+        releaseShapeRow.getSlider().setValue(shape, juce::dontSendNotification);
+        commitCurrentValues("Update zone release curve");
     };
 
     triggerModeRow.getComboBox().onChange = [this]
@@ -400,6 +430,10 @@ void ZoneMappingEditor::resized()
     advancedArea.removeFromTop(6);
     releaseRow.setBounds(advancedArea.removeFromTop(sliderRowHeight));
     advancedArea.removeFromTop(6);
+    releaseCurveRow.setBounds(advancedArea.removeFromTop(comboRowHeight));
+    advancedArea.removeFromTop(6);
+    releaseShapeRow.setBounds(advancedArea.removeFromTop(sliderRowHeight));
+    advancedArea.removeFromTop(6);
     triggerModeRow.setBounds(advancedArea.removeFromTop(comboRowHeight));
     advancedArea.removeFromTop(6);
     previewZoneRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
@@ -461,6 +495,8 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
              static_cast<juce::Component*>(&releaseRow),
+             static_cast<juce::Component*>(&releaseCurveRow),
+             static_cast<juce::Component*>(&releaseShapeRow),
              static_cast<juce::Component*>(&triggerModeRow),
              static_cast<juce::Component*>(&performanceEventRow),
              static_cast<juce::Component*>(&sustainConditionRow),
@@ -491,6 +527,8 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
              static_cast<juce::Component*>(&releaseRow.getSlider()),
+             static_cast<juce::Component*>(&releaseCurveRow.getComboBox()),
+             static_cast<juce::Component*>(&releaseShapeRow.getSlider()),
              static_cast<juce::Component*>(&triggerModeRow.getComboBox()),
              static_cast<juce::Component*>(&performanceEventRow.getComboBox()),
              static_cast<juce::Component*>(&sustainConditionRow.getComboBox()),
@@ -538,6 +576,7 @@ ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
     values.pan = panRow.getSlider().getValue();
     values.loopEnabled = loopToggleRow.getToggle().getToggleState();
     values.releaseSeconds = releaseRow.getSlider().getValue();
+    values.releaseShape = releaseShapeRow.getSlider().getValue();
     values.triggerMode = triggerModeRow.getComboBox().getSelectedId() == 2
         ? drs::engine::ZoneTriggerMode::oneShot
         : drs::engine::ZoneTriggerMode::gated;
@@ -668,6 +707,28 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     if (values.releaseSeconds > releaseSlider.getMaximum())
         releaseSlider.setRange(0.0, values.releaseSeconds * 2.0, 0.01);
     releaseSlider.setValue(values.releaseSeconds, juce::dontSendNotification);
+    auto& releaseShapeSlider = releaseShapeRow.getSlider();
+    if (values.releaseShape < releaseShapeSlider.getMinimum()
+        || values.releaseShape > releaseShapeSlider.getMaximum())
+    {
+        releaseShapeSlider.setRange(std::min(-12.0, values.releaseShape * 2.0),
+                                    std::max(12.0, values.releaseShape * 2.0), 0.0001);
+    }
+    releaseShapeSlider.setValue(values.releaseShape, juce::dontSendNotification);
+    const auto matchesShape = [&](const double preset)
+    {
+        return std::abs(values.releaseShape - preset) < 0.005;
+    };
+    releaseCurveRow.getComboBox().setSelectedId(
+        matchesShape(drs::engine::sfzDefaultReleaseShape) ? 1
+        : matchesShape(0.0) ? 2
+        : matchesShape(drs::engine::slowReleaseShape) ? 3 : 4,
+        juce::dontSendNotification);
+    const auto releaseControlsEnabled = values.hasSelection
+        && values.triggerMode != drs::engine::ZoneTriggerMode::oneShot;
+    releaseRow.getSlider().setEnabled(releaseControlsEnabled);
+    releaseCurveRow.getComboBox().setEnabled(releaseControlsEnabled);
+    releaseShapeRow.getSlider().setEnabled(releaseControlsEnabled);
     triggerModeRow.getComboBox().setSelectedId(
         values.triggerMode == drs::engine::ZoneTriggerMode::oneShot ? 2 : 1,
         juce::dontSendNotification);

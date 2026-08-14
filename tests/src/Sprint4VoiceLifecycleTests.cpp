@@ -46,6 +46,8 @@ struct ModelOptions
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    double releaseSeconds = 0.0;
+    double releaseShape = 0.0;
 };
 
 drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
@@ -68,6 +70,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     snapshotZone.loopEnabled = options.loopEnabled;
     snapshotZone.loopStartFrame = options.loopStartFrame;
     snapshotZone.loopEndFrame = options.loopEndFrame;
+    snapshotZone.releaseSeconds = options.releaseSeconds;
+    snapshotZone.releaseShape = options.releaseShape;
     snapshot.zones.push_back(std::move(snapshotZone));
     drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
     snapshotGroup.groupId = "lifecycle-group";
@@ -101,6 +105,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     preparedZone.loopEnabled = options.loopEnabled;
     preparedZone.loopStartFrame = options.loopStartFrame;
     preparedZone.loopEndFrame = options.loopEndFrame;
+    preparedZone.releaseSeconds = options.releaseSeconds;
+    preparedZone.releaseShape = options.releaseShape;
     prepared.zones.push_back(std::move(preparedZone));
     drs::engine::PreparedPlaybackGroupRoute preparedGroup;
     preparedGroup.groupId = "lifecycle-group";
@@ -281,6 +287,32 @@ void runReleaseLawMatrix()
     require(idempotent.getReleaseSamplesRemaining() == 2038 && !idempotent.beginRelease()
                 && idempotent.getReleaseSamplesRemaining() == 2038,
             "Repeated note-off must not restart the release envelope.");
+
+    ModelOptions natural = loop;
+    natural.sourceSampleRate = 8.0;
+    natural.releaseSeconds = 1.0;
+    natural.releaseShape = drs::engine::sfzDefaultReleaseShape;
+    const auto naturalModel = buildModel(std::vector<float>(16, 1.0f), natural);
+    drs::engine::SamplerVoice naturalVoice;
+    require(naturalVoice.start(*naturalModel, startRequest(60, 8.0))
+                && naturalVoice.beginRelease(),
+            "Natural release voice should start.");
+    StereoOutput naturalOutput(5);
+    naturalVoice.render(naturalOutput.view(), 0, 5);
+    require(naturalOutput.left[4] < 0.01f,
+            "The SFZ natural curve should decay well below a linear envelope by its midpoint.");
+
+    ModelOptions slow = natural;
+    slow.releaseShape = drs::engine::slowReleaseShape;
+    const auto slowModel = buildModel(std::vector<float>(16, 1.0f), slow);
+    drs::engine::SamplerVoice slowVoice;
+    require(slowVoice.start(*slowModel, startRequest(60, 8.0))
+                && slowVoice.beginRelease(),
+            "Slow release voice should start.");
+    StereoOutput slowOutput(5);
+    slowVoice.render(slowOutput.view(), 0, 5);
+    require(slowOutput.left[4] > 0.9f,
+            "The positive slow curve should retain more level than a linear envelope at its midpoint.");
 }
 
 void runReleasePartitionInvariance()

@@ -609,6 +609,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.gainDb = zonePlan.gainDb;
         zone.sampleStartFrame = zonePlan.sampleStartFrame;
         zone.releaseSeconds = zonePlan.releaseSeconds;
+        zone.releaseShape = zonePlan.releaseShape;
         zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);
         zone.prefetchBytes = clampedPrefetchBytes;
         zone.roundRobin = roundRobin;

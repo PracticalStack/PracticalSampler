@@ -852,6 +852,7 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["releaseShape"] = zone.releaseShape;
         if (useExplicitRoundRobin)
         {
             if (zone.roundRobin.has_value())
@@ -1360,6 +1361,8 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         zone.loopEndFrame = *loopEndFrame;
                     if (const auto releaseSeconds = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                         zone.releaseSeconds = *releaseSeconds;
+                    if (const auto releaseShape = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseShape", context.c_str()))
+                        zone.releaseShape = *releaseShape;
                     if (const auto tune = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
                         zone.fineTuneCents = *tune;
                     if (const auto velocityTrack = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
@@ -2087,6 +2090,8 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, "Project zone '" + zone.id + "' must not have a negative releaseSeconds.");
+            if (!std::isfinite(zone.releaseShape))
+                addIssue(result, "Project zone '" + zone.id + "' must have a finite releaseShape.");
 
             validateRoundRobinDescriptor(result,
                                          "Project zone '" + zone.id + "'",
@@ -2994,6 +2999,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 zone.prefetchBytes = *prefetchBytes;
             if (const auto releaseSeconds = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                 zone.releaseSeconds = *releaseSeconds;
+            if (const auto releaseShape = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "releaseShape", context.c_str()))
+                zone.releaseShape = *releaseShape;
             if (const auto tune = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
                 zone.fineTuneCents = *tune;
             if (const auto velocityTrack = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
@@ -3098,6 +3105,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, context + " must not have a negative releaseSeconds.");
+            if (!std::isfinite(zone.releaseShape))
+                addIssue(result, context + " field 'releaseShape' must be finite.");
 
             if (!std::isfinite(zone.gainDb))
                 addIssue(result, context + " field 'gainDb' must be finite.");
@@ -3423,6 +3432,7 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["releaseShape"] = zone.releaseShape;
         if (instrument.schemaVersion >= 2)
         {
             if (zone.roundRobin.has_value())

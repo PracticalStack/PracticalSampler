@@ -1411,6 +1411,13 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                  "Per-zone and inherited release times can map into native envelope release controls." };
     }
 
+    if (opcodeName == "ampeg_release_shape")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "ampEnvelope.releaseShape",
+                 "Per-zone and inherited release shapes map directly into the native amplitude envelope." };
+    }
+
     if (opcodeName == "label_cc1")
     {
         return { SfzImportSupportDisposition::reportedOnly,

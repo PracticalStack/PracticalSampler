@@ -43,6 +43,7 @@ bool zonesMatch(const PlaybackSnapshotZone& authored, const PreparedPlaybackZone
         && authored.loopStartFrame == prepared.loopStartFrame
         && authored.loopEndFrame == prepared.loopEndFrame
         && authored.releaseSeconds == prepared.releaseSeconds
+        && authored.releaseShape == prepared.releaseShape
         && authored.roundRobinLength == prepared.roundRobinLength
         && authored.roundRobinPosition == prepared.roundRobinPosition
         && authored.triggerMode == prepared.triggerMode;

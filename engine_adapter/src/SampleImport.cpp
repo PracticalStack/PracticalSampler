@@ -1467,6 +1467,7 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
     suggestion.zone.gainDb = 0.0;
     suggestion.zone.pan = 0.0;
     suggestion.zone.sampleStartFrame = 0;
+    suggestion.zone.releaseShape = sfzDefaultReleaseShape;
 
     if (metadata != nullptr && metadata->loopRangePresent)
     {

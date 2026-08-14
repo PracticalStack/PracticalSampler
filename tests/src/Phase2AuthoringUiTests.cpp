@@ -910,6 +910,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     populatedViewModel.pan = 0.25;
     populatedViewModel.loopEnabled = false;
     populatedViewModel.releaseSeconds = 1.25;
+    populatedViewModel.releaseShape = drs::engine::sfzDefaultReleaseShape;
     populatedViewModel.roundRobinEnabled = true;
     populatedViewModel.roundRobinPoolText = "Pool: rr-main";
     populatedViewModel.roundRobinSlotText = "Slot: 1 of 3 | Mode: sequential";
@@ -944,6 +945,10 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
             "Zone mapping editor should expose one loop toggle after removing old mapping rows.");
     require(countDescendantsById(editor, "authoringReleaseSecondsSlider") == 1,
             "Zone mapping editor should expose one release-time control.");
+    require(countDescendantsById(editor, "authoringReleaseCurveSelector") == 1,
+            "Zone mapping editor should expose one release-curve preset selector.");
+    require(countDescendantsById(editor, "authoringReleaseShapeSlider") == 1,
+            "Zone mapping editor should expose one release-shape control.");
     require(countDescendantsById(editor, "authoringTriggerModeSelector") == 1,
             "Zone mapping editor should expose one trigger-mode selector.");
     require(countDescendantsById(editor, "authoringZoneArticulationSelector") == 1,
@@ -965,6 +970,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
              juce::String("authoringAdvancedInspectorSection"),
              juce::String("authoringAdvancedInspectorSectionDisclosure"),
              juce::String("authoringReleaseSecondsSlider"),
+             juce::String("authoringReleaseCurveSelector"),
+             juce::String("authoringReleaseShapeSlider"),
              juce::String("authoringTriggerModeSelector"),
              juce::String("authoringRestoreRootKeyButton")
          })
@@ -978,6 +985,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyHighSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringZoneArticulationSelector");
     requireNonEmptyAccessibilityHelpText(editor, "authoringReleaseSecondsSlider");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringReleaseCurveSelector");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringReleaseShapeSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringTriggerModeSelector");
     requireNonEmptyAccessibilityHelpText(editor, "authoringRestoreRootKeyButton");
     requireIncreasingFocusOrder(editor,
@@ -996,6 +1005,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                                     "authoringAdvancedInspectorSectionDisclosure",
                                     "authoringLoopEnabledToggle",
                                     "authoringReleaseSecondsSlider",
+                                    "authoringReleaseCurveSelector",
+                                    "authoringReleaseShapeSlider",
                                     "authoringTriggerModeSelector",
                                     "authoringRestoreRootKeyButton"
                                 });
@@ -1012,6 +1023,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringPanSlider", false);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", false);
     requireAccessibilityHandlerState(editor, "authoringReleaseSecondsSlider", false);
+    requireAccessibilityHandlerState(editor, "authoringReleaseCurveSelector", false);
+    requireAccessibilityHandlerState(editor, "authoringReleaseShapeSlider", false);
     requireAccessibilityHandlerState(editor, "authoringTriggerModeSelector", false);
     requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", false);
 
@@ -1073,11 +1086,15 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
         advancedDisclosure.onClick();
     requireComponentVisibleWithin(editor, "authoringLoopEnabledToggle", bounds);
     requireComponentVisibleWithin(editor, "authoringReleaseSecondsSlider", bounds);
+    requireComponentVisibleWithin(editor, "authoringReleaseCurveSelector", bounds);
+    requireComponentVisibleWithin(editor, "authoringReleaseShapeSlider", bounds);
     requireComponentVisibleWithin(editor, "authoringTriggerModeSelector", bounds);
     requireComponentVisibleWithin(editor, "authoringRestoreRootKeyButton", bounds);
     requireComponentVisibleWithin(editor, "authoringZoneValidationMessage", bounds);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", true);
     requireAccessibilityHandlerState(editor, "authoringReleaseSecondsSlider", true);
+    requireAccessibilityHandlerState(editor, "authoringReleaseCurveSelector", true);
+    requireAccessibilityHandlerState(editor, "authoringReleaseShapeSlider", true);
     requireAccessibilityHandlerState(editor, "authoringTriggerModeSelector", true);
     requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", true);
 
@@ -1159,6 +1176,23 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     require(std::abs(lastCommittedValues.releaseSeconds - 1.75) < 0.001,
             "Zone mapping editor should report the edited release time.");
 
+    auto& releaseCurveSelector = requireComboBox(editor, "authoringReleaseCurveSelector");
+    auto& releaseShapeSlider = requireSlider(editor, "authoringReleaseShapeSlider");
+    require(releaseCurveSelector.getSelectedId() == 1
+                && std::abs(releaseShapeSlider.getValue() - drs::engine::sfzDefaultReleaseShape) < 0.001,
+            "Zone mapping editor should recognize and display the Natural / SFZ release preset.");
+    releaseCurveSelector.setSelectedId(2, juce::sendNotificationSync);
+    require(commitRequests == 7 && lastCommitLabel == "Update zone release curve"
+                && std::abs(lastCommittedValues.releaseShape) < 0.001,
+            "The Linear release preset should commit its exact numeric shape.");
+    releaseShapeSlider.setValue(-4.0, juce::dontSendNotification);
+    releaseShapeSlider.onDragStart();
+    releaseShapeSlider.onDragEnd();
+    require(commitRequests == 8 && lastCommitLabel == "Update zone release shape"
+                && std::abs(lastCommittedValues.releaseShape - (-4.0)) < 0.001
+                && releaseCurveSelector.getSelectedId() == 4,
+            "Editing the bipolar release shape should commit the numeric value and select Custom.");
+
     auto longReleaseViewModel = lastCommittedValues;
     longReleaseViewModel.releaseSeconds = 45.0;
     editor.setViewModel(longReleaseViewModel);
@@ -1171,7 +1205,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     require(static_cast<bool>(loopToggle.onClick),
             "Zone mapping editor loop toggle should expose an onClick callback.");
     loopToggle.onClick();
-    require(commitRequests == 7, "Zone mapping editor should commit loop toggle edits.");
+    require(commitRequests == 9, "Zone mapping editor should commit loop toggle edits.");
     require(lastCommitLabel == "Toggle zone loop", "Zone mapping editor should label loop edits.");
     require(lastCommittedValues.loopEnabled, "Zone mapping editor should report the toggled loop state.");
 
@@ -1179,11 +1213,13 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     require(triggerModeSelector.getSelectedId() == 1,
             "Zone mapping editor should default selected zones to gated trigger mode.");
     triggerModeSelector.setSelectedId(2, juce::sendNotificationSync);
-    require(commitRequests == 8, "Zone mapping editor should commit trigger-mode edits.");
+    require(commitRequests == 10, "Zone mapping editor should commit trigger-mode edits.");
     require(lastCommitLabel == "Update zone trigger mode",
             "Zone mapping editor should label trigger-mode edits.");
     require(lastCommittedValues.triggerMode == drs::engine::ZoneTriggerMode::oneShot,
             "Zone mapping editor should report one-shot trigger mode.");
+    require(!releaseSlider.isEnabled() && !releaseCurveSelector.isEnabled() && !releaseShapeSlider.isEnabled(),
+            "One-shot zones should disable release-time and release-curve controls that do not affect playback.");
 
     requireButton(editor, "authoringRestoreRootKeyButton").onClick();
     require(restoreRequests == 1, "Zone mapping editor should emit restore-root-key callbacks.");
@@ -1201,7 +1237,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Zone Map context menu: Delete Selected Sample\n";
     inventory << "- Workbench host: authoringWorkbench, authoringWorkbenchTabStrip, authoringWorkbenchToggleButton\n";
     inventory << "- Workbench tabs: authoringWorkbenchWaveformTab, authoringWorkbenchMacrosTab, authoringWorkbenchRoutingTab, authoringWorkbenchPerformanceTab\n";
-    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringReleaseSecondsSlider, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
+    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringReleaseSecondsSlider, authoringReleaseCurveSelector, authoringReleaseShapeSlider, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Workbench context: authoringWorkbenchTitleLabel, authoringWorkbenchScopeLabel, authoringWorkbenchBreadcrumbLabel\n";
     inventory << "- Waveform workbench content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
     inventory << "- Macros workbench content: authoringMacroList, authoringMacroListBox, authoringMacroCreateButton, authoringMacroDuplicateButton, authoringMacroDeleteButton, authoringMacroNameEditor, authoringMacroExposeToggle, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
@@ -1371,18 +1407,32 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
                     "Authoring panel should not expose duplicate pan controls after mapping-row removal.");
             requireButton(panel, "authoringMixInspectorSectionDisclosure").onClick();
 
+            auto& mapDisclosure = requireButton(panel, "authoringMapInspectorSectionDisclosure");
+            if (mapDisclosure.getButtonText() == "Hide")
+                mapDisclosure.onClick();
+
             ensureControlsVisible("authoringRestoreRootKeyButton",
                                   "authoringReleaseSecondsSlider",
                                   "authoringAdvancedInspectorSectionDisclosure");
             requireComponentVisibleWithin(panel, "authoringLoopEnabledToggle", panelBounds);
             requireComponentVisibleWithin(panel, "authoringReleaseSecondsSlider", panelBounds);
+            requireComponentVisibleWithin(panel, "authoringReleaseCurveSelector", panelBounds);
+            requireComponentVisibleWithin(panel, "authoringReleaseShapeSlider", panelBounds);
             requireComponentVisible(panel, "authoringRestoreRootKeyButton");
             require(countDescendantsById(panel, "authoringLoopEnabledToggle") == 1,
                     "Authoring panel should not expose duplicate loop toggles after mapping-row removal.");
             require(countDescendantsById(panel, "authoringReleaseSecondsSlider") == 1,
                     "Authoring panel should not expose duplicate release-time controls.");
+            require(countDescendantsById(panel, "authoringReleaseCurveSelector") == 1
+                        && countDescendantsById(panel, "authoringReleaseShapeSlider") == 1,
+                    "Authoring panel should expose one release-curve selector and one numeric shape control.");
             require(countDescendantsById(panel, "authoringRestoreRootKeyButton") == 1,
                     "Authoring panel should not expose duplicate restore-root-key actions after mapping-row removal.");
+            auto& advancedDisclosure = requireButton(panel, "authoringAdvancedInspectorSectionDisclosure");
+            if (advancedDisclosure.getButtonText() == "Hide")
+                advancedDisclosure.onClick();
+            if (mapDisclosure.getButtonText() == "Show")
+                mapDisclosure.onClick();
             break;
         }
         case 2:
@@ -3369,6 +3419,11 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
     releaseSlider.onDragEnd();
     require(std::abs(session.getSelectedZone()->releaseSeconds - 1.75) < 0.001,
             "Gate A workflow should commit release-time edits through the compact inspector.");
+
+    auto& releaseCurveSelector = requireComboBox(panel, "authoringReleaseCurveSelector");
+    releaseCurveSelector.setSelectedId(1, juce::sendNotificationSync);
+    require(std::abs(session.getSelectedZone()->releaseShape - drs::engine::sfzDefaultReleaseShape) < 0.001,
+            "Gate A workflow should commit the Natural / SFZ release curve through the compact inspector.");
 
     auto& triggerModeSelector = requireComboBox(panel, "authoringTriggerModeSelector");
     triggerModeSelector.setSelectedId(2, juce::sendNotificationSync);

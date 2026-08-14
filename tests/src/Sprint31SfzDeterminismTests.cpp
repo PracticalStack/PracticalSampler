@@ -215,6 +215,7 @@ void requireZoneEquals(const drs::engine::RuntimeProjectZoneDefinition& expected
                 && expected.loopStartFrame == actual.loopStartFrame
                 && expected.loopEndFrame == actual.loopEndFrame
                 && expected.releaseSeconds == actual.releaseSeconds
+                && expected.releaseShape == actual.releaseShape
                 && expected.roundRobinLength == actual.roundRobinLength
                 && expected.roundRobinPosition == actual.roundRobinPosition
                 && expected.triggerMode == actual.triggerMode,
@@ -419,7 +420,8 @@ int main()
                 "Broadened project round-tripping should preserve stereo no-xfade sample-source and zone counts.");
         require(roundTripProject.project.authoring.zones.front().roundRobinLength == 3
                     && roundTripProject.project.authoring.zones.front().roundRobinPosition == 1
-                    && roundTripProject.project.authoring.zones.front().releaseSeconds == 0.5,
+                    && roundTripProject.project.authoring.zones.front().releaseSeconds == 0.5
+                    && roundTripProject.project.authoring.zones.front().releaseShape == sfzDefaultReleaseShape,
                 "Broadened project round-tripping should preserve stereo no-xfade round-robin and release metadata.");
 
         const auto roundTripInstrument = loadRuntimeInstrumentManifest(instrumentPath.generic_string());
@@ -428,7 +430,8 @@ int main()
         require(roundTripInstrument.instrument.zones.size() == instrument.zones.size()
                     && roundTripInstrument.instrument.zones.front().roundRobinLength == 3
                     && roundTripInstrument.instrument.zones.front().roundRobinPosition == 1
-                    && roundTripInstrument.instrument.zones.front().releaseSeconds == 0.5,
+                    && roundTripInstrument.instrument.zones.front().releaseSeconds == 0.5
+                    && roundTripInstrument.instrument.zones.front().releaseShape == sfzDefaultReleaseShape,
                 "Broadened instrument round-tripping should preserve stereo no-xfade round-robin and release metadata.");
 
         std::cout << "Sprint 3.1.6 SFZ determinism tests passed." << std::endl;

@@ -61,6 +61,7 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     semanticRoute.fineTuneCents = 17.0;
     semanticRoute.amplitudeVelocityTracking = 37.0;
     semanticRoute.releaseSeconds = 1.25;
+    semanticRoute.releaseShape = -6.0;
     semanticRoute.controllerConditions = { { 23, 0, 63 } };
     semanticRoute.performance.event = drs::engine::PerformanceEventKind::release;
     request.sessionState.loadProfileId = "balanced";
@@ -260,6 +261,7 @@ int main()
                     && preparedRoute->fineTuneCents == 17.0
                     && preparedRoute->amplitudeVelocityTracking == 37.0
                     && preparedRoute->releaseSeconds == 1.25
+                    && preparedRoute->releaseShape == -6.0
                     && preparedRoute->controllerConditions
                         == std::vector<drs::engine::RuntimeControllerCondition> { { 23, 0, 63 } },
                 "Package-v2 reconstruction must retain tuning, velocity tracking, release time, and controller conditions.");
@@ -271,6 +273,7 @@ int main()
             });
         require(renderRoute != renderRoutes.end()
                     && renderRoute->releaseSeconds == 1.25
+                    && renderRoute->releaseShape == -6.0
                     && renderRoute->performanceEvent
                         == drs::engine::PerformanceEventKind::release,
                 "Package-v2 reconstruction must rebuild release envelopes and non-note-on performance events.");

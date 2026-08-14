@@ -606,6 +606,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
+        zoneObject["releaseShape"] = zone.releaseShape;
         if (zone.roundRobin.has_value())
             zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
@@ -1220,6 +1221,9 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         if (zone.releaseSeconds < 0.0)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-release", path,
                        "Zone releaseSeconds must not be negative.");
+        if (!std::isfinite(zone.releaseShape))
+            addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-release-shape", path,
+                       "Zone releaseShape must be finite.");
         if (zone.roundRobinLength < 0 || zone.roundRobinPosition < 0)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-round-robin", path,
                        "Zone round-robin metadata must not be negative.");
@@ -1270,6 +1274,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.loopStartFrame,
             zone.loopEndFrame,
             zone.releaseSeconds,
+            zone.releaseShape,
             roundRobin,
             zone.roundRobinLength,
             zone.roundRobinPosition,

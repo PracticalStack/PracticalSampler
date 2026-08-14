@@ -77,6 +77,8 @@ private:
     CompactInspectorSliderRow panRow;
     CompactInspectorToggleRow loopToggleRow;
     CompactInspectorSliderRow releaseRow;
+    CompactInspectorComboRow releaseCurveRow;
+    CompactInspectorSliderRow releaseShapeRow;
     CompactInspectorComboRow triggerModeRow;
     CompactInspectorComboRow performanceEventRow;
     CompactInspectorComboRow sustainConditionRow;

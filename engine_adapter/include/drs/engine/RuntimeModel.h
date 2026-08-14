@@ -34,6 +34,12 @@ enum class PerformanceEventKind : std::uint8_t
 
 inline constexpr std::size_t kPerformanceEventKindCount = 6;
 
+// SFZ/ARIA's traditional amplitude-envelope release curve. Zero is the
+// historical Decent Rhapsody linear release and remains the compatibility
+// default for projects saved before release-shape support.
+inline constexpr double sfzDefaultReleaseShape = -10.3616;
+inline constexpr double slowReleaseShape = 6.0;
+
 enum class PerformanceSustainCondition : std::uint8_t
 {
     any,
@@ -145,6 +151,7 @@ struct RuntimeProjectZoneDefinition
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
     double releaseSeconds = 0.0;
+    double releaseShape = 0.0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;
@@ -379,6 +386,7 @@ struct RuntimeZoneDefinition
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
     double releaseSeconds = 0.0;
+    double releaseShape = 0.0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;

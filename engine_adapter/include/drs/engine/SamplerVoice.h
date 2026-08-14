@@ -105,6 +105,7 @@ private:
     bool loopActive = false;
     std::uint32_t releaseSamplesRemaining = 0;
     std::uint32_t releaseSamplesTotal = 0;
+    double releaseShape = 0.0;
     bool underrunning = false;
     std::uint64_t nextLookAheadPublicationFrame = 0;
 };

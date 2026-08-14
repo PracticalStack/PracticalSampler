@@ -410,6 +410,8 @@ int main()
                 "Stage 2 should keep projecting a deterministic authored group for the first imported zone.");
         require(firstZone.releaseSeconds == 0.5,
                 "The projected SFZ ampeg_release should land on the first region.");
+        require(firstZone.releaseShape == sfzDefaultReleaseShape,
+                "SFZ regions without an explicit release shape should use the ARIA-compatible default.");
         require(firstZone.sampleSourceId != secondZone.sampleSourceId
                     && secondZone.sampleSourceId != thirdZone.sampleSourceId,
                 "The first round-robin regions should still point at distinct sample sources.");
@@ -430,7 +432,7 @@ int main()
         const auto scopedVolumeTempDirectory = fs::temp_directory_path() / "drs-sprint31-sfz-stage1";
         const auto scopedVolumeFixturePath = scopedVolumeTempDirectory / "scoped-volume-stage1.sfz";
         writeTextFile(scopedVolumeFixturePath,
-                      "<master>\n"
+                      "<master> ampeg_release_shape=-6\n"
                       "volume=2\n"
                       "\n"
                       "<group> volume=-3 lovel=1 hivel=63\n"
@@ -447,6 +449,9 @@ int main()
                 "Stage 1 should keep the scoped-volume fixture projectable and playable.");
         require(scopedVolumeProjection.masterGainDb == 2.0,
                 "Stage 1 should capture master volume on the projection result.");
+        require(!scopedVolumeProjection.zones.empty()
+                    && scopedVolumeProjection.zones.front().releaseShape == -6.0,
+                "Inherited SFZ ampeg_release_shape should map exactly into the projected zone.");
         require(scopedVolumeProjection.groups.size() == 1,
                 "Stage 2 should keep velocity-layered scoped-volume content inside one projected group.");
         require(scopedVolumeProjection.zones.size() == 2,
@@ -620,7 +625,8 @@ int main()
                 "Projected SFZ content should build a native instrument manifest with every zone.");
         require(instrument.zones.at(0).roundRobinLength == 3
                     && instrument.zones.at(1).roundRobinPosition == 2
-                    && instrument.zones.at(0).releaseSeconds == 0.5,
+                    && instrument.zones.at(0).releaseSeconds == 0.5
+                    && instrument.zones.at(0).releaseShape == sfzDefaultReleaseShape,
                 "Projected SFZ round-robin and release metadata should survive project-to-instrument conversion.");
         requireCrossfadeEquals(instrument.zones.at(0).velocityCrossfade,
                                0,
@@ -665,7 +671,8 @@ int main()
         require(roundTripProject.loaded, "Projected SFZ content should survive project save/load round-tripping.");
         require(roundTripProject.project.authoring.zones.at(0).roundRobinLength == 3
                     && roundTripProject.project.authoring.zones.at(0).roundRobinPosition == 1
-                    && roundTripProject.project.authoring.zones.at(0).releaseSeconds == 0.5,
+                    && roundTripProject.project.authoring.zones.at(0).releaseSeconds == 0.5
+                    && roundTripProject.project.authoring.zones.at(0).releaseShape == sfzDefaultReleaseShape,
                 "Projected SFZ zone metadata should survive project round-tripping.");
         require(roundTripProject.project.authoring.zones.at(0).roundRobin.has_value()
                     && roundTripProject.project.authoring.zones.at(0).roundRobin->slotCount == 3
@@ -689,7 +696,8 @@ int main()
                 "Projected SFZ content should survive instrument-manifest save/load round-tripping.");
         require(roundTripInstrument.instrument.zones.at(0).roundRobinLength == 3
                     && roundTripInstrument.instrument.zones.at(2).roundRobinPosition == 3
-                    && roundTripInstrument.instrument.zones.at(0).releaseSeconds == 0.5,
+                    && roundTripInstrument.instrument.zones.at(0).releaseSeconds == 0.5
+                    && roundTripInstrument.instrument.zones.at(0).releaseShape == sfzDefaultReleaseShape,
                 "Round-tripped native instrument zones should preserve SFZ round-robin and release metadata.");
         require(roundTripInstrument.instrument.zones.at(0).roundRobin.has_value()
                     && roundTripInstrument.instrument.zones.at(0).roundRobin->slotCount == 3

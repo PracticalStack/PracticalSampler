@@ -776,6 +776,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.gainDb = projectZone.gainDb;
         zone.sampleStartFrame = projectZone.sampleStartFrame;
         zone.releaseSeconds = projectZone.releaseSeconds;
+        zone.releaseShape = projectZone.releaseShape;
         zone.roundRobin = projectZone.roundRobin;
         zone.roundRobinLength = projectZone.roundRobinLength;
         zone.roundRobinPosition = projectZone.roundRobinPosition;

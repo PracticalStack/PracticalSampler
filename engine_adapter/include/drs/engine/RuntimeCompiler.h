@@ -33,6 +33,7 @@ struct RuntimeCompileZoneDefinition
     double gainDb = 0.0;
     std::uint64_t sampleStartFrame = 0;
     double releaseSeconds = 0.0;
+    double releaseShape = 0.0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;

@@ -160,6 +160,7 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
         && snapshotZone.loopEndFrame == preparedZone.loopEndFrame
         && snapshotZone.releaseSeconds == preparedZone.releaseSeconds
+        && snapshotZone.releaseShape == preparedZone.releaseShape
         && snapshotZone.roundRobin == preparedZone.roundRobin
         && snapshotZone.roundRobinLength == preparedZone.roundRobinLength
         && snapshotZone.roundRobinPosition == preparedZone.roundRobinPosition
@@ -633,6 +634,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.loopStartFrame,
                                   zone.loopEndFrame,
                                   zone.releaseSeconds,
+                                  zone.releaseShape,
                                   zone.roundRobin,
                                   zone.roundRobinLength,
                                   zone.roundRobinPosition,

@@ -128,6 +128,7 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     padZone.velocityHigh = 95;
     padZone.gainDb = -0.75;
     padZone.releaseSeconds = 1.25;
+    padZone.releaseShape = -6.0;
     project.authoring.zones.push_back(std::move(padZone));
 
     drs::engine::RuntimeProjectZoneDefinition leadZone;
@@ -188,6 +189,8 @@ int main()
                 "Standalone package sessions should preserve exported zone gain.");
         require(std::abs(standalonePayload->snapshot->zones.at(0).releaseSeconds - 1.25) < 1.0e-9,
                 "Standalone package sessions should preserve exported zone release time.");
+        require(std::abs(standalonePayload->snapshot->zones.at(0).releaseShape - (-6.0)) < 1.0e-9,
+                "Standalone package sessions should preserve exported zone release shape.");
         require(standalonePayload->snapshot->zones.at(1).sampleStartFrame == 64,
                 "Standalone package sessions should preserve exported sample start offsets.");
         require(std::abs(standalonePayload->prepared->masterGainDb - (-1.5)) < 1.0e-9,
@@ -198,6 +201,8 @@ int main()
                 "Standalone prepared playback should preserve exported zone gain.");
         require(std::abs(standalonePayload->prepared->zones.at(0).releaseSeconds - 1.25) < 1.0e-9,
                 "Standalone prepared playback should preserve exported zone release time.");
+        require(std::abs(standalonePayload->prepared->zones.at(0).releaseShape - (-6.0)) < 1.0e-9,
+                "Standalone prepared playback should preserve exported zone release shape.");
         require(standalonePayload->prepared->zones.at(1).sampleStartFrame == 64,
                 "Standalone prepared playback should preserve exported sample start offsets.");
         standalone.resized();
@@ -255,6 +260,8 @@ int main()
                 "Plugin package sessions should preserve exported zone gain.");
         require(std::abs(pluginPayload->snapshot->zones.at(0).releaseSeconds - 1.25) < 1.0e-9,
                 "Plugin package sessions should preserve exported zone release time.");
+        require(std::abs(pluginPayload->snapshot->zones.at(0).releaseShape - (-6.0)) < 1.0e-9,
+                "Plugin package sessions should preserve exported zone release shape.");
         require(pluginPayload->snapshot->zones.at(1).sampleStartFrame == 64,
                 "Plugin package sessions should preserve exported sample start offsets.");
         require(std::abs(pluginPayload->prepared->masterGainDb - (-1.5)) < 1.0e-9,
@@ -265,6 +272,8 @@ int main()
                 "Plugin prepared playback should preserve exported zone gain.");
         require(std::abs(pluginPayload->prepared->zones.at(0).releaseSeconds - 1.25) < 1.0e-9,
                 "Plugin prepared playback should preserve exported zone release time.");
+        require(std::abs(pluginPayload->prepared->zones.at(0).releaseShape - (-6.0)) < 1.0e-9,
+                "Plugin prepared playback should preserve exported zone release shape.");
         require(pluginPayload->prepared->zones.at(1).sampleStartFrame == 64,
                 "Plugin prepared playback should preserve exported sample start offsets.");
         editor->resized();

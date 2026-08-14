@@ -354,6 +354,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.streamOffsetBytes = 0;
         zone.prefetchBytes = 16384;
         zone.releaseSeconds = projectZone.releaseSeconds;
+        zone.releaseShape = projectZone.releaseShape;
         if (const auto roundRobin = materializeRoundRobinDescriptor(projectZone))
         {
             zone.roundRobin = *roundRobin;

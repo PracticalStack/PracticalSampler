@@ -6,6 +6,28 @@
 
 namespace drs::engine
 {
+namespace
+{
+float computeReleaseEnvelope(const std::uint32_t samplesRemaining,
+                             const std::uint32_t samplesTotal,
+                             const double authoredShape) noexcept
+{
+    if (samplesTotal == 0)
+        return 1.0f;
+
+    const auto linearLevel = static_cast<double>(samplesRemaining)
+        / static_cast<double>(samplesTotal);
+    if (!std::isfinite(authoredShape) || std::abs(authoredShape) < 1.0e-6)
+        return static_cast<float>(linearLevel);
+
+    // Negative values produce the fast initial decay used by SFZ/ARIA;
+    // positive values retain more level until late in the release.
+    const auto shape = std::clamp(authoredShape, -60.0, 60.0);
+    const auto curvedLevel = std::expm1(-shape * linearLevel) / std::expm1(-shape);
+    return static_cast<float>(std::clamp(curvedLevel, 0.0, 1.0));
+}
+} // namespace
+
 SamplerPanGains computeSamplerPanGains(double normalizedPan) noexcept
 {
     const auto pan = static_cast<float>(std::clamp(normalizedPan, -1.0, 1.0));
@@ -90,6 +112,10 @@ bool SamplerVoice::beginRelease(const double overrideReleaseSeconds) noexcept
     lifecycleState = SamplerVoiceLifecycleState::releasing;
     const auto releaseSeconds = overrideReleaseSeconds > 0.0
         ? overrideReleaseSeconds : (route != nullptr ? route->releaseSeconds : 0.0);
+    const auto usesAuthoredRelease = overrideReleaseSeconds <= 0.0
+        && route != nullptr && route->releaseSeconds > 0.0;
+    releaseShape = usesAuthoredRelease && std::isfinite(route->releaseShape)
+        ? route->releaseShape : 0.0;
     if (releaseSeconds > 0.0 && std::isfinite(outputSampleRate) && outputSampleRate > 0.0)
     {
         releaseSamplesTotal = static_cast<std::uint32_t>(
@@ -205,7 +231,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
         };
 
         const auto envelope = isReleasing() && releaseSamplesTotal > 0
-            ? static_cast<float>(releaseSamplesRemaining) / static_cast<float>(releaseSamplesTotal)
+            ? computeReleaseEnvelope(releaseSamplesRemaining, releaseSamplesTotal, releaseShape)
             : 1.0f;
         const auto leftSample = readInterpolated(0) * baseGain * panGains.left * envelope;
         const auto rightSource = sourceChannelCount > 1 ? readInterpolated(1) : readInterpolated(0);
@@ -263,6 +289,7 @@ void SamplerVoice::reset() noexcept
     loopActive = false;
     releaseSamplesRemaining = 0;
     releaseSamplesTotal = 0;
+    releaseShape = 0.0;
     underrunning = false;
     nextLookAheadPublicationFrame = 0;
 }

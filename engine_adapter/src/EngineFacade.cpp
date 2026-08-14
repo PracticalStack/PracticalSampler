@@ -1273,6 +1273,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.pan = 0.0;
         snapshotZone.sampleStartFrame = zone.sampleStartFrame;
         snapshotZone.releaseSeconds = zone.releaseSeconds;
+        snapshotZone.releaseShape = zone.releaseShape;
         snapshotZone.roundRobin = zone.roundRobin;
         snapshotZone.roundRobinLength = zone.roundRobinLength;
         snapshotZone.roundRobinPosition = zone.roundRobinPosition;
@@ -4540,7 +4541,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
             zone.rootKey, zone.keyLow, zone.keyHigh, zone.velocityLow, zone.velocityHigh,
             zone.velocityCrossfade, zone.velocityCrossfadeRuntime, zone.gainDb, zone.pan,
             zone.sampleStartFrame, zone.loopEnabled, zone.loopStartFrame, zone.loopEndFrame,
-            zone.releaseSeconds, zone.roundRobin, zone.roundRobinLength,
+            zone.releaseSeconds, zone.releaseShape, zone.roundRobin, zone.roundRobinLength,
             zone.roundRobinPosition, zone.triggerMode, zone.fineTuneCents,
             zone.amplitudeVelocityTracking, zone.controllerConditions });
     }
