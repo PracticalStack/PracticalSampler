@@ -69,6 +69,8 @@ private:
     void refreshSurface();
     void refreshMacroValues();
     void updateMacroValues(const std::vector<drs::engine::EngineMacroDescriptor>& macros);
+    void setInstrumentControlsCollapsed(bool shouldCollapse);
+    void updateInstrumentControlsVisibility();
     void syncKeyboardPlayableRange();
 
     drs::engine::EngineFacade& engineFacade;
@@ -87,6 +89,7 @@ private:
     std::uint64_t lastObservedMacroValueRevision = 0;
     bool initialRevisionCheckPending = true;
     bool showingPublishedMixer = false;
+    bool instrumentControlsCollapsed = false;
     std::size_t hiddenPublishedMacroCount = 0;
     std::vector<std::string> visibleMacroIds;
     std::vector<std::unique_ptr<MacroControl>> macroControls;
@@ -98,6 +101,7 @@ private:
     std::string loadedArtworkSourceKey;
 
     juce::Label macroStripLabel;
+    juce::TextButton macroStripToggleButton;
     juce::Label mixerEmptyStateLabel;
     juce::Label loadIndicatorLabel;
 };

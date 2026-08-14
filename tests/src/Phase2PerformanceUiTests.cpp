@@ -173,6 +173,32 @@ int main()
                              "performanceMacroStripLabel",
                              "Instrument Controls",
                              "Performance panel should label the control area as instrument controls.");
+        auto& instrumentControlsToggle = requireButton(
+            panel, "performanceMacroStripToggleButton");
+        require(instrumentControlsToggle.getButtonText() == "Hide Controls",
+                "Instrument Controls should start expanded with an explicit collapse action.");
+        auto* referenceMacroSlider = findDescendantById(panel, "performanceMacroSlider.tone");
+        require(referenceMacroSlider != nullptr && referenceMacroSlider->isVisible(),
+                "Reference Instrument Controls should be visible while the panel is expanded.");
+        referenceMacroSlider->grabKeyboardFocus();
+        instrumentControlsToggle.onClick();
+        require(instrumentControlsToggle.getButtonText() == "Show Controls"
+                    && !referenceMacroSlider->isVisible()
+                    && referenceMacroSlider->getBounds().isEmpty(),
+                "Collapsing Instrument Controls should hide and release the control content area. button="
+                    + instrumentControlsToggle.getButtonText().toStdString()
+                    + " visible=" + std::to_string(referenceMacroSlider->isVisible())
+                    + " bounds=" + referenceMacroSlider->getBounds().toString().toStdString());
+        require(juce::Component::getCurrentlyFocusedComponent() == &instrumentControlsToggle,
+                "Collapsing focused Instrument Controls should return keyboard focus to the disclosure button.");
+        panel.refreshNow();
+        require(instrumentControlsToggle.getButtonText() == "Show Controls"
+                    && !referenceMacroSlider->isVisible(),
+                "Performance refreshes should preserve the collapsed Instrument Controls state.");
+        instrumentControlsToggle.onClick();
+        require(instrumentControlsToggle.getButtonText() == "Hide Controls"
+                    && referenceMacroSlider->isVisible(),
+                "Expanding Instrument Controls should restore its player-facing controls.");
 
         const auto phase1Project = drs::engine::loadPhase1ReferenceProjectManifest();
         require(phase1Project.loaded, "Phase 1 reference project must load before performance UI migration coverage runs.");
@@ -327,6 +353,22 @@ int main()
                              "Diagnostics should continue to expose hidden helper controls through the full published macro table.");
         require(!requireLabel(panel, "performanceMixerEmptyStateLabel").isVisible(),
                 "Performance mixer empty state should stay hidden while at least one exposed control is available.");
+        auto* publishedLayerControl = findDescendantById(
+            panel, "performanceMixerNameLabel.layer-blend");
+        require(publishedLayerControl != nullptr && publishedLayerControl->isShowing(),
+                "Published Instrument Controls should be showing before the panel is collapsed.");
+        instrumentControlsToggle.onClick();
+        require(instrumentControlsToggle.getButtonText() == "Show Controls"
+                    && !publishedLayerControl->isShowing(),
+                "Collapsing Instrument Controls should hide the published packaged-instrument mixer.");
+        refreshPanel(panel);
+        require(instrumentControlsToggle.getButtonText() == "Show Controls"
+                    && !publishedLayerControl->isShowing(),
+                "Published topology refreshes should preserve the collapsed Instrument Controls state.");
+        instrumentControlsToggle.onClick();
+        require(instrumentControlsToggle.getButtonText() == "Hide Controls"
+                    && publishedLayerControl->isShowing(),
+                "Expanding Instrument Controls should restore the published packaged-instrument mixer.");
 
         auto hiddenOnlyProject = phase2ProjectLoad.project;
         hiddenOnlyProject.projectId += "-performance-mixer-hidden-only";

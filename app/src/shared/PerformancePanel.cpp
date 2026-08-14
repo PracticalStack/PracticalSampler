@@ -194,6 +194,12 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
 {
     macroStripLabel.setFont(juce::FontOptions(16.0f, juce::Font::bold));
     macroStripLabel.setComponentID("performanceMacroStripLabel");
+    macroStripToggleButton.setComponentID("performanceMacroStripToggleButton");
+    macroStripToggleButton.setWantsKeyboardFocus(true);
+    macroStripToggleButton.onClick = [this]
+    {
+        setInstrumentControlsCollapsed(!instrumentControlsCollapsed);
+    };
     mixerEmptyStateLabel.setFont(juce::FontOptions(15.0f));
     mixerEmptyStateLabel.setComponentID("performanceMixerEmptyStateLabel");
     mixerEmptyStateLabel.setJustificationType(juce::Justification::centredLeft);
@@ -217,6 +223,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
 
     addAndMakeVisible(artworkPanel);
     addAndMakeVisible(macroStripLabel);
+    addAndMakeVisible(macroStripToggleButton);
     addAndMakeVisible(mixerEmptyStateLabel);
     addAndMakeVisible(loadIndicatorLabel);
     addAndMakeVisible(keyboardComponent);
@@ -263,22 +270,36 @@ void PerformancePanel::resized()
     const auto macroRowsHeight = static_cast<int>(macroControls.size()) * 34;
     int controlSectionHeight = 32;
 
-    if (showingPublishedMixer)
+    if (!instrumentControlsCollapsed && showingPublishedMixer)
     {
         controlSectionHeight += publishedMixer.getControlCount() == 0
             ? 64
             : std::min(420, std::max(220, area.getHeight() / 3));
     }
-    else if (!macroControls.empty())
+    else if (!instrumentControlsCollapsed && !macroControls.empty())
     {
         controlSectionHeight += macroRowsHeight + 8;
     }
 
     auto controlArea = area.removeFromBottom(std::min(controlSectionHeight, area.getHeight()));
-    macroStripLabel.setBounds(controlArea.removeFromTop(24));
+    auto controlHeader = controlArea.removeFromTop(24);
+    macroStripToggleButton.setBounds(controlHeader.removeFromRight(112));
+    controlHeader.removeFromRight(8);
+    macroStripLabel.setBounds(controlHeader);
     controlArea.removeFromTop(8);
 
-    if (showingPublishedMixer)
+    if (instrumentControlsCollapsed)
+    {
+        publishedMixer.setBounds({});
+        mixerEmptyStateLabel.setBounds({});
+        for (auto& control : macroControls)
+        {
+            control->nameLabel.setBounds({});
+            control->slider.setBounds({});
+            control->valueLabel.setBounds({});
+        }
+    }
+    else if (showingPublishedMixer)
     {
         if (publishedMixer.getControlCount() == 0)
         {
@@ -378,7 +399,6 @@ void PerformancePanel::rebuildMacroControls(
     visibleMacroIds.clear();
     macroControls.clear();
     showingPublishedMixer = mixerControl;
-    publishedMixer.setVisible(mixerControl);
 
     if (mixerControl)
     {
@@ -386,6 +406,7 @@ void PerformancePanel::rebuildMacroControls(
         for (const auto& macro : macros)
             visibleMacroIds.push_back(macro.id);
         publishedMixer.setControls(buildPublishedMixerControls(macros));
+        updateInstrumentControlsVisibility();
         return;
     }
 
@@ -431,6 +452,57 @@ void PerformancePanel::rebuildMacroControls(
         addAndMakeVisible(control->slider);
         addAndMakeVisible(control->valueLabel);
         macroControls.push_back(std::move(control));
+    }
+    updateInstrumentControlsVisibility();
+}
+
+void PerformancePanel::setInstrumentControlsCollapsed(const bool shouldCollapse)
+{
+    if (instrumentControlsCollapsed == shouldCollapse)
+        return;
+
+    auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
+    const auto focusedPublishedControl = focusedComponent != nullptr
+        && (focusedComponent == &publishedMixer || publishedMixer.isParentOf(focusedComponent));
+    const auto focusedLegacyControl = focusedComponent != nullptr
+        && std::any_of(macroControls.begin(), macroControls.end(), [&](const auto& control)
+        {
+            return focusedComponent == &control->slider
+                || focusedComponent == &control->nameLabel
+                || focusedComponent == &control->valueLabel;
+        });
+
+    instrumentControlsCollapsed = shouldCollapse;
+    updateInstrumentControlsVisibility();
+    resized();
+    repaint();
+
+    if (shouldCollapse && (focusedPublishedControl || focusedLegacyControl))
+        macroStripToggleButton.grabKeyboardFocus();
+}
+
+void PerformancePanel::updateInstrumentControlsVisibility()
+{
+    const auto expanded = !instrumentControlsCollapsed;
+    macroStripToggleButton.setButtonText(expanded ? "Hide Controls" : "Show Controls");
+    macroStripToggleButton.setTitle(expanded
+        ? "Collapse Instrument Controls" : "Expand Instrument Controls");
+    const auto description = expanded
+        ? juce::String("Instrument Controls are expanded. Press to collapse the panel.")
+        : juce::String("Instrument Controls are collapsed. Press to expand the panel.");
+    macroStripToggleButton.setTooltip(description);
+    macroStripToggleButton.setDescription(description);
+
+    publishedMixer.setVisible(expanded && showingPublishedMixer
+                              && publishedMixer.getControlCount() > 0);
+    mixerEmptyStateLabel.setVisible(expanded && showingPublishedMixer
+                                    && publishedMixer.getControlCount() == 0);
+    for (auto& control : macroControls)
+    {
+        const auto visible = expanded && !showingPublishedMixer;
+        control->nameLabel.setVisible(visible);
+        control->slider.setVisible(visible);
+        control->valueLabel.setVisible(visible);
     }
 }
 
@@ -548,8 +620,7 @@ void PerformancePanel::refreshSurface()
     macroStripLabel.setText(buildMacroStripTitle(macroSurface), juce::dontSendNotification);
     macroStripLabel.setTooltip(macroStripDescription);
     macroStripLabel.setDescription(macroStripDescription);
-    mixerEmptyStateLabel.setVisible(macroSurface.showingPublishedMixer
-                                    && macroSurface.displayedMacros.empty());
+    updateInstrumentControlsVisibility();
     const auto mixerEmptyText = buildMixerEmptyStateText(macroSurface.hiddenPublishedMacroCount);
     mixerEmptyStateLabel.setText(mixerEmptyText, juce::dontSendNotification);
     mixerEmptyStateLabel.setTooltip(mixerEmptyText);
