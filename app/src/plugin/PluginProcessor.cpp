@@ -3655,9 +3655,6 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
         ? authorized->macroBindings
         : (packageSession ? engineFacade.getActivePublishedMacroBindings()
                           : drs::engine::ImmutablePublishedMacroBindingTablePtr {});
-    if (packageSession && macroBindings != nullptr)
-        installPublishedMacroBindings(*macroBindings);
-
     if (packageSession
         && performanceSnapshot.hasActiveActivation
         && !performanceSnapshot.hasPendingActivation
@@ -3666,6 +3663,8 @@ bool Processor::synchronizePerformanceActivation(bool installImmediately)
     {
         return false;
     }
+    if (packageSession && macroBindings != nullptr)
+        installPublishedMacroBindings(*macroBindings);
 
     const auto& sessionState = engineFacade.getCurrentSessionState();
 

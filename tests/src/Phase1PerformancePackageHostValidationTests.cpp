@@ -48,6 +48,11 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
                                               const int blockCount = 8,
                                               const bool paceAsAudioDevice = false)
 {
+    juce::MidiBuffer resetMidiBuffer;
+    resetMidiBuffer.addEvent(juce::MidiMessage::controllerEvent(1, 120, 0), 0);
+    juce::AudioBuffer<float> resetBuffer(2, 512);
+    processor.processBlock(resetBuffer, resetMidiBuffer);
+
     processor.queuePerformanceSurfaceNoteOn(midiNoteNumber, velocity);
 
     float maxMagnitude = 0.0f;
@@ -63,6 +68,10 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
     }
 
     processor.queuePerformanceSurfaceNoteOff(midiNoteNumber);
+    resetMidiBuffer.clear();
+    resetMidiBuffer.addEvent(juce::MidiMessage::controllerEvent(1, 120, 0), 0);
+    resetBuffer.clear();
+    processor.processBlock(resetBuffer, resetMidiBuffer);
     return maxMagnitude;
 }
 
@@ -285,6 +294,19 @@ int main(int argc, char** argv)
         processor->serviceMessageThreadWork();
         require(pluginMagnitude > 0.0001f,
                 "Plugin host validation should produce audible output from the checked-in package.");
+        processor->setMacroValueFromShell("Instrument", 0.0);
+        processor->serviceMessageThreadWork();
+        const auto minimumGainMagnitude = renderQueuedPerformanceSurfaceMagnitude(
+            *processor, 69, 0.8f);
+        processor->setMacroValueFromShell("Instrument", 1.0);
+        processor->serviceMessageThreadWork();
+        const auto maximumGainMagnitude = renderQueuedPerformanceSurfaceMagnitude(
+            *processor, 69, 0.8f);
+        require(minimumGainMagnitude > 0.0001f
+                    && maximumGainMagnitude > minimumGainMagnitude * 2.5f,
+                "The packaged Instrument gain control did not materially change rendered output."
+                " minimum=" + std::to_string(minimumGainMagnitude)
+                    + " maximum=" + std::to_string(maximumGainMagnitude));
         const auto pluginDiagnostics = processor->getEngineFacade().getDiagnosticsSnapshot();
         const auto pluginRealtime = processor->getRealtimeSafetySnapshot();
         require(pluginDiagnostics.available,
