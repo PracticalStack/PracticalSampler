@@ -60,6 +60,7 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     auto& semanticRoute = request.project.authoring.zones.front();
     semanticRoute.fineTuneCents = 17.0;
     semanticRoute.amplitudeVelocityTracking = 37.0;
+    semanticRoute.releaseSeconds = 1.25;
     semanticRoute.controllerConditions = { { 23, 0, 63 } };
     semanticRoute.performance.event = drs::engine::PerformanceEventKind::release;
     request.sessionState.loadProfileId = "balanced";
@@ -258,9 +259,10 @@ int main()
         require(preparedRoute != preparedRoutes.end()
                     && preparedRoute->fineTuneCents == 17.0
                     && preparedRoute->amplitudeVelocityTracking == 37.0
+                    && preparedRoute->releaseSeconds == 1.25
                     && preparedRoute->controllerConditions
                         == std::vector<drs::engine::RuntimeControllerCondition> { { 23, 0, 63 } },
-                "Package-v2 reconstruction must retain tuning, velocity tracking, and controller conditions.");
+                "Package-v2 reconstruction must retain tuning, velocity tracking, release time, and controller conditions.");
         const auto& renderRoutes = preparedActivation.renderModel->getRoutes();
         const auto renderRoute = std::find_if(
             renderRoutes.begin(), renderRoutes.end(), [](const auto& route)
@@ -268,9 +270,10 @@ int main()
                 return route.zoneId == "pad-a3";
             });
         require(renderRoute != renderRoutes.end()
+                    && renderRoute->releaseSeconds == 1.25
                     && renderRoute->performanceEvent
                         == drs::engine::PerformanceEventKind::release,
-                "Package-v2 reconstruction must rebuild non-note-on performance events.");
+                "Package-v2 reconstruction must rebuild release envelopes and non-note-on performance events.");
         drs::engine::EngineFacade facade;
         const auto activated = facade.activatePreparedPerformancePackageSession(
             std::move(preparedActivation));

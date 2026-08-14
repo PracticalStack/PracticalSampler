@@ -775,6 +775,7 @@ PerformancePackageExportPreparationResult preparePerformancePackageExport(
         zone.velocityCrossfade = projectZone.velocityCrossfade;
         zone.gainDb = projectZone.gainDb;
         zone.sampleStartFrame = projectZone.sampleStartFrame;
+        zone.releaseSeconds = projectZone.releaseSeconds;
         zone.roundRobin = projectZone.roundRobin;
         zone.roundRobinLength = projectZone.roundRobinLength;
         zone.roundRobinPosition = projectZone.roundRobinPosition;

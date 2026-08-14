@@ -3540,6 +3540,7 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
         viewModel.gainDb = zone->gainDb;
         viewModel.pan = zone->pan;
         viewModel.loopEnabled = zone->loopEnabled;
+        viewModel.releaseSeconds = zone->releaseSeconds;
         viewModel.triggerMode = zone->triggerMode;
         viewModel.performanceEvent = zone->performance.event;
         viewModel.performanceSustain = zone->performance.sustain;
@@ -6010,6 +6011,7 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     editedZone.gainDb = values.gainDb;
     editedZone.pan = values.pan;
     editedZone.loopEnabled = values.loopEnabled;
+    editedZone.releaseSeconds = values.releaseSeconds;
     editedZone.triggerMode = values.triggerMode;
     editedZone.performance.event = values.performanceEvent;
     editedZone.performance.sustain = values.performanceSustain;

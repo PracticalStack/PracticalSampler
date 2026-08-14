@@ -903,6 +903,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     populatedViewModel.gainDb = -3.5;
     populatedViewModel.pan = 0.25;
     populatedViewModel.loopEnabled = false;
+    populatedViewModel.releaseSeconds = 1.25;
     populatedViewModel.roundRobinEnabled = true;
     populatedViewModel.roundRobinPoolText = "Pool: rr-main";
     populatedViewModel.roundRobinSlotText = "Slot: 1 of 3 | Mode: sequential";
@@ -935,6 +936,8 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
             "Zone mapping editor should expose one pan control after removing old mapping rows.");
     require(countDescendantsById(editor, "authoringLoopEnabledToggle") == 1,
             "Zone mapping editor should expose one loop toggle after removing old mapping rows.");
+    require(countDescendantsById(editor, "authoringReleaseSecondsSlider") == 1,
+            "Zone mapping editor should expose one release-time control.");
     require(countDescendantsById(editor, "authoringTriggerModeSelector") == 1,
             "Zone mapping editor should expose one trigger-mode selector.");
     require(countDescendantsById(editor, "authoringZoneArticulationSelector") == 1,
@@ -955,6 +958,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
              juce::String("authoringMixInspectorSectionDisclosure"),
              juce::String("authoringAdvancedInspectorSection"),
              juce::String("authoringAdvancedInspectorSectionDisclosure"),
+             juce::String("authoringReleaseSecondsSlider"),
              juce::String("authoringTriggerModeSelector"),
              juce::String("authoringRestoreRootKeyButton")
          })
@@ -967,6 +971,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyLowSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringKeyHighSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringZoneArticulationSelector");
+    requireNonEmptyAccessibilityHelpText(editor, "authoringReleaseSecondsSlider");
     requireNonEmptyAccessibilityHelpText(editor, "authoringTriggerModeSelector");
     requireNonEmptyAccessibilityHelpText(editor, "authoringRestoreRootKeyButton");
     requireIncreasingFocusOrder(editor,
@@ -984,6 +989,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                                     "authoringPanSlider",
                                     "authoringAdvancedInspectorSectionDisclosure",
                                     "authoringLoopEnabledToggle",
+                                    "authoringReleaseSecondsSlider",
                                     "authoringTriggerModeSelector",
                                     "authoringRestoreRootKeyButton"
                                 });
@@ -999,6 +1005,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     requireAccessibilityHandlerState(editor, "authoringGainSlider", false);
     requireAccessibilityHandlerState(editor, "authoringPanSlider", false);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", false);
+    requireAccessibilityHandlerState(editor, "authoringReleaseSecondsSlider", false);
     requireAccessibilityHandlerState(editor, "authoringTriggerModeSelector", false);
     requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", false);
 
@@ -1059,10 +1066,12 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     if (advancedDisclosure.getButtonText() == "Show")
         advancedDisclosure.onClick();
     requireComponentVisibleWithin(editor, "authoringLoopEnabledToggle", bounds);
+    requireComponentVisibleWithin(editor, "authoringReleaseSecondsSlider", bounds);
     requireComponentVisibleWithin(editor, "authoringTriggerModeSelector", bounds);
     requireComponentVisibleWithin(editor, "authoringRestoreRootKeyButton", bounds);
     requireComponentVisibleWithin(editor, "authoringZoneValidationMessage", bounds);
     requireAccessibilityHandlerState(editor, "authoringLoopEnabledToggle", true);
+    requireAccessibilityHandlerState(editor, "authoringReleaseSecondsSlider", true);
     requireAccessibilityHandlerState(editor, "authoringTriggerModeSelector", true);
     requireAccessibilityHandlerState(editor, "authoringRestoreRootKeyButton", true);
 
@@ -1131,12 +1140,32 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
                 == "Velocity range was normalized to keep Low <= High.",
             "Zone mapping editor should explain when velocity ranges are normalized.");
 
+    auto& releaseSlider = requireSlider(editor, "authoringReleaseSecondsSlider");
+    require(std::abs(releaseSlider.getValue() - 1.25) < 0.001,
+            "Zone mapping editor should display the selected zone release time.");
+    releaseSlider.setValue(1.75, juce::dontSendNotification);
+    require(static_cast<bool>(releaseSlider.onDragEnd),
+            "Zone mapping editor release slider should expose a drag-end commit callback.");
+    releaseSlider.onDragStart();
+    releaseSlider.onDragEnd();
+    require(commitRequests == 6, "Zone mapping editor should commit release-time edits.");
+    require(lastCommitLabel == "Update zone release", "Zone mapping editor should label release-time edits.");
+    require(std::abs(lastCommittedValues.releaseSeconds - 1.75) < 0.001,
+            "Zone mapping editor should report the edited release time.");
+
+    auto longReleaseViewModel = lastCommittedValues;
+    longReleaseViewModel.releaseSeconds = 45.0;
+    editor.setViewModel(longReleaseViewModel);
+    editor.resized();
+    require(std::abs(releaseSlider.getValue() - 45.0) < 0.001,
+            "Zone mapping editor should preserve imported release times beyond its default editing range.");
+
     auto& loopToggle = requireToggleButton(editor, "authoringLoopEnabledToggle");
     loopToggle.setToggleState(true, juce::dontSendNotification);
     require(static_cast<bool>(loopToggle.onClick),
             "Zone mapping editor loop toggle should expose an onClick callback.");
     loopToggle.onClick();
-    require(commitRequests == 6, "Zone mapping editor should commit loop toggle edits.");
+    require(commitRequests == 7, "Zone mapping editor should commit loop toggle edits.");
     require(lastCommitLabel == "Toggle zone loop", "Zone mapping editor should label loop edits.");
     require(lastCommittedValues.loopEnabled, "Zone mapping editor should report the toggled loop state.");
 
@@ -1144,7 +1173,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
     require(triggerModeSelector.getSelectedId() == 1,
             "Zone mapping editor should default selected zones to gated trigger mode.");
     triggerModeSelector.setSelectedId(2, juce::sendNotificationSync);
-    require(commitRequests == 7, "Zone mapping editor should commit trigger-mode edits.");
+    require(commitRequests == 8, "Zone mapping editor should commit trigger-mode edits.");
     require(lastCommitLabel == "Update zone trigger mode",
             "Zone mapping editor should label trigger-mode edits.");
     require(lastCommittedValues.triggerMode == drs::engine::ZoneTriggerMode::oneShot,
@@ -1166,7 +1195,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Zone Map context menu: Delete Selected Sample\n";
     inventory << "- Drawer host: authoringDrawer, authoringDrawerTabStrip, authoringDrawerToggleButton\n";
     inventory << "- Drawer tabs: authoringDrawerWaveformTab, authoringDrawerMacrosTab, authoringDrawerRoutingTab, authoringDrawerPerformanceTab\n";
-    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
+    inventory << "- Mapping inspector: authoringRootKeySlider, authoringKeyLowSlider, authoringKeyHighSlider, authoringVelocityLowSlider, authoringVelocityHighSlider, authoringGainSlider, authoringPanSlider, authoringLoopEnabledToggle, authoringReleaseSecondsSlider, authoringTriggerModeSelector, authoringRestoreRootKeyButton\n";
     inventory << "- Drawer context: authoringDrawerTitleLabel, authoringDrawerScopeLabel, authoringDrawerBreadcrumbLabel\n";
     inventory << "- Waveform drawer content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
     inventory << "- Macros drawer content: authoringMacroList, authoringMacroListBox, authoringMacroCreateButton, authoringMacroDuplicateButton, authoringMacroDeleteButton, authoringMacroNameEditor, authoringMacroExposeToggle, authoringMacroAssignmentSelector, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
@@ -1337,12 +1366,15 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
             requireButton(panel, "authoringMixInspectorSectionDisclosure").onClick();
 
             ensureControlsVisible("authoringRestoreRootKeyButton",
-                                  "authoringLoopEnabledToggle",
+                                  "authoringReleaseSecondsSlider",
                                   "authoringAdvancedInspectorSectionDisclosure");
             requireComponentVisibleWithin(panel, "authoringLoopEnabledToggle", panelBounds);
+            requireComponentVisibleWithin(panel, "authoringReleaseSecondsSlider", panelBounds);
             requireComponentVisible(panel, "authoringRestoreRootKeyButton");
             require(countDescendantsById(panel, "authoringLoopEnabledToggle") == 1,
                     "Authoring panel should not expose duplicate loop toggles after mapping-row removal.");
+            require(countDescendantsById(panel, "authoringReleaseSecondsSlider") == 1,
+                    "Authoring panel should not expose duplicate release-time controls.");
             require(countDescendantsById(panel, "authoringRestoreRootKeyButton") == 1,
                     "Authoring panel should not expose duplicate restore-root-key actions after mapping-row removal.");
             break;
@@ -3324,6 +3356,13 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
     loopToggle.onClick();
     require(session.getSelectedZone()->loopEnabled,
             "Gate A workflow should commit loop-toggle edits through the compact inspector.");
+
+    auto& releaseSlider = requireSlider(panel, "authoringReleaseSecondsSlider");
+    releaseSlider.onDragStart();
+    releaseSlider.setValue(1.75, juce::dontSendNotification);
+    releaseSlider.onDragEnd();
+    require(std::abs(session.getSelectedZone()->releaseSeconds - 1.75) < 0.001,
+            "Gate A workflow should commit release-time edits through the compact inspector.");
 
     auto& triggerModeSelector = requireComboBox(panel, "authoringTriggerModeSelector");
     triggerModeSelector.setSelectedId(2, juce::sendNotificationSync);

@@ -62,6 +62,7 @@ ZoneMappingEditor::ZoneMappingEditor()
       gainRow("Gain (dB)", "authoringGainRow", -24.0, 12.0, 0.1),
       panRow("Pan", "authoringPanRow", -1.0, 1.0, 0.01),
       loopToggleRow("Loop", "authoringLoopRow", "Enabled"),
+      releaseRow("Release (s)", "authoringReleaseRow", 0.0, 30.0, 0.01),
       triggerModeRow("Trigger mode", "authoringTriggerModeRow"),
       performanceEventRow("Event", "authoringPerformanceEventRow"),
       sustainConditionRow("Sustain", "authoringSustainConditionRow"),
@@ -99,6 +100,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     gainRow.getSlider().setComponentID("authoringGainSlider");
     panRow.getSlider().setComponentID("authoringPanSlider");
     loopToggleRow.getToggle().setComponentID("authoringLoopEnabledToggle");
+    releaseRow.getSlider().setComponentID("authoringReleaseSecondsSlider");
     triggerModeRow.getComboBox().setComponentID("authoringTriggerModeSelector");
     performanceEventRow.getComboBox().setComponentID("authoringPerformanceEventSelector");
     sustainConditionRow.getComboBox().setComponentID("authoringPerformanceSustainSelector");
@@ -150,17 +152,20 @@ ZoneMappingEditor::ZoneMappingEditor()
     panRow.getSlider().setExplicitFocusOrder(61);
     advancedSection.getDisclosureButton().setExplicitFocusOrder(62);
     loopToggleRow.getToggle().setExplicitFocusOrder(63);
-    triggerModeRow.getComboBox().setExplicitFocusOrder(64);
-    previewZoneRow.getButton().setExplicitFocusOrder(65);
-    restoreRootKeyRow.getButton().setExplicitFocusOrder(66);
-    performanceSection.getDisclosureButton().setExplicitFocusOrder(67);
-    performanceEventRow.getComboBox().setExplicitFocusOrder(68);
-    sustainConditionRow.getComboBox().setExplicitFocusOrder(69);
-    pitchSourceRow.getComboBox().setExplicitFocusOrder(70);
-    chokeGroupRow.getComboBox().setExplicitFocusOrder(71);
-    chokeTargetRow.getComboBox().setExplicitFocusOrder(72);
-    chokeFadeRow.getSlider().setExplicitFocusOrder(73);
-    createChokeGroupRow.getButton().setExplicitFocusOrder(74);
+    releaseRow.getSlider().setExplicitFocusOrder(64);
+    triggerModeRow.getComboBox().setExplicitFocusOrder(65);
+    previewZoneRow.getButton().setExplicitFocusOrder(66);
+    restoreRootKeyRow.getButton().setExplicitFocusOrder(67);
+    performanceSection.getDisclosureButton().setExplicitFocusOrder(68);
+    performanceEventRow.getComboBox().setExplicitFocusOrder(69);
+    sustainConditionRow.getComboBox().setExplicitFocusOrder(70);
+    pitchSourceRow.getComboBox().setExplicitFocusOrder(71);
+    chokeGroupRow.getComboBox().setExplicitFocusOrder(72);
+    chokeTargetRow.getComboBox().setExplicitFocusOrder(73);
+    chokeFadeRow.getSlider().setExplicitFocusOrder(74);
+    createChokeGroupRow.getButton().setExplicitFocusOrder(75);
+    releaseRow.getSlider().setHelpText(
+        "Sets the selected zone's amplitude release time after note-off, in seconds.");
     triggerModeRow.getComboBox().setHelpText(
         "Gated samples release on note-off. One-shot samples play to their natural end.");
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
@@ -218,11 +223,12 @@ ZoneMappingEditor::ZoneMappingEditor()
     mixSectionContent.setSize(0, sliderRowHeight + 6 + sliderRowHeight);
 
     addOwnedRow(advancedSectionContent, loopToggleRow, toggleRowHeight);
+    addOwnedRow(advancedSectionContent, releaseRow, sliderRowHeight);
     addOwnedRow(advancedSectionContent, triggerModeRow, comboRowHeight);
     addOwnedRow(advancedSectionContent, previewZoneRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, restoreRootKeyRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
-    advancedSectionContent.setSize(0, toggleRowHeight + 6 + comboRowHeight + 6 + actionRowHeight + 6
+    advancedSectionContent.setSize(0, toggleRowHeight + 6 + sliderRowHeight + 6 + comboRowHeight + 6 + actionRowHeight + 6
                                       + actionRowHeight + 6 + messageRowHeight);
     addOwnedRow(performanceSectionContent, performanceEventRow, comboRowHeight);
     addOwnedRow(performanceSectionContent, sustainConditionRow, comboRowHeight);
@@ -265,6 +271,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     bindCommitOnGestureFinished(velocityRangeRow.getHighSlider(), "Update zone velocity range");
     bindCommitOnGestureFinished(gainRow.getSlider(), "Update zone gain");
     bindCommitOnGestureFinished(panRow.getSlider(), "Update zone pan");
+    bindCommitOnGestureFinished(releaseRow.getSlider(), "Update zone release");
 
     loopToggleRow.getToggle().onClick = [this]
     {
@@ -391,6 +398,8 @@ void ZoneMappingEditor::resized()
     auto advancedArea = advancedSectionContent.getLocalBounds();
     loopToggleRow.setBounds(advancedArea.removeFromTop(toggleRowHeight));
     advancedArea.removeFromTop(6);
+    releaseRow.setBounds(advancedArea.removeFromTop(sliderRowHeight));
+    advancedArea.removeFromTop(6);
     triggerModeRow.setBounds(advancedArea.removeFromTop(comboRowHeight));
     advancedArea.removeFromTop(6);
     previewZoneRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
@@ -451,6 +460,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&gainRow),
              static_cast<juce::Component*>(&panRow),
              static_cast<juce::Component*>(&loopToggleRow),
+             static_cast<juce::Component*>(&releaseRow),
              static_cast<juce::Component*>(&triggerModeRow),
              static_cast<juce::Component*>(&performanceEventRow),
              static_cast<juce::Component*>(&sustainConditionRow),
@@ -480,6 +490,7 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&gainRow.getSlider()),
              static_cast<juce::Component*>(&panRow.getSlider()),
              static_cast<juce::Component*>(&loopToggleRow.getToggle()),
+             static_cast<juce::Component*>(&releaseRow.getSlider()),
              static_cast<juce::Component*>(&triggerModeRow.getComboBox()),
              static_cast<juce::Component*>(&performanceEventRow.getComboBox()),
              static_cast<juce::Component*>(&sustainConditionRow.getComboBox()),
@@ -526,6 +537,7 @@ ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
     values.gainDb = gainRow.getSlider().getValue();
     values.pan = panRow.getSlider().getValue();
     values.loopEnabled = loopToggleRow.getToggle().getToggleState();
+    values.releaseSeconds = releaseRow.getSlider().getValue();
     values.triggerMode = triggerModeRow.getComboBox().getSelectedId() == 2
         ? drs::engine::ZoneTriggerMode::oneShot
         : drs::engine::ZoneTriggerMode::gated;
@@ -652,6 +664,10 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     gainRow.getSlider().setValue(values.gainDb, juce::dontSendNotification);
     panRow.getSlider().setValue(values.pan, juce::dontSendNotification);
     loopToggleRow.getToggle().setToggleState(values.loopEnabled, juce::dontSendNotification);
+    auto& releaseSlider = releaseRow.getSlider();
+    if (values.releaseSeconds > releaseSlider.getMaximum())
+        releaseSlider.setRange(0.0, values.releaseSeconds * 2.0, 0.01);
+    releaseSlider.setValue(values.releaseSeconds, juce::dontSendNotification);
     triggerModeRow.getComboBox().setSelectedId(
         values.triggerMode == drs::engine::ZoneTriggerMode::oneShot ? 2 : 1,
         juce::dontSendNotification);

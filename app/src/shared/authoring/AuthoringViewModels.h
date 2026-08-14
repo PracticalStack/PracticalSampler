@@ -51,6 +51,7 @@ struct ZoneFieldValuesViewModel
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    double releaseSeconds = 0.0;
     bool roundRobinEnabled = false;
     std::string roundRobinPoolText;
     std::string roundRobinSlotText;
