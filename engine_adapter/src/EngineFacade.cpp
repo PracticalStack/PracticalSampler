@@ -1126,6 +1126,7 @@ CompiledPerformanceProgramResult compilePerformancePackageProgram(
         authoringZone.exclusiveTargetGroupIds = zone.exclusiveTargetGroupIds;
         authoringZone.chokeReleaseSeconds = zone.chokeReleaseSeconds;
         authoringZone.controllerConditions = zone.controllerConditions;
+        authoringZone.damper = zone.damper;
         authoring.zones.push_back(std::move(authoringZone));
     }
     authoring.roundRobinResetRules = instrument.roundRobinResetRules;
@@ -1367,6 +1368,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.fineTuneCents = zone.fineTuneCents;
         snapshotZone.amplitudeVelocityTracking = zone.amplitudeVelocityTracking;
         snapshotZone.controllerConditions = zone.controllerConditions;
+        snapshotZone.damper = zone.damper;
         result.snapshot.zones.push_back(std::move(snapshotZone));
 
         if (!zone.articulationId.empty())
@@ -4709,7 +4711,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
             zone.sampleStartFrame, zone.loopEnabled, zone.loopStartFrame, zone.loopEndFrame,
             zone.releaseSeconds, zone.releaseShape, zone.roundRobin, zone.roundRobinLength,
             zone.roundRobinPosition, zone.triggerMode, zone.fineTuneCents,
-            zone.amplitudeVelocityTracking, zone.controllerConditions });
+            zone.amplitudeVelocityTracking, zone.controllerConditions, zone.damper });
     }
     for (const auto& group : result.snapshotResult.snapshot.groupRoutes)
     {

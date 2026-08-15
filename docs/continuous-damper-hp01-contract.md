@@ -194,11 +194,13 @@ later slice promotes it to registered green behavior:
 - `release-trigger-uniqueness` — HP-04
 - `sustain-controller-reassignment` — HP-02/HP-03
 - `generation-owned-damper-update` — HP-03/HP-04
-- `salamander-half-pedal-projection` — HP-02
+- `salamander-half-pedal-projection` — promoted by HP-02 on August 15, 2026;
+  direct invocation now exits 0 and names the registered HP-02 coverage
 
 Exit 2 means invalid invocation or fixture setup and is never an expected result.
 Later slices must replace each red seam with behavioral coverage; deleting the seam
-or treating expected exit 1 as a release pass is prohibited.
+or treating expected exit 1 as a release pass is prohibited. Promoted seams remain
+addressable in the harness and return exit 0 with the owning registered test.
 
 ## HP-01 acceptance
 
@@ -223,6 +225,9 @@ or treating expected exit 1 as a release pass is prohibited.
 - The contract test verifies the source file SHA-256, raw format-1 header, two-track
   parse, 960 PPQ division, and all 28 trace events against both the frozen JSON and
   the original MIDI.
+- HP-02 promotes `salamander-half-pedal-projection` to
+  `drs.continuous_damper.hp02`. The other six runtime/voice seams continue to return
+  expected exit 1.
 
 The checkout contains `AccurateSalamanderTests.mid` but not the Accurate Salamander
 preset/sample corpus needed for a meaningful real-passage audio baseline. Capturing

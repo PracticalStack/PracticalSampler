@@ -178,6 +178,7 @@ add_library(drs_engine_adapter STATIC
     src/AuthoringPreviewRecovery.cpp
     src/AuthoringSession.cpp
     src/ControlLaw.cpp
+    src/ContinuousDamper.cpp
     src/CuratedDspCatalog.cpp
     src/DraftPlaybackContract.cpp
     src/DspGain.cpp
@@ -232,6 +233,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/AuthoringSession.h
     include/drs/engine/VelocityCrossfadeAuthoring.h
     include/drs/engine/ControlLaw.h
+    include/drs/engine/ContinuousDamper.h
+    include/drs/engine/ContinuousDamperContract.h
     include/drs/engine/CuratedDspCatalog.h
     include/drs/engine/DraftPlaybackContract.h
     include/drs/engine/DspGain.h

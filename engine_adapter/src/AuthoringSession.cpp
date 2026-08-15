@@ -2890,6 +2890,25 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
                                   "Imported content must include at least one zone.");
 
     auto project = getProject();
+    const auto requiresContinuousDamperSchema = std::any_of(
+        zones.begin(), zones.end(), [](const RuntimeProjectZoneDefinition& zone)
+        {
+            return zone.damper.dynamicRelease
+                || zone.damper.sustainControllerNumber != legacySustainControllerNumber
+                || zone.damper.sustainThreshold != legacySustainThreshold;
+        });
+    if (requiresContinuousDamperSchema
+        && project.schemaVersion < continuousDamperProjectSchemaVersion)
+    {
+        if (project.schemaVersion != 6 || project.authoring.schemaVersion != 5)
+            return makeRejectedResult(getDocumentState(),
+                                      "Authoring import rejected",
+                                      "Continuous damper import requires a schema-6 / authoring-5 base project.");
+        // An empty SFZ project is not independently valid until the import content is
+        // appended. Reserve 7/6 inside this one final validated document commit.
+        project.schemaVersion = continuousDamperProjectSchemaVersion;
+        project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    }
     std::vector<std::pair<std::string, RoundRobinMode>> enabledGroups;
     for (const auto& group : project.authoring.groups)
     {

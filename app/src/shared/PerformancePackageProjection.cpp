@@ -268,6 +268,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
         zone.fineTuneCents = projectZone.fineTuneCents;
         zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
         zone.controllerConditions = projectZone.controllerConditions;
+        zone.damper = projectZone.damper;
         plan.zones.push_back(std::move(zone));
     }
 

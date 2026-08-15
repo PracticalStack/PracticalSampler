@@ -166,6 +166,18 @@ std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSche
         upgradedProject = articulationMigration.project;
     }
 
+    if (upgradedProject.schemaVersion == 6 && upgradedProject.authoring.schemaVersion == 5)
+    {
+        const auto damperMigration = drs::engine::migrateRuntimeProjectToContinuousDamperSchema(upgradedProject);
+        if (!damperMigration.valid)
+        {
+            issues = damperMigration.issues;
+            return std::nullopt;
+        }
+
+        upgradedProject = damperMigration.project;
+    }
+
     return upgradedProject;
 }
 

@@ -247,6 +247,7 @@ std::optional<SfzImportSemanticDependency> classifySemanticDependency(
 }
 
 std::string findEffectiveSampleReference(const SfzNormalizedSection& section);
+std::optional<int> parseIntValue(const std::string& text);
 
 SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSection& section)
 {
@@ -256,6 +257,11 @@ SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSectio
 
     std::vector<SfzImportSemanticDependency> candidates;
     std::set<int> referencedControllers;
+    const auto* dynamicDamper = findEffectiveOpcode(section, "ampeg_dynamic");
+    const auto hasNativeDamperReleaseBlock = dynamicDamper != nullptr
+        && parseIntValue(dynamicDamper->value).value_or(0) == 1
+        && findEffectiveOpcode(section, "ampeg_releasecc64") != nullptr
+        && findEffectiveOpcode(section, "ampeg_release_curvecc64") != nullptr;
     for (const auto& opcode : section.effectiveOpcodes)
     {
         auto dependency = classifySemanticDependency(opcode);
@@ -263,6 +269,14 @@ SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSectio
             || dependency->impact == SfzImportSemanticImpact::presentationOnly)
         {
             continue;
+        }
+
+        const auto dependencyOpcode = toLowerAscii(dependency->opcodeName);
+        if (hasNativeDamperReleaseBlock
+            && (dependencyOpcode == "ampeg_releasecc64"
+                || dependencyOpcode == "ampeg_release_curvecc64"))
+        {
+            dependency->support = SfzImportSemanticSupport::native;
         }
 
         if (dependency->kind != SfzImportSemanticDependencyKind::controllerDefault
@@ -1057,6 +1071,81 @@ std::map<CrossfadeOpcodeKey, OpcodeClassification> buildVelocityCrossfadeOpcodeC
     return classifications;
 }
 
+std::map<CrossfadeOpcodeKey, OpcodeClassification> buildContinuousDamperCurveClassifications(
+    const SfzNormalizedDocument& document)
+{
+    std::set<int> referencedIndices;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+        const auto* dynamic = findEffectiveOpcode(section, "ampeg_dynamic");
+        const auto* amount = findEffectiveOpcode(section, "ampeg_releasecc64");
+        const auto* curve = findEffectiveOpcode(section, "ampeg_release_curvecc64");
+        if (dynamic == nullptr || parseIntValue(dynamic->value).value_or(0) != 1
+            || amount == nullptr || curve == nullptr)
+            continue;
+        if (const auto index = parseIntValue(curve->value); index.has_value())
+            referencedIndices.insert(*index);
+    }
+
+    std::map<CrossfadeOpcodeKey, OpcodeClassification> classifications;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::curve)
+            continue;
+        const auto* indexOpcode = findEffectiveOpcode(section, "curve_index");
+        const auto index = indexOpcode != nullptr ? parseIntValue(indexOpcode->value) : std::nullopt;
+        if (!index.has_value() || referencedIndices.count(*index) == 0)
+            continue;
+        for (const auto& opcode : section.localOpcodes)
+        {
+            classifications.emplace(
+                makeCrossfadeOpcodeKey(opcode),
+                OpcodeClassification {
+                    SfzImportSupportDisposition::converted,
+                    "zone.damper.releaseCurve[" + std::to_string(*index) + "]",
+                    "Curve points referenced by ampeg_release_curvecc64 compile into an immutable 128-value native damper table."
+                });
+        }
+    }
+    return classifications;
+}
+
+std::map<CrossfadeOpcodeKey, OpcodeClassification> buildContinuousDamperOpcodeClassifications(
+    const SfzNormalizedDocument& document)
+{
+    std::map<CrossfadeOpcodeKey, OpcodeClassification> classifications;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+        const auto* dynamic = findEffectiveOpcode(section, "ampeg_dynamic");
+        const auto* amount = findEffectiveOpcode(section, "ampeg_releasecc64");
+        const auto* curve = findEffectiveOpcode(section, "ampeg_release_curvecc64");
+        if (dynamic == nullptr || parseIntValue(dynamic->value).value_or(0) != 1
+            || amount == nullptr || curve == nullptr)
+            continue;
+
+        classifications[makeCrossfadeOpcodeKey(*dynamic)] = {
+            SfzImportSupportDisposition::converted,
+            "zone.damper.dynamicRelease",
+            "ampeg_dynamic=1 enables the bounded native amplitude-release controller path when the complete CC64 release block is present."
+        };
+        classifications[makeCrossfadeOpcodeKey(*amount)] = {
+            SfzImportSupportDisposition::converted,
+            "zone.damper.releaseAmountSeconds",
+            "CC64 amplitude-release depth maps into the native bounded release-time amount."
+        };
+        classifications[makeCrossfadeOpcodeKey(*curve)] = {
+            SfzImportSupportDisposition::converted,
+            "zone.damper.releaseCurveIndex",
+            "The CC64 release curve reference resolves to one immutable native 128-value table."
+        };
+    }
+    return classifications;
+}
+
 void incrementDispositionCount(SfzImportReportSummary& summary,
                                const SfzImportSupportDisposition disposition) noexcept
 {
@@ -1411,6 +1500,44 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                  "Per-zone and inherited release times can map into native envelope release controls." };
     }
 
+    if (opcodeName == "sustain_cc")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.damper.sustainControllerNumber",
+                 "The authored binary sustain controller maps directly into native damper metadata." };
+    }
+
+    if (opcodeName == "sustain_lo")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.damper.sustainThreshold",
+                 "The authored sustain lower threshold maps directly into native damper metadata; an absent value uses the ARIA-compatible 0.5 import default." };
+    }
+
+    if (opcodeName == "ampeg_dynamic")
+    {
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "report.damper.dynamicRelease",
+                 "ampeg_dynamic remains review-only unless it participates in the complete supported CC64 half-pedal release block.",
+                 "sfz.damper.dynamic_flag.reported",
+                 "General ampeg_dynamic use will be reported",
+                 "The focused importer converts ampeg_dynamic=1 only when matching release amount and curve-reference declarations are inherited by a playable region." };
+    }
+
+    if (opcodeName == "ampeg_releasecc64")
+    {
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "report.damper.releaseAmountSeconds",
+                 "The release amount remains review-only unless it participates in the complete supported CC64 half-pedal release block." };
+    }
+
+    if (opcodeName == "ampeg_release_curvecc64")
+    {
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "report.damper.releaseCurveIndex",
+                 "The release curve reference remains review-only unless it participates in the complete supported CC64 half-pedal release block." };
+    }
+
     if (opcodeName == "ampeg_release_shape")
     {
         return { SfzImportSupportDisposition::converted,
@@ -1547,6 +1674,10 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                 buildVelocityCrossfadeOpcodeClassifications(result.normalizeResult.document);
             const auto roundRobinClassifications =
                 buildSequentialRoundRobinOpcodeClassifications(result.normalizeResult.document);
+            const auto continuousDamperCurveClassifications =
+                buildContinuousDamperCurveClassifications(result.normalizeResult.document);
+            const auto continuousDamperOpcodeClassifications =
+                buildContinuousDamperOpcodeClassifications(result.normalizeResult.document);
 
             std::map<SupportKey, SfzImportOpcodeSupportSummary> supportSummaries;
 
@@ -1606,6 +1737,18 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                             classification = classificationIterator->second;
                         }
                     }
+                    if (const auto classificationIterator =
+                            continuousDamperCurveClassifications.find(makeCrossfadeOpcodeKey(opcode));
+                        classificationIterator != continuousDamperCurveClassifications.end())
+                    {
+                        classification = classificationIterator->second;
+                    }
+                    if (const auto classificationIterator =
+                            continuousDamperOpcodeClassifications.find(makeCrossfadeOpcodeKey(opcode));
+                        classificationIterator != continuousDamperOpcodeClassifications.end())
+                    {
+                        classification = classificationIterator->second;
+                    }
                     incrementDispositionCount(result.report.summary, classification.disposition);
                     addClassificationFinding(result.report.findings,
                                              classification,
@@ -1631,7 +1774,12 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                     {
                         trace.semanticDependencyKind = semantic->kind;
                         trace.semanticImpact = semantic->impact;
-                        trace.semanticSupport = semantic->support;
+                        trace.semanticSupport = ((toLowerAscii(opcode.name) == "ampeg_releasecc64"
+                                                  || toLowerAscii(opcode.name) == "ampeg_release_curvecc64")
+                                                 && classification.disposition
+                                                     == SfzImportSupportDisposition::converted)
+                            ? SfzImportSemanticSupport::native
+                            : semantic->support;
                         trace.affectsRegionEligibility = semantic->affectsRegionEligibility;
                         if (semantic->impact == SfzImportSemanticImpact::presentationOnly)
                         {

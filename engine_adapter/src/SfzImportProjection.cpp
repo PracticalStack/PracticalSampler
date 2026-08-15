@@ -336,6 +336,181 @@ struct ScopedGainContribution
     bool hasRegionGain = false;
 };
 
+struct ContinuousDamperCurveCatalog
+{
+    std::map<int, std::array<double, continuousDamperCurvePointCount>> curves;
+    std::vector<std::string> issues;
+};
+
+std::optional<int> parseCurvePointIndex(const std::string& opcodeName)
+{
+    if (opcodeName.size() != 4 || opcodeName.front() != 'v'
+        || !std::all_of(opcodeName.begin() + 1, opcodeName.end(), [](unsigned char value)
+                        { return std::isdigit(value) != 0; }))
+        return std::nullopt;
+    const auto index = parseIntValue(opcodeName.substr(1));
+    return index.has_value() && *index >= 0 && *index <= 127 ? index : std::nullopt;
+}
+
+ContinuousDamperCurveCatalog buildContinuousDamperCurveCatalog(
+    const SfzParsedDocument& document,
+    const std::set<int>& referencedCurveIndices)
+{
+    ContinuousDamperCurveCatalog catalog;
+
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::curve)
+            continue;
+
+        std::optional<int> curveIndex;
+        for (const auto& opcode : section.opcodes)
+        {
+            const auto name = toLowerAscii(opcode.name);
+            if (name != "curve_index")
+                continue;
+            const auto candidate = parseIntValue(opcode.value);
+            if (candidate.has_value() && referencedCurveIndices.count(*candidate) == 0)
+                continue;
+            if (curveIndex.has_value())
+                catalog.issues.push_back("[damper.curve.index_duplicate] A referenced <curve> section declares curve_index more than once.");
+            curveIndex = candidate;
+        }
+
+        if (!curveIndex.has_value())
+            continue;
+        if (*curveIndex < 0 || *curveIndex > 255)
+        {
+            catalog.issues.push_back("[damper.curve.index_out_of_range] Referenced curve_index must be between 0 and 255.");
+            continue;
+        }
+        if (referencedCurveIndices.count(*curveIndex) == 0)
+            continue;
+        if (catalog.curves.count(*curveIndex) != 0)
+        {
+            catalog.issues.push_back("[damper.curve.index_duplicate] curve_index "
+                                     + std::to_string(*curveIndex) + " is declared more than once.");
+            continue;
+        }
+
+        std::vector<ContinuousDamperCurvePoint> points;
+        for (const auto& opcode : section.opcodes)
+        {
+            const auto name = toLowerAscii(opcode.name);
+            if (name == "curve_index" || name.rfind("v", 0) != 0)
+                continue;
+            const auto pointIndex = parseCurvePointIndex(name);
+            const auto pointValue = parseDoubleValue(opcode.value);
+            if (!pointIndex.has_value())
+            {
+                catalog.issues.push_back("[damper.curve.point_name_malformed] Curve points must use v000 through v127 names.");
+                continue;
+            }
+            if (!pointValue.has_value())
+            {
+                catalog.issues.push_back("[damper.curve.point_value_malformed] Curve point values must be numeric.");
+                continue;
+            }
+            points.push_back({ *pointIndex, *pointValue });
+        }
+        const auto compiled = compileContinuousDamperCurve(points);
+        if (!compiled.compiled)
+        {
+            catalog.issues.push_back("[" + compiled.findingCode + "] " + compiled.detail);
+            continue;
+        }
+        catalog.curves.emplace(*curveIndex, compiled.values);
+    }
+    for (const auto referenced : referencedCurveIndices)
+        if (catalog.curves.count(referenced) == 0)
+            catalog.issues.push_back("[damper.curve_reference_missing] Referenced curve_index "
+                                     + std::to_string(referenced) + " was not compiled.");
+    return catalog;
+}
+
+std::set<int> findNativeContinuousDamperCurveReferences(
+    const SfzNormalizedDocument& document)
+{
+    std::set<int> references;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+        const auto* dynamic = findEffectiveOpcode(section, "ampeg_dynamic");
+        const auto* amount = findEffectiveOpcode(section, "ampeg_releasecc64");
+        const auto* curve = findEffectiveOpcode(section, "ampeg_release_curvecc64");
+        if (dynamic == nullptr || parseIntValue(dynamic->value).value_or(0) != 1
+            || amount == nullptr || curve == nullptr)
+            continue;
+        if (const auto index = parseIntValue(curve->value); index.has_value()
+            && *index >= 0 && *index <= 255)
+            references.insert(*index);
+    }
+    return references;
+}
+
+bool projectContinuousDamper(const SfzNormalizedSection& section,
+                             const ContinuousDamperCurveCatalog& catalog,
+                             ContinuousDamperDefinition& damper,
+                             std::string& issue)
+{
+    const auto* sustainController = findEffectiveOpcode(section, "sustain_cc");
+    const auto* sustainThreshold = findEffectiveOpcode(section, "sustain_lo");
+    const auto* dynamicRelease = findEffectiveOpcode(section, "ampeg_dynamic");
+    const auto* releaseAmount = findEffectiveOpcode(section, "ampeg_releasecc64");
+    const auto* releaseCurve = findEffectiveOpcode(section, "ampeg_release_curvecc64");
+    const auto dynamicValue = parseIntValue(dynamicRelease != nullptr ? dynamicRelease->value : "0");
+    const auto hasNativeDynamicRelease = dynamicValue.has_value() && *dynamicValue == 1
+        && releaseAmount != nullptr && releaseCurve != nullptr;
+    if (sustainController == nullptr && sustainThreshold == nullptr && !hasNativeDynamicRelease)
+        return true;
+
+    const auto sustainControllerValue = parseIntValue(
+        sustainController != nullptr ? sustainController->value
+                                     : std::to_string(sfzDefaultSustainControllerNumber));
+    const auto sustainThresholdValue = parseDoubleValue(
+        sustainThreshold != nullptr ? sustainThreshold->value
+                                    : std::to_string(sfzDefaultSustainThreshold));
+    if (!sustainControllerValue.has_value() || *sustainControllerValue < 0
+        || *sustainControllerValue > 127 || !sustainThresholdValue.has_value()
+        || !std::isfinite(*sustainThresholdValue) || *sustainThresholdValue < 0.0
+        || *sustainThresholdValue > 127.0)
+    {
+        issue = "[damper.sustain_declaration_invalid] sustain_cc and sustain_lo must resolve within the native controller domain.";
+        return false;
+    }
+    damper.sustainControllerNumber = *sustainControllerValue;
+    damper.sustainThreshold = *sustainThresholdValue;
+
+    if (!hasNativeDynamicRelease)
+        return true;
+    damper.dynamicRelease = true;
+
+    const auto amount = parseDoubleValue(releaseAmount->value);
+    const auto curveIndex = parseIntValue(releaseCurve->value);
+    if (!amount.has_value() || !std::isfinite(*amount) || *amount < 0.0
+        || *amount > maximumDynamicReleaseSeconds)
+    {
+        issue = "[damper.release_amount_out_of_range] ampeg_releasecc64 must be finite and between 0 and 100 seconds.";
+        return false;
+    }
+    if (!curveIndex.has_value() || *curveIndex < 0 || *curveIndex > 255)
+    {
+        issue = "[damper.curve_reference_out_of_range] ampeg_release_curvecc64 must be between 0 and 255.";
+        return false;
+    }
+    if (catalog.curves.count(*curveIndex) == 0)
+    {
+        issue = "[damper.curve_reference_missing] ampeg_release_curvecc64 must reference one valid compiled curve.";
+        return false;
+    }
+    damper.releaseControllerNumber = halfPedalReleaseControllerNumber;
+    damper.releaseAmountSeconds = *amount;
+    damper.releaseCurveIndex = *curveIndex;
+    damper.releaseCurve = catalog.curves.at(*curveIndex);
+    return true;
+}
+
 ScopedGainContribution buildScopedGainContribution(const SfzNormalizedSection& section,
                                                    const ScopedGainState& state)
 {
@@ -780,6 +955,19 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
                                             const SfzImportProjectionResult& projection)
 {
     auto project = baseProject;
+    const auto requiresContinuousDamperSchema = std::any_of(
+        projection.zones.begin(), projection.zones.end(), [](const RuntimeProjectZoneDefinition& zone)
+        {
+            return zone.damper.dynamicRelease
+                || zone.damper.sustainControllerNumber != legacySustainControllerNumber
+                || zone.damper.sustainThreshold != legacySustainThreshold;
+        });
+    if (requiresContinuousDamperSchema
+        && project.schemaVersion == 6 && project.authoring.schemaVersion == 5)
+    {
+        project.schemaVersion = continuousDamperProjectSchemaVersion;
+        project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    }
     project.sampleSources.insert(project.sampleSources.end(),
                                  projection.sampleSources.begin(),
                                  projection.sampleSources.end());
@@ -1041,6 +1229,18 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         return result;
     }
 
+    const auto nativeDamperCurveReferences = findNativeContinuousDamperCurveReferences(
+        analysis.normalizeResult.document);
+    const auto damperCurves = buildContinuousDamperCurveCatalog(
+        analysis.parseResult.document, nativeDamperCurveReferences);
+    if (!damperCurves.issues.empty())
+    {
+        result.blocking = true;
+        result.state = "SFZ projection blocked";
+        result.issues = damperCurves.issues;
+        return result;
+    }
+
     const std::set<std::size_t> unsafeRegionDocumentOrders(
         result.unsafeUnconditionalRegionDocumentOrders.begin(),
         result.unsafeUnconditionalRegionDocumentOrders.end());
@@ -1277,6 +1477,14 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         zone.releaseShape = sfzDefaultReleaseShape;
         if (const auto* releaseShape = findEffectiveOpcode(section, "ampeg_release_shape"))
             zone.releaseShape = parseDoubleValue(releaseShape->value).value_or(sfzDefaultReleaseShape);
+        std::string damperIssue;
+        if (!projectContinuousDamper(section, damperCurves, zone.damper, damperIssue))
+        {
+            result.blocking = true;
+            result.issues.push_back("Region at document order "
+                                    + std::to_string(section.documentOrder) + ": " + damperIssue);
+            continue;
+        }
         zone.sampleStartFrame = parseFrameValue(findEffectiveOpcode(section, "offset") != nullptr
                                                     ? findEffectiveOpcode(section, "offset")->value
                                                     : "0")
@@ -1394,6 +1602,16 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         result.zones.push_back(std::move(zone));
         if (!result.zones.back().groupId.empty())
             projectedGroupStates[result.zones.back().groupId].zoneIndices.push_back(result.zones.size() - 1);
+    }
+
+    if (result.blocking)
+    {
+        result.sampleSources.clear();
+        result.groups.clear();
+        result.zones.clear();
+        result.controllerDefaults.clear();
+        result.state = "SFZ projection blocked";
+        return result;
     }
 
     if (result.zones.empty())

@@ -258,7 +258,10 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
 {
     drs::engine::RuntimeInstrumentModel instrument;
     instrument.schemaName = "drs.instrument";
-    instrument.schemaVersion = project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5 ? 3 : 2;
+    instrument.schemaVersion = project.schemaVersion >= drs::engine::continuousDamperProjectSchemaVersion
+            && project.authoring.schemaVersion >= drs::engine::continuousDamperAuthoringSchemaVersion
+        ? drs::engine::continuousDamperInstrumentSchemaVersion
+        : (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5 ? 3 : 2);
     instrument.instrumentId = project.projectId.empty() ? "instrument" : project.projectId + ".instrument";
     instrument.displayName = project.displayName;
     instrument.sourceProjectPath = projectFile.getFullPathName().toStdString();
@@ -384,6 +387,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.fineTuneCents = projectZone.fineTuneCents;
         zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
         zone.controllerConditions = projectZone.controllerConditions;
+        zone.damper = projectZone.damper;
         instrument.zones.push_back(std::move(zone));
     }
 

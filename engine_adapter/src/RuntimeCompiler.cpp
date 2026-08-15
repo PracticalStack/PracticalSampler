@@ -426,11 +426,19 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         {
             return !macro.targets.empty();
         });
+    const auto requiresContinuousDamperInstrumentSchema = std::any_of(
+        plan.zones.begin(), plan.zones.end(), [](const RuntimeCompileZoneDefinition& zone)
+        {
+            return zone.damper.dynamicRelease
+                || zone.damper.sustainControllerNumber != legacySustainControllerNumber
+                || zone.damper.sustainThreshold != legacySustainThreshold;
+        });
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = requiresFxRoutingInstrumentSchema
-        ? runtimeInstrumentFxRoutingSchemaVersion
-        : (requiresPerformanceInstrumentSchema ? 3
-            : (requiresExtendedInstrumentSchema ? 2 : 1));
+    result.instrument.schemaVersion = requiresContinuousDamperInstrumentSchema
+        ? continuousDamperInstrumentSchemaVersion
+        : (requiresFxRoutingInstrumentSchema ? runtimeInstrumentFxRoutingSchemaVersion
+            : (requiresPerformanceInstrumentSchema ? 3
+                : (requiresExtendedInstrumentSchema ? 2 : 1)));
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -480,6 +488,15 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
         if (zonePlan.velocityLow > zonePlan.velocityHigh)
             addIssue(result, "Zone '" + zonePlan.id + "' has velocityLow greater than velocityHigh.");
+        if (zonePlan.damper.dynamicRelease
+            || zonePlan.damper.sustainControllerNumber != legacySustainControllerNumber
+            || zonePlan.damper.sustainThreshold != legacySustainThreshold)
+        {
+            std::string findingCode;
+            std::string detail;
+            if (!validateContinuousDamperDefinition(zonePlan.damper, findingCode, detail))
+                addIssue(result, "[" + findingCode + "] Zone '" + zonePlan.id + "': " + detail);
+        }
         if (zonePlan.roundRobinLength < 0 || zonePlan.roundRobinPosition < 0)
             addIssue(result, "Zone '" + zonePlan.id + "' must not have negative round-robin metadata.");
         if (zonePlan.roundRobinPosition > 0 && zonePlan.roundRobinLength <= 0)
@@ -634,12 +651,13 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.fineTuneCents = zonePlan.fineTuneCents;
         zone.amplitudeVelocityTracking = zonePlan.amplitudeVelocityTracking;
         zone.controllerConditions = zonePlan.controllerConditions;
+        zone.damper = zonePlan.damper;
         result.instrument.zones.push_back(std::move(zone));
     }
 
     populateCrossfadeRuntimeDescriptors(plan, result.instrument.zones);
 
-    if (result.instrument.schemaVersion == runtimeInstrumentFxRoutingSchemaVersion)
+    if (result.instrument.schemaVersion >= runtimeInstrumentFxRoutingSchemaVersion)
     {
         const auto validation = validateRuntimeInstrumentModel(result.instrument);
         for (const auto& issue : validation.issues)

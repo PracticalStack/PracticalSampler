@@ -607,6 +607,18 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        ordered_json damperCurve = ordered_json::array();
+        for (const auto value : zone.damper.releaseCurve)
+            damperCurve.push_back(value);
+        zoneObject["damper"] = {
+            { "sustainControllerNumber", zone.damper.sustainControllerNumber },
+            { "sustainThreshold", zone.damper.sustainThreshold },
+            { "dynamicRelease", zone.damper.dynamicRelease },
+            { "releaseControllerNumber", zone.damper.releaseControllerNumber },
+            { "releaseAmountSeconds", zone.damper.releaseAmountSeconds },
+            { "releaseCurveIndex", zone.damper.releaseCurveIndex },
+            { "releaseCurve", std::move(damperCurve) }
+        };
         if (zone.roundRobin.has_value())
             zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
@@ -1224,6 +1236,13 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         if (!std::isfinite(zone.releaseShape))
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-release-shape", path,
                        "Zone releaseShape must be finite.");
+        {
+            std::string findingCode;
+            std::string detail;
+            if (!validateContinuousDamperDefinition(zone.damper, findingCode, detail))
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, findingCode,
+                           path + ".damper", detail);
+        }
         if (zone.roundRobinLength < 0 || zone.roundRobinPosition < 0)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-round-robin", path,
                        "Zone round-robin metadata must not be negative.");
@@ -1285,7 +1304,8 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.chokeReleaseSeconds,
             zone.fineTuneCents,
             zone.amplitudeVelocityTracking,
-            zone.controllerConditions
+            zone.controllerConditions,
+            zone.damper
         });
 
         if (!zone.articulationId.empty())

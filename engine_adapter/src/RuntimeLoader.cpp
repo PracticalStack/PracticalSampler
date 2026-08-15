@@ -185,6 +185,63 @@ std::optional<TValue> readOptional(const json& object,
 }
 
 template <typename TResult>
+std::optional<ContinuousDamperDefinition> readContinuousDamper(
+    const json& object,
+    TResult& result,
+    const std::string& context)
+{
+    const auto iterator = object.find("damper");
+    if (iterator == object.end() || !iterator->is_object())
+    {
+        addIssue(result, context + " is missing required object field 'damper'.");
+        return std::nullopt;
+    }
+
+    ContinuousDamperDefinition damper;
+    const auto sustainController = readRequired<TResult, int>(*iterator, result,
+                                                               "sustainControllerNumber", context.c_str());
+    const auto sustainThreshold = readRequired<TResult, double>(*iterator, result,
+                                                                 "sustainThreshold", context.c_str());
+    const auto dynamicRelease = readRequired<TResult, bool>(*iterator, result,
+                                                             "dynamicRelease", context.c_str());
+    const auto releaseController = readRequired<TResult, int>(*iterator, result,
+                                                               "releaseControllerNumber", context.c_str());
+    const auto releaseAmount = readRequired<TResult, double>(*iterator, result,
+                                                              "releaseAmountSeconds", context.c_str());
+    const auto curveIndex = readRequired<TResult, int>(*iterator, result,
+                                                        "releaseCurveIndex", context.c_str());
+    if (sustainController) damper.sustainControllerNumber = *sustainController;
+    if (sustainThreshold) damper.sustainThreshold = *sustainThreshold;
+    if (dynamicRelease) damper.dynamicRelease = *dynamicRelease;
+    if (releaseController) damper.releaseControllerNumber = *releaseController;
+    if (releaseAmount) damper.releaseAmountSeconds = *releaseAmount;
+    if (curveIndex) damper.releaseCurveIndex = *curveIndex;
+
+    const auto curve = iterator->find("releaseCurve");
+    if (curve == iterator->end() || !curve->is_array()
+        || curve->size() != continuousDamperCurvePointCount)
+    {
+        addIssue(result, context + " damper releaseCurve must contain exactly 128 numeric values.");
+    }
+    else
+    {
+        for (std::size_t index = 0; index < curve->size(); ++index)
+        {
+            try
+            {
+                damper.releaseCurve[index] = curve->at(index).get<double>();
+            }
+            catch (const json::exception&)
+            {
+                addIssue(result, context + " damper releaseCurve must contain only numeric values.");
+                break;
+            }
+        }
+    }
+    return damper;
+}
+
+template <typename TResult>
 std::vector<std::string> readRequiredStringArray(const json& object,
                                                  TResult& result,
                                                  const char* propertyName,
@@ -824,9 +881,26 @@ ordered_json serializeControllerDefaults(const std::vector<RuntimeControllerDefa
     return array;
 }
 
+ordered_json serializeContinuousDamper(const ContinuousDamperDefinition& damper)
+{
+    ordered_json curve = ordered_json::array();
+    for (const auto value : damper.releaseCurve)
+        curve.push_back(value);
+    return {
+        { "sustainControllerNumber", damper.sustainControllerNumber },
+        { "sustainThreshold", damper.sustainThreshold },
+        { "dynamicRelease", damper.dynamicRelease },
+        { "releaseControllerNumber", damper.releaseControllerNumber },
+        { "releaseAmountSeconds", damper.releaseAmountSeconds },
+        { "releaseCurveIndex", damper.releaseCurveIndex },
+        { "releaseCurve", std::move(curve) }
+    };
+}
+
 ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones,
                                    bool useExplicitRoundRobin,
-                                   bool usePerformanceRules)
+                                   bool usePerformanceRules,
+                                   bool useContinuousDamper)
 {
     ordered_json array = ordered_json::array();
 
@@ -853,6 +927,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        if (useContinuousDamper)
+            zoneObject["damper"] = serializeContinuousDamper(zone.damper);
         if (useExplicitRoundRobin)
         {
             if (zone.roundRobin.has_value())
@@ -1230,7 +1306,8 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= 6)
+    if (project.schemaVersion >= 2
+        && project.schemaVersion <= continuousDamperProjectSchemaVersion)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1363,6 +1440,9 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         zone.releaseSeconds = *releaseSeconds;
                     if (const auto releaseShape = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseShape", context.c_str()))
                         zone.releaseShape = *releaseShape;
+                    if (project.schemaVersion >= continuousDamperProjectSchemaVersion)
+                        if (const auto damper = readContinuousDamper(zoneObject, result, context))
+                            zone.damper = *damper;
                     if (const auto tune = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
                         zone.fineTuneCents = *tune;
                     if (const auto velocityTrack = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
@@ -1941,17 +2021,33 @@ RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
         }
     }
 
-    if (instrument.schemaVersion != 4)
+    if (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion)
     {
-        if (!instrument.fxSlots.empty() || !instrument.routingBuses.empty()
-            || std::any_of(instrument.macros.begin(), instrument.macros.end(), [](const auto& macro)
-            {
-                return !macro.targets.empty();
-            })
-            || std::any_of(instrument.groups.begin(), instrument.groups.end(), [](const auto& group)
-            {
-                return !group.routingBusId.empty();
-            }))
+        for (std::size_t index = 0; index < instrument.zones.size(); ++index)
+        {
+            std::string findingCode;
+            std::string detail;
+            if (!validateContinuousDamperDefinition(instrument.zones[index].damper,
+                                                     findingCode, detail))
+                addFinding(findingCode, "zones[" + std::to_string(index) + "].damper", detail);
+        }
+    }
+
+    const auto hasGraphMetadata = !instrument.fxSlots.empty() || !instrument.routingBuses.empty()
+        || std::any_of(instrument.macros.begin(), instrument.macros.end(), [](const auto& macro)
+        {
+            return !macro.targets.empty();
+        })
+        || std::any_of(instrument.groups.begin(), instrument.groups.end(), [](const auto& group)
+        {
+            return !group.routingBusId.empty();
+        });
+    if (instrument.schemaVersion < runtimeInstrumentFxRoutingSchemaVersion
+        || (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion
+            && !hasGraphMetadata))
+    {
+        if (instrument.schemaVersion < runtimeInstrumentFxRoutingSchemaVersion
+            && hasGraphMetadata)
         {
             addFinding("graph-requires-instrument-v4", "schemaVersion",
                        "FX slots, routing buses, group routing assignments, and macro targets require runtime instrument schema v4.");
@@ -2234,9 +2330,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         addIssue(result, "Project schemaName must be 'drs.project'.");
 
     if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3
-        && project.schemaVersion != 4 && project.schemaVersion != 5 && project.schemaVersion != 6)
+        && project.schemaVersion != 4 && project.schemaVersion != 5 && project.schemaVersion != 6
+        && project.schemaVersion != continuousDamperProjectSchemaVersion)
     {
-        addIssue(result, "Project schemaVersion must be 1, 2, 3, 4, 5, or 6.");
+        addIssue(result, "Project schemaVersion must be 1, 2, 3, 4, 5, 6, or 7.");
     }
 
     if (project.projectId.empty())
@@ -2271,7 +2368,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= 6)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= continuousDamperProjectSchemaVersion)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -2292,6 +2389,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
             addIssue(result, "Project authoring schemaVersion must be 4 for schemaVersion 5 projects.");
         if (project.schemaVersion == 6 && authoring.schemaVersion != 5)
             addIssue(result, "Project authoring schemaVersion must be 5 for schemaVersion 6 projects.");
+        if (project.schemaVersion == continuousDamperProjectSchemaVersion
+            && authoring.schemaVersion != continuousDamperAuthoringSchemaVersion)
+            addIssue(result, "Project authoring schemaVersion must be 6 for schemaVersion 7 projects.");
 
         if (!std::isfinite(authoring.masterGainDb))
             addIssue(result, "Project authoring masterGainDb must be finite.");
@@ -2413,6 +2513,13 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                 addIssue(result, "Project zone '" + zone.id + "' must not have a negative releaseSeconds.");
             if (!std::isfinite(zone.releaseShape))
                 addIssue(result, "Project zone '" + zone.id + "' must have a finite releaseShape.");
+            if (project.schemaVersion >= continuousDamperProjectSchemaVersion)
+            {
+                std::string findingCode;
+                std::string detail;
+                if (!validateContinuousDamperDefinition(zone.damper, findingCode, detail))
+                    addIssue(result, "[" + findingCode + "] Project zone '" + zone.id + "': " + detail);
+            }
 
             validateRoundRobinDescriptor(result,
                                          "Project zone '" + zone.id + "'",
@@ -3014,6 +3121,38 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToPerformanceArticulationSche
     return result;
 }
 
+RuntimeProjectMigrationResult migrateRuntimeProjectToContinuousDamperSchema(
+    const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project continuous-damper migration failed";
+    if (project.schemaVersion == continuousDamperProjectSchemaVersion
+        && project.authoring.schemaVersion == continuousDamperAuthoringSchemaVersion)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid ? "Project already uses the continuous-damper schema" : validation.state;
+        return result;
+    }
+    if (project.schemaVersion != 6 || project.authoring.schemaVersion != 5)
+    {
+        addIssue(result, "Only Project schemaVersion 6 with authoring schemaVersion 5 can migrate to the continuous-damper schema.");
+        return result;
+    }
+
+    result.project = project;
+    result.project.schemaVersion = continuousDamperProjectSchemaVersion;
+    result.project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    const auto validation = validateRuntimeProjectModel(result.project);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to the continuous-damper schema" : validation.state;
+    return result;
+}
+
 RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawText,
                                                          const std::string& manifestPath,
                                                          const bool validateReferencedPaths)
@@ -3377,6 +3516,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 zone.releaseSeconds = *releaseSeconds;
             if (const auto releaseShape = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "releaseShape", context.c_str()))
                 zone.releaseShape = *releaseShape;
+            if (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion)
+                if (const auto damper = readContinuousDamper(zoneObject, result, context))
+                    zone.damper = *damper;
             if (const auto tune = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
                 zone.fineTuneCents = *tune;
             if (const auto velocityTrack = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
@@ -3483,6 +3625,13 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 addIssue(result, context + " must not have a negative releaseSeconds.");
             if (!std::isfinite(zone.releaseShape))
                 addIssue(result, context + " field 'releaseShape' must be finite.");
+            if (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion)
+            {
+                std::string findingCode;
+                std::string detail;
+                if (!validateContinuousDamperDefinition(zone.damper, findingCode, detail))
+                    addIssue(result, "[" + findingCode + "] " + context + ": " + detail);
+            }
 
             if (!std::isfinite(zone.gainDb))
                 addIssue(result, context + " field 'gainDb' must be finite.");
@@ -3694,8 +3843,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
         addIssue(result, "Manifest schemaName must be 'drs.instrument' for the Sprint 1 loader.");
 
     if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2
-        && instrument.schemaVersion != 3 && instrument.schemaVersion != 4)
-        addIssue(result, "Manifest schemaVersion must be 1, 2, 3, or 4.");
+        && instrument.schemaVersion != 3 && instrument.schemaVersion != 4
+        && instrument.schemaVersion != continuousDamperInstrumentSchemaVersion)
+        addIssue(result, "Manifest schemaVersion must be 1, 2, 3, 4, or 5.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -3800,7 +3950,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
             authoring["controllerDefaults"] = serializeControllerDefaults(project.authoring.controllerDefaults);
         }
         authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3,
-                                                     project.schemaVersion >= 6);
+                                                     project.schemaVersion >= 6,
+                                                     project.schemaVersion >= continuousDamperProjectSchemaVersion);
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
@@ -3904,6 +4055,8 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         if (zone.releaseShape != 0.0)
             zoneObject["releaseShape"] = zone.releaseShape;
+        if (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion)
+            zoneObject["damper"] = serializeContinuousDamper(zone.damper);
         if (instrument.schemaVersion >= 2)
         {
             if (zone.roundRobin.has_value())

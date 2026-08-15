@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drs/engine/ContinuousDamper.h"
 #include "drs/engine/VelocityCrossfade.h"
 
 #include <cstddef>
@@ -165,6 +166,7 @@ struct RuntimeProjectZoneDefinition
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
+    ContinuousDamperDefinition damper;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The
@@ -403,6 +405,7 @@ struct RuntimeZoneDefinition
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
+    ContinuousDamperDefinition damper;
 };
 
 struct RuntimeInstrumentModel

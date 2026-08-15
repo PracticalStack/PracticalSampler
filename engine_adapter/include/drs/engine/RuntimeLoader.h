@@ -36,6 +36,8 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToZoneGroupsSchema(const Runt
 RuntimeProjectMigrationResult migrateRuntimeProjectToCuratedDspSchema(const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPerformanceArticulationSchema(
     const RuntimeProjectModel& project);
+RuntimeProjectMigrationResult migrateRuntimeProjectToContinuousDamperSchema(
+    const RuntimeProjectModel& project);
 
 std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, const std::string& manifestPath);
 std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& instrument, const std::string& manifestPath);

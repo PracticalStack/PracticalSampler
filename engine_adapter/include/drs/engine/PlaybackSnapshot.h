@@ -170,6 +170,7 @@ struct PlaybackSnapshotZone
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
+    ContinuousDamperDefinition damper;
 };
 
 // S3.7-T5 deferral note: this remains a public aggregate for current builder, facade, and

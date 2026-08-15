@@ -325,6 +325,18 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        ordered_json damperCurve = ordered_json::array();
+        for (const auto value : zone.damper.releaseCurve)
+            damperCurve.push_back(value);
+        zoneObject["damper"] = {
+            { "sustainControllerNumber", zone.damper.sustainControllerNumber },
+            { "sustainThreshold", zone.damper.sustainThreshold },
+            { "dynamicRelease", zone.damper.dynamicRelease },
+            { "releaseControllerNumber", zone.damper.releaseControllerNumber },
+            { "releaseAmountSeconds", zone.damper.releaseAmountSeconds },
+            { "releaseCurveIndex", zone.damper.releaseCurveIndex },
+            { "releaseCurve", std::move(damperCurve) }
+        };
         if (zone.roundRobin.has_value())
             zoneObject["roundRobin"] = serializeRoundRobin(*zone.roundRobin);
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
@@ -1559,7 +1571,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.triggerMode,
             zone.fineTuneCents,
             zone.amplitudeVelocityTracking,
-            zone.controllerConditions
+            zone.controllerConditions,
+            zone.damper
         });
     }
 
@@ -2785,7 +2798,8 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.roundRobin == right.roundRobin
         && left.roundRobinLength == right.roundRobinLength
         && left.roundRobinPosition == right.roundRobinPosition
-        && left.triggerMode == right.triggerMode;
+        && left.triggerMode == right.triggerMode
+        && left.damper == right.damper;
 }
 
 bool operator==(const PreparedPlaybackGroupRoute& left, const PreparedPlaybackGroupRoute& right)

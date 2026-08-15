@@ -636,6 +636,32 @@ set_target_properties(drs_continuous_damper_hp01_red_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_continuous_damper_hp02_tests
+    src/ContinuousDamperHp02Tests.cpp
+)
+
+target_link_libraries(drs_continuous_damper_hp02_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_continuous_damper_hp02_tests
+    PRIVATE
+        DRS_HP02_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/performance-engine/half-pedal/hp02"
+)
+
+target_compile_features(drs_continuous_damper_hp02_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.continuous_damper.hp02
+    COMMAND drs_continuous_damper_hp02_tests
+)
+
+set_target_properties(drs_continuous_damper_hp02_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_performance_engine_s1_articulation_tests
     src/PerformanceEngineSprint1ArticulationTests.cpp
 )
@@ -4584,6 +4610,7 @@ add_dependencies(drs_all_tests
     drs_curated_dsp_contract_tests
     drs_performance_engine_s0_fixture_tests
     drs_continuous_damper_hp01_contract_tests
+    drs_continuous_damper_hp02_tests
     drs_performance_engine_s1_articulation_tests
     drs_performance_engine_s2_rule_tests
     drs_curated_dsp_control_law_tests

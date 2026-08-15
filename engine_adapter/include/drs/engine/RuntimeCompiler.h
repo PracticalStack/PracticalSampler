@@ -46,6 +46,7 @@ struct RuntimeCompileZoneDefinition
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
+    ContinuousDamperDefinition damper;
 };
 
 struct RuntimeCompilePlan

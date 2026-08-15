@@ -1,0 +1,24 @@
+// Focused HP-02 fixture derived from the Accurate Salamander live-preset damper block.
+<global>
+sustain_cc=90
+ampeg_dynamic=1
+ampeg_releasecc64=100
+ampeg_release_curvecc64=11
+
+<curve>
+curve_index=11
+v000=0.0
+v032=0.0
+v042=0.1
+v054=0.3
+v062=0.4
+v064=1.0
+v127=1.0
+
+<effect>
+width_oncc1=20
+
+<region>
+sample=../../../../hise_project/Samples/DRS_Sine_A3.wav
+key=60
+ampeg_release=0.25
