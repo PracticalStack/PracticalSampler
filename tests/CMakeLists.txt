@@ -587,6 +587,55 @@ set_target_properties(drs_performance_engine_s0_fixture_tests PROPERTIES
     FOLDER "Tests"
 )
 
+# Continuous damper HP-01 contract, deterministic fixtures, and direct-red baseline.
+add_executable(drs_continuous_damper_hp01_contract_tests
+    src/ContinuousDamperHp01ContractTests.cpp
+)
+
+target_link_libraries(drs_continuous_damper_hp01_contract_tests
+    PRIVATE
+        juce::juce_audio_basics
+        juce::juce_cryptography
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_include_directories(drs_continuous_damper_hp01_contract_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/engine_adapter/include
+)
+
+target_compile_definitions(drs_continuous_damper_hp01_contract_tests
+    PRIVATE
+        DRS_CONTINUOUS_DAMPER_HP01_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/performance-engine/half-pedal/hp01"
+        DRS_WORKSPACE_ROOT="${CMAKE_SOURCE_DIR}/.."
+)
+
+target_compile_features(drs_continuous_damper_hp01_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.continuous_damper.hp01.contract
+    COMMAND drs_continuous_damper_hp01_contract_tests
+)
+
+set_target_properties(drs_continuous_damper_hp01_contract_tests PROPERTIES
+    FOLDER "Tests"
+)
+
+add_executable(drs_continuous_damper_hp01_red_tests
+    src/ContinuousDamperHp01RedTests.cpp
+)
+
+target_compile_features(drs_continuous_damper_hp01_red_tests PRIVATE cxx_std_17)
+
+# HP-01 expected-red seams are invoked directly and intentionally excluded from
+# CTest and drs_all_tests. HP-02 through HP-04 promote each seam to green coverage.
+set_target_properties(drs_continuous_damper_hp01_red_tests PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_performance_engine_s1_articulation_tests
     src/PerformanceEngineSprint1ArticulationTests.cpp
 )
@@ -4534,6 +4583,7 @@ add_dependencies(drs_all_tests
     drs_host_state_restore_stress_tests
     drs_curated_dsp_contract_tests
     drs_performance_engine_s0_fixture_tests
+    drs_continuous_damper_hp01_contract_tests
     drs_performance_engine_s1_articulation_tests
     drs_performance_engine_s2_rule_tests
     drs_curated_dsp_control_law_tests

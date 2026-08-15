@@ -1,0 +1,52 @@
+{
+  "schema": "drs.continuous-damper.hp01.midi-trace/v1",
+  "fixtureId": "accurate-salamander-tests-cc64-trace",
+  "source": {
+    "path": "../DemoMidi/AccurateSalamanderTests.mid",
+    "sha256": "f47ee4961578c087909100a8ab1b8160f22e4df9ab993ed3c91159152de13a62",
+    "midiFormat": 1,
+    "trackCount": 2,
+    "ticksPerQuarterNote": 960,
+    "tempoMicrosecondsPerQuarterNote": 500000
+  },
+  "summary": {
+    "cc64EventCount": 28,
+    "distinctValueCount": 22,
+    "minimumValue": 0,
+    "maximumValue": 72,
+    "belowLegacyThresholdCount": 24,
+    "atOrAboveLegacyThresholdCount": 4,
+    "firstSweepObservation": "values 12 through 61 and back to 0 never enter current DRS sustain",
+    "secondSweepObservation": "values 22 through 63 remain current DRS pedal-up; the only transition occurs at 64"
+  },
+  "events": [
+    { "track": 2, "tick": 0, "seconds": 0.000000, "channel": 1, "value": 0 },
+    { "track": 2, "tick": 6130, "seconds": 3.192708, "channel": 1, "value": 12 },
+    { "track": 2, "tick": 6167, "seconds": 3.211979, "channel": 1, "value": 46 },
+    { "track": 2, "tick": 6207, "seconds": 3.232813, "channel": 1, "value": 56 },
+    { "track": 2, "tick": 6242, "seconds": 3.251042, "channel": 1, "value": 60 },
+    { "track": 2, "tick": 6280, "seconds": 3.270833, "channel": 1, "value": 61 },
+    { "track": 2, "tick": 6357, "seconds": 3.310938, "channel": 1, "value": 60 },
+    { "track": 2, "tick": 6398, "seconds": 3.332292, "channel": 1, "value": 58 },
+    { "track": 2, "tick": 6432, "seconds": 3.350000, "channel": 1, "value": 57 },
+    { "track": 2, "tick": 6477, "seconds": 3.373438, "channel": 1, "value": 54 },
+    { "track": 2, "tick": 6515, "seconds": 3.393229, "channel": 1, "value": 52 },
+    { "track": 2, "tick": 6552, "seconds": 3.412500, "channel": 1, "value": 52 },
+    { "track": 2, "tick": 6630, "seconds": 3.453125, "channel": 1, "value": 50 },
+    { "track": 2, "tick": 6668, "seconds": 3.472917, "channel": 1, "value": 15 },
+    { "track": 2, "tick": 6707, "seconds": 3.493229, "channel": 1, "value": 0 },
+    { "track": 2, "tick": 7163, "seconds": 3.730729, "channel": 1, "value": 22 },
+    { "track": 2, "tick": 7202, "seconds": 3.751042, "channel": 1, "value": 48 },
+    { "track": 2, "tick": 7240, "seconds": 3.770833, "channel": 1, "value": 55 },
+    { "track": 2, "tick": 7280, "seconds": 3.791667, "channel": 1, "value": 58 },
+    { "track": 2, "tick": 7317, "seconds": 3.810938, "channel": 1, "value": 59 },
+    { "track": 2, "tick": 7352, "seconds": 3.829167, "channel": 1, "value": 59 },
+    { "track": 2, "tick": 7430, "seconds": 3.869792, "channel": 1, "value": 60 },
+    { "track": 2, "tick": 7467, "seconds": 3.889063, "channel": 1, "value": 62 },
+    { "track": 2, "tick": 7508, "seconds": 3.910417, "channel": 1, "value": 63 },
+    { "track": 2, "tick": 7560, "seconds": 3.937500, "channel": 1, "value": 64 },
+    { "track": 2, "tick": 7600, "seconds": 3.958333, "channel": 1, "value": 66 },
+    { "track": 2, "tick": 7637, "seconds": 3.977604, "channel": 1, "value": 68 },
+    { "track": 2, "tick": 7677, "seconds": 3.998438, "channel": 1, "value": 72 }
+  ]
+}

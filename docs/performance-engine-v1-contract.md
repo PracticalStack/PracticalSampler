@@ -4,6 +4,11 @@ Status: accepted for implementation
 Decision date: August 2, 2026  
 Scope: declarative-events Sprint 0; normative for Sprints 1-12
 
+Continuous damper extension: the accepted HP-01 contract in
+`continuous-damper-hp01-contract.md` supersedes this document's Boolean-only CC64
+boundary only for routes that explicitly opt into continuous release control.
+Legacy content retains the v1 behavior below.
+
 ## Boundary and ownership
 
 The performance engine is a closed declarative event router. It compiles stable

@@ -1,0 +1,45 @@
+{
+  "schema": "drs.continuous-damper.hp01.synthetic-looped-piano/v1",
+  "fixtureId": "continuous-damper-synthetic-looped-piano",
+  "sample": {
+    "sourceId": "generated-constant-loop",
+    "sampleRate": 48000,
+    "channelCount": 1,
+    "frameCount": 96000,
+    "generatedValue": 0.25,
+    "loopStartFrame": 1024,
+    "loopEndFrame": 2048
+  },
+  "route": {
+    "zoneId": "continuous-damper-c4",
+    "rootKey": 60,
+    "keyLow": 60,
+    "keyHigh": 60,
+    "velocityLow": 1,
+    "velocityHigh": 127,
+    "triggerMode": "gated",
+    "baseReleaseSeconds": 0.25,
+    "releaseShape": 0.0,
+    "sustainControllerNumber": 90,
+    "sustainThreshold": 0.5,
+    "dynamicRelease": true,
+    "releaseControl": {
+      "controllerNumber": 64,
+      "amountSeconds": 100.0,
+      "curveIndex": 11
+    }
+  },
+  "curve": {
+    "curveIndex": 11,
+    "points": {
+      "v000": 0.0,
+      "v032": 0.0,
+      "v042": 0.1,
+      "v054": 0.3,
+      "v062": 0.4,
+      "v064": 1.0,
+      "v127": 1.0
+    },
+    "interpolation": "linear-between-explicit-points"
+  }
+}
