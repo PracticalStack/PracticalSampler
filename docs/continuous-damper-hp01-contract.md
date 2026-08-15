@@ -41,6 +41,7 @@ The compile-time reservations live in
 | Imported SFZ default `sustain_lo` | 0.5 |
 | Continuous half-pedal release controller in this iteration | 64 |
 | Compiled curve size | 128 normalized entries |
+| Native gated-sample release default | 0.03 seconds |
 | Minimum effective release | 0.001 seconds |
 | Maximum effective release | 100 seconds |
 | Reserved project / authoring schema | 7 / 6 |
@@ -77,6 +78,10 @@ effectiveReleaseSeconds = clamp(
     100.0)
 ```
 
+- An omitted native or SFZ base release uses 0.03 seconds. An explicitly authored
+  release value always wins.
+- The 0.001-second clamp is a technical floor for the calculated dynamic release;
+  it is not the default envelope release.
 - The curve has exactly 128 compiled normalized values.
 - Explicit SFZ `v000` through `v127` points are retained.
 - Gaps use deterministic linear interpolation between the nearest explicit points.

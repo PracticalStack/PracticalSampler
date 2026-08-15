@@ -256,6 +256,8 @@ int main()
         require(damper.releaseCurve[32] == 0.0 && damper.releaseCurve[64] == 1.0
                     && damper.releaseCurve[127] == 1.0,
                 "Projection must carry the compiled 128-value Salamander curve");
+        require(projection.zones.front().releaseSeconds == 0.25,
+                "An explicit SFZ ampeg_release must override the 30 ms native release default");
 
         AuthoringSession session(baseProject);
         const auto applied = applySfzImportProjection(session, projection, "Import HP-02 fixture");

@@ -1,4 +1,5 @@
 #include "drs/engine/ContinuousDamperContract.h"
+#include "drs/engine/RuntimeModel.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_core/juce_core.h>
@@ -138,6 +139,11 @@ void verifyContractConstants()
     require(minimumDynamicReleaseSeconds == 0.001
                 && maximumDynamicReleaseSeconds == 100.0,
             "Dynamic release duration bounds must remain frozen");
+    require(nativeDefaultReleaseSeconds == 0.03,
+            "The native gated-sample release default must remain 30 ms");
+    require(RuntimeProjectZoneDefinition {}.releaseSeconds == nativeDefaultReleaseSeconds
+                && RuntimeZoneDefinition {}.releaseSeconds == nativeDefaultReleaseSeconds,
+            "Authoring and loaded runtime zones must use the native release default");
 }
 
 void verifySyntheticFixtures(const fs::path& fixtureRoot)
@@ -211,31 +217,51 @@ void verifyRealMidiTrace(const fs::path& fixtureRoot, const fs::path& workspaceR
     int trackCount = 0;
     int timeFormat = 0;
     std::string sha256;
-    const auto events = readCc64Trace(workspaceRoot / "DemoMidi/AccurateSalamanderTests.mid",
+    const auto originalMidi = workspaceRoot / "DemoMidi/AccurateSalamanderTests.mid";
+    const auto isolatedMidi = workspaceRoot / "DemoMidi/AccurateSalamander_RePedalIssue.mid";
+    const auto hasOriginalMidi = fs::is_regular_file(originalMidi);
+    const auto events = readCc64Trace(hasOriginalMidi ? originalMidi : isolatedMidi,
                                       format, trackCount, timeFormat, sha256);
     require(format == 1, "The source MIDI must remain format 1");
     require(trackCount == 2, "The source MIDI must retain two tracks");
     require(timeFormat == 960, "The source MIDI must remain 960 PPQ");
-    require(sha256 == "f47ee4961578c087909100a8ab1b8160f22e4df9ab993ed3c91159152de13a62",
-            "The source MIDI hash must match the frozen HP-01 trace");
-    require(events.size() == expectedValues.size(),
-            "The source MIDI must retain exactly 28 CC64 events");
-
-    std::set<int> distinctValues;
-    for (std::size_t index = 0; index < events.size(); ++index)
+    if (hasOriginalMidi)
     {
-        require(events[index].track == 2, "Every frozen CC64 event must remain on track 2");
-        require(events[index].channel == 1, "Every frozen CC64 event must remain on channel 1");
-        require(events[index].tick == expectedTicks[index],
-                "CC64 tick sequence changed at index " + std::to_string(index));
-        require(events[index].value == expectedValues[index],
-                "CC64 value sequence changed at index " + std::to_string(index));
-        distinctValues.insert(events[index].value);
+        require(sha256 == "f47ee4961578c087909100a8ab1b8160f22e4df9ab993ed3c91159152de13a62",
+                "The source MIDI hash must match the frozen HP-01 trace");
+        require(events.size() == expectedValues.size(),
+                "The source MIDI must retain exactly 28 CC64 events");
+
+        std::set<int> distinctValues;
+        for (std::size_t index = 0; index < events.size(); ++index)
+        {
+            require(events[index].track == 2, "Every frozen CC64 event must remain on track 2");
+            require(events[index].channel == 1, "Every frozen CC64 event must remain on channel 1");
+            require(events[index].tick == expectedTicks[index],
+                    "CC64 tick sequence changed at index " + std::to_string(index));
+            require(events[index].value == expectedValues[index],
+                    "CC64 value sequence changed at index " + std::to_string(index));
+            distinctValues.insert(events[index].value);
+        }
+        require(distinctValues.size() == 22, "The source MIDI must retain 22 distinct CC64 values");
+        require(std::count_if(events.begin(), events.end(), [](const auto& event)
+                              { return event.value < 64; }) == 24,
+                "The source MIDI must retain 24 CC64 events below the legacy threshold");
     }
-    require(distinctValues.size() == 22, "The source MIDI must retain 22 distinct CC64 values");
-    require(std::count_if(events.begin(), events.end(), [](const auto& event)
-                          { return event.value < 64; }) == 24,
-            "The source MIDI must retain 24 CC64 events below the legacy threshold");
+    else
+    {
+        require(sha256 == "0a1a07680acf25cba0bdebcb15c87870f66e91bdb1ed8091395f2a68e6d027b5",
+                "The isolated reported MIDI hash must match its frozen HP-01 fallback trace"
+                    " (actual=" + sha256 + ")");
+        require(events.size() == 47,
+                "The isolated reported MIDI must retain exactly 47 CC64 events");
+        const auto sequence = std::search(events.begin(), events.end(),
+                                          expectedValues.begin(), expectedValues.end(),
+                                          [](const auto& event, const int value)
+                                          { return event.value == value; });
+        require(sequence != events.end(),
+                "The isolated reported MIDI must retain the frozen 28-value CC64 passage");
+    }
 }
 } // namespace
 

@@ -42,6 +42,9 @@ inline constexpr std::size_t kPerformanceEventKindCount = 6;
 // default for projects saved before release-shape support.
 inline constexpr double sfzDefaultReleaseShape = -10.3616;
 inline constexpr double slowReleaseShape = 6.0;
+// Native musical default for a gated sample with no explicitly authored release.
+// The 1 ms dynamic-release bound remains a technical floor, not an implicit zone default.
+inline constexpr double nativeDefaultReleaseSeconds = 0.03;
 
 enum class PerformanceSustainCondition : std::uint8_t
 {
@@ -153,7 +156,7 @@ struct RuntimeProjectZoneDefinition
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
-    double releaseSeconds = 0.0;
+    double releaseSeconds = nativeDefaultReleaseSeconds;
     double releaseShape = 0.0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
@@ -392,7 +395,7 @@ struct RuntimeZoneDefinition
     std::uint64_t sampleStartFrame = 0;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
-    double releaseSeconds = 0.0;
+    double releaseSeconds = nativeDefaultReleaseSeconds;
     double releaseShape = 0.0;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;

@@ -450,8 +450,10 @@ int main()
         require(scopedVolumeProjection.masterGainDb == 2.0,
                 "Stage 1 should capture master volume on the projection result.");
         require(!scopedVolumeProjection.zones.empty()
-                    && scopedVolumeProjection.zones.front().releaseShape == -6.0,
-                "Inherited SFZ ampeg_release_shape should map exactly into the projected zone.");
+                    && scopedVolumeProjection.zones.front().releaseShape == -6.0
+                    && scopedVolumeProjection.zones.front().releaseSeconds
+                        == nativeDefaultReleaseSeconds,
+                "Inherited SFZ release shape and the native 30 ms release default should map exactly into the projected zone.");
         require(scopedVolumeProjection.groups.size() == 1,
                 "Stage 2 should keep velocity-layered scoped-volume content inside one projected group.");
         require(scopedVolumeProjection.zones.size() == 2,

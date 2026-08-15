@@ -271,6 +271,7 @@
             <h3>Release-time modulation</h3>
             <ul>
               <li>For the focused path, <code>effectiveReleaseSeconds = clamp(baseRelease + amount × curve(CC64), 0.001, 100.0)</code>.</li>
+              <li>An omitted native or SFZ base release uses 30 ms; an explicitly authored <code>ampeg_release</code> overrides it. The 1 ms bound is the calculated dynamic-release floor, not the default.</li>
               <li>Undefined curve points use linear interpolation between the nearest authored points.</li>
               <li>With dynamic release enabled, CC64 changes during release update the remaining slope at the event sample.</li>
               <li>The update preserves the current envelope level: no upward gain jump, restart, or discontinuity is permitted.</li>

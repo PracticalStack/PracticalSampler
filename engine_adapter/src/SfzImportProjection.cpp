@@ -1472,8 +1472,8 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         }
         zone.releaseSeconds = parseDoubleValue(findEffectiveOpcode(section, "ampeg_release") != nullptr
                                                    ? findEffectiveOpcode(section, "ampeg_release")->value
-                                                   : "0")
-                                  .value_or(0.0);
+                                                   : std::to_string(nativeDefaultReleaseSeconds))
+                                  .value_or(nativeDefaultReleaseSeconds);
         zone.releaseShape = sfzDefaultReleaseShape;
         if (const auto* releaseShape = findEffectiveOpcode(section, "ampeg_release_shape"))
             zone.releaseShape = parseDoubleValue(releaseShape->value).value_or(sfzDefaultReleaseShape);
