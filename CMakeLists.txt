@@ -4,6 +4,9 @@ project(DecentRhapsodyStudio VERSION 0.1.0 LANGUAGES C CXX)
 
 include(CTest)
 
+set(DRS_PRODUCT_DISPLAY_NAME "Practical Sampler")
+set(DRS_COMPANY_DISPLAY_NAME "Practical Sampler Project")
+
 set_property(GLOBAL PROPERTY USE_FOLDERS YES)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -30,7 +33,7 @@ set(JUCE_COPY_PLUGIN_AFTER_BUILD OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(third_party/juce EXCLUDE_FROM_ALL)
 
-message(STATUS "Decent Rhapsody Studio Phase 0 configuration")
+message(STATUS "${DRS_PRODUCT_DISPLAY_NAME} Phase 0 configuration")
 message(STATUS "  JUCE source: ${CMAKE_CURRENT_SOURCE_DIR}/third_party/juce")
 message(STATUS "  HISE source: ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hise")
 message(STATUS "  HISE CMake integration enabled: ${DRS_ENABLE_HISE_INTEGRATION}")

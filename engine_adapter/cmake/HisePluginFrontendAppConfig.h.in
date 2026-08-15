@@ -2,9 +2,9 @@
 
 #define JUCE_ENABLE_AUDIO_GUARD 1
 
-#define JucePlugin_Name "Decent Rhapsody Studio"
-#define JucePlugin_Desc "Decent Rhapsody Studio"
-#define JucePlugin_Manufacturer "Decent Rhapsody"
+#define JucePlugin_Name "@DRS_PRODUCT_DISPLAY_NAME@"
+#define JucePlugin_Desc "@DRS_PRODUCT_DISPLAY_NAME@"
+#define JucePlugin_Manufacturer "@DRS_COMPANY_DISPLAY_NAME@"
 #define JucePlugin_ManufacturerWebsite "https://example.invalid"
 #define JucePlugin_ManufacturerEmail "team@example.invalid"
 #define JucePlugin_ManufacturerCode 0x44726870

@@ -14,6 +14,6 @@ inline constexpr char workspacePhase1ReferenceStream[] = "@CMAKE_SOURCE_DIR@/con
 inline constexpr char workspacePhase1ReferencePackageManifest[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/tiny-open-instrument/package-manifest.json";
 inline constexpr char workspacePhase2RuntimeRoot[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase2";
 inline constexpr char workspacePhase2ReferenceProject[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase2/authoring-foundation/reference-project/phase2-authoring-foundation.drsproj";
-inline constexpr char runtimeCompanyName[] = "Decent Rhapsody";
-inline constexpr char runtimeProductName[] = "Decent Rhapsody Studio";
+inline constexpr char runtimeCompanyName[] = "@DRS_COMPANY_DISPLAY_NAME@";
+inline constexpr char runtimeProductName[] = "@DRS_PRODUCT_DISPLAY_NAME@";
 } // namespace drs::engine::generated

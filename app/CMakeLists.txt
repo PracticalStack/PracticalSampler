@@ -150,8 +150,8 @@ target_compile_definitions(drs_plugin_shell
 target_compile_features(drs_plugin_shell PUBLIC cxx_std_17)
 
 juce_add_gui_app(DecentRhapsodyStudioApp
-    PRODUCT_NAME "Decent Rhapsody Studio"
-    COMPANY_NAME "Decent Rhapsody"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME}"
+    COMPANY_NAME "${DRS_COMPANY_DISPLAY_NAME}"
     BUNDLE_ID "com.decentrhapsody.studio.app"
     NEEDS_WEB_BROWSER FALSE
     NEEDS_CURL FALSE
@@ -178,7 +178,7 @@ target_link_libraries(DecentRhapsodyStudioApp
 )
 
 juce_add_plugin(drs_plugin_bundle
-    COMPANY_NAME "Decent Rhapsody"
+    COMPANY_NAME "${DRS_COMPANY_DISPLAY_NAME}"
     BUNDLE_ID "com.decentrhapsody.studio.plugin"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
@@ -189,7 +189,7 @@ juce_add_plugin(drs_plugin_bundle
     PLUGIN_MANUFACTURER_CODE Dcrh
     PLUGIN_CODE Drs0
     FORMATS VST3
-    PRODUCT_NAME "Decent Rhapsody Studio"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME}"
     NEEDS_WEB_BROWSER FALSE
     NEEDS_CURL FALSE
 )
@@ -205,7 +205,7 @@ target_link_libraries(drs_plugin_bundle
 
 get_target_property(DRS_PLUGIN_VST3_ARTEFACT drs_plugin_bundle_VST3 JUCE_PLUGIN_ARTEFACT_FILE)
 set(DRS_PLUGIN_LEGACY_VST3_DIR
-    "${CMAKE_CURRENT_BINARY_DIR}/DecentRhapsodyStudioPlugin_artefacts/$<CONFIG>/VST3/Decent Rhapsody Studio.vst3")
+    "${CMAKE_CURRENT_BINARY_DIR}/DecentRhapsodyStudioPlugin_artefacts/$<CONFIG>/VST3/${DRS_PRODUCT_DISPLAY_NAME}.vst3")
 
 add_custom_command(TARGET drs_plugin_bundle_VST3 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory

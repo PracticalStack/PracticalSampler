@@ -2,6 +2,7 @@
 
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/WorkspacePaths.generated.h"
 #include "shared/PlayableInstrumentLicenseViewer.h"
 #include "shared/ProjectStorage.h"
 #include "shared/MessageThreadMetrics.h"
@@ -2132,7 +2133,7 @@ juce::String MainComponent::buildWindowTitle() const
 {
     const auto applicationName = juce::JUCEApplication::getInstance() != nullptr
         ? juce::JUCEApplication::getInstance()->getApplicationName()
-        : juce::String("Decent Rhapsody Studio");
+        : juce::String(drs::engine::generated::runtimeProductName);
 
     auto title = applicationName;
     title += " - ";

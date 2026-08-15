@@ -1,7 +1,7 @@
 {
   "schemaName": "drs.presentationIdentityOccurrenceLedger",
   "schemaVersion": 1,
-  "generatedAtUtc": "2026-08-15T21:57:58Z",
+  "generatedAtUtc": "2026-08-15T22:26:39Z",
   "scope": "workspace",
   "workspaceRoot": "E:\\Dev\\Cpp\\VST\\DecentRhapsody",
   "legacyIdentity": {
@@ -13,16 +13,16 @@
     "companyName": "Practical Sampler Project",
     "proposedRepositoryName": "PracticalSampler"
   },
-  "occurrenceCount": 552,
+  "occurrenceCount": 540,
   "classificationSummary": {
-    "CHANGE": 301,
+    "CHANGE": 289,
     "DEFER": 126,
     "PRESERVE-HISTORICAL": 56,
     "REGENERATE": 69
   },
   "ruleSummary": {
-    "active-product-presentation": 292,
-    "company-presentation-field": 9,
+    "active-product-presentation": 284,
+    "company-presentation-field": 5,
     "deferred-partial-product-copy": 13,
     "derived-reaper-fixture": 69,
     "external-reaper-user-project": 84,
@@ -163,61 +163,6 @@
       "excerpt": "<p class=\"meta\">Decent Rhapsody Studio · High-level implementation and qualification plan</p>"
     },
     {
-      "path": "DecentRhapsodyStudio/app/CMakeLists.txt",
-      "line": 153,
-      "column": 19,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "PRODUCT_NAME \"Decent Rhapsody Studio\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/CMakeLists.txt",
-      "line": 154,
-      "column": 19,
-      "identity": "companyName",
-      "matchedText": "Decent Rhapsody",
-      "classification": "CHANGE",
-      "rule": "company-presentation-field",
-      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project.",
-      "excerpt": "COMPANY_NAME \"Decent Rhapsody\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/CMakeLists.txt",
-      "line": 181,
-      "column": 19,
-      "identity": "companyName",
-      "matchedText": "Decent Rhapsody",
-      "classification": "CHANGE",
-      "rule": "company-presentation-field",
-      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project.",
-      "excerpt": "COMPANY_NAME \"Decent Rhapsody\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/CMakeLists.txt",
-      "line": 192,
-      "column": 19,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "PRODUCT_NAME \"Decent Rhapsody Studio\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/CMakeLists.txt",
-      "line": 208,
-      "column": 86,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "\"${CMAKE_CURRENT_BINARY_DIR}/DecentRhapsodyStudioPlugin_artefacts/$<CONFIG>/VST3/Decent Rhapsody Studio.vst3\")"
-    },
-    {
       "path": "DecentRhapsodyStudio/app/README.md",
       "line": 5,
       "column": 156,
@@ -318,18 +263,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
-      "line": 2135,
-      "column": 25,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": ": juce::String(\"Decent Rhapsody Studio\");"
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
-      "line": 2359,
+      "line": 2360,
       "column": 67,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -340,7 +274,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
-      "line": 2382,
+      "line": 2383,
       "column": 67,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -351,7 +285,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
-      "line": 2407,
+      "line": 2408,
       "column": 69,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -362,7 +296,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
-      "line": 2431,
+      "line": 2432,
       "column": 69,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -373,7 +307,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
-      "line": 2571,
+      "line": 2572,
       "column": 67,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -381,17 +315,6 @@
       "rule": "deferred-partial-product-copy",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Save Decent Rhapsody project\","
-    },
-    {
-      "path": "DecentRhapsodyStudio/CMakeLists.txt",
-      "line": 33,
-      "column": 17,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "message(STATUS \"Decent Rhapsody Studio Phase 0 configuration\")"
     },
     {
       "path": "DecentRhapsodyStudio/code-review.html",
@@ -747,7 +670,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 115,
+      "line": 116,
       "column": 4,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -758,7 +681,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 115,
+      "line": 116,
       "column": 57,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -769,7 +692,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 115,
+      "line": 116,
       "column": 90,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -780,7 +703,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 116,
+      "line": 117,
       "column": 4,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -791,7 +714,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 116,
+      "line": 117,
       "column": 52,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -802,7 +725,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 116,
+      "line": 117,
       "column": 106,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -813,7 +736,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 116,
+      "line": 117,
       "column": 139,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -824,7 +747,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 117,
+      "line": 118,
       "column": 34,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -835,7 +758,7 @@
     },
     {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-phase0-baseline.md",
-      "line": 117,
+      "line": 118,
       "column": 66,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
@@ -876,61 +799,6 @@
       "rule": "historical-engineering-evidence",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "Plug-in: VST3i Decent Rhapsody Studio"
-    },
-    {
-      "path": "DecentRhapsodyStudio/engine_adapter/cmake/HisePluginFrontendAppConfig.h.in",
-      "line": 5,
-      "column": 26,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "#define JucePlugin_Name \"Decent Rhapsody Studio\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/engine_adapter/cmake/HisePluginFrontendAppConfig.h.in",
-      "line": 6,
-      "column": 26,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "#define JucePlugin_Desc \"Decent Rhapsody Studio\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/engine_adapter/cmake/HisePluginFrontendAppConfig.h.in",
-      "line": 7,
-      "column": 34,
-      "identity": "companyName",
-      "matchedText": "Decent Rhapsody",
-      "classification": "CHANGE",
-      "rule": "company-presentation-field",
-      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project.",
-      "excerpt": "#define JucePlugin_Manufacturer \"Decent Rhapsody\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/engine_adapter/cmake/WorkspacePaths.generated.h.in",
-      "line": 17,
-      "column": 47,
-      "identity": "companyName",
-      "matchedText": "Decent Rhapsody",
-      "classification": "CHANGE",
-      "rule": "company-presentation-field",
-      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project.",
-      "excerpt": "inline constexpr char runtimeCompanyName[] = \"Decent Rhapsody\";"
-    },
-    {
-      "path": "DecentRhapsodyStudio/engine_adapter/cmake/WorkspacePaths.generated.h.in",
-      "line": 18,
-      "column": 47,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "inline constexpr char runtimeProductName[] = \"Decent Rhapsody Studio\";"
     },
     {
       "path": "DecentRhapsodyStudio/engine_adapter/include/drs/engine/RuntimeModel.h",
@@ -4916,7 +4784,7 @@
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 502,
+      "line": 509,
       "column": 58,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -4927,7 +4795,7 @@
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 632,
+      "line": 639,
       "column": 17,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -4938,7 +4806,7 @@
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 632,
+      "line": 639,
       "column": 40,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
