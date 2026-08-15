@@ -56,5 +56,5 @@ Compatibility coverage includes the voice kernel, binary pedal state machine, an
 voice-generation cutover suites. The HP-01 direct harness now reports
 `preserve-continuous-cc64`, `dynamic-release-envelope`,
 `sustain-controller-reassignment`, and `generation-owned-damper-update` as promoted
-green behavior. `repedal-still-audible` and `release-trigger-uniqueness` remain red
-until HP-04.
+green behavior. It left `repedal-still-audible` and `release-trigger-uniqueness` for
+HP-04; both were subsequently promoted on August 15, 2026.

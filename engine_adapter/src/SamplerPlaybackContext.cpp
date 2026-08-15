@@ -388,8 +388,21 @@ void SamplerPlaybackContext::resetAtBlockBoundary() noexcept
 {
     const auto resetCount = voicePool.activeVoiceCount() + voicePool.releasingVoiceCount();
     counters.resetVoiceCount += resetCount;
-    voicePool.resetVoices();
     performanceState.reset();
+    if (activeRenderModel != nullptr && activeActivationSlot >= 0)
+    {
+        const auto generation = activationSlots[
+            static_cast<std::size_t>(activeActivationSlot)].serial;
+        voicePool.prepare(*activeRenderModel, sampleRate, generation);
+        performanceState.migrateProgram(activeRenderModel->getPerformanceProgram(), generation,
+                                        activeRenderModel->usesContinuousDamper(),
+                                        activeRenderModel->getSustainControllerNumber(),
+                                        activeRenderModel->getSustainThreshold());
+    }
+    else
+    {
+        voicePool.resetVoices();
+    }
     if (activeDspGeneration != nullptr)
         activeDspGeneration->resetEffectState();
     eventScratch.clear();
@@ -468,6 +481,10 @@ SamplerPlaybackContextSnapshot SamplerPlaybackContext::getSnapshot() const noexc
             = diagnosticReleasingVoiceStealCount.load(std::memory_order_relaxed);
         snapshot.counters.droppedEventCount = diagnosticDroppedEventCount.load(std::memory_order_relaxed);
         snapshot.counters.resetVoiceCount = diagnosticResetVoiceCount.load(std::memory_order_relaxed);
+        snapshot.counters.dynamicReleaseUpdateCount
+            = diagnosticDynamicReleaseUpdateCount.load(std::memory_order_relaxed);
+        snapshot.counters.repedalCatchCount
+            = diagnosticRepedalCatchCount.load(std::memory_order_relaxed);
         snapshot.counters.crossfadeStartedVoiceCount
             = diagnosticCrossfadeStartedVoiceCount.load(std::memory_order_relaxed);
         snapshot.counters.crossfadeOverlapHitCount
@@ -743,6 +760,8 @@ void SamplerPlaybackContext::accumulate(const SamplerVoicePoolRenderResult& resu
     counters.releasingVoiceStealCount += result.render.releasingVoiceStealCount;
     counters.droppedEventCount += result.render.droppedEventCount;
     counters.resetVoiceCount += result.resetVoiceCount;
+    counters.dynamicReleaseUpdateCount += result.dynamicReleaseUpdateCount;
+    counters.repedalCatchCount += result.repedalCatchCount;
     counters.crossfadeStartedVoiceCount += result.render.crossfadeStartedVoiceCount;
     counters.crossfadeOverlapHitCount += result.render.crossfadeOverlapHitCount;
     counters.crossfadeFallbackCount += result.render.crossfadeFallbackCount;
@@ -807,6 +826,10 @@ void SamplerPlaybackContext::publishRealtimeDiagnostics() noexcept
                                              std::memory_order_release);
     diagnosticDroppedEventCount.store(counters.droppedEventCount, std::memory_order_release);
     diagnosticResetVoiceCount.store(counters.resetVoiceCount, std::memory_order_release);
+    diagnosticDynamicReleaseUpdateCount.store(counters.dynamicReleaseUpdateCount,
+                                               std::memory_order_release);
+    diagnosticRepedalCatchCount.store(counters.repedalCatchCount,
+                                      std::memory_order_release);
     diagnosticCrossfadeStartedVoiceCount.store(counters.crossfadeStartedVoiceCount,
                                                std::memory_order_release);
     diagnosticCrossfadeOverlapHitCount.store(counters.crossfadeOverlapHitCount,

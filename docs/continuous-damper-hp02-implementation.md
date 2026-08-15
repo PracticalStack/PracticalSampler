@@ -63,5 +63,5 @@ The registered `drs.continuous_damper.hp02` test covers:
 Compatibility coverage also passes for the HP-01 contract, binary pedal behavior,
 SFZ report and projection suites, prepared playback, packaged FX routing, and package
 export lifecycle. `salamander-half-pedal-projection` remains addressable in the
-HP-01 direct harness and now exits 0. HP-03 subsequently promoted four runtime
-behavior seams; the two HP-04 lifecycle seams still exit 1.
+HP-01 direct harness and now exits 0. HP-03 and HP-04 subsequently promoted all six
+runtime behavior seams.

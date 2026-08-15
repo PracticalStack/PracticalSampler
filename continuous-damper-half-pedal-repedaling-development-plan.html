@@ -445,7 +445,7 @@
               <li>Guarantee one physical note-off, one effective release event, and at most one release-trigger sample regardless of repedal count.</li>
               <li>Cover repeated pitches, voice stealing, all-notes-off, all-sound-off/reset, transport discontinuity, project replacement, and package close.</li>
             </ul>
-            <div class="exit"><strong>Exit:</strong> repedaling audibly extends only the remaining tail, cannot revive completed voices, and cannot leak or duplicate semantic events.</div>
+            <div class="exit"><strong>Exit — complete August 15, 2026:</strong> a rising CC64 value catches only still-audible releasing voices in place, retaining voice, trigger, route, articulation, and activation-generation identity while preserving the exact remaining envelope level. Dense same-offset staircases remain allocation-free; repeated pitches emit one effective release and one release-trigger sample per gesture; and finished, stolen, panic-reset, transport-reset, and closed-package voices cannot revive. Transport reset reapplies active controller defaults and continuous-damper configuration so host CC64 resumes immediately. Dedicated realtime diagnostics count dynamic updates and repedal catches without changing voice allocation or stealing order.</div>
           </div>
         </article>
 

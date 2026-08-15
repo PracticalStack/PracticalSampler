@@ -182,25 +182,25 @@ and 22 distinct values. The first expressive sweep rises only to 61 and returns 
 zero, so Boolean DRS currently treats the complete sweep as pedal-up. The second
 sweep crosses 64 only near its end.
 
-## Direct-only expected-red seams
+## Direct seam promotion harness
 
 `drs_continuous_damper_hp01_red_tests` is intentionally excluded from CTest and
-`drs_all_tests`. Invoke exactly one named seam; exit 1 is expected until its owning
-later slice promotes it to registered green behavior:
+`drs_all_tests`. Invoke exactly one named seam. All seven original seams now return
+exit 0 and name their owning registered behavioral coverage:
 
-- `repedal-still-audible` — HP-04
-- `release-trigger-uniqueness` — HP-04
 - `salamander-half-pedal-projection` — promoted by HP-02 on August 15, 2026;
   direct invocation now exits 0 and names the registered HP-02 coverage
 - `preserve-continuous-cc64`, `dynamic-release-envelope`,
   `sustain-controller-reassignment`, and `generation-owned-damper-update` —
   promoted by HP-03 on August 15, 2026; direct invocation now exits 0 and names
   the registered HP-03 coverage
+- `repedal-still-audible` and `release-trigger-uniqueness` — promoted by HP-04
+  on August 15, 2026; direct invocation now exits 0 and names the registered HP-04
+  coverage
 
 Exit 2 means invalid invocation or fixture setup and is never an expected result.
-Later slices must replace each red seam with behavioral coverage; deleting the seam
-or treating expected exit 1 as a release pass is prohibited. Promoted seams remain
-addressable in the harness and return exit 0 with the owning registered test.
+Promoted seams remain addressable in the harness; none were deleted to make the
+contract appear green.
 
 ## HP-01 acceptance
 

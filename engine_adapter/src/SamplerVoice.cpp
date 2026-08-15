@@ -40,6 +40,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
 {
     reset();
     if (request.voiceId == 0
+        || request.triggerId == 0
         || request.activationGeneration == 0
         || request.routeIndex >= model.getRoutes().size()
         || request.sourceMidiNote < 0 || request.sourceMidiNote > 127
@@ -81,6 +82,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
 
     lifecycleState = SamplerVoiceLifecycleState::active;
     voiceId = request.voiceId;
+    triggerId = request.triggerId;
     activationGeneration = request.activationGeneration;
     routeIndex = request.routeIndex;
     sourceMidiNote = request.sourceMidiNote;
@@ -179,6 +181,8 @@ bool SamplerVoice::updateDynamicRelease(const std::uint8_t controllerNumber,
         return false;
 
     const auto currentLevel = getReleaseEnvelopeLevel();
+    const auto isRepedalCatch = hasReleaseControllerValue
+        && controllerValue > releaseControllerValue;
     const auto releaseSeconds = dynamicReleaseSeconds(controllerValue);
     const auto samples = static_cast<std::uint32_t>(std::max(
         1ll, static_cast<long long>(std::llround(releaseSeconds * outputSampleRate))));
@@ -188,6 +192,7 @@ bool SamplerVoice::updateDynamicRelease(const std::uint8_t controllerNumber,
     hasReleaseControllerValue = true;
     releaseControllerValue = controllerValue;
     ++dynamicReleaseUpdateCount;
+    repedalCatchCount += isRepedalCatch ? 1u : 0u;
     return true;
 }
 
@@ -343,6 +348,7 @@ void SamplerVoice::reset() noexcept
 {
     lifecycleState = SamplerVoiceLifecycleState::idle;
     voiceId = 0;
+    triggerId = 0;
     activationGeneration = 0;
     routeIndex = 0;
     sourceMidiNote = 0;
@@ -364,6 +370,7 @@ void SamplerVoice::reset() noexcept
     hasReleaseControllerValue = false;
     releaseControllerValue = 0;
     dynamicReleaseUpdateCount = 0;
+    repedalCatchCount = 0;
     underrunning = false;
     nextLookAheadPublicationFrame = 0;
 }

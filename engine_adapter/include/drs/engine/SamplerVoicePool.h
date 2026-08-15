@@ -39,7 +39,9 @@ struct SamplerVoiceSlotSnapshot
 {
     SamplerVoiceSlotState state = SamplerVoiceSlotState::free;
     std::uint64_t voiceId = 0;
+    std::uint64_t triggerId = 0;
     std::uint64_t activationGeneration = 0;
+    std::size_t routeIndex = 0;
     std::size_t modelRevision = 0;
     int sourceMidiNote = 0;
     int effectiveMidiNote = 0;
@@ -51,6 +53,7 @@ struct SamplerVoiceSlotSnapshot
     std::uint32_t releaseSamplesTotal = 0;
     float releaseEnvelopeLevel = 0.0f;
     std::uint32_t dynamicReleaseUpdateCount = 0;
+    std::uint32_t repedalCatchCount = 0;
     int damperCurveIndex = -1;
 };
 
@@ -66,6 +69,7 @@ struct SamplerVoicePoolRenderResult
     std::uint32_t sustainDeferredVoiceCount = 0;
     std::uint32_t resetVoiceCount = 0;
     std::uint32_t dynamicReleaseUpdateCount = 0;
+    std::uint32_t repedalCatchCount = 0;
 };
 
 struct SamplerRouteEligibilityQuery

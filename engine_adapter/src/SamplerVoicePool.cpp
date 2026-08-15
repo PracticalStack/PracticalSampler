@@ -516,7 +516,9 @@ SamplerVoiceSlotSnapshot SamplerVoicePool::getSlotSnapshot(std::size_t index) co
     const auto& slot = slots[index];
     return { slot.state,
              slot.voice.getVoiceId(),
+             slot.voice.getTriggerId(),
              slot.voice.getActivationGeneration(),
+             slot.voice.getRouteIndex(),
              slot.voice.getRenderModel() != nullptr
                  ? slot.voice.getRenderModel()->getRevision() : 0,
              slot.voice.getSourceMidiNote(),
@@ -529,6 +531,7 @@ SamplerVoiceSlotSnapshot SamplerVoicePool::getSlotSnapshot(std::size_t index) co
              slot.voice.getReleaseSamplesTotal(),
              slot.voice.getReleaseEnvelopeLevel(),
              slot.voice.getDynamicReleaseUpdateCount(),
+             slot.voice.getRepedalCatchCount(),
              slot.voice.getDamperCurveIndex() };
 }
 
@@ -848,6 +851,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 const auto routeEffectiveMidiNote = std::clamp(routeSourceMidiNote + midiNoteOffset, 0, 127);
                 SamplerVoiceStartRequest request;
                 request.voiceId = nextVoiceId;
+                request.triggerId = nextTriggerId;
                 request.activationGeneration = activeGeneration;
                 request.routeIndex = routeIndex;
                 request.sourceMidiNote = routeSourceMidiNote;
@@ -996,8 +1000,16 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             if (isRawSustain)
                 for (auto& slot : slots)
                     if (slot.state == SamplerVoiceSlotState::releasing
-                        && slot.voice.updateDynamicRelease(halfPedalReleaseControllerNumber,
-                                                           exactValue))
+                        && [&]() noexcept
+                        {
+                            const auto catchesBefore = slot.voice.getRepedalCatchCount();
+                            if (!slot.voice.updateDynamicRelease(
+                                    halfPedalReleaseControllerNumber, exactValue))
+                                return false;
+                            result.repedalCatchCount += slot.voice.getRepedalCatchCount()
+                                - catchesBefore;
+                            return true;
+                        }())
                     {
                         ++result.dynamicReleaseUpdateCount;
                     }
@@ -1058,8 +1070,16 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 {
                     auto& slot = slots[index];
                     if (slot.state == SamplerVoiceSlotState::releasing
-                        && slot.voice.updateDynamicRelease(event.controllerNumber,
-                                                           event.controllerValue))
+                        && [&]() noexcept
+                        {
+                            const auto catchesBefore = slot.voice.getRepedalCatchCount();
+                            if (!slot.voice.updateDynamicRelease(event.controllerNumber,
+                                                                 event.controllerValue))
+                                return false;
+                            result.repedalCatchCount += slot.voice.getRepedalCatchCount()
+                                - catchesBefore;
+                            return true;
+                        }())
                     {
                         ++result.dynamicReleaseUpdateCount;
                     }

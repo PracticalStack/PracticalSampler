@@ -18,6 +18,7 @@ enum class SamplerVoiceLifecycleState : std::uint8_t
 struct SamplerVoiceStartRequest
 {
     std::uint64_t voiceId = 0;
+    std::uint64_t triggerId = 1;
     std::size_t routeIndex = 0;
     int sourceMidiNote = 60;
     int effectiveMidiNote = 60;
@@ -70,6 +71,7 @@ public:
     bool isActive() const noexcept { return lifecycleState == SamplerVoiceLifecycleState::active; }
     bool isReleasing() const noexcept { return lifecycleState == SamplerVoiceLifecycleState::releasing; }
     std::uint64_t getVoiceId() const noexcept { return voiceId; }
+    std::uint64_t getTriggerId() const noexcept { return triggerId; }
     std::uint64_t getActivationGeneration() const noexcept { return activationGeneration; }
     std::size_t getRouteIndex() const noexcept { return routeIndex; }
     int getSourceMidiNote() const noexcept { return sourceMidiNote; }
@@ -91,6 +93,7 @@ public:
     {
         return dynamicReleaseUpdateCount;
     }
+    std::uint32_t getRepedalCatchCount() const noexcept { return repedalCatchCount; }
     int getDamperCurveIndex() const noexcept
     {
         return route != nullptr ? route->damper.releaseCurveIndex : -1;
@@ -118,6 +121,7 @@ private:
 
     SamplerVoiceLifecycleState lifecycleState = SamplerVoiceLifecycleState::idle;
     std::uint64_t voiceId = 0;
+    std::uint64_t triggerId = 0;
     std::uint64_t activationGeneration = 0;
     std::size_t routeIndex = 0;
     int sourceMidiNote = 0;
@@ -139,6 +143,7 @@ private:
     bool hasReleaseControllerValue = false;
     std::uint8_t releaseControllerValue = 0;
     std::uint32_t dynamicReleaseUpdateCount = 0;
+    std::uint32_t repedalCatchCount = 0;
     bool underrunning = false;
     std::uint64_t nextLookAheadPublicationFrame = 0;
 };
