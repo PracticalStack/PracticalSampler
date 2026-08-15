@@ -42,7 +42,7 @@ remain authoritative for their individual domains.
   resolution, sample decode, stream decode, large-resource destruction, final shared release,
   capacity growth, and deadline overrun.
 - Supported gate budgets are 44.1 or 48 kHz, block sizes 32 through 1024, up to 128 events per block,
-  and 24 voices per Preview or Performance context.
+  and 64 voices per Preview or Performance context.
 - Each prohibited action has an isolated negative regression. The declared clean maximum-load case
   must report zero guard failures.
 

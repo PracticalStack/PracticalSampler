@@ -409,10 +409,11 @@ void runStealAndRepeatedResetMatrix()
     events.push(noteOn(0, 62));
     StereoOutput stealOutput(1);
     auto result = pool.renderBlock(stealOutput.view(), events.view());
-    require(result.render.releasedVoiceCount == 24
+    require(result.render.releasedVoiceCount == drs::engine::SamplerVoicePool::capacity
                 && result.render.stolenVoiceCount == 1
                 && result.activeVoiceCount == 1
-                && result.releasingVoiceCount == 23,
+                && result.releasingVoiceCount
+                    == drs::engine::SamplerVoicePool::capacity - 1,
             "Stealing during release must choose one oldest releasing voice.");
 
     events.clear();
@@ -420,7 +421,7 @@ void runStealAndRepeatedResetMatrix()
     events.push(resetEvent(2));
     StereoOutput resetOutput(5);
     result = pool.renderBlock(resetOutput.view(), events.view());
-    require(result.resetVoiceCount == 24
+    require(result.resetVoiceCount == drs::engine::SamplerVoicePool::capacity
                 && result.activeVoiceCount == 0
                 && result.releasingVoiceCount == 0
                 && pool.finishedVoiceCount() == 0,

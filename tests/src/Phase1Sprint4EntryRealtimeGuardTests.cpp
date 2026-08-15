@@ -226,7 +226,7 @@ void runCleanMaximumLoadCase()
             "Diagnostics must distinguish the Performance and Preview contexts.");
     require(snapshot.performancePeakActiveVoiceCount == Profile::targetPolyphonyPerContext
                 && snapshot.authoringPreviewPeakActiveVoiceCount == Profile::targetPolyphonyPerContext,
-            "Peak-voice diagnostics should capture the clean 48-voice load.");
+            "Peak-voice diagnostics should capture the clean 128-voice load.");
     require(snapshot.performanceDroppedEventCount == 0
                 && snapshot.authoringPreviewDroppedEventCount == 0
                 && snapshot.performanceDroppedNoteCount == 0

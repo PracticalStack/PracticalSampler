@@ -97,7 +97,7 @@ SamplerRouteEligibilityResult evaluateSamplerRouteEligibility(
 class SamplerVoicePool final
 {
 public:
-    static constexpr std::size_t capacity = 24;
+    static constexpr std::size_t capacity = 64;
 
     bool prepare(const SamplerRenderModel& model,
                  double outputSampleRate,

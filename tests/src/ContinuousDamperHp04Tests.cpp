@@ -508,7 +508,9 @@ void verifyFinishedAndStolenVoicesStayGone(const ModelFixture& fixture)
     const auto replacementResult = stealing.renderBlock(replacementOutput.view(), view(replacement));
     require(replacementResult.render.stolenVoiceCount == 1
                 && replacementResult.render.releasingVoiceStealCount == 1
-                && findVoice(stealing, 1).voiceId == 0 && findVoice(stealing, 25).voiceId == 25,
+                && findVoice(stealing, 1).voiceId == 0
+                && findVoice(stealing, SamplerVoicePool::capacity + 1).voiceId
+                    == SamplerVoicePool::capacity + 1,
             "The oldest releasing voice must be replaced deterministically");
     const std::array catchRemaining { controller(0, 110) };
     StereoOutput catchRemainingOutput(1);
@@ -518,7 +520,9 @@ void verifyFinishedAndStolenVoicesStayGone(const ModelFixture& fixture)
     allocation_probe::enabled = false;
     require(caught.dynamicReleaseUpdateCount == SamplerVoicePool::capacity - 1
                 && caught.repedalCatchCount == SamplerVoicePool::capacity - 1
-                && findVoice(stealing, 1).voiceId == 0 && findVoice(stealing, 25).voiceId == 25
+                && findVoice(stealing, 1).voiceId == 0
+                && findVoice(stealing, SamplerVoicePool::capacity + 1).voiceId
+                    == SamplerVoicePool::capacity + 1
                 && allocation_probe::allocations == 0 && allocation_probe::deallocations == 0,
             "A stolen voice must stay gone while every remaining tail is caught in place");
 }

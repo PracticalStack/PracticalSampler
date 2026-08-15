@@ -30,7 +30,7 @@ route and activation generation:
 The authored release shape remains unchanged. A relevant controller change on an
 already-releasing voice captures its current envelope level, replaces only the
 future segment duration, and renders the first updated sample from that exact level.
-Repeated exact values are no-ops. The update path is bounded to the fixed 24-voice
+Repeated exact values are no-ops. The update path is bounded to the fixed 64-voice
 pool, uses stack state only, and performs no callback allocation.
 
 Older voices continue to reference their original render model, so a controller

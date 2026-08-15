@@ -455,8 +455,8 @@ void runEventBlockContract()
 {
     static_assert(drs::engine::SamplerEventBlock::capacity == 512,
                   "Sprint 4 event capacity changed.");
-    static_assert(drs::engine::SamplerVoicePool::capacity == 24,
-                  "Sprint 4 per-context voice capacity changed.");
+    static_assert(drs::engine::SamplerVoicePool::capacity == 64,
+                  "The per-context voice capacity must retain the qualified piano bound.");
 
     drs::engine::SamplerEventBlock block;
     require(block.push(noteOn(8, 60))
@@ -745,20 +745,20 @@ void runCapacityAndStealMatrix()
         events.push(noteOn(0, 60));
     StereoOutput output(1);
     auto result = pool.renderBlock(output.view(), events.view());
-    require(result.render.startedVoiceCount == 24
+    require(result.render.startedVoiceCount == drs::engine::SamplerVoicePool::capacity
                 && result.render.stolenVoiceCount == 0
-                && result.activeVoiceCount == 24,
-            "The first 24 notes must fill the fixed pool without stealing.");
+                && result.activeVoiceCount == drs::engine::SamplerVoicePool::capacity,
+            "The first 64 notes must fill the fixed pool without stealing.");
 
     events.clear();
     events.push(noteOn(0, 61));
     StereoOutput stealOutput(1);
     result = pool.renderBlock(stealOutput.view(), events.view());
     require(result.render.stolenVoiceCount == 1
-                && result.activeVoiceCount == 24
+                && result.activeVoiceCount == drs::engine::SamplerVoicePool::capacity
                 && !containsVoiceId(pool, 1)
-                && containsVoiceId(pool, 25),
-            "The 25th note must deterministically steal the oldest active voice.");
+                && containsVoiceId(pool, drs::engine::SamplerVoicePool::capacity + 1),
+            "The first over-capacity note must deterministically steal the oldest active voice.");
 
     pool.resetVoices();
     events.clear();
@@ -771,10 +771,11 @@ void runCapacityAndStealMatrix()
     events.push(noteOn(0, 62));
     StereoOutput releaseStealOutput(1);
     result = pool.renderBlock(releaseStealOutput.view(), events.view());
-    require(result.render.releasedVoiceCount == 24
+    require(result.render.releasedVoiceCount == drs::engine::SamplerVoicePool::capacity
                 && result.render.stolenVoiceCount == 1
                 && result.activeVoiceCount == 1
-                && result.releasingVoiceCount == 23,
+                && result.releasingVoiceCount
+                    == drs::engine::SamplerVoicePool::capacity - 1,
             "A new note must steal the oldest releasing voice before any active voice.");
 
     const auto oneFrameModel = buildModel(1);
@@ -817,7 +818,7 @@ void runOverflowDropAndRealtimeMatrix()
     allocation_probe::enabled = false;
     require(result.accepted
                 && result.render.consumedEventCount == drs::engine::SamplerEventBlock::capacity
-                && result.activeVoiceCount == 24
+                && result.activeVoiceCount == drs::engine::SamplerVoicePool::capacity
                 && allocation_probe::allocations == 0
                 && allocation_probe::deallocations == 0,
             "Maximum bounded scheduling/render must perform no allocation, release, or capacity growth.");

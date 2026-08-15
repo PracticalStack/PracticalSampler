@@ -27,12 +27,17 @@ complete 2.63 GB package with the real WAV corpus. See
 
 ## Reported MIDI passage
 
-The checked-in passage retains 55 note-ons, 52 explicit note-offs, and 28 exact
-CC64 events. The qualification preserves event sample position, MIDI channel,
+The isolated reported passage retains 125 note-ons, 125 explicit note-offs, and 47
+exact CC64 events. The qualification preserves event sample position, MIDI channel,
 controller number/value, note-off velocity, and stable input order in the common
 offline render harness. It appends one all-notes-off event 10 ms after the source
-endpoint so the three deliberately open notes enter a bounded, comparable release
-window.
+endpoint to produce a bounded, comparable release window.
+
+A direct Performance-pool regression also renders the passage through the reported
+2.46–2.48 second pedal transition with Salamander's authored one-second base
+release. The former 24-voice profile had already stolen 12 voices and lost at least
+one of F3, A#3, and D4. The qualified 64-voice per-context profile reaches that
+transition with zero steals, all three chord notes still live, and a repedal catch.
 
 The real passage is rendered at 44.1 and 48 kHz with 128-, 256-, and 512-frame
 blocks. At each sample rate, all three partitionings are sample-equivalent. Both
@@ -40,14 +45,14 @@ rates produce the same lifecycle evidence:
 
 | Metric | 44.1 kHz | 48 kHz |
 |---|---:|---:|
-| Started/released voices | 55/55 | 55/55 |
-| Dynamic release updates | 46 | 46 |
-| Repedal catches | 26 | 26 |
-| Continuous tail RMS | 0.387837582 | 0.387837089 |
-| Legacy tail RMS | 0.084502297 | 0.084501179 |
-| 128-frame checksum | `905742e803790220` | `be1641158601d32a` |
+| Started/released voices | 125/125 | 125/125 |
+| Dynamic release updates | 125 | 125 |
+| Repedal catches | 38 | 38 |
+| Continuous tail RMS | 0.353919482 | 0.353918568 |
+| Legacy tail RMS | 0.249218649 | 0.249217461 |
+| 128-frame checksum | `bc5de62fe5671984` | `c122e80be954a634` |
 
-The continuous result retains roughly 4.6 times the tail RMS of the frozen legacy
+The continuous result retains roughly 1.42 times the tail RMS of the frozen legacy
 binary path over the CC-aligned comparison window. No MIDI event is dropped, and
 the continuous tail remains audible through the bounded render. This is the
 automated evidence that the intermediate-value cutoff is removed; it is not a
@@ -87,6 +92,9 @@ Final automated matrix:
 - Offline renderer, SFZ compatibility/projection/runtime/determinism,
   voice-generation ownership, shell publish parity, realtime safety, and package
   session: 10/10 passed after the host-state boundary repair.
+- The 64-voice per-context / 128-voice combined callback profile passed the complete
+  44.1/48 kHz and 32–1024-frame realtime guard without allocation, lock, I/O, or
+  deadline failures.
 - Performance engine S0 through S10: 11/11 passed.
 - Host-state contract, restore coordinator, recovery UI, restore stress, project
   recall, and phase-1 state recall: 6/6 passed; background publication also passed.

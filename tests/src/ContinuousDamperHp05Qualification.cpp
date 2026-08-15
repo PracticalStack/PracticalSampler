@@ -4,6 +4,7 @@
 #include "drs/engine/PackageWriter.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SamplerRenderModel.h"
+#include "drs/engine/SamplerVoicePool.h"
 #include "drs/engine/SfzImportProjection.h"
 #include "shared/ProjectStorage.h"
 
@@ -324,7 +325,8 @@ Passage readPassage(const fs::path& midiPath, const bool requireFrozenHp05Identi
 
 SamplerRenderModelPtr buildQualificationModel(const ContinuousDamperDefinition& damper,
                                                const std::size_t revision,
-                                               const std::string& id)
+                                               const std::string& id,
+                                               const double releaseSeconds = 0.02)
 {
     ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = revision;
@@ -340,7 +342,7 @@ SamplerRenderModelPtr buildQualificationModel(const ContinuousDamperDefinition& 
     snapshotZone.loopEnabled = true;
     snapshotZone.loopStartFrame = 0;
     snapshotZone.loopEndFrame = 65536;
-    snapshotZone.releaseSeconds = 0.02;
+    snapshotZone.releaseSeconds = releaseSeconds;
     snapshotZone.releaseShape = sfzDefaultReleaseShape;
     snapshotZone.damper = damper;
     snapshot.zones.push_back(snapshotZone);
@@ -399,6 +401,104 @@ SamplerRenderModelPtr buildQualificationModel(const ContinuousDamperDefinition& 
     require(built.built && built.model != nullptr,
             "The HP-05 deterministic qualification model must build");
     return built.model;
+}
+
+SamplerVoicePoolRenderResult renderDiagnosticFrames(
+    SamplerVoicePool& pool,
+    const std::uint32_t frameCount,
+    const SamplerRenderEventView events = {})
+{
+    require(frameCount <= 512, "The reported-passage diagnostic block must remain bounded");
+    std::array<float, 512> left {};
+    std::array<float, 512> right {};
+    float* channels[] { left.data(), right.data() };
+    const auto result = pool.renderBlock({ channels, 2, frameCount }, events);
+    require(result.accepted, "The reported-passage diagnostic render must be accepted");
+    return result;
+}
+
+void qualifyReportedChordSurvival(const Passage& passage,
+                                  const SamplerRenderModelPtr& model)
+{
+    constexpr double sampleRate = 48000.0;
+    constexpr std::array targetNotes { 53, 58, 62 };
+    SamplerVoicePool pool;
+    require(pool.prepare(*model, sampleRate, 9001),
+            "The reported-passage voice pool must prepare");
+
+    std::uint64_t currentFrame = 0;
+    std::uint64_t stolenVoiceCount = 0;
+    std::uint64_t repedalCatchCount = 0;
+    auto reachedReportedPedalUp = false;
+    for (std::size_t index = 0; index < passage.events.size();)
+    {
+        const auto eventFrame = static_cast<std::uint64_t>(
+            std::llround(passage.events[index].seconds * sampleRate));
+        while (currentFrame < eventFrame)
+        {
+            const auto frameCount = static_cast<std::uint32_t>(
+                std::min<std::uint64_t>(512, eventFrame - currentFrame));
+            const auto result = renderDiagnosticFrames(pool, frameCount);
+            stolenVoiceCount += result.render.stolenVoiceCount;
+            repedalCatchCount += result.repedalCatchCount;
+            currentFrame += frameCount;
+        }
+
+        SamplerEventBlock block;
+        auto isReportedPedalUp = false;
+        while (index < passage.events.size()
+               && static_cast<std::uint64_t>(
+                      std::llround(passage.events[index].seconds * sampleRate)) == eventFrame)
+        {
+            const auto& source = passage.events[index++];
+            SamplerRenderEvent event;
+            event.type = source.type;
+            event.midiNote = static_cast<std::uint8_t>(source.note);
+            event.velocity = static_cast<float>(source.velocity) / 127.0f;
+            event.midiChannel = static_cast<std::uint8_t>(source.channel);
+            event.noteOffVelocity = static_cast<float>(source.noteOffVelocity) / 127.0f;
+            event.inputSequence = source.sequence;
+            event.controllerNumber = static_cast<std::uint8_t>(source.controllerNumber);
+            event.controllerValue = static_cast<std::uint8_t>(source.controllerValue);
+            require(block.push(event), "The reported-passage event group must remain bounded");
+            isReportedPedalUp = isReportedPedalUp
+                || (source.type == SamplerRenderEventType::controllerChange
+                    && source.controllerNumber == 64 && source.controllerValue == 0
+                    && source.seconds >= 2.46 && source.seconds <= 2.48);
+        }
+
+        const auto result = renderDiagnosticFrames(pool, 1, block.view());
+        ++currentFrame;
+        stolenVoiceCount += result.render.stolenVoiceCount;
+        repedalCatchCount += result.repedalCatchCount;
+        if (!isReportedPedalUp)
+            continue;
+
+        std::array<bool, targetNotes.size()> survives {};
+        for (std::size_t slot = 0; slot < SamplerVoicePool::capacity; ++slot)
+        {
+            const auto voice = pool.getSlotSnapshot(slot);
+            if (voice.state != SamplerVoiceSlotState::active
+                && voice.state != SamplerVoiceSlotState::releasing)
+                continue;
+            const auto found = std::find(targetNotes.begin(), targetNotes.end(),
+                                         voice.sourceMidiNote);
+            if (found != targetNotes.end())
+                survives[static_cast<std::size_t>(
+                    std::distance(targetNotes.begin(), found))] = true;
+        }
+        require(std::all_of(survives.begin(), survives.end(), [](const bool value)
+                            { return value; }),
+                "F3, A#3, and D4 must remain live through the reported repedal passage"
+                    " (steals=" + std::to_string(stolenVoiceCount) + ")");
+        reachedReportedPedalUp = true;
+        break;
+    }
+
+    require(reachedReportedPedalUp && repedalCatchCount > 0,
+            "The supplied passage must reach the reported transition after a repedal catch");
+    require(stolenVoiceCount == 0,
+            "The supported piano-polyphony profile must not steal before the reported chord transition");
 }
 
 std::vector<drs::tests::OfflineTimelineEvent> timelineAt(const Passage& passage,
@@ -537,6 +637,9 @@ void writeReport(const fs::path& reportPath,
            << "  \"noteOnCount\": " << passage.noteOnCount << ",\n"
            << "  \"noteOffCount\": " << passage.noteOffCount << ",\n"
            << "  \"cc64Count\": " << passage.cc64Count << ",\n"
+           << "  \"voiceCapacityPerContext\": " << SamplerVoicePool::capacity << ",\n"
+           << "  \"reportedChordSurvival\": true,\n"
+           << "  \"preTransitionVoiceSteals\": 0,\n"
            << "  \"curve11NoteZoneCount\": " << curve11ZoneCount << ",\n"
            << "  \"curve12PseudoResonanceZoneCount\": " << curve12ZoneCount << ",\n"
            << "  \"plogueReferenceAvailable\": false,\n"
@@ -590,6 +693,11 @@ int main(int argc, char** argv)
         const auto passage = readPassage(midiPath, hasOriginalMidi);
         const auto continuousModel = buildQualificationModel(
             representative.damper, 501, "hp05-continuous");
+        const auto reportedPassageModel = buildQualificationModel(
+            representative.damper, 503, "hp05-repedal-regression",
+            representative.releaseSeconds);
+        qualifyReportedChordSurvival(readPassage(isolatedMidiPath, false),
+                                     reportedPassageModel);
         const auto legacyModel = buildQualificationModel(
             ContinuousDamperDefinition {}, 502, "hp05-legacy");
         const std::array matrix {
@@ -610,6 +718,7 @@ int main(int argc, char** argv)
                   << " curve11Zones=" << curve11ZoneCount
                   << " dynamicUpdates=" << matrix[1].dynamicUpdates
                   << " repedalCatches=" << matrix[1].repedalCatches
+                  << " voiceCapacity=" << SamplerVoicePool::capacity
                   << " plogueReference=PENDING" << std::endl;
         return 0;
     }

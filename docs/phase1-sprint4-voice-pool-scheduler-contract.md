@@ -70,7 +70,7 @@ drop counter.
 rate. `renderBlock()`, event admission, range rendering, state counting, allocation, stealing,
 note-off, all-notes-off, and reset are `noexcept`/bounded operations with no locks or ownership
 exchange. The focused test installs global allocation/deallocation probes and requires zero events at
-128-event/24-voice pressure.
+128-event/64-voice pressure.
 
 The Sprint 4.5 [playback context](phase1-sprint4-playback-context-contract.md) retains every immutable
 model activation until no active or releasing pool voice references it, then returns a primitive

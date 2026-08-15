@@ -288,8 +288,9 @@ void runCapacityAndRapidCutoverMatrix()
                                   0.0, true, 1.0f);
     require(context.stageActivation(generationA.model), "Capacity generation A must stage.");
     SamplerEventBlock fill;
-    for (int note = 36; note < 60; ++note)
-        require(fill.push(noteOn(0, note)), "Fixed pool fill event must remain bounded.");
+    for (std::size_t index = 0; index < SamplerVoicePool::capacity; ++index)
+        require(fill.push(noteOn(0, 36 + static_cast<int>(index))),
+                "Fixed pool fill event must remain bounded.");
     StereoOutput fillOutput(1);
     require(context.renderBlock(fillOutput.view(), fill.view()).voicePool.activeVoiceCount
                 == SamplerVoicePool::capacity,

@@ -28,7 +28,7 @@ routes complete through the old immutable model. Mini Sprint 6.6 does not add cr
 
 ## Fixed capacity and stealing
 
-The Performance pool remains fixed at 24 voices and activation ownership remains fixed at four
+The Performance pool remains fixed at 64 voices and activation ownership remains fixed at four
 slots. A note-on never grows either structure. Under pressure, Performance selects deterministically:
 
 1. oldest active voice from a retired generation;
@@ -57,7 +57,7 @@ pitch increment, gain, loop state, and sustain deferral without transferring own
 
 ## Owned limits
 
-- Performance voices: 24
+- Performance voices: 64
 - activation slots / simultaneous leased generations: 4
 - retirement token queue: 8 plus the ring sentinel
 - event block: 128

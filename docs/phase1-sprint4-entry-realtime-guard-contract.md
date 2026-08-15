@@ -38,8 +38,8 @@ final shared-ownership release. `getAudioThreadViolationCount()` sums prohibited
 ## Callback budget profile
 
 Supported Sprint 4 entry configurations are 44.1 kHz and 48 kHz, block sizes 32 through 1024,
-up to 128 MIDI/note events per block, and 24 voices per playback context. Preview and Performance have
-separate pools, for a combined target of 48 voices. The deadline is the nominal block duration rounded
+up to 128 MIDI/note events per block, and 64 voices per playback context. Preview and Performance have
+separate pools, for a combined target of 128 voices. The deadline is the nominal block duration rounded
 to the nearest microsecond.
 
 | Block size | 44.1 kHz deadline (microseconds) | 48 kHz deadline (microseconds) |

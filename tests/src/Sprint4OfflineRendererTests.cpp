@@ -361,14 +361,17 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     artifacts.push_back(std::move(polyphony));
 
     std::vector<drs::tests::OfflineTimelineEvent> stealEvents;
-    for (int index = 0; index < 25; ++index)
-        stealEvents.push_back(noteOn(0, 48 + index));
+    for (std::size_t index = 0; index <= drs::engine::SamplerVoicePool::capacity; ++index)
+        stealEvents.push_back(noteOn(0, 48 + static_cast<int>(index)));
     auto stealing = render("voice-stealing", loopConstant, 4, std::move(stealEvents));
-    requireFrame(stealing, 0, 0, 24.0, "Fixed-pool post-steal mix");
-    require(stealing.summary.counters.startedVoiceCount == 25
+    requireFrame(stealing, 0, 0,
+                 static_cast<double>(drs::engine::SamplerVoicePool::capacity),
+                 "Fixed-pool post-steal mix");
+    require(stealing.summary.counters.startedVoiceCount
+                == drs::engine::SamplerVoicePool::capacity + 1
                 && stealing.summary.counters.stolenVoiceCount == 1
-                && stealing.summary.activeVoiceCount == 24,
-            "The 25th voice should deterministically steal one of 24 slots.");
+                && stealing.summary.activeVoiceCount == drs::engine::SamplerVoicePool::capacity,
+            "The first over-capacity voice should deterministically steal one bounded slot.");
     artifacts.push_back(std::move(stealing));
 
     auto repeated = render("repeated-note-release", loopConstant, 12,

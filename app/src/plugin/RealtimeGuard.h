@@ -50,7 +50,7 @@ struct RealtimeCallbackBudgetProfile
     static constexpr std::size_t minimumBlockSize = 32;
     static constexpr std::size_t maximumBlockSize = 1024;
     static constexpr std::size_t maximumEventsPerBlock = 128;
-    static constexpr std::size_t targetPolyphonyPerContext = 24;
+    static constexpr std::size_t targetPolyphonyPerContext = 64;
     static constexpr std::size_t playbackContextCount = 2;
 
     static std::uint64_t deadlineMicros(double sampleRate, std::size_t blockSize) noexcept;
