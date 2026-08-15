@@ -1,0 +1,59 @@
+{
+  "schemaName": "drs.presentationIdentityAuditRules",
+  "schemaVersion": 1,
+  "workspaceRootRelativeToRepository": "..",
+  "legacyIdentity": {
+    "productName": "Decent Rhapsody Studio",
+    "companyName": "Decent Rhapsody"
+  },
+  "approvedIdentity": {
+    "productName": "Practical Sampler",
+    "companyName": "Practical Sampler Project",
+    "proposedRepositoryName": "PracticalSampler"
+  },
+  "rules": [
+    {
+      "id": "identity-decision-record",
+      "classification": "DEFER",
+      "pathRegex": "^(?:practical-sampler-identity-layer-initiative-plan\\.html|pretty-good-sampler-name-refactor-plan\\.html|DecentRhapsodyStudio/(?:docs/practical-sampler-|tools/(?:practical-sampler-|audit-practical-sampler-|verify-practical-sampler-)))",
+      "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration."
+    },
+    {
+      "id": "historical-engineering-evidence",
+      "classification": "PRESERVE-HISTORICAL",
+      "pathRegex": "^DecentRhapsodyStudio/(?:PROGRESS\\.md|code-review\\.html|docs/.*evidence[^/]*\\.(?:md|txt)|validation/reaper/(?:Backups/|.*(?:evidence|\\.log)))",
+      "reason": "Dated evidence remains truthful to the build or host run that produced it."
+    },
+    {
+      "id": "external-reaper-user-project",
+      "classification": "DEFER",
+      "pathRegex": "^ReaperProjects/",
+      "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative."
+    },
+    {
+      "id": "derived-reaper-fixture",
+      "classification": "REGENERATE",
+      "pathRegex": "^DecentRhapsodyStudio/validation/reaper/.*(?:\\.rpp|(?:track-chunks|restored-track-chunks)\\.txt|reaper-(?:vstplugins64|fxtags)\\.ini)$",
+      "reason": "Active host fixtures and scanner caches will be regenerated for the new plug-in and company names."
+    },
+    {
+      "id": "company-presentation-field",
+      "classification": "CHANGE",
+      "identity": "companyName",
+      "lineRegex": "(?:COMPANY_NAME|MyAppPublisher|JucePlugin_Manufacturer|runtimeCompanyName|<Company(?:Copyright)?\\s|Vendor(?:\\s|\\\"|$)|Vendor Provenance)",
+      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project."
+    },
+    {
+      "id": "active-product-presentation",
+      "classification": "CHANGE",
+      "identity": "productName",
+      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface."
+    },
+    {
+      "id": "deferred-partial-product-copy",
+      "classification": "DEFER",
+      "identity": "companyName",
+      "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule."
+    }
+  ]
+}

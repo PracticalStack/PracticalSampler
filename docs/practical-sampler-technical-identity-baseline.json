@@ -1,0 +1,82 @@
+{
+  "schemaName": "drs.practicalSampler.technicalIdentityBaseline",
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-15",
+  "capturedFromCommit": "2cfa6ae462bd581980addd243384172db8f81d05",
+  "presentationIdentity": {
+    "currentProductName": "Decent Rhapsody Studio",
+    "approvedProductName": "Practical Sampler",
+    "currentCompanyName": "Decent Rhapsody",
+    "approvedCompanyName": "Practical Sampler Project",
+    "proposedRepositoryName": "PracticalSampler"
+  },
+  "cmakeIdentity": {
+    "projectName": "DecentRhapsodyStudio",
+    "applicationTarget": "DecentRhapsodyStudioApp",
+    "pluginTarget": "drs_plugin_bundle",
+    "compatibilityTarget": "DecentRhapsodyStudioPlugin"
+  },
+  "applicationIdentity": {
+    "bundleId": "com.decentrhapsody.studio.app"
+  },
+  "pluginIdentity": {
+    "format": "VST3",
+    "bundleId": "com.decentrhapsody.studio.plugin",
+    "manufacturerCodeFourCc": "Dcrh",
+    "manufacturerCodeHex": "0x44637268",
+    "pluginCodeFourCc": "Drs0",
+    "pluginCodeHex": "0x44727330",
+    "componentCid": "ABCDEF019182FAEB4463726844727330",
+    "controllerCid": "ABCDEF011234ABCD4463726844727330",
+    "reaperTypeId": 741815803,
+    "frontendTemplateManufacturerCodeHex": "0x44726870",
+    "frontendTemplatePluginCodeHex": "0x44727330"
+  },
+  "nativeFormats": [
+    ".drsproj",
+    ".drinst",
+    ".drstrm",
+    ".drpkg"
+  ],
+  "coreSchemas": [
+    { "name": "drs.project", "currentVersion": 7 },
+    { "name": "drs.authoring", "currentVersion": 6 },
+    { "name": "drs.instrument", "currentVersion": 5 },
+    { "name": "drs.performancePackage", "currentVersion": 1 },
+    { "name": "drs.performancePackage.toc", "currentVersion": 1 },
+    { "name": "drs.hostState", "currentVersion": 1 },
+    { "name": "drs.playbackSnapshot", "currentVersion": 1 },
+    { "name": "drs.presetState", "currentVersion": 1 },
+    { "name": "drs.streamContainer", "currentVersion": 1 }
+  ],
+  "packageIdentity": {
+    "magicAscii": "DRSPKG1\\0",
+    "magicHex": "44 52 53 50 4B 47 31 00",
+    "compatibilityPolicyId": "drs.performancePackage.policy.v1.0",
+    "payloadDomain": "drs.performancePackage.payload",
+    "tocDomain": "drs.performancePackage.toc"
+  },
+  "serializedStateIdentity": {
+    "hostStateSchema": "drs.hostState",
+    "presetStateSchema": "drs.presetState",
+    "playbackSnapshotSchema": "drs.playbackSnapshot"
+  },
+  "hostParameters": [
+    "macro.tone",
+    "macro.motion",
+    "macro.slot.3",
+    "macro.slot.4",
+    "macro.slot.5",
+    "macro.slot.6",
+    "macro.slot.7",
+    "macro.slot.8",
+    "macro.slot.9",
+    "macro.slot.10",
+    "macro.slot.11",
+    "macro.slot.12",
+    "macro.slot.13",
+    "macro.slot.14",
+    "macro.slot.15",
+    "macro.slot.16"
+  ]
+}
