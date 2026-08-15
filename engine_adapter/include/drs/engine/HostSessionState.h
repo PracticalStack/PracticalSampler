@@ -14,8 +14,11 @@ namespace drs::engine
 inline constexpr const char* hostSessionStateSchemaName = "drs.hostState";
 inline constexpr int hostSessionStateSchemaVersion = 1;
 
-inline constexpr std::size_t hostSessionStateMaxBytes = 2u * 1024u * 1024u;
-inline constexpr std::size_t hostSessionStateMaxProjectSnapshotBytes = 1536u * 1024u;
+// Schema-7 piano projects persist an immutable 128-point damper curve per route.
+// The 8 MiB envelope admits the qualified 1,700-route Salamander snapshot while
+// retaining a strict pre-parse ceiling and excluding all sample/stream bytes.
+inline constexpr std::size_t hostSessionStateMaxBytes = 8u * 1024u * 1024u;
+inline constexpr std::size_t hostSessionStateMaxProjectSnapshotBytes = 7680u * 1024u;
 inline constexpr std::size_t hostSessionStateMaxJsonDepth = 64u;
 inline constexpr std::size_t hostSessionStateMaxStringBytes = 64u * 1024u;
 inline constexpr std::size_t hostSessionStateMaxPathBytes = 32u * 1024u;

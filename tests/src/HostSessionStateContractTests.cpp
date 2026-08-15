@@ -57,8 +57,8 @@ int main()
 {
     try
     {
-        static_assert(drs::engine::hostSessionStateMaxBytes == 2u * 1024u * 1024u);
-        static_assert(drs::engine::hostSessionStateMaxProjectSnapshotBytes == 1536u * 1024u);
+        static_assert(drs::engine::hostSessionStateMaxBytes == 8u * 1024u * 1024u);
+        static_assert(drs::engine::hostSessionStateMaxProjectSnapshotBytes == 7680u * 1024u);
         static_assert(drs::engine::hostSessionStateMaxJsonDepth == 64u);
         static_assert(drs::engine::hostSessionStateMaxStringBytes == 64u * 1024u);
         static_assert(drs::engine::hostSessionStateMaxPathBytes == 32u * 1024u);
@@ -231,8 +231,8 @@ int main()
                                        drs::engine::HostSessionStateFindingCode::fieldTypeInvalid),
                 "Wrong required-field type must be rejected.");
 
-        require(budgetDescriptor.find("\"targetUtf8Bytes\": 2097153") != std::string::npos,
-                "Over-budget fixture descriptor must target exactly one byte above 2 MiB.");
+        require(budgetDescriptor.find("\"targetUtf8Bytes\": 8388609") != std::string::npos,
+                "Over-budget fixture descriptor must target exactly one byte above 8 MiB.");
         const auto oversized = drs::engine::parseHostSessionState(
             std::string(drs::engine::hostSessionStateMaxBytes + 1u, 'x'));
         require(oversized.disposition == drs::engine::HostSessionStateParseDisposition::invalid
@@ -296,11 +296,11 @@ int main()
                 "A project collection above its declared limit must fail before project expansion.");
 
         std::string largeNotes = "\"notes\": [";
-        for (std::size_t index = 0; index < 1600u; ++index)
+        for (std::size_t index = 0; index < 3850u; ++index)
         {
             if (index != 0)
                 largeNotes += ",";
-            largeNotes += "\"" + std::string(1000u, 'n') + "\"";
+            largeNotes += "\"" + std::string(2050u, 'n') + "\"";
         }
         largeNotes += "]";
         const auto largeSnapshotText = replaceFirst(
@@ -314,7 +314,7 @@ int main()
         const auto snapshotRejected = drs::engine::parseHostSessionState(largeSnapshotText);
         require(containsFinding(snapshotRejected,
                                 drs::engine::HostSessionStateFindingCode::projectSnapshotTooLarge),
-                "An embedded snapshot above 1.5 MiB must fail before project parsing.");
+                "An embedded snapshot above 7.5 MiB must fail before project parsing.");
 
         auto invalidForSerialization = *saved.hostState;
         invalidForSerialization.projectBinding.manifestPath.assign(
@@ -341,10 +341,33 @@ int main()
             firstProject.project, firstLocation);
         const auto secondDigest = drs::engine::computeHostProjectManifestDigest(
             secondProject.project, secondLocation);
-        require(firstDigest == "fnv1a64:82e49267501d959a"
+        require(firstDigest == "fnv1a64:a9774c2eb31512be"
                     && secondDigest == firstDigest,
                 "Equivalent relocated project models must produce the checked-in canonical digest; first="
                     + firstDigest + ", second=" + secondDigest + ".");
+
+        const auto schemaFive = drs::engine::migrateRuntimeProjectToCuratedDspSchema(
+            firstProject.project);
+        require(schemaFive.valid, "The legacy digest fixture must migrate to project schema 5.");
+        const auto schemaSix = drs::engine::migrateRuntimeProjectToPerformanceArticulationSchema(
+            schemaFive.project);
+        require(schemaSix.valid, "The legacy digest fixture must migrate to project schema 6.");
+        const auto beforeDamperMigration = drs::engine::computeHostProjectManifestDigest(
+            schemaSix.project, firstLocation);
+        const auto schemaSeven = drs::engine::migrateRuntimeProjectToContinuousDamperSchema(
+            schemaSix.project);
+        require(schemaSeven.valid,
+                "The legacy digest fixture must migrate to project schema 7.");
+        const auto afterDamperMigration = drs::engine::computeHostProjectManifestDigest(
+            schemaSeven.project, firstLocation);
+        require(afterDamperMigration == beforeDamperMigration,
+                "Binary-default damper migration must not invalidate an existing DAW binding.");
+
+        auto authoredDamper = schemaSeven.project;
+        authoredDamper.authoring.zones.front().damper.sustainControllerNumber = 90;
+        require(drs::engine::computeHostProjectManifestDigest(authoredDamper, firstLocation)
+                    != beforeDamperMigration,
+                "Authored non-default damper metadata must participate in host binding identity.");
 
         const auto matchingBinding = drs::engine::verifyHostProjectBinding(
             saved.hostState->projectBinding, firstProject.project, firstLocation);

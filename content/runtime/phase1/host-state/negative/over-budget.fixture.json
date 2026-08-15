@@ -3,7 +3,7 @@
   "fixtureSchemaVersion": 1,
   "baseFixture": "../reference/saved-project.hoststate.json",
   "paddingField": "padding",
-  "targetUtf8Bytes": 2097153,
+  "targetUtf8Bytes": 8388609,
   "expectedFindingCode": "host-state-payload-too-large",
   "notes": [
     "The test synthesizes this input in memory so the repository does not carry a multi-megabyte fixture.",

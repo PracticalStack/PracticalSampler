@@ -22,6 +22,11 @@ struct OfflineTimelineEvent
     engine::SamplerRenderEventType type = engine::SamplerRenderEventType::noteOn;
     std::uint8_t midiNote = 60;
     float velocity = 1.0f;
+    std::uint8_t midiChannel = 0;
+    float noteOffVelocity = 0.0f;
+    std::uint32_t inputSequence = 0;
+    std::uint8_t controllerNumber = 0;
+    std::uint8_t controllerValue = 0;
 };
 
 struct OfflineRenderRequest

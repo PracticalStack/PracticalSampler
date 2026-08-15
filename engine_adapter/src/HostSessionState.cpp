@@ -4,6 +4,7 @@
 
 #include <json/json.hpp>
 
+#include <algorithm>
 #include <iomanip>
 #include <limits>
 #include <optional>
@@ -487,7 +488,7 @@ void parseAuthoringState(const json& object,
                 addFinding(result,
                            HostSessionStateFindingCode::projectSnapshotTooLarge,
                            "/authoringState/projectSnapshot",
-                           "Embedded project snapshot exceeds the 1.5 MiB version 1 limit.");
+                           "Embedded project snapshot exceeds the 7.5 MiB version 1 limit.");
                 return;
             }
 
@@ -624,7 +625,7 @@ HostSessionStateParseResult parseHostSessionState(const std::string& text,
         addFinding(result,
                    HostSessionStateFindingCode::payloadTooLarge,
                    "/",
-                   "Host-state payload exceeds the 2 MiB version 1 limit.");
+                   "Host-state payload exceeds the 8 MiB version 1 limit.");
         return result;
     }
 
@@ -944,7 +945,23 @@ HostSessionStateSerializeResult serializeHostSessionState(
 std::string computeHostProjectManifestDigest(const RuntimeProjectModel& project,
                                              const std::string& manifestPath)
 {
-    const auto canonical = serializeRuntimeProjectManifest(project, manifestPath);
+    // Schema-7 migration adds only compatibility-default damper declarations to
+    // older projects that do not author continuous behavior. Canonicalize that
+    // case back to its schema-6 shape so an existing DAW binding keeps the same
+    // digest after opening in an HP-capable build. Projects that author any
+    // non-default damper metadata retain schema 7 in their identity.
+    auto canonicalProject = project;
+    if (canonicalProject.schemaVersion == continuousDamperProjectSchemaVersion
+        && canonicalProject.authoring.schemaVersion == continuousDamperAuthoringSchemaVersion
+        && std::all_of(canonicalProject.authoring.zones.begin(),
+                       canonicalProject.authoring.zones.end(),
+                       [](const auto& zone)
+                       { return zone.damper == ContinuousDamperDefinition {}; }))
+    {
+        canonicalProject.schemaVersion = continuousDamperProjectSchemaVersion - 1;
+        canonicalProject.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion - 1;
+    }
+    const auto canonical = serializeRuntimeProjectManifest(canonicalProject, manifestPath);
     std::uint64_t hash = 14695981039346656037ull;
     for (const auto character : canonical)
     {

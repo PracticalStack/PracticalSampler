@@ -704,6 +704,47 @@ set_target_properties(drs_continuous_damper_hp04_tests PROPERTIES
     FOLDER "Tests"
 )
 
+add_executable(drs_continuous_damper_hp05_qualification
+    src/ContinuousDamperHp05Qualification.cpp
+    support/Sprint4OfflineRenderHarness.cpp
+    support/Sprint4OfflineRenderHarness.h
+)
+
+target_link_libraries(drs_continuous_damper_hp05_qualification
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        drs_sampler_core
+        juce::juce_audio_formats
+)
+
+target_include_directories(drs_continuous_damper_hp05_qualification
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+target_compile_definitions(drs_continuous_damper_hp05_qualification
+    PRIVATE
+        DRS_WORKSPACE_ROOT="${CMAKE_SOURCE_DIR}/.."
+)
+
+target_compile_features(drs_continuous_damper_hp05_qualification PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.continuous_damper.hp05.qualification
+    COMMAND drs_continuous_damper_hp05_qualification
+        "${CMAKE_CURRENT_BINARY_DIR}/continuous-damper-hp05-qualification.json"
+)
+
+set_tests_properties(drs.continuous_damper.hp05.qualification PROPERTIES
+    RUN_SERIAL TRUE
+    TIMEOUT 300
+)
+
+set_target_properties(drs_continuous_damper_hp05_qualification PROPERTIES
+    FOLDER "Tests"
+)
+
 add_executable(drs_performance_engine_s1_articulation_tests
     src/PerformanceEngineSprint1ArticulationTests.cpp
 )
@@ -4655,6 +4696,7 @@ add_dependencies(drs_all_tests
     drs_continuous_damper_hp02_tests
     drs_continuous_damper_hp03_tests
     drs_continuous_damper_hp04_tests
+    drs_continuous_damper_hp05_qualification
     drs_performance_engine_s1_articulation_tests
     drs_performance_engine_s2_rule_tests
     drs_curated_dsp_control_law_tests
@@ -5076,7 +5118,7 @@ target_compile_definitions(drs_ui_responsiveness_baseline PRIVATE JUCE_MODAL_LOO
 add_test(
     NAME drs.ui.responsiveness_baseline
     COMMAND drs_ui_responsiveness_baseline
-        "${CMAKE_SOURCE_DIR}/../DemoSFVInstruments/AccurateSalamanderGrandPianoV6.2beta2_48khz24bit/sfz_daw/Accurate-SalamanderGrandPiano_flat.Recommended.sfz"
+        "${CMAKE_SOURCE_DIR}/../DemoSFVInstruments/AccurateSalamanderGrandPianoV6.2beta2_48khz24bit/sfz_live/Accurate-SalamanderGrandPiano_flat.Recommended.sfz"
         "${CMAKE_SOURCE_DIR}/content/runtime/phase1/reference-corpus/tiny-open-instrument/performance-package-corpus/valid.drpkg"
         "${CMAKE_CURRENT_BINARY_DIR}/ui-responsiveness-baseline.json"
 )

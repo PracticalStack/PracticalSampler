@@ -15,8 +15,10 @@ The plug-in publishes a bounded JSON envelope with four sections:
   macro-schema digest, and prepared-content digest.
 
 Sample bytes, stream assets, decoded buffers, caches, voices, diagnostics, undo history, and
-background-worker state are never embedded. The maximum complete host chunk is 2 MiB and the
-maximum embedded project snapshot is 1.5 MiB.
+background-worker state are never embedded. The maximum complete host chunk is 8 MiB and the
+maximum embedded project snapshot is 7.5 MiB. This bounded increase admits the qualified
+1,700-route Salamander schema-7 project, whose routes each retain an immutable 128-point damper
+curve; sample and stream bytes remain excluded.
 
 Clean saved projects use the validated `.drsproj` file. Dirty or never-saved projects carry a
 bounded canonical project snapshot so authored changes survive a DAW save without duplicating
@@ -115,4 +117,3 @@ change detector, not a security boundary.
   save the DAW project once to migrate.
 - For host-specific checks, follow [host-validation.md](host-validation.md) and compare captured
   evidence with [host-state-reaper-validation-evidence.md](host-state-reaper-validation-evidence.md).
-

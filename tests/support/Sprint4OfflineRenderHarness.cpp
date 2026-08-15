@@ -186,10 +186,17 @@ OfflineRenderArtifact renderOffline(const OfflineRenderRequest& request)
         while (eventIndex < events.size() && events[eventIndex].frame < blockEnd)
         {
             const auto& event = events[eventIndex++];
-            if (!blockEvents.push({ event.type,
-                                    static_cast<std::uint32_t>(event.frame - blockStart),
-                                    event.midiNote,
-                                    event.velocity }))
+            engine::SamplerRenderEvent renderEvent;
+            renderEvent.type = event.type;
+            renderEvent.sampleOffset = static_cast<std::uint32_t>(event.frame - blockStart);
+            renderEvent.midiNote = event.midiNote;
+            renderEvent.velocity = event.velocity;
+            renderEvent.midiChannel = event.midiChannel;
+            renderEvent.noteOffVelocity = event.noteOffVelocity;
+            renderEvent.inputSequence = event.inputSequence;
+            renderEvent.controllerNumber = event.controllerNumber;
+            renderEvent.controllerValue = event.controllerValue;
+            if (!blockEvents.push(renderEvent))
             {
                 throw std::runtime_error("Offline event block exceeded the core event capacity.");
             }
@@ -251,6 +258,8 @@ OfflineArtifactComparison compareOfflineArtifacts(const OfflineRenderArtifact& e
         || expectedCounters.appliedActivationCount != actualCounters.appliedActivationCount
         || expectedCounters.enqueuedRetirementCount != actualCounters.enqueuedRetirementCount
         || expectedCounters.reclaimedActivationCount != actualCounters.reclaimedActivationCount
+        || expectedCounters.dynamicReleaseUpdateCount != actualCounters.dynamicReleaseUpdateCount
+        || expectedCounters.repedalCatchCount != actualCounters.repedalCatchCount
         || expected.summary.activeVoiceCount != actual.summary.activeVoiceCount
         || expected.summary.releasingVoiceCount != actual.summary.releasingVoiceCount
         || expected.summary.finishedVoiceCount != actual.summary.finishedVoiceCount)
