@@ -44,6 +44,14 @@
       "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project."
     },
     {
+      "id": "legacy-identity-compatibility-fixture",
+      "classification": "PRESERVE-HISTORICAL",
+      "identity": "productName",
+      "pathRegex": "^DecentRhapsodyStudio/tests/src/(?:Sprint0ImportAndStorageHardeningTests|PerformancePackageExportLifecycleTests)\\.cpp$",
+      "lineRegex": "legacy(?:Package)?IdentityNote",
+      "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated."
+    },
+    {
       "id": "active-product-presentation",
       "classification": "CHANGE",
       "identity": "productName",

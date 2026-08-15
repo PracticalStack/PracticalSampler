@@ -400,7 +400,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
     populateCrossfadeRuntimeDescriptors(instrument.zones);
 
     instrument.validationNotes = {
-        "Generated from the current Decent Rhapsody Studio authoring project when the project was saved."
+        "Generated from the current Practical Sampler authoring project when the project was saved."
     };
     return instrument;
 }

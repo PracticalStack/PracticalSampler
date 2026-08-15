@@ -17,7 +17,7 @@ BackgroundPanel.setPaintRoutine(function(g)
 	g.fillAll(DRSTheme.backgroundColour);
 });
 
-const var Header = DRSTheme.styleLabel("Header", "Decent Rhapsody Studio", 36, 28, 360, 32);
+const var Header = DRSTheme.styleLabel("Header", "Practical Sampler", 36, 28, 360, 32);
 Header.set("fontSize", 28.0);
 
 const var Subheader = DRSTheme.styleLabel("Subheader", "Phase 0 frontend shell", 36, 64, 360, 24);

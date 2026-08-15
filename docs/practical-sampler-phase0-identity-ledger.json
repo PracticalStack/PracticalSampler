@@ -1,7 +1,7 @@
 {
   "schemaName": "drs.presentationIdentityOccurrenceLedger",
   "schemaVersion": 1,
-  "generatedAtUtc": "2026-08-15T22:26:39Z",
+  "generatedAtUtc": "2026-08-15T22:38:03Z",
   "scope": "workspace",
   "workspaceRoot": "E:\\Dev\\Cpp\\VST\\DecentRhapsody",
   "legacyIdentity": {
@@ -13,21 +13,22 @@
     "companyName": "Practical Sampler Project",
     "proposedRepositoryName": "PracticalSampler"
   },
-  "occurrenceCount": 540,
+  "occurrenceCount": 533,
   "classificationSummary": {
-    "CHANGE": 289,
-    "DEFER": 126,
-    "PRESERVE-HISTORICAL": 56,
+    "CHANGE": 279,
+    "DEFER": 127,
+    "PRESERVE-HISTORICAL": 58,
     "REGENERATE": 69
   },
   "ruleSummary": {
-    "active-product-presentation": 284,
-    "company-presentation-field": 5,
+    "active-product-presentation": 276,
+    "company-presentation-field": 3,
     "deferred-partial-product-copy": 13,
     "derived-reaper-fixture": 69,
     "external-reaper-user-project": 84,
     "historical-engineering-evidence": 56,
-    "identity-decision-record": 29
+    "identity-decision-record": 30,
+    "legacy-identity-compatibility-fixture": 2
   },
   "occurrences": [
     {
@@ -229,39 +230,6 @@
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Export Decent Rhapsody playable instrument\","
     },
     {
-      "path": "DecentRhapsodyStudio/app/src/shared/PerformancePackageProjection.cpp",
-      "line": 119,
-      "column": 36,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "\"Exported from the current Decent Rhapsody Studio authoring project.\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/src/shared/PerformancePackageProjection.cpp",
-      "line": 290,
-      "column": 36,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "\"Exported from the current Decent Rhapsody Studio authoring project.\""
-    },
-    {
-      "path": "DecentRhapsodyStudio/app/src/shared/ProjectStorage.cpp",
-      "line": 403,
-      "column": 37,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "\"Generated from the current Decent Rhapsody Studio authoring project when the project was saved.\""
-    },
-    {
       "path": "DecentRhapsodyStudio/app/src/standalone/MainComponent.cpp",
       "line": 2360,
       "column": 67,
@@ -350,28 +318,6 @@
       "excerpt": "Decent Rhapsody Studio code review · generated from commit a90a7037 · July 29, 2026"
     },
     {
-      "path": "DecentRhapsodyStudio/content/hise_project/project_info.xml",
-      "line": 4,
-      "column": 16,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "<Name value=\"Decent Rhapsody Studio\"/>"
-    },
-    {
-      "path": "DecentRhapsodyStudio/content/hise_project/project_info.xml",
-      "line": 6,
-      "column": 55,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "<Description value=\"Phase 0 authoring shell for the Decent Rhapsody Studio sampler frontend.\"/>"
-    },
-    {
       "path": "DecentRhapsodyStudio/content/hise_project/README.md",
       "line": 3,
       "column": 69,
@@ -381,50 +327,6 @@
       "rule": "active-product-presentation",
       "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
       "excerpt": "This directory is the product-owned HISE authoring content root for Decent Rhapsody Studio."
-    },
-    {
-      "path": "DecentRhapsodyStudio/content/hise_project/Scripts/ScriptProcessors/DecentRhapsody/Interface.js",
-      "line": 20,
-      "column": 51,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "const var Header = DRSTheme.styleLabel(\"Header\", \"Decent Rhapsody Studio\", 36, 28, 360, 32);"
-    },
-    {
-      "path": "DecentRhapsodyStudio/content/hise_project/user_info.xml",
-      "line": 4,
-      "column": 19,
-      "identity": "companyName",
-      "matchedText": "Decent Rhapsody",
-      "classification": "CHANGE",
-      "rule": "company-presentation-field",
-      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project.",
-      "excerpt": "<Company value=\"Decent Rhapsody\" type=\"TEXT\" description=\"Company Name\"/>"
-    },
-    {
-      "path": "DecentRhapsodyStudio/content/hise_project/user_info.xml",
-      "line": 7,
-      "column": 39,
-      "identity": "companyName",
-      "matchedText": "Decent Rhapsody",
-      "classification": "CHANGE",
-      "rule": "company-presentation-field",
-      "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project.",
-      "excerpt": "<CompanyCopyright value=\"&#169;2026 Decent Rhapsody\" type=\"TEXT\" description=\"Company Copyright\"/>"
-    },
-    {
-      "path": "DecentRhapsodyStudio/content/hise_project/XmlPresetBackups/DecentRhapsodyStudioUIData/DecentRhapsodyStudioDesktop.xml",
-      "line": 7,
-      "column": 20,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "text=\"Decent Rhapsody Studio\" fontName=\"Oxygen\" fontSize=\"28\""
     },
     {
       "path": "DecentRhapsodyStudio/continuous-damper-half-pedal-repedaling-development-plan.html",
@@ -768,6 +670,17 @@
       "excerpt": "| VST3 `moduleinfo.json` | Name: Decent Rhapsody Studio; vendor: Decent Rhapsody; both frozen CIDs present | `0F49685645D0F33CB9DE28EBFFB5F1954065B2C89953EE57E53761C81C32CCB0` |"
     },
     {
+      "path": "DecentRhapsodyStudio/docs/practical-sampler-phase2-owned-content.md",
+      "line": 34,
+      "column": 19,
+      "identity": "companyName",
+      "matchedText": "Decent Rhapsody",
+      "classification": "DEFER",
+      "rule": "identity-decision-record",
+      "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
+      "excerpt": "partial phrase “Decent Rhapsody authoring assets” remains unchanged because it is neither the full"
+    },
+    {
       "path": "DecentRhapsodyStudio/docs/practical-sampler-technical-identity-baseline.json",
       "line": 7,
       "column": 28,
@@ -832,17 +745,6 @@
       "rule": "deferred-partial-product-copy",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "nextSteps.emplace_back(\"Populate content/hise_project/UserPresets and content/hise_project/SampleMaps with the first Decent Rhapsody authoring assets so the adapter can validate real content, not just empty folders.\");"
-    },
-    {
-      "path": "DecentRhapsodyStudio/engine_adapter/src/EngineFacade.cpp",
-      "line": 2309,
-      "column": 134,
-      "identity": "productName",
-      "matchedText": "Decent Rhapsody Studio",
-      "classification": "CHANGE",
-      "rule": "active-product-presentation",
-      "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
-      "excerpt": "nextSteps.emplace_back(\"The bundled HISE SDK inputs are extracted. Validate which parts are still needed versus optional for Decent Rhapsody Studio's Windows workflow.\");"
     },
     {
       "path": "DecentRhapsodyStudio/groups-functionality-iteration.html",
@@ -2198,6 +2100,17 @@
       "excerpt": "PRODUCT_NAME \"Decent Rhapsody Studio Performance Responsiveness Tests\""
     },
     {
+      "path": "DecentRhapsodyStudio/tests/src/PerformancePackageExportLifecycleTests.cpp",
+      "line": 28,
+      "column": 74,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-HISTORICAL",
+      "rule": "legacy-identity-compatibility-fixture",
+      "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated.",
+      "excerpt": "const std::string legacyPackageIdentityNote = \"Exported from the current Decent Rhapsody Studio authoring project.\";"
+    },
+    {
       "path": "DecentRhapsodyStudio/tests/src/Phase0SmokeTests.cpp",
       "line": 57,
       "column": 24,
@@ -2229,6 +2142,17 @@
       "rule": "active-product-presentation",
       "reason": "The full old product display name becomes Practical Sampler in an active presentation surface.",
       "excerpt": "require(foundTypes[0]->name == \"Decent Rhapsody Studio\", \"Scanned VST3 plugin name did not match the built product name.\");"
+    },
+    {
+      "path": "DecentRhapsodyStudio/tests/src/Sprint0ImportAndStorageHardeningTests.cpp",
+      "line": 16,
+      "column": 52,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-HISTORICAL",
+      "rule": "legacy-identity-compatibility-fixture",
+      "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated.",
+      "excerpt": "const std::string legacyIdentityNote = \"Created in Decent Rhapsody Studio before the presentation rename.\";"
     },
     {
       "path": "DecentRhapsodyStudio/tests/src/Vst3HostStateQualificationTests.cpp",
@@ -4784,7 +4708,7 @@
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 509,
+      "line": 516,
       "column": 58,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -4795,7 +4719,7 @@
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 639,
+      "line": 646,
       "column": 17,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
@@ -4806,7 +4730,7 @@
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 639,
+      "line": 646,
       "column": 40,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <ProjectSettings>
-  <Name value="Decent Rhapsody Studio"/>
+  <Name value="Practical Sampler"/>
   <Version value="0.1.0"/>
-  <Description value="Phase 0 authoring shell for the Decent Rhapsody Studio sampler frontend."/>
+  <Description value="Phase 0 authoring shell for the Practical Sampler frontend."/>
   <BundleIdentifier value="com.decentrhapsody.studio"/>
   <PluginCode value="Drs0"/>
   <EmbedAudioFiles value="No"/>

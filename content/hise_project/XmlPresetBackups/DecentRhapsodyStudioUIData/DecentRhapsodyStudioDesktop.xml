@@ -4,7 +4,7 @@
   <Component type="ScriptPanel" id="BackgroundPanel" x="0" y="0" width="920"
              height="540" bgColour="4279375651"/>
   <Component type="ScriptLabel" id="Header" x="36" y="28" width="360" height="32"
-             text="Decent Rhapsody Studio" fontName="Oxygen" fontSize="28"
+             text="Practical Sampler" fontName="Oxygen" fontSize="28"
              textColour="4294246888" bgColour="0" editable="0"/>
   <Component type="ScriptLabel" id="Subheader" x="36" y="64" width="360" height="24"
              text="Phase 0 frontend shell" fontName="Oxygen" fontSize="16"

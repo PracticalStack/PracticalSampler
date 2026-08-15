@@ -1,5 +1,6 @@
 #include "drs/engine/SfzImportProjection.h"
 #include "drs/engine/SfzImportReport.h"
+#include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
 
 #include <algorithm>
@@ -12,6 +13,9 @@
 namespace
 {
 namespace fs = std::filesystem;
+const std::string legacyIdentityNote = "Created in Decent Rhapsody Studio before the presentation rename.";
+const std::string currentInstrumentProvenance =
+    "Generated from the current Practical Sampler authoring project when the project was saved.";
 
 void require(const bool condition, const std::string& message)
 {
@@ -62,6 +66,7 @@ drs::engine::RuntimeProjectModel makeStorageProject(const juce::File& projectFil
                                                 .getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 1;
+    project.notes = { legacyIdentityNote };
     return project;
 }
 
@@ -212,6 +217,49 @@ void verifyRecoverableProjectPairSave()
             "The initial project pair should save.");
     const auto originalProjectText = projectFile.loadFileAsString();
     const auto originalInstrumentText = instrumentFile.loadFileAsString();
+    const auto legacyProjectLoad = drs::engine::loadRuntimeProjectManifest(
+        projectFile.getFullPathName().toStdString());
+    require(legacyProjectLoad.loaded
+                && legacyProjectLoad.project.schemaName == "drs.project"
+                && legacyProjectLoad.project.schemaVersion == 2
+                && legacyProjectLoad.project.notes == std::vector<std::string> { legacyIdentityNote }
+                && drs::engine::serializeRuntimeProjectManifest(
+                       legacyProjectLoad.project, projectFile.getFullPathName().toStdString())
+                       .find(legacyIdentityNote) != std::string::npos,
+            "A project note containing the former presentation name must load and reserialize unchanged.");
+
+    const auto generatedInstrument = drs::app::buildInstrumentManifestForProject(original, projectFile);
+    require(generatedInstrument.schemaName == "drs.instrument"
+                && generatedInstrument.schemaVersion == 2
+                && generatedInstrument.validationNotes
+                    == std::vector<std::string> { currentInstrumentProvenance }
+                && originalInstrumentText.toStdString().find(currentInstrumentProvenance)
+                    != std::string::npos,
+            "A newly saved instrument must use Practical Sampler provenance without a schema change.");
+
+    const auto legacyInstrumentFile = testRoot.getChildFile("Legacy Identity.drinst");
+    const auto referenceInstrumentLoad = drs::engine::loadPhase1ReferenceInstrumentManifest();
+    require(referenceInstrumentLoad.loaded,
+            "The legacy identity compatibility fixture requires the valid reference instrument.");
+    auto legacyInstrument = referenceInstrumentLoad.instrument;
+    legacyInstrument.validationNotes = { legacyIdentityNote };
+    require(legacyInstrumentFile.replaceWithText(
+                drs::engine::serializeRuntimeInstrumentManifest(
+                    legacyInstrument, legacyInstrumentFile.getFullPathName().toStdString()),
+                false,
+                false,
+                "\n"),
+            "The legacy identity instrument fixture should be writable.");
+    const auto legacyInstrumentLoad = drs::engine::parseRuntimeInstrumentManifest(
+        legacyInstrumentFile.loadFileAsString().toStdString(),
+        legacyInstrumentFile.getFullPathName().toStdString(),
+        false);
+    require(legacyInstrumentLoad.loaded
+                && legacyInstrumentLoad.instrument.schemaName == legacyInstrument.schemaName
+                && legacyInstrumentLoad.instrument.schemaVersion == legacyInstrument.schemaVersion
+                && legacyInstrumentLoad.instrument.validationNotes
+                    == std::vector<std::string> { legacyIdentityNote },
+            "An instrument note containing the former presentation name must remain readable and unchanged.");
 
     auto replacement = makeStorageProject(projectFile, "Replacement Generation");
     drs::app::ProjectFilesSaveOptions options;

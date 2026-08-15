@@ -25,6 +25,9 @@ namespace
 {
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+const std::string legacyPackageIdentityNote = "Exported from the current Decent Rhapsody Studio authoring project.";
+const std::string currentPackageIdentityNote =
+    "Exported from the current Practical Sampler authoring project.";
 
 void require(const bool condition, const std::string& message)
 {
@@ -375,6 +378,11 @@ int main()
         const auto packageV2 = drs::engine::loadPerformancePackageV2Metadata(completedPackage);
         require(packageV2.loaded && packageV2.package != nullptr,
                 "The exported semantic package must reopen through the package-v2 metadata path.");
+        require(packageV2.metadata.manifest.notes
+                    == std::vector<std::string> { currentPackageIdentityNote }
+                    && packageV2.metadata.instrument.instrument.validationNotes
+                        == std::vector<std::string> { currentPackageIdentityNote },
+                "A newly exported package must use Practical Sampler manifest and instrument provenance.");
         require(packageV2.metadata.manifest.schemaVersion
                     == drs::engine::performancePackageLegacySchemaVersion
                     && packageV2.metadata.manifest.minimumReaderSchemaVersion
@@ -382,6 +390,41 @@ int main()
                     && packageV2.metadata.instrument.instrument.schemaVersion
                         < drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
                 "Graph-free export must retain legacy package and runtime instrument versions.");
+
+        const auto legacyIdentityPackagePath = tempRoot / "legacy-identity-note.drpkg";
+        auto legacyIdentityInjected = false;
+        writePackageV2Variant(tempRoot / "completed.drpkg", legacyIdentityPackagePath,
+                              [&](auto& records)
+                              {
+                                  for (auto& record : records)
+                                  {
+                                      if (record.identity.sourceId != "package-manifest")
+                                          continue;
+
+                                      std::string manifestText(record.plaintextBytes.begin(),
+                                                               record.plaintextBytes.end());
+                                      const auto notePosition = manifestText.find(currentPackageIdentityNote);
+                                      require(notePosition != std::string::npos,
+                                              "The exported package manifest must contain current provenance before legacy-note substitution.");
+                                      manifestText.replace(notePosition,
+                                                           currentPackageIdentityNote.size(),
+                                                           legacyPackageIdentityNote);
+                                      record.plaintextBytes.assign(manifestText.begin(), manifestText.end());
+                                      legacyIdentityInjected = true;
+                                  }
+                              });
+        require(legacyIdentityInjected,
+                "The package compatibility fixture must replace only the free-text identity note.");
+        const auto legacyIdentityPackage = drs::engine::loadPerformancePackageV2Metadata(
+            legacyIdentityPackagePath.generic_string());
+        require(legacyIdentityPackage.loaded
+                    && legacyIdentityPackage.metadata.manifest.notes
+                        == std::vector<std::string> { legacyPackageIdentityNote }
+                    && legacyIdentityPackage.metadata.manifest.schemaVersion
+                        == packageV2.metadata.manifest.schemaVersion
+                    && legacyIdentityPackage.metadata.manifest.minimumReaderSchemaVersion
+                        == packageV2.metadata.manifest.minimumReaderSchemaVersion,
+                "A package containing the former product name only in free-text notes must remain readable without schema migration.");
         const auto expectedBackgroundBytes
             = drs::tests::performance_package::buildBackgroundImageJpegFixture();
         require(packageV2.metadata.backgroundImage.loaded

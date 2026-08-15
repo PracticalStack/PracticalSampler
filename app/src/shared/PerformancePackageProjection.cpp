@@ -116,7 +116,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
     plan.routingBuses = project.authoring.routingBuses;
     plan.projectNotes = project.notes;
     plan.instrumentValidationNotes = {
-        "Exported from the current Decent Rhapsody Studio authoring project."
+        "Exported from the current Practical Sampler authoring project."
     };
     plan.streamNotes = {
         "Generated for sealed playable package export."
@@ -287,7 +287,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
         : drs::engine::performancePackageLegacySchemaVersion;
     result.manifest.masterGainDb = plan.masterGainDb;
     result.manifest.notes = {
-        "Exported from the current Decent Rhapsody Studio authoring project."
+        "Exported from the current Practical Sampler authoring project."
     };
 
     if (!result.issues.empty())

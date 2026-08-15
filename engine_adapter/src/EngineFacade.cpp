@@ -2306,7 +2306,7 @@ EngineStatusSnapshot EngineFacade::getStatusSnapshot() const
         nextSteps.emplace_back("Create the product-owned content/hise_project layout so HISE authoring assets have a stable location outside third_party.");
 
     if (hiseSdkExtracted)
-        nextSteps.emplace_back("The bundled HISE SDK inputs are extracted. Validate which parts are still needed versus optional for Decent Rhapsody Studio's Windows workflow.");
+        nextSteps.emplace_back("The bundled HISE SDK inputs are extracted. Validate which parts are still needed versus optional for Practical Sampler's Windows workflow.");
     else if (hiseSdkZipPresent)
         nextSteps.emplace_back("Extract third_party/hise/tools/SDK/sdk.zip so HISE's ASIO and VST3 SDK inputs are available.");
 
