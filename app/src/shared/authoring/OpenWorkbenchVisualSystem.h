@@ -10,7 +10,8 @@ namespace drs::app::authoring::visual
 {
 // Open Workbench is deliberately quiet and utilitarian: a neutral application
 // shell, warm work surfaces, graphite text, and a small set of semantic accents.
-// Keep authoring paint code on these roles so a future theme can be changed here.
+// Keep every Pass 03 surface (Perform and authoring) on these roles so future
+// visual-system work remains a single deliberate change rather than a local fork.
 inline const juce::Colour shell { 0xffe9ece8 };
 inline const juce::Colour surface { 0xffffffff };
 inline const juce::Colour surfaceRaised { 0xffffffff };

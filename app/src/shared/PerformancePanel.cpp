@@ -384,6 +384,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
     detailsToggleButton.setTitle("Show Performance Details");
     detailsToggleButton.setDescription(
         "Show detailed publication, macro, and runtime diagnostics.");
+    detailsToggleButton.setHelpText(detailsToggleButton.getDescription());
     detailsToggleButton.setTooltip(detailsToggleButton.getDescription());
     detailsToggleButton.setWantsKeyboardFocus(true);
     detailsToggleButton.setExplicitFocusOrder(10);
@@ -756,6 +757,7 @@ void PerformancePanel::setDiagnosticsVisible(const bool shouldShow)
         ? juce::String("Detailed publication, macro, and runtime diagnostics are visible. Press to hide them.")
         : juce::String("Show detailed publication, macro, and runtime diagnostics.");
     detailsToggleButton.setDescription(description);
+    detailsToggleButton.setHelpText(description);
     detailsToggleButton.setTooltip(description);
 
     if (diagnosticsVisible)
@@ -778,6 +780,7 @@ void PerformancePanel::updateInstrumentControlsVisibility()
         : juce::String("Instrument Controls are collapsed. Press to expand the panel.");
     macroStripToggleButton.setTooltip(description);
     macroStripToggleButton.setDescription(description);
+    macroStripToggleButton.setHelpText(description);
 
     publishedMixer.setVisible(expanded && showingPublishedMixer
                               && publishedMixer.getControlCount() > 0);

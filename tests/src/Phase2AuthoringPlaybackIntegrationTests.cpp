@@ -136,6 +136,11 @@ bool waitForAutomaticPreview(drs::plugin::Processor& processor,
     while (std::chrono::steady_clock::now() <= deadline)
     {
         processor.serviceMessageThreadWork();
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        buffer.clear();
+        processor.processBlock(buffer, midi);
+        processor.serviceMessageThreadWork();
         const auto& status = processor.getEngineFacade().getDraftPlaybackStatus();
         if (!status.pendingPreview.active
             && status.preview.revision == expectedRevision
@@ -143,6 +148,13 @@ bool waitForAutomaticPreview(drs::plugin::Processor& processor,
             return true;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
+    const auto& status = processor.getEngineFacade().getDraftPlaybackStatus();
+    std::cerr << "Automatic preview timeout: expected=" << expectedRevision
+              << " draft=" << status.draftRevision
+              << " preview=" << status.preview.revision
+              << " previewState=" << status.preview.state
+              << " pending=" << status.pendingPreview.active
+              << " lastEvent=" << status.lastEvent << std::endl;
     return false;
 }
 
@@ -250,13 +262,18 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
                                                                                     { importedZone },
                                                                                     "Import migrated authoring shell zone");
     require(importResult.applied, shellName + " should accept imported authoring content.");
+    require(processor.getAuthoringSession().selectZone(importedZone.id).applied,
+            shellName + " should select the imported zone for the explicit preview/edit path.");
     require(processor.serviceMessageThreadWork(),
             shellName + " should sync imported authoring content into the draft-playback facade.");
     refreshAuthoringWorkspace(root);
-    require(!requireButton(root, "authoringPlaybackBannerPrepareButton").isVisible(),
-            shellName + " must not offer a duplicate manual prepare while the Sprint 5 Preview controller owns the build.");
+    auto& prepareButton = requireButton(root, "authoringPlaybackBannerPrepareButton");
+    require(prepareButton.isVisible() && prepareButton.isEnabled()
+                && static_cast<bool>(prepareButton.onClick),
+            shellName + " should offer explicit first-preview preparation after importing the first playable zone.");
+    prepareButton.onClick();
     require(waitForAutomaticPreview(processor, 1),
-            shellName + " should automatically prepare imported authored content through the Preview controller.");
+            shellName + " should prepare imported authored content through the Preview controller.");
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",

@@ -3463,6 +3463,42 @@ add_test(
 set_tests_properties(drs.open_workbench.phase8 PROPERTIES TIMEOUT 60)
 set_target_properties(drs_open_workbench_phase8_tests PROPERTIES FOLDER "Tests")
 
+juce_add_console_app(drs_open_workbench_phase9_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 9 Convergence Qualification"
+)
+
+target_sources(drs_open_workbench_phase9_tests
+    PRIVATE
+        src/OpenWorkbenchPhase9Tests.cpp
+)
+
+target_link_libraries(drs_open_workbench_phase9_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        drs_plugin_shell
+        drs_standalone_shell
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_open_workbench_phase9_tests PRIVATE cxx_std_17)
+
+if(MSVC)
+    target_link_options(drs_open_workbench_phase9_tests PRIVATE /STACK:8388608)
+endif()
+
+add_test(
+    NAME drs.open_workbench.phase9
+    COMMAND drs_open_workbench_phase9_tests
+)
+
+set_tests_properties(drs.open_workbench.phase9 PROPERTIES TIMEOUT 120)
+set_target_properties(drs_open_workbench_phase9_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_performance_engine_s10_articulation_ui_tests
     PRODUCT_NAME "Decent Rhapsody Studio Sprint 10 Articulation UI Tests"
 )
@@ -4880,6 +4916,8 @@ if(MSVC)
     target_link_options(drs_phase1_state_recall_tests PRIVATE /STACK:8388608)
     target_link_options(drs_phase1_macro_bridge_tests PRIVATE /STACK:8388608)
     target_link_options(drs_performance_mixer_s0_red_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_sprint6_publish_shell_parity_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase2_authoring_playback_integration_tests PRIVATE /STACK:8388608)
     target_link_options(drs_wav_import_lifecycle_io_audit_tests PRIVATE /STACK:8388608)
 endif()
 
@@ -4972,6 +5010,7 @@ add_dependencies(drs_open_workbench_qualification
     drs_open_workbench_phase6_tests
     drs_open_workbench_phase7_tests
     drs_open_workbench_phase8_tests
+    drs_open_workbench_phase9_tests
     drs_phase2_authoring_ui_tests
     drs_phase2_mapping_workspace_tests
     drs_phase2_repeated_structure_density_tests

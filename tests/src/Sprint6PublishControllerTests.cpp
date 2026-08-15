@@ -191,10 +191,15 @@ int main()
 
         PerformancePublishController concurrentController({ 8 });
         std::atomic<bool> stopReader { false };
+        std::atomic<bool> readerReady { false };
+        std::atomic<bool> startReader { false };
         std::atomic<bool> coherent { true };
         std::atomic<std::size_t> readCount { 0 };
         std::thread reader([&]
         {
+            readerReady.store(true, std::memory_order_release);
+            while (!startReader.load(std::memory_order_acquire))
+                std::this_thread::yield();
             while (!stopReader.load(std::memory_order_acquire))
             {
                 const auto snapshot = concurrentController.getSnapshot();
@@ -217,6 +222,13 @@ int main()
                 readCount.fetch_add(1, std::memory_order_relaxed);
             }
         });
+
+        while (!readerReady.load(std::memory_order_acquire))
+            std::this_thread::yield();
+        startReader.store(true, std::memory_order_release);
+        while (readCount.load(std::memory_order_acquire) == 0
+               && coherent.load(std::memory_order_acquire))
+            std::this_thread::yield();
 
         for (std::uint64_t revision = 1; revision <= 40; ++revision)
         {
