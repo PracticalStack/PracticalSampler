@@ -319,7 +319,8 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
                                    PublishPresentationProvider presentationProvider,
                                    AudioCallbackActiveProvider callbackActiveProvider,
                                    InstrumentControlsExpandedProvider controlsExpandedProvider,
-                                   InstrumentControlsExpandedChangedCallback controlsExpandedChanged)
+                                   InstrumentControlsExpandedChangedCallback controlsExpandedChanged,
+                                   WorkspaceDisplayNameProvider displayNameProvider)
     : engineFacade(facade),
       onMacroValueChanged(std::move(macroValueChanged)),
       onPerformanceNoteOn(std::move(performanceNoteOn)),
@@ -328,6 +329,7 @@ PerformancePanel::PerformancePanel(drs::engine::EngineFacade& facade,
       audioCallbackActiveProvider(std::move(callbackActiveProvider)),
       instrumentControlsExpandedProvider(std::move(controlsExpandedProvider)),
       onInstrumentControlsExpandedChanged(std::move(controlsExpandedChanged)),
+      workspaceDisplayNameProvider(std::move(displayNameProvider)),
       publishedMixer([this](const std::string& macroId, const double value)
       {
           if (onMacroValueChanged)
@@ -612,6 +614,8 @@ void PerformancePanel::refreshNow()
     {
         refreshMacroValues();
     }
+    if (!structuralRefresh)
+        refreshInstrumentName();
     if (structuralRefresh || diagnosticsVisible)
         diagnosticsPanel.refreshNow();
 }
@@ -922,14 +926,8 @@ void PerformancePanel::refreshSurface()
         statusColour = authoring::visual::success;
     }
 
-    const auto instrumentName = !performanceSnapshot.instrumentDisplayName.empty()
-        ? juce::String::fromUTF8(performanceSnapshot.instrumentDisplayName.c_str())
-        : (performanceSnapshot.loaded ? juce::String("Untitled Instrument")
-                                      : juce::String("No Instrument Loaded"));
+    refreshInstrumentName();
     const auto instrumentContext = buildInstrumentContext(performanceSnapshot);
-    instrumentNameLabel.setText(instrumentName, juce::dontSendNotification);
-    instrumentNameLabel.setDescription("Loaded performance instrument: " + instrumentName + ".");
-    instrumentNameLabel.setTooltip(instrumentName);
     instrumentContextLabel.setText(instrumentContext, juce::dontSendNotification);
     instrumentContextLabel.setDescription(instrumentContext);
     instrumentContextLabel.setTooltip(instrumentContext);
@@ -968,6 +966,23 @@ void PerformancePanel::refreshSurface()
     updateMacroValues(macroSurface.displayedMacros);
 
     diagnosticsPanel.repaint();
+}
+
+void PerformancePanel::refreshInstrumentName()
+{
+    auto instrumentName = workspaceDisplayNameProvider
+        ? workspaceDisplayNameProvider().trim()
+        : (performanceSnapshot.loaded
+               ? juce::String::fromUTF8(performanceSnapshot.instrumentDisplayName.c_str()).trim()
+               : juce::String {});
+    if (instrumentName == "No Project Loaded" || instrumentName == "No instrument loaded")
+        instrumentName.clear();
+
+    instrumentNameLabel.setText(instrumentName, juce::dontSendNotification);
+    instrumentNameLabel.setDescription(instrumentName.isNotEmpty()
+        ? "Loaded performance instrument or project: " + instrumentName + "."
+        : "No performance instrument or project is loaded.");
+    instrumentNameLabel.setTooltip(instrumentName);
 }
 
 void PerformancePanel::refreshMacroValues()

@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Continuous Damper, Half-Pedal, and Repedaling - Development Plan</title>
+  <style>
+    :root {
+      --paper: #f4f0e7;
+      --surface: #fffdf8;
+      --ink: #182534;
+      --muted: #5e6870;
+      --line: #d7d0c4;
+      --navy: #194b68;
+      --navy-soft: #e6f0f4;
+      --rust: #aa4d2d;
+      --rust-soft: #f7e9e1;
+      --green: #2c6a50;
+      --green-soft: #e5f1ea;
+      --amber: #805f1e;
+      --amber-soft: #f7efd9;
+      --violet: #67507d;
+      --violet-soft: #eee8f3;
+      --shadow: 0 18px 52px rgba(34, 42, 47, 0.08);
+      --sans: "Aptos", "Segoe UI", sans-serif;
+      --serif: "Charter", "Bitstream Charter", Georgia, serif;
+      --mono: "Cascadia Mono", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 78px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(25, 75, 104, 0.026) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(25, 75, 104, 0.026) 1px, transparent 1px),
+        var(--paper);
+      background-size: 30px 30px;
+      font: 15px/1.58 var(--sans);
+    }
+
+    a { color: var(--navy); text-underline-offset: 3px; }
+    code {
+      padding: 0.1em 0.34em;
+      border: 1px solid rgba(25, 75, 104, 0.13);
+      border-radius: 4px;
+      color: #173f57;
+      background: #edf3f5;
+      font-family: var(--mono);
+      font-size: 0.9em;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid #bdb4a6;
+      background: rgba(244, 240, 231, 0.95);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-inner {
+      max-width: 1420px;
+      min-height: 62px;
+      margin: 0 auto;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { font: 700 18px var(--serif); }
+    .meta { color: var(--muted); font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+
+    .shell {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 34px 28px 80px;
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+      gap: 30px;
+    }
+    nav {
+      position: sticky;
+      top: 92px;
+      align-self: start;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 253, 248, 0.88);
+      box-shadow: var(--shadow);
+    }
+    nav strong { display: block; margin-bottom: 10px; font-family: var(--serif); }
+    nav a { display: block; padding: 5px 0; color: var(--muted); text-decoration: none; }
+    nav a:hover { color: var(--rust); }
+
+    main { min-width: 0; }
+    .hero, section {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 46px 48px; border-top: 6px solid var(--navy); }
+    section { margin-top: 24px; padding: 32px 36px; }
+    h1, h2, h3 { margin-top: 0; font-family: var(--serif); line-height: 1.15; }
+    h1 { max-width: 980px; margin-bottom: 18px; font-size: clamp(34px, 5vw, 58px); }
+    h2 { margin-bottom: 18px; font-size: 29px; }
+    h3 { margin-bottom: 9px; font-size: 20px; }
+    p { margin: 0 0 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 22px; }
+    li + li { margin-top: 7px; }
+    .eyebrow { margin-bottom: 12px; color: var(--rust); font: 700 12px var(--mono); letter-spacing: 0.09em; text-transform: uppercase; }
+    .lede { max-width: 1000px; color: #334654; font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+    .chip { padding: 6px 10px; border-radius: 999px; color: var(--navy); background: var(--navy-soft); font: 700 11px var(--mono); }
+
+    .callout {
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-left: 4px solid var(--rust);
+      background: var(--rust-soft);
+    }
+    .callout.green { border-color: var(--green); background: var(--green-soft); }
+    .callout.amber { border-color: var(--amber); background: var(--amber-soft); }
+    .callout.violet { border-color: var(--violet); background: var(--violet-soft); }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { padding: 20px; border: 1px solid var(--line); border-radius: 9px; background: #faf8f2; }
+    .card p:last-child { margin-bottom: 0; }
+    .decision { border-top: 4px solid var(--green); }
+    .risk { border-top: 4px solid var(--amber); }
+    .boundary { border-top: 4px solid var(--violet); }
+
+    .slice {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 20px;
+      padding: 24px 0;
+      border-top: 1px solid var(--line);
+    }
+    .slice:first-of-type { border-top: 0; padding-top: 2px; }
+    .slice-id {
+      width: 72px;
+      padding: 8px 6px;
+      border-radius: 6px;
+      color: #fff;
+      background: var(--navy);
+      text-align: center;
+      font: 700 13px var(--mono);
+    }
+    .estimate { color: var(--muted); font: 700 11px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; }
+    .exit { margin-top: 13px; padding: 12px 14px; border-left: 3px solid var(--green); background: var(--green-soft); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #fff; background: var(--navy); }
+    tbody tr:nth-child(even) { background: #faf8f2; }
+    .compact td:first-child { width: 23%; font-weight: 700; }
+
+    .sequence { margin-top: 18px; padding: 18px; border: 1px solid var(--line); background: #faf8f2; }
+    .sequence code { display: inline-block; margin: 2px 0; }
+    footer { padding-top: 24px; color: var(--muted); font: 12px var(--mono); }
+
+    @media (max-width: 920px) {
+      .shell { grid-template-columns: 1fr; }
+      nav { position: static; }
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .topbar-inner, .shell { padding-left: 16px; padding-right: 16px; }
+      .hero, section { padding: 26px 22px; }
+      .slice { grid-template-columns: 1fr; gap: 10px; }
+    }
+    @media print {
+      .topbar, nav { display: none; }
+      .shell { display: block; max-width: none; padding: 0; }
+      .hero, section { box-shadow: none; break-inside: avoid; }
+      .slice { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Decent Rhapsody Studio / Internal Engineering</div>
+      <div class="meta">Development plan / 15 Aug 2026</div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav aria-label="Document sections">
+      <strong>On this page</strong>
+      <a href="#outcome">Outcome</a>
+      <a href="#baseline">Current baseline</a>
+      <a href="#contract">Frozen behavior</a>
+      <a href="#model">Runtime model</a>
+      <a href="#sfz">Salamander SFZ scope</a>
+      <a href="#slices">Delivery slices</a>
+      <a href="#coverage">Verification matrix</a>
+      <a href="#risks">Risks and boundaries</a>
+      <a href="#done">Definition of done</a>
+    </nav>
+
+    <main>
+      <article class="hero" id="outcome">
+        <div class="eyebrow">Focused Piano-Damper Iteration</div>
+        <h1>Replace the CC64 release cliff with continuous damping and catchable release tails.</h1>
+        <p class="lede">
+          Preserve sample-positioned MIDI CC64 values from 0 through 127, modulate the release time of
+          already-sounding notes, and let a later pedal-down catch whatever energy remains. Convert the
+          Accurate Salamander live-preset half-pedal opcodes into the native runtime while keeping pedal and
+          sympathetic resonance as a separately scheduled capability.
+        </p>
+        <div class="chips">
+          <span class="chip">8–10 engineering days</span>
+          <span class="chip">Continuous CC64</span>
+          <span class="chip">Dynamic release</span>
+          <span class="chip">Repedaling</span>
+          <span class="chip">Salamander live SFZ</span>
+          <span class="chip">Legacy binary compatibility</span>
+          <span class="chip">No resonance expansion</span>
+        </div>
+        <div class="callout green">
+          <strong>Recommended delivery:</strong> five reviewable slices over 1½–2 weeks. Freeze the control law
+          and red timelines first, then persistence/import, realtime voice behavior, repedaling, and host-level
+          qualification using the actual piano MIDI passage.
+        </div>
+      </article>
+
+      <section id="baseline">
+        <div class="eyebrow">Baseline</div>
+        <h2>Why the current passage sounds artificial</h2>
+        <p>
+          The host path retains the incoming CC64 byte, but the performance evaluator immediately converts it
+          to a Boolean transition at 64. The voice pool then stores CC64 as either 0 or 127. Pedal-up moves every
+          deferred voice into one fixed release segment, and a later pedal-down cannot alter or catch that segment.
+        </p>
+        <table class="compact" aria-label="Current and target behavior">
+          <thead><tr><th>Input</th><th>Current result</th><th>Target result</th></tr></thead>
+          <tbody>
+            <tr><td>CC64 0–63</td><td>All values mean fully up; deferred voices release at one fixed rate.</td><td>Every value remains available to the route release curve; damping varies continuously.</td></tr>
+            <tr><td>CC64 64–127</td><td>All values mean fully down; repeated values are discarded as state-equivalent.</td><td>Binary transition events remain edge-triggered, while release modulation still observes each value.</td></tr>
+            <tr><td>127 → 20 → 110</td><td>The value 20 begins release; 110 cannot catch the releasing voice.</td><td>20 increases damping; 110 extends the remaining tail from its current level without restoring lost energy.</td></tr>
+            <tr><td>Salamander <code>sustain_cc=90</code></td><td>Reported, not converted; DRS continues treating CC64 as the binary sustain switch.</td><td>CC90 owns binary sustain, leaving CC64 free to modulate release time as authored.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout amber">
+          <strong>Parity warning:</strong> the Salamander <code>sfz_live</code> preset intentionally disables the
+          normal CC64 switch and uses a 100-second CC64-modulated release plus curve 11. Comparing that preset
+          against DRS today is not a binary-sustain comparison.
+        </div>
+      </section>
+
+      <section id="contract">
+        <div class="eyebrow">Contract</div>
+        <h2>Behavior to freeze before implementation</h2>
+        <div class="grid">
+          <div class="card decision">
+            <h3>Continuous controller state</h3>
+            <ul>
+              <li>Every valid CC64 event preserves its exact 0–127 value, sample offset, channel placeholder, and stable input sequence.</li>
+              <li>Pedal-down/up mechanics remain threshold transitions; intermediate changes do not retrigger pedal samples or Round Robin resets.</li>
+              <li>The authored sustain controller and threshold determine binary deferral independently from envelope modulation.</li>
+              <li>Reset restores declared controller defaults; panic still terminates voices immediately.</li>
+            </ul>
+          </div>
+          <div class="card decision">
+            <h3>Release-time modulation</h3>
+            <ul>
+              <li>For the focused path, <code>effectiveReleaseSeconds = clamp(baseRelease + amount × curve(CC64), 0.001, 100.0)</code>.</li>
+              <li>Undefined curve points use linear interpolation between the nearest authored points.</li>
+              <li>With dynamic release enabled, CC64 changes during release update the remaining slope at the event sample.</li>
+              <li>The update preserves the current envelope level: no upward gain jump, restart, or discontinuity is permitted.</li>
+            </ul>
+          </div>
+          <div class="card decision">
+            <h3>Repedaling</h3>
+            <ul>
+              <li>A still-audible releasing voice remains eligible for dynamic damper updates until completion or stealing.</li>
+              <li>Raising CC64 after damping began lengthens the remaining release from its current level; it does not restore energy already lost.</li>
+              <li>Repedaling does not re-enter attack or sustain, allocate another voice, or emit another authored release event.</li>
+              <li>A finished or stolen voice is not recoverable.</li>
+            </ul>
+          </div>
+          <div class="card decision">
+            <h3>Compatibility</h3>
+            <ul>
+              <li>Existing projects and instruments default to binary CC64 at threshold 64 with no release modulation; SFZ import applies ARIA's separate <code>sustain_lo</code> default of 0.5 when the opcode is absent.</li>
+              <li>Current pedal-down/up trigger ordering and generation ownership remain unchanged for legacy content.</li>
+              <li>Imported half-pedal declarations opt routes into dynamic behavior explicitly; no behavior is inferred from instrument names.</li>
+              <li>Preview and Performance controller state remain isolated.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="sequence">
+          <strong>Frozen repedal example</strong><br>
+          <code>note-on C4</code> → <code>CC64=127</code> → <code>note-off C4</code> →
+          <code>CC64=32</code> → <code>CC64=110</code><br>
+          The note enters release exactly once. CC64=32 produces a short, audible damping segment. CC64=110
+          catches the remaining level and substantially extends its tail. The output never jumps louder, and no
+          second release sample is triggered.
+        </div>
+      </section>
+
+      <section id="model">
+        <div class="eyebrow">Architecture</div>
+        <h2>Add a small compiled damper contract, not a general modulation matrix</h2>
+        <p>
+          Persist authoring-level damper configuration and compile it into fixed-size route data. The audio path
+          performs only bounded table lookup, interpolation, and envelope-state updates. Parsing, validation,
+          curve construction, string handling, and allocation remain outside the callback.
+        </p>
+        <table aria-label="Data model and ownership">
+          <thead><tr><th>Layer</th><th>Addition</th><th>Ownership and constraints</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Project authoring</td>
+              <td><code>sustainControllerNumber</code>, <code>sustainThreshold</code>, route release-control declaration, and referenced curve definitions</td>
+              <td>Advance <code>drs.project</code> 6→7 and <code>drs.authoring</code> 5→6; migrate older content to binary defaults.</td>
+            </tr>
+            <tr>
+              <td>Runtime instrument</td>
+              <td>Validated controller policy and per-zone compiled release-control fields</td>
+              <td>Advance <code>drs.instrument</code> 4→5. Existing v1–v4 readers retain their current compatibility path.</td>
+            </tr>
+            <tr>
+              <td>Compiled curve</td>
+              <td>128-entry immutable normalized table</td>
+              <td>Built during compile/preparation; no sparse-point search or allocation in audio.</td>
+            </tr>
+            <tr>
+              <td>Performance state</td>
+              <td>Exact 128-controller values plus sustain-controller Boolean edge state</td>
+              <td>Controller value updates are sample-positioned. Binary semantics use the declared controller and threshold.</td>
+            </tr>
+            <tr>
+              <td>Voice state</td>
+              <td>Current envelope level/phase, current effective release duration, dynamic-release eligibility, and originating route/generation</td>
+              <td>Repedal updates the existing release segment in place; retired-generation route data stays alive through existing activation ownership.</td>
+            </tr>
+            <tr>
+              <td>Package container</td>
+              <td>No new container behavior</td>
+              <td><code>.drpkg</code> carries the schema-5 runtime manifest through the existing authenticated package path; no package-v2 format bump.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <strong>Same-offset order:</strong> retain sample offset plus input sequence. Apply the controller value,
+          update affected dynamic voices, evaluate a binary sustain edge when the event targets the declared sustain
+          controller, release newly undeferred notes, emit each effective release route once, then resolve transition
+          mechanics. One input event must either publish its complete bounded action set or be rejected atomically.
+        </div>
+      </section>
+
+      <section id="sfz">
+        <div class="eyebrow">Import Scope</div>
+        <h2>Convert the Salamander half-pedal vocabulary</h2>
+        <p>
+          Promote the live-preset note-damping block from report-only to native conversion. Keep the implementation
+          deliberately narrower than general SFZ controller modulation.
+        </p>
+        <table aria-label="SFZ opcode scope">
+          <thead><tr><th>SFZ declaration</th><th>Native target</th><th>Focused-iteration behavior</th></tr></thead>
+          <tbody>
+            <tr><td><code>sustain_cc=90</code></td><td>Instrument sustain-controller number</td><td>CC90 owns binary note deferral; CC64 remains an ordinary modulation source.</td></tr>
+            <tr><td><code>sustain_lo</code></td><td>Instrument sustain threshold</td><td>Convert when present. Use ARIA's 0.5 default for imported SFZ content and retain threshold 64 for migrated native content.</td></tr>
+            <tr><td><code>ampeg_dynamic=1</code></td><td>Route dynamic-release flag</td><td>Recalculate an active release segment when its controlling CC changes.</td></tr>
+            <tr><td><code>ampeg_releasecc64=100</code></td><td>Route release-control amount</td><td>Add up to 100 seconds according to the selected CC64 curve.</td></tr>
+            <tr><td><code>ampeg_release_curvecc64=11</code></td><td>Route compiled curve reference</td><td>Resolve curve 11 during projection/compile; missing or invalid references produce actionable findings.</td></tr>
+            <tr><td><code>&lt;curve&gt; curve_index=11</code> plus <code>v000…v127</code></td><td>Authoring curve definition → 128-entry compiled table</td><td>Preserve explicit points and linearly interpolate gaps deterministically.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout violet">
+          <strong>Deliberate boundary:</strong> conversion is production-supported for the CC64 amplitude-release
+          path used by the Salamander note regions. General <code>*_onccN</code> envelope modulation, arbitrary
+          modulation graphs, high-resolution CCs, pedal-resonance synthesis, and sympathetic-resonance behavior
+          remain out of scope. Existing controller-gated sample regions continue their current behavior, but new
+          resonance modeling is not part of this acceptance gate.
+        </div>
+      </section>
+
+      <section id="slices">
+        <div class="eyebrow">Delivery</div>
+        <h2>Five slices / 8–10 engineering days</h2>
+
+        <article class="slice">
+          <div class="slice-id">HP-01</div>
+          <div>
+            <div class="estimate">1 day / contract and red evidence</div>
+            <h3>Freeze the damper law and timeline corpus</h3>
+            <ul>
+              <li>Write the native damper/release contract, schema defaults, duration clamp, curve interpolation, repedal continuity, and same-offset precedence.</li>
+              <li>Check in a synthetic looped-piano fixture and MIDI timelines containing CC64 values 0, 20, 32, 42, 54, 62, 64, 90, 110, and 127.</li>
+              <li>Add expected-red coverage for continuous tails, repedaling, release-trigger uniqueness, sustain-controller reassignment, activation cutover, and legacy binary playback.</li>
+              <li>Capture a short reference render and CC64 trace from the reported real-world MIDI passage.</li>
+            </ul>
+            <div class="exit"><strong>Exit:</strong> every audible behavior has an unambiguous event timeline and the red tests fail only at the missing production seams.</div>
+          </div>
+        </article>
+
+        <article class="slice">
+          <div class="slice-id">HP-02</div>
+          <div>
+            <div class="estimate">2 days / persistence, compile, and import</div>
+            <h3>Add the native model and Salamander projection</h3>
+            <ul>
+              <li>Add project-7/authoring-6 and instrument-5 damper fields with deterministic serialization, migration, validation, digests, cache invalidation, and package round trips.</li>
+              <li>Parse and project <code>sustain_cc</code>, <code>sustain_lo</code> (including ARIA's imported default), <code>ampeg_dynamic</code>, <code>ampeg_releasecc64</code>, <code>ampeg_release_curvecc64</code>, and curve-11 points through inherited SFZ scopes.</li>
+              <li>Compile sparse curves to immutable 128-entry tables and reject duplicate indices, malformed points, invalid references, non-finite values, and unsupported controllers with stable findings.</li>
+              <li>Change the import report classification for the supported half-pedal block from report-only to converted without hiding still-unsupported resonance/modulation declarations.</li>
+            </ul>
+            <div class="exit"><strong>Exit:</strong> the Salamander live note regions carry byte-deterministic native damper metadata through project, prepared playback, runtime instrument, and package reopen.</div>
+          </div>
+        </article>
+
+        <article class="slice">
+          <div class="slice-id">HP-03</div>
+          <div>
+            <div class="estimate">2–3 days / realtime voice behavior</div>
+            <h3>Preserve continuous CC64 and implement dynamic release</h3>
+            <ul>
+              <li>Stop rewriting sustain-controller values to 0/127; retain exact controller state across host normalization, performance evaluation, voice-pool routing, reset, and activation.</li>
+              <li>Separate Boolean pedal-transition events from continuous release-control updates so intermediate values never fire duplicate mechanics.</li>
+              <li>Extend <code>SamplerVoice</code> with a click-free, allocation-free release-segment update that preserves current level and authored release shape.</li>
+              <li>Apply CC64 changes to active releasing voices at the incoming sample offset, including voices owned by an older activation generation.</li>
+              <li>Preserve bounded voice allocation, stealing order, page streaming, loop behavior, DSP routing, and render diagnostics.</li>
+            </ul>
+            <div class="exit"><strong>Exit:</strong> offline renders show monotonically different tail lengths across the Salamander curve points with no 63→64 discontinuity beyond the authored curve itself.</div>
+          </div>
+        </article>
+
+        <article class="slice">
+          <div class="slice-id">HP-04</div>
+          <div>
+            <div class="estimate">1–2 days / repedaling and lifecycle hardening</div>
+            <h3>Catch still-audible voices safely</h3>
+            <ul>
+              <li>Update a releasing voice when CC64 rises again without changing its voice identity, source route, articulation-at-attack, or activation generation.</li>
+              <li>Prove level continuity under fast 127→0→127 and stair-step controller bursts, including multiple CC changes within one callback.</li>
+              <li>Guarantee one physical note-off, one effective release event, and at most one release-trigger sample regardless of repedal count.</li>
+              <li>Cover repeated pitches, voice stealing, all-notes-off, all-sound-off/reset, transport discontinuity, project replacement, and package close.</li>
+            </ul>
+            <div class="exit"><strong>Exit:</strong> repedaling audibly extends only the remaining tail, cannot revive completed voices, and cannot leak or duplicate semantic events.</div>
+          </div>
+        </article>
+
+        <article class="slice">
+          <div class="slice-id">HP-05</div>
+          <div>
+            <div class="estimate">2 days / qualification and release evidence</div>
+            <h3>Qualify the real piano passage and protect compatibility</h3>
+            <ul>
+              <li>Import and package the Salamander live recommended preset; verify the half-pedal block is converted and all deferred resonance findings remain explicit.</li>
+              <li>Render the reported MIDI passage through DRS at 44.1/48 kHz and block sizes 128/256/512; compare CC-aligned tail behavior with the Plogue reference.</li>
+              <li>Run plugin and standalone MIDI paths, editor open/closed host qualification, package reopen/recall, realtime guards, and UI responsiveness checks.</li>
+              <li>Rerun binary-sustain, performance-event, release-trigger, large-instrument streaming, package, SFZ compatibility, and production VST3 build gates.</li>
+              <li>Record known differences: no new pedal resonance, sympathetic resonance, physical string coupling, or full Plogue opcode parity.</li>
+            </ul>
+            <div class="exit"><strong>Exit:</strong> the passage no longer exhibits DRS’s artificial intermediate-CC cutoff, the focused reference comparison is signed off, and legacy content remains behaviorally stable.</div>
+          </div>
+        </article>
+      </section>
+
+      <section id="coverage">
+        <div class="eyebrow">Evidence</div>
+        <h2>Verification matrix</h2>
+        <table aria-label="Verification matrix">
+          <thead><tr><th>Area</th><th>Required proof</th><th>Likely test home</th></tr></thead>
+          <tbody>
+            <tr><td>Host MIDI</td><td>Exact CC64 value, offset, channel placeholder, and input sequence survive normalization; dense CC bursts remain bounded.</td><td><code>Sprint6VoiceGenerationCutoverTests</code> plus focused host-MIDI tests</td></tr>
+            <tr><td>Control law</td><td>Known curve-11 points and interpolated values yield deterministic effective release times at 44.1/48/96 kHz.</td><td>New damper control-law unit tests</td></tr>
+            <tr><td>Voice envelope</td><td>No NaN, click, upward gain jump, restart, premature loop exit, or block-boundary dependence during dynamic updates.</td><td><code>SamplerVoice</code> and offline-render tests</td></tr>
+            <tr><td>Repedaling</td><td>127→32→110 catches remaining energy; repeated catches do not duplicate release events; finished/stolen voices stay finished.</td><td>Voice-pool lifecycle and Piano Lite timeline tests</td></tr>
+            <tr><td>Performance semantics</td><td>Mechanical pedal routes remain edge-only; release routes emit once; Preview and Performance states remain isolated.</td><td>Performance engine sprint tests</td></tr>
+            <tr><td>Generation ownership</td><td>Old-generation releasing voices respond using their originating compiled route while new notes use the active generation.</td><td><code>Sprint6VoiceGenerationCutoverTests</code></td></tr>
+            <tr><td>Schema and package</td><td>6/5 migration defaults to binary behavior; 7/6 and instrument-5 round trips are deterministic; package authentication and reopen preserve curves.</td><td>Runtime loader/compiler, package, and export lifecycle tests</td></tr>
+            <tr><td>SFZ import</td><td>Salamander inheritance and curve 11 convert correctly; malformed and unsupported modulation stays visible with stable findings.</td><td><code>Sprint31SfzCompatibilityTests</code> and projection tests</td></tr>
+            <tr><td>Compatibility</td><td>Existing binary sustain, pedal mechanics, release samples, Round Robin reset, all-notes-off, reset, and legacy projects render unchanged.</td><td>Existing registered performance and regression suites</td></tr>
+            <tr><td>Real passage</td><td>CC-aligned A/B render demonstrates removal of premature cutoff without claiming resonance parity.</td><td>REAPER qualification artifact and checked-in analysis summary</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="risks">
+        <div class="eyebrow">Guardrails</div>
+        <h2>Risks and explicit boundaries</h2>
+        <div class="grid">
+          <div class="card risk">
+            <h3>Envelope discontinuity</h3>
+            <p>Changing a running duration by resetting counters can click or jump in level. The implementation must preserve the current envelope level and alter only its future trajectory.</p>
+          </div>
+          <div class="card risk">
+            <h3>Long-tail pressure</h3>
+            <p>Salamander deliberately requests up to 100-second releases. Keep the fixed voice limit and deterministic stealing policy; add pressure diagnostics instead of allocating unbounded voice state.</p>
+          </div>
+          <div class="card risk">
+            <h3>Semantic duplication</h3>
+            <p>Repedaling must not generate a second logical release or release sample. Physical note state, effective release state, and envelope state remain distinct.</p>
+          </div>
+          <div class="card risk">
+            <h3>False reference parity</h3>
+            <p>The live preset also contains pseudo pedal-resonance regions and other ARIA modulation. Qualification must isolate note damping and document residual differences honestly.</p>
+          </div>
+          <div class="card boundary">
+            <h3>Deferred: resonance</h3>
+            <p>No new pedal-down resonance, pedal-up resonance, sympathetic string coupling, soundboard model, convolution response, or resonance mixer controls.</p>
+          </div>
+          <div class="card boundary">
+            <h3>Deferred: general modulation</h3>
+            <p>No arbitrary target/source matrix, LFO/envelope controller graph, high-resolution CC, MPE/per-note damper, scripting, or blanket support for every <code>*_onccN</code> opcode.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="done">
+        <div class="eyebrow">Acceptance</div>
+        <h2>Definition of done</h2>
+        <ol>
+          <li>DRS preserves and applies every sample-positioned CC64 value instead of collapsing the controller to 0/127.</li>
+          <li>Authored CC64 curves modulate release duration continuously and update already-releasing voices without clicks, gain jumps, or callback allocation.</li>
+          <li>Repedaling catches the remaining audible tail, does not restore lost energy, and cannot duplicate voices or release events.</li>
+          <li>The Salamander live-preset note-damping block—<code>sustain_cc</code>, <code>sustain_lo</code>, <code>ampeg_dynamic</code>, <code>ampeg_releasecc64</code>, <code>ampeg_release_curvecc64</code>, and curve points—converts into native persisted behavior.</li>
+          <li>Existing projects, packages, binary CC64 behavior, pedal mechanics, release triggers, reset behavior, and activation-generation ownership remain compatible.</li>
+          <li>The reported piano MIDI passage no longer has the artificial early cutoff at intermediate CC64 values in plugin and standalone qualification renders.</li>
+          <li>Focused unit, timeline, import, schema, package, streaming, host, realtime, regression, and production-build gates are green.</li>
+          <li>Release evidence explicitly states that pedal and sympathetic resonance remain outside this iteration.</li>
+        </ol>
+        <div class="callout green">
+          <strong>Release decision:</strong> ship when continuous damping and repedaling are demonstrably correct on
+          the real passage and the Salamander note regions. Do not hold this iteration open for resonance parity;
+          schedule resonance from its own acoustic behavior, content, DSP, authoring, and qualification contract.
+        </div>
+      </section>
+
+      <footer>Decent Rhapsody Studio · Internal engineering artifact · Continuous damper / half-pedal / repedaling</footer>
+    </main>
+  </div>
+</body>
+</html>

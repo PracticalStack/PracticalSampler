@@ -475,6 +475,13 @@ MainComponent::MainComponent(bool enableAudioOutput)
                        [this](const bool expanded)
                        {
                            processor.setInstrumentControlsExpandedChoice(expanded);
+                       },
+                       [this]()
+                       {
+                           const auto& document = processor.getWorkspaceDocumentState();
+                           return document.displayName == "No Project Loaded"
+                               ? juce::String {}
+                               : juce::String::fromUTF8(document.displayName.c_str());
                        }),
       authoringPanel(processor.getAuthoringSession(),
                      [this]()

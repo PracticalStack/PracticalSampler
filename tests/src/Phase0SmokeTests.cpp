@@ -359,6 +359,10 @@ int main()
                 "Standalone shell should expose the Sprint 5 keyboard surface.");
         require(findDescendantById(mainComponent, "performanceArtworkPanel") != nullptr,
                 "Standalone shell should expose the performance artwork panel.");
+        auto* standaloneInstrumentName = dynamic_cast<juce::Label*>(
+            findDescendantById(mainComponent, "performanceInstrumentNameLabel"));
+        require(standaloneInstrumentName != nullptr && standaloneInstrumentName->getText().isEmpty(),
+                "Standalone Perform should not show an instrument name before a workspace is loaded.");
         auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(mainComponent, "workspaceTabs"));
         require(standaloneTabs != nullptr, "Standalone shell workspace tab container should be a tabbed component.");
         standaloneTabs->setCurrentTabIndex(1);
@@ -376,6 +380,10 @@ int main()
                     == drs::engine::PackageSessionReadiness::metadataLoaded
                     && !mainComponent.getProcessor().getWorkspaceDocumentState().playable,
                 "A manifest-only standalone package workspace must report metadata loaded, not playable.");
+        if (auto* panel = dynamic_cast<drs::app::PerformancePanel*>(standaloneInstrumentName->getParentComponent()))
+            panel->refreshNow();
+        require(standaloneInstrumentName->getText() == "Smoke Package",
+                "Standalone Perform should show the current package name.");
         mainComponent.resized();
         require(standaloneTabs->getNumTabs() == 1,
                 "Standalone shell should hide the Map tab in performance-only workspace mode.");
@@ -387,6 +395,10 @@ int main()
         require(mainComponent.getProcessor().getWorkspaceDocumentState().authoringAvailable
                     && standaloneTabs->getNumTabs() == 2,
                 "Standalone shell should restore the authoring workspace before bundled playback validation.");
+        if (auto* panel = dynamic_cast<drs::app::PerformancePanel*>(standaloneInstrumentName->getParentComponent()))
+            panel->refreshNow();
+        require(standaloneInstrumentName->getText().isEmpty(),
+                "Standalone Perform should clear its instrument name when the workspace closes.");
         require(!mainComponent.isAudioOutputEnabled(),
                 "Headless standalone smoke validation should keep the real audio device disabled.");
         mainComponent.getProcessor().prepareToPlay(44100.0, 512);
@@ -460,6 +472,10 @@ int main()
                 "Plugin editor should expose the Sprint 5 keyboard surface.");
         require(findDescendantById(*editor, "performanceArtworkPanel") != nullptr,
                 "Plugin editor should expose the performance artwork panel.");
+        auto* pluginInstrumentName = dynamic_cast<juce::Label*>(
+            findDescendantById(*editor, "performanceInstrumentNameLabel"));
+        require(pluginInstrumentName != nullptr && pluginInstrumentName->getText().isEmpty(),
+                "Plug-in Perform should not show an instrument name before a workspace is loaded.");
         auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
         require(pluginTabs != nullptr, "Plugin editor workspace tab container should be a tabbed component.");
         pluginTabs->setCurrentTabIndex(1);
@@ -477,6 +493,10 @@ int main()
                     == drs::engine::PackageSessionReadiness::metadataLoaded
                     && !processor.getWorkspaceDocumentState().playable,
                 "A manifest-only plug-in package workspace must report metadata loaded, not playable.");
+        if (auto* panel = dynamic_cast<drs::app::PerformancePanel*>(pluginInstrumentName->getParentComponent()))
+            panel->refreshNow();
+        require(pluginInstrumentName->getText() == "Plugin Smoke Package",
+                "Plug-in Perform should show the current package name.");
         editor->resized();
         require(pluginTabs->getNumTabs() == 1,
                 "Plugin editor should hide the Map tab in performance-only workspace mode.");
@@ -487,6 +507,10 @@ int main()
         require(processor.getWorkspaceDocumentState().authoringAvailable
                     && pluginTabs->getNumTabs() == 2,
                 "Plugin editor should restore the authoring workspace before bundled playback validation.");
+        if (auto* panel = dynamic_cast<drs::app::PerformancePanel*>(pluginInstrumentName->getParentComponent()))
+            panel->refreshNow();
+        require(pluginInstrumentName->getText().isEmpty(),
+                "Plug-in Perform should clear its instrument name when the workspace closes.");
 
         processor.prepareToPlay(44100.0, 512);
         processor.getEngineFacade().resetSessionStateToDefault();

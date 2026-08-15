@@ -26,6 +26,7 @@ public:
     using AudioCallbackActiveProvider = std::function<bool()>;
     using InstrumentControlsExpandedProvider = std::function<std::optional<bool>()>;
     using InstrumentControlsExpandedChangedCallback = std::function<void(bool)>;
+    using WorkspaceDisplayNameProvider = std::function<juce::String()>;
 
     struct LayoutSnapshot
     {
@@ -48,7 +49,8 @@ public:
                               PublishPresentationProvider publishPresentationProvider = {},
                               AudioCallbackActiveProvider audioCallbackActiveProvider = {},
                               InstrumentControlsExpandedProvider instrumentControlsExpandedProvider = {},
-                              InstrumentControlsExpandedChangedCallback onInstrumentControlsExpandedChanged = {});
+                              InstrumentControlsExpandedChangedCallback onInstrumentControlsExpandedChanged = {},
+                              WorkspaceDisplayNameProvider workspaceDisplayNameProvider = {});
     ~PerformancePanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -117,6 +119,7 @@ private:
     void rebuildMacroControls(const std::vector<drs::engine::EngineMacroDescriptor>& macros,
                               bool mixerControl);
     void refreshArtwork();
+    void refreshInstrumentName();
     void refreshSurface();
     void refreshMacroValues();
     void updateMacroValues(const std::vector<drs::engine::EngineMacroDescriptor>& macros);
@@ -133,6 +136,7 @@ private:
     AudioCallbackActiveProvider audioCallbackActiveProvider;
     InstrumentControlsExpandedProvider instrumentControlsExpandedProvider;
     InstrumentControlsExpandedChangedCallback onInstrumentControlsExpandedChanged;
+    WorkspaceDisplayNameProvider workspaceDisplayNameProvider;
     bool hasActivePublishedPerformance = false;
     juce::String publishedPerformanceStateLabel { "Idle" };
     juce::String publishedPerformanceGuidance;

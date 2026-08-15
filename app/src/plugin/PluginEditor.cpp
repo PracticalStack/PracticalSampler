@@ -483,6 +483,13 @@ Editor::Editor(Processor& owner)
                        [&owner](const bool expanded)
                        {
                            owner.setInstrumentControlsExpandedChoice(expanded);
+                       },
+                       [&owner]()
+                       {
+                           const auto& document = owner.getWorkspaceDocumentState();
+                           return document.displayName == "No Project Loaded"
+                               ? juce::String {}
+                               : juce::String::fromUTF8(document.displayName.c_str());
                        }),
       authoringPanel(owner.getAuthoringSession(),
                      [&owner]()

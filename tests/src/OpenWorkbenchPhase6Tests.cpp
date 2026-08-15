@@ -70,7 +70,10 @@ std::vector<drs::app::PerformanceMixerControlView> makeMixerControls()
 
 void qualifyExpandedAndCompactLayouts(drs::engine::EngineFacade& facade)
 {
-    drs::app::PerformancePanel panel(facade);
+    juce::String workspaceDisplayName { "Phase 6 Project" };
+    drs::app::PerformancePanel panel(
+        facade, {}, {}, {}, {}, {}, {}, {}, {},
+        [&workspaceDisplayName] { return workspaceDisplayName; });
     panel.setSize(1120, 800);
     panel.setVisible(true);
     panel.refreshNow();
@@ -93,9 +96,9 @@ void qualifyExpandedAndCompactLayouts(drs::engine::EngineFacade& facade)
     auto& instrumentName = requireLabel(panel, "performanceInstrumentNameLabel");
     auto& instrumentContext = requireLabel(panel, "performanceInstrumentContextLabel");
     auto& status = requireLabel(panel, "performanceLoadIndicatorLabel");
-    require(instrumentName.getText().isNotEmpty()
+    require(instrumentName.getText() == workspaceDisplayName
                 && instrumentName.getTitle() == "Performance instrument",
-            "Perform must expose a named, accessible instrument identity.");
+            "Perform must expose the current workspace name as its accessible identity.");
     require(instrumentContext.getText().isNotEmpty()
                 && instrumentContext.getTitle() == "Performance context",
             "Perform must expose concise instrument context beneath its identity.");
@@ -161,6 +164,12 @@ void qualifyExpandedAndCompactLayouts(drs::engine::EngineFacade& facade)
                 && shellPixel.getBlue() == drs::app::authoring::visual::shell.getBlue(),
             "Perform must paint the shared light application shell at its perimeter (actual "
                 + shellPixel.toDisplayString(false).toStdString() + ").");
+
+    workspaceDisplayName.clear();
+    panel.refreshNow();
+    require(instrumentName.getText().isEmpty()
+                && instrumentName.getDescription().contains("No performance instrument or project"),
+            "Perform must leave its identity header empty when no workspace is loaded.");
 }
 
 void qualifyAudioUnavailableState(drs::engine::EngineFacade& facade)
