@@ -4,6 +4,7 @@
 #include "shared/authoring/AuthoringViewModels.h"
 #include "shared/authoring/MacroWorkbenchView.h"
 #include "shared/authoring/RepeatedStructureList.h"
+#include "shared/authoring/RoutingWorkbenchView.h"
 #include "shared/authoring/ZoneMappingEditor.h"
 #include "shared/authoring/ZoneMapCanvas.h"
 #include "shared/authoring/WaveformDetailView.h"
@@ -73,6 +74,10 @@ public:
     authoring::MacroWorkbenchView::LayoutSnapshot getMacroWorkbenchLayoutSnapshot() const noexcept
     {
         return macroWorkbenchContent.getLayoutSnapshot();
+    }
+    authoring::RoutingWorkbenchView::LayoutSnapshot getRoutingWorkbenchLayoutSnapshot() const noexcept
+    {
+        return routingWorkbenchContent.getLayoutSnapshot();
     }
 
 private:
@@ -326,7 +331,7 @@ private:
     juce::TextButton macroMoveUpButton;
     juce::TextButton macroMoveDownButton;
 
-    juce::Component routingWorkbenchContent;
+    authoring::RoutingWorkbenchView routingWorkbenchContent;
     juce::Viewport routingWorkbenchViewport;
     juce::Label fxSectionLabel;
     juce::Label fxScopeLabel;

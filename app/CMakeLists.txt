@@ -42,6 +42,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/authoring/OpenWorkbenchVisualSystem.h
     src/shared/authoring/MacroWorkbenchView.cpp
     src/shared/authoring/MacroWorkbenchView.h
+    src/shared/authoring/RoutingWorkbenchView.cpp
+    src/shared/authoring/RoutingWorkbenchView.h
     src/shared/authoring/CompactInspectorPrimitives.cpp
     src/shared/authoring/CompactInspectorPrimitives.h
     src/shared/authoring/RepeatedStructureAdapters.h

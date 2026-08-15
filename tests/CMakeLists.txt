@@ -3433,6 +3433,36 @@ add_test(
 set_tests_properties(drs.open_workbench.phase7 PROPERTIES TIMEOUT 60)
 set_target_properties(drs_open_workbench_phase7_tests PROPERTIES FOLDER "Tests")
 
+juce_add_console_app(drs_open_workbench_phase8_tests
+    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 8 Routing Qualification"
+)
+
+target_sources(drs_open_workbench_phase8_tests
+    PRIVATE
+        src/OpenWorkbenchPhase8Tests.cpp
+)
+
+target_link_libraries(drs_open_workbench_phase8_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_open_workbench_phase8_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.open_workbench.phase8
+    COMMAND drs_open_workbench_phase8_tests
+)
+
+set_tests_properties(drs.open_workbench.phase8 PROPERTIES TIMEOUT 60)
+set_target_properties(drs_open_workbench_phase8_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_performance_engine_s10_articulation_ui_tests
     PRODUCT_NAME "Decent Rhapsody Studio Sprint 10 Articulation UI Tests"
 )
@@ -4941,6 +4971,7 @@ add_dependencies(drs_open_workbench_qualification
     drs_open_workbench_phase5_tests
     drs_open_workbench_phase6_tests
     drs_open_workbench_phase7_tests
+    drs_open_workbench_phase8_tests
     drs_phase2_authoring_ui_tests
     drs_phase2_mapping_workspace_tests
     drs_phase2_repeated_structure_density_tests

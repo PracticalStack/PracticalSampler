@@ -1200,8 +1200,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureSectionLabel(waveformLabel, "Waveform Detail");
     configureSectionLabel(zoneLabel, "Selected Zone");
     configureSectionLabel(groupSectionLabel, "Zone Groups");
-    configureSectionLabel(fxSectionLabel, "Selected FX");
-    configureSectionLabel(routingSectionLabel, "Selected Bus");
+    configureSectionLabel(fxSectionLabel, "Selected Insert");
+    configureSectionLabel(routingSectionLabel, "Bus & Signal Path");
 
     configureFieldLabel(groupNameLabel, "Group Name");
     configureFieldLabel(macroNameLabel, "Macro Name");
@@ -1958,6 +1958,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     fxMoveDownButton.setButtonText("Move Down");
     fxMoveDownButton.onClick = [this] { moveSelectedFxSlot(1); };
     fxDeleteButton.setButtonText("Delete");
+    fxDeleteButton.setColour(juce::TextButton::textColourOffId,
+                             authoring::visual::error);
     fxDeleteButton.onClick = [this] { deleteSelectedFxSlot(); };
     fxMoveOwnerButton.setButtonText("Move to Scope");
     fxMoveOwnerButton.onClick = [this] { moveSelectedFxSlotToSelectedOwner(); };
@@ -2278,43 +2280,40 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     routingWorkbenchViewport.setScrollBarThickness(12);
     routingWorkbenchViewport.setWantsKeyboardFocus(false);
     routingWorkbenchContent.setSize(1, 1);
-    for (auto* component : {
-             static_cast<juce::Component*>(&fxSectionLabel),
-             static_cast<juce::Component*>(&fxScopeLabel),
-             static_cast<juce::Component*>(&fxScopeSelector),
-             static_cast<juce::Component*>(&fxScopeBreadcrumbLabel),
-             static_cast<juce::Component*>(&fxSelector),
-             static_cast<juce::Component*>(&fxNameEditor),
-             static_cast<juce::Component*>(&fxTypeLabel),
-             static_cast<juce::Component*>(&fxTypeSelector),
-             static_cast<juce::Component*>(&fxBypassedToggle),
-             static_cast<juce::Component*>(&fxAddButton),
-             static_cast<juce::Component*>(&fxDuplicateButton),
-             static_cast<juce::Component*>(&fxMoveUpButton),
-             static_cast<juce::Component*>(&fxMoveDownButton),
-             static_cast<juce::Component*>(&fxDeleteButton),
-             static_cast<juce::Component*>(&fxOwnerSelector),
-             static_cast<juce::Component*>(&fxMoveOwnerButton),
-             static_cast<juce::Component*>(&fxParameterSelector),
-             static_cast<juce::Component*>(&fxParameterSlider),
-             static_cast<juce::Component*>(&fxParameterResetButton),
-             static_cast<juce::Component*>(&fxAssignMacroButton),
-             static_cast<juce::Component*>(&fxParameterValueLabel),
-             static_cast<juce::Component*>(&fxSummaryLabel),
-             static_cast<juce::Component*>(&fxDiagnosticsLabel),
-             static_cast<juce::Component*>(&routingSectionLabel),
-             static_cast<juce::Component*>(&routingBusSelector),
-             static_cast<juce::Component*>(&routingInputLabel),
-             static_cast<juce::Component*>(&routingInputSelector),
-             static_cast<juce::Component*>(&routingInsertOneLabel),
-             static_cast<juce::Component*>(&routingInsertOneSelector),
-             static_cast<juce::Component*>(&routingInsertTwoLabel),
-             static_cast<juce::Component*>(&routingInsertTwoSelector),
-             static_cast<juce::Component*>(&routingSummaryLabel)
-         })
-    {
-        routingWorkbenchContent.addAndMakeVisible(component);
-    }
+    routingWorkbenchContent.setBindings({
+        &fxSectionLabel,
+        &fxScopeLabel,
+        &fxScopeSelector,
+        &fxScopeBreadcrumbLabel,
+        &fxSelector,
+        &fxNameEditor,
+        &fxTypeLabel,
+        &fxTypeSelector,
+        &fxBypassedToggle,
+        &fxAddButton,
+        &fxDuplicateButton,
+        &fxMoveUpButton,
+        &fxMoveDownButton,
+        &fxDeleteButton,
+        &fxOwnerSelector,
+        &fxMoveOwnerButton,
+        &fxParameterSelector,
+        &fxParameterSlider,
+        &fxParameterResetButton,
+        &fxAssignMacroButton,
+        &fxParameterValueLabel,
+        &fxSummaryLabel,
+        &fxDiagnosticsLabel,
+        &routingSectionLabel,
+        &routingBusSelector,
+        &routingInputLabel,
+        &routingInputSelector,
+        &routingInsertOneLabel,
+        &routingInsertOneSelector,
+        &routingInsertTwoLabel,
+        &routingInsertTwoSelector,
+        &routingSummaryLabel
+    });
 
     articulationWorkbenchViewport.setViewedComponent(&articulationWorkbenchContent, false);
     articulationWorkbenchViewport.setScrollBarsShown(true, false);
@@ -2476,9 +2475,9 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Provides access to project macro creation, assignment, range, and ordering controls.",
                                 "All macro controls are visible at standard workspace heights. Scroll vertically in unusually short host windows.");
     configureAccessibleMetadata(routingWorkbenchViewport,
-                                "Scrollable routing inspector",
-                                "Provides access to project routing, FX chain, ownership, and parameter controls.",
-                                "Scroll vertically to reach the advanced FX controls.");
+                                "Routing signal-path editor",
+                                "Provides access to the selected bus signal path, insert ownership, FX parameters, and Macro controls.",
+                                "Bus and selected-insert regions are side by side at normal widths and stack vertically in compact or short hosts.");
 
     configureAccessibleMetadata(workbenchToggleButton,
                                 "Workbench visibility",
@@ -2697,26 +2696,26 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Routing insert B",
                                 "Chooses the second insert effect for the selected routing bus.",
                                 "Open the list to choose the second insert.");
-    fxSelector.setExplicitFocusOrder(80);
-    fxScopeSelector.setExplicitFocusOrder(81);
-    fxNameEditor.setExplicitFocusOrder(82);
-    fxTypeSelector.setExplicitFocusOrder(83);
-    fxBypassedToggle.setExplicitFocusOrder(84);
-    fxAddButton.setExplicitFocusOrder(85);
-    fxDuplicateButton.setExplicitFocusOrder(86);
-    fxMoveUpButton.setExplicitFocusOrder(87);
-    fxMoveDownButton.setExplicitFocusOrder(88);
-    fxDeleteButton.setExplicitFocusOrder(89);
-    fxOwnerSelector.setExplicitFocusOrder(90);
-    fxMoveOwnerButton.setExplicitFocusOrder(91);
-    fxParameterSelector.setExplicitFocusOrder(92);
-    fxParameterSlider.setExplicitFocusOrder(93);
-    fxParameterResetButton.setExplicitFocusOrder(94);
-    fxAssignMacroButton.setExplicitFocusOrder(95);
-    routingBusSelector.setExplicitFocusOrder(96);
-    routingInputSelector.setExplicitFocusOrder(97);
-    routingInsertOneSelector.setExplicitFocusOrder(98);
-    routingInsertTwoSelector.setExplicitFocusOrder(99);
+    fxScopeSelector.setExplicitFocusOrder(80);
+    routingBusSelector.setExplicitFocusOrder(81);
+    routingInputSelector.setExplicitFocusOrder(82);
+    routingInsertOneSelector.setExplicitFocusOrder(83);
+    routingInsertTwoSelector.setExplicitFocusOrder(84);
+    fxSelector.setExplicitFocusOrder(85);
+    fxNameEditor.setExplicitFocusOrder(86);
+    fxTypeSelector.setExplicitFocusOrder(87);
+    fxBypassedToggle.setExplicitFocusOrder(88);
+    fxOwnerSelector.setExplicitFocusOrder(89);
+    fxMoveOwnerButton.setExplicitFocusOrder(90);
+    fxParameterSelector.setExplicitFocusOrder(91);
+    fxParameterSlider.setExplicitFocusOrder(92);
+    fxParameterResetButton.setExplicitFocusOrder(93);
+    fxAssignMacroButton.setExplicitFocusOrder(94);
+    fxAddButton.setExplicitFocusOrder(95);
+    fxDuplicateButton.setExplicitFocusOrder(96);
+    fxMoveUpButton.setExplicitFocusOrder(97);
+    fxMoveDownButton.setExplicitFocusOrder(98);
+    fxDeleteButton.setExplicitFocusOrder(99);
     configureAccessibleMetadata(masterGainSlider,
                                 "Project master gain",
                                 "Adjusts the project's top-level gain before group and zone gain are combined.",
@@ -3161,148 +3160,9 @@ void AuthoringPanel::resized()
         const auto routingContentWidth = std::max(320,
                                                   routingWorkbenchViewport.getWidth()
                                                       - routingWorkbenchViewport.getScrollBarThickness());
-        const auto useRoutingColumns = expanded
-            && !shortHeightLayout
-            && routingContentWidth >= 700
-            && routingWorkbenchViewport.getHeight() >= 190;
-        const auto routingContentHeight = useRoutingColumns
-            ? std::max(244, routingWorkbenchViewport.getHeight() + 18)
-            : (expanded ? 364 : 160);
+        const auto routingContentHeight = authoring::RoutingWorkbenchView::preferredContentHeight(
+            routingContentWidth, routingWorkbenchViewport.getHeight(), shortHeightLayout);
         routingWorkbenchContent.setSize(routingContentWidth, routingContentHeight);
-
-        auto routingEditorArea = routingWorkbenchContent.getLocalBounds().reduced(0, 0);
-        constexpr auto routingColumnGap = 12;
-        auto splitRoutingRow = [=](juce::Rectangle<int> row)
-        {
-            auto left = row.removeFromLeft((row.getWidth() - routingColumnGap) / 2);
-            row.removeFromLeft(std::min(routingColumnGap, row.getWidth()));
-            return std::pair { left, row };
-        };
-        auto takeRoutingRow = [&](int height = 28, int gapAfter = 4)
-        {
-            auto row = routingEditorArea.removeFromTop(height);
-            routingEditorArea.removeFromTop(std::min(gapAfter, routingEditorArea.getHeight()));
-            return row;
-        };
-
-        if (useRoutingColumns)
-        {
-            auto columns = splitRoutingRow(routingEditorArea);
-            auto left = columns.first;
-            auto right = columns.second;
-            auto takeColumnRow = [](juce::Rectangle<int>& column, const int height, const int gap = 3)
-            {
-                auto row = column.removeFromTop(std::min(height, column.getHeight()));
-                column.removeFromTop(std::min(gap, column.getHeight()));
-                return row;
-            };
-
-            fxSectionLabel.setBounds(takeColumnRow(left, 20));
-            auto row = takeColumnRow(left, 24);
-            layoutLabelAndField(row, fxScopeLabel, fxScopeSelector, 44);
-            fxSelector.setBounds(takeColumnRow(left, 24));
-            row = takeColumnRow(left, 24);
-            auto bypassArea = row.removeFromRight(std::min(110, row.getWidth() / 3));
-            row.removeFromRight(std::min(6, row.getWidth()));
-            layoutLabelAndField(row, fxTypeLabel, fxTypeSelector, 44);
-            fxBypassedToggle.setBounds(bypassArea);
-            row = takeColumnRow(left, 24);
-            auto ownerArea = row.removeFromRight((row.getWidth() - 6) / 2);
-            row.removeFromRight(std::min(6, row.getWidth()));
-            fxNameEditor.setBounds(row);
-            fxOwnerSelector.setBounds(ownerArea);
-
-            row = takeColumnRow(left, 24, 4);
-            const auto buttonWidth = std::max(54, (row.getWidth() - 16) / 5);
-            fxAddButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-            fxDuplicateButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-            fxMoveUpButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-            fxMoveDownButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-            fxDeleteButton.setBounds(row);
-            row = takeColumnRow(left, 24);
-            auto parameterArea = row.removeFromRight((row.getWidth() - 6) / 2);
-            row.removeFromRight(std::min(6, row.getWidth()));
-            fxMoveOwnerButton.setBounds(row);
-            fxParameterSelector.setBounds(parameterArea);
-            row = takeColumnRow(left, 28);
-            auto parameterActions = row.removeFromRight(std::min(190, row.getWidth() / 2));
-            row.removeFromRight(std::min(6, row.getWidth()));
-            fxParameterSlider.setBounds(row);
-            fxParameterResetButton.setBounds(parameterActions.removeFromLeft((parameterActions.getWidth() - 5) / 2));
-            parameterActions.removeFromLeft(std::min(5, parameterActions.getWidth()));
-            fxAssignMacroButton.setBounds(parameterActions);
-            row = takeColumnRow(left, 16, 2);
-            auto valueArea = row.removeFromLeft((row.getWidth() - 8) / 2);
-            row.removeFromLeft(std::min(8, row.getWidth()));
-            fxParameterValueLabel.setBounds(valueArea);
-            fxSummaryLabel.setBounds(row);
-            fxDiagnosticsLabel.setBounds(left.removeFromTop(std::max(1, left.getHeight())));
-
-            routingSectionLabel.setBounds(takeColumnRow(right, 20));
-            fxScopeBreadcrumbLabel.setBounds(takeColumnRow(right, 18));
-            routingBusSelector.setBounds(takeColumnRow(right, 24));
-            row = takeColumnRow(right, 24);
-            layoutLabelAndField(row, routingInputLabel, routingInputSelector, 44);
-            row = takeColumnRow(right, 24);
-            layoutLabelAndField(row, routingInsertOneLabel, routingInsertOneSelector, 52);
-            row = takeColumnRow(right, 24);
-            layoutLabelAndField(row, routingInsertTwoLabel, routingInsertTwoSelector, 52);
-            routingSummaryLabel.setBounds(right.removeFromTop(std::max(1, right.getHeight())));
-        }
-        else
-        {
-            auto headerRow = takeRoutingRow(24);
-            auto [leftHeader, rightHeader] = splitRoutingRow(headerRow);
-            fxSectionLabel.setBounds(leftHeader);
-            routingSectionLabel.setBounds(rightHeader);
-
-            if (expanded)
-            {
-                auto [left, right] = splitRoutingRow(takeRoutingRow());
-                layoutLabelAndField(left, fxScopeLabel, fxScopeSelector, 44);
-                fxScopeBreadcrumbLabel.setBounds(right);
-            }
-
-            auto [left, right] = splitRoutingRow(takeRoutingRow());
-            fxSelector.setBounds(left);
-            routingBusSelector.setBounds(right);
-            std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-            layoutLabelAndField(left, fxTypeLabel, fxTypeSelector, 44);
-            layoutLabelAndField(right, routingInputLabel, routingInputSelector, 44);
-            std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-            fxBypassedToggle.setBounds(left);
-            layoutLabelAndField(right, routingInsertOneLabel, routingInsertOneSelector, 44);
-            layoutLabelAndField(takeRoutingRow(28, expanded ? 6 : 0),
-                                routingInsertTwoLabel, routingInsertTwoSelector, 56);
-
-            if (expanded)
-            {
-                std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-                fxNameEditor.setBounds(left);
-                fxOwnerSelector.setBounds(right);
-                auto row = takeRoutingRow();
-                const auto buttonWidth = std::max(64, (row.getWidth() - 20) / 5);
-                fxAddButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-                fxDuplicateButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-                fxMoveUpButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-                fxMoveDownButton.setBounds(row.removeFromLeft(buttonWidth)); row.removeFromLeft(5);
-                fxDeleteButton.setBounds(row);
-                std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-                fxMoveOwnerButton.setBounds(left);
-                fxParameterSelector.setBounds(right);
-                std::tie(left, right) = splitRoutingRow(takeRoutingRow());
-                fxParameterSlider.setBounds(left);
-                fxParameterResetButton.setBounds(right.removeFromLeft((right.getWidth() - 5) / 2));
-                right.removeFromLeft(5);
-                fxAssignMacroButton.setBounds(right);
-                std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 2));
-                fxParameterValueLabel.setBounds(left);
-                fxSummaryLabel.setBounds(right);
-                std::tie(left, right) = splitRoutingRow(takeRoutingRow(18, 0));
-                fxDiagnosticsLabel.setBounds(left);
-                routingSummaryLabel.setBounds(right);
-            }
-        }
     }
     else if (workbenchState.activeTab == authoring::WorkbenchTab::performance)
     {
@@ -4436,9 +4296,22 @@ void AuthoringPanel::refreshWorkbenchVisibility()
         || isComponentFocusedWithin(focusedComponent, macroMaxSlider)
         || isComponentFocusedWithin(focusedComponent, macroMoveUpButton)
         || isComponentFocusedWithin(focusedComponent, macroMoveDownButton);
-    const auto focusWithinRouting = isComponentFocusedWithin(focusedComponent, fxSelector)
+    const auto focusWithinRouting = isComponentFocusedWithin(focusedComponent, fxScopeSelector)
+        || isComponentFocusedWithin(focusedComponent, fxSelector)
+        || isComponentFocusedWithin(focusedComponent, fxNameEditor)
         || isComponentFocusedWithin(focusedComponent, fxTypeSelector)
         || isComponentFocusedWithin(focusedComponent, fxBypassedToggle)
+        || isComponentFocusedWithin(focusedComponent, fxAddButton)
+        || isComponentFocusedWithin(focusedComponent, fxDuplicateButton)
+        || isComponentFocusedWithin(focusedComponent, fxMoveUpButton)
+        || isComponentFocusedWithin(focusedComponent, fxMoveDownButton)
+        || isComponentFocusedWithin(focusedComponent, fxDeleteButton)
+        || isComponentFocusedWithin(focusedComponent, fxOwnerSelector)
+        || isComponentFocusedWithin(focusedComponent, fxMoveOwnerButton)
+        || isComponentFocusedWithin(focusedComponent, fxParameterSelector)
+        || isComponentFocusedWithin(focusedComponent, fxParameterSlider)
+        || isComponentFocusedWithin(focusedComponent, fxParameterResetButton)
+        || isComponentFocusedWithin(focusedComponent, fxAssignMacroButton)
         || isComponentFocusedWithin(focusedComponent, routingBusSelector)
         || isComponentFocusedWithin(focusedComponent, routingInputSelector)
         || isComponentFocusedWithin(focusedComponent, routingInsertOneSelector)
@@ -4524,28 +4397,28 @@ void AuthoringPanel::refreshWorkbenchVisibility()
 
     setVisibleAndAccessible(routingWorkbenchViewport, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(fxSectionLabel, workbenchContentVisible && routingTab);
-    setVisibleAndAccessible(fxScopeLabel, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxScopeSelector, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxScopeBreadcrumbLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxScopeLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxScopeSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxScopeBreadcrumbLabel, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(fxSelector, workbenchContentVisible && routingTab);
-    setVisibleAndAccessible(fxNameEditor, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxNameEditor, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(fxTypeLabel, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(fxTypeSelector, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(fxBypassedToggle, workbenchContentVisible && routingTab);
-    setVisibleAndAccessible(fxAddButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxDuplicateButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxMoveUpButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxMoveDownButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxDeleteButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxOwnerSelector, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxMoveOwnerButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterSelector, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterSlider, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterResetButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxAssignMacroButton, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxParameterValueLabel, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxSummaryLabel, workbenchContentVisible && routingTab && expanded);
-    setVisibleAndAccessible(fxDiagnosticsLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(fxAddButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxDuplicateButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxMoveUpButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxMoveDownButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxDeleteButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxOwnerSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxMoveOwnerButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxParameterSelector, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxParameterSlider, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxParameterResetButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxAssignMacroButton, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxParameterValueLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxSummaryLabel, workbenchContentVisible && routingTab);
+    setVisibleAndAccessible(fxDiagnosticsLabel, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(routingSectionLabel, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(routingBusSelector, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(routingInputLabel, workbenchContentVisible && routingTab);
@@ -4554,7 +4427,7 @@ void AuthoringPanel::refreshWorkbenchVisibility()
     setVisibleAndAccessible(routingInsertOneSelector, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(routingInsertTwoLabel, workbenchContentVisible && routingTab);
     setVisibleAndAccessible(routingInsertTwoSelector, workbenchContentVisible && routingTab);
-    setVisibleAndAccessible(routingSummaryLabel, workbenchContentVisible && routingTab && expanded);
+    setVisibleAndAccessible(routingSummaryLabel, workbenchContentVisible && routingTab);
 
     setVisibleAndAccessible(performanceBankSelector, workbenchContentVisible && performanceTab);
     setVisibleAndAccessible(triggerSlotSelector, workbenchContentVisible && performanceTab);
@@ -5819,6 +5692,12 @@ void AuthoringPanel::refreshFromSession()
         macroAssignmentRemoveButton.setEnabled(false);
     }
 
+    auto routingSelectedFxContext = juce::String("No selected insert.");
+    auto routingMacroControlSummary = juce::String(
+        "No selected parameter is available for Macro control assignment.");
+    auto routingSignalPath = juce::String("No routing bus is selected.");
+    auto routingWarningState = false;
+
     const auto hasScopedFx = selectedFxSlotIndex >= 0
         && static_cast<std::size_t>(selectedFxSlotIndex) < project.authoring.fxSlots.size();
     if (hasScopedFx)
@@ -5845,6 +5724,7 @@ void AuthoringPanel::refreshFromSession()
         fxParameterSelector.clear(juce::dontSendNotification);
         const auto* descriptor = drs::engine::findCuratedDspEffect(fxSlot.effectType, fxSlot.effectVersion);
         const auto unavailable = descriptor == nullptr || fxSlot.unavailable || fxSlot.legacyInert;
+        routingWarningState = unavailable;
         if (descriptor != nullptr && !descriptor->parameters.empty())
         {
             for (std::size_t index = 0; index < descriptor->parameters.size(); ++index)
@@ -5885,6 +5765,9 @@ void AuthoringPanel::refreshFromSession()
             && findMacroIndexForDspTarget(project,
                                           fxSlot.id,
                                           fxParameterIds[static_cast<std::size_t>(selectedFxParameterIndex)]).has_value();
+        routingMacroControlSummary = hasMacroControl
+            ? "Assigned to a Macro control. Edit Control opens the existing assignment."
+            : "Not assigned to a Macro control. Create Control uses the current parameter.";
         fxAssignMacroButton.setButtonText(hasMacroControl ? "Edit Control" : "Create Control");
         fxAssignMacroButton.setTitle(fxAssignMacroButton.getButtonText());
         fxDuplicateButton.setEnabled(true);
@@ -5892,6 +5775,24 @@ void AuthoringPanel::refreshFromSession()
         fxMoveUpButton.setEnabled(!scopedFxSlotIds.empty() && scopedFxSlotIds.front() != fxSlot.id);
         fxMoveDownButton.setEnabled(!scopedFxSlotIds.empty() && scopedFxSlotIds.back() != fxSlot.id);
         fxMoveOwnerButton.setEnabled(fxOwnerSelector.getNumItems() > 1);
+        if (const auto* ownerBus = findOwnerBusForFxSlot(project, fxSlot.id))
+        {
+            const auto position = std::find(ownerBus->fxSlotIds.begin(), ownerBus->fxSlotIds.end(),
+                                            fxSlot.id);
+            routingSelectedFxContext = "Owner "
+                + juce::String::fromUTF8(ownerBus->displayName.c_str())
+                + " | Insert "
+                + juce::String(position == ownerBus->fxSlotIds.end()
+                                   ? 0 : static_cast<int>(std::distance(ownerBus->fxSlotIds.begin(), position)) + 1)
+                + " of " + juce::String(static_cast<int>(ownerBus->fxSlotIds.size()))
+                + " | " + (fxSlot.bypassed ? "Bypassed" : "Active");
+        }
+        else
+        {
+            routingSelectedFxContext = "No owner bus | position unavailable | "
+                + juce::String(fxSlot.bypassed ? "Bypassed" : "Active");
+            routingWarningState = true;
+        }
         fxSummaryLabel.setText(
             unavailable ? "Legacy effect — review to enable | " + juce::String::fromUTF8(fxSlot.id.c_str())
                 : juce::String::fromUTF8(fxSlot.id.c_str()) + " | "
@@ -5921,6 +5822,7 @@ void AuthoringPanel::refreshFromSession()
                 + "/128" + (totalCost > 128 ? " OVER BUDGET" : " within budget")
                 + " | " + (tailCapable ? "tail-capable" : "no tail"),
             juce::dontSendNotification);
+        routingWarningState = routingWarningState || totalCost > 128;
     }
     else
     {
@@ -6005,11 +5907,31 @@ void AuthoringPanel::refreshFromSession()
                 + " | chain " + joinIdList(routingBus.fxSlotIds)
                 + " | " + buildMacroControllerSummaryForBus(project, routingBus.id),
             juce::dontSendNotification);
+        routingSignalPath = "Input "
+            + formatRoutingInputSourceLabel(project, routingBus.inputSourceId);
+        for (const auto& fxSlotId : routingBus.fxSlotIds)
+        {
+            const auto fxSlot = std::find_if(project.authoring.fxSlots.begin(),
+                                             project.authoring.fxSlots.end(),
+                                             [&](const auto& candidate)
+                                             {
+                                                 return candidate.id == fxSlotId;
+                                             });
+            routingSignalPath << " > "
+                              << (fxSlot != project.authoring.fxSlots.end()
+                                      ? juce::String::fromUTF8(fxSlot->displayName.c_str())
+                                      : juce::String::fromUTF8(fxSlotId.c_str()));
+        }
+        routingSignalPath << " > Output";
     }
     else
     {
         routingSummaryLabel.setText("No routing buses are authored in this project yet.", juce::dontSendNotification);
     }
+
+    routingWorkbenchContent.setPresentationState(
+        !project.authoring.routingBuses.empty(), hasScopedFx, routingWarningState,
+        routingSignalPath, routingSelectedFxContext, routingMacroControlSummary);
 
     if (const auto selectedPerformanceBank = authoringSession.getSelectedPerformanceBank(); selectedPerformanceBank.has_value())
     {

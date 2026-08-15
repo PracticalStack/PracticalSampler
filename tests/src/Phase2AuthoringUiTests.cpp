@@ -1241,7 +1241,7 @@ void writeReachabilityChecklist(std::ostream& inventory)
     inventory << "- Workbench context: authoringWorkbenchTitleLabel, authoringWorkbenchScopeLabel, authoringWorkbenchBreadcrumbLabel\n";
     inventory << "- Waveform workbench content: authoringWaveformPreview, authoringWaveformStatusLabel, authoringWaveformInfoLabel, authoringWaveformLoopLabel, authoringWaveformImportLabel, authoringWaveformValidationLabel, authoringWaveformValidationButton\n";
     inventory << "- Macros workbench content: authoringMacroList, authoringMacroListBox, authoringMacroCreateButton, authoringMacroDuplicateButton, authoringMacroDeleteButton, authoringMacroNameEditor, authoringMacroExposeToggle, authoringMacroAssignmentList, authoringMacroAssignmentListBox, authoringMacroAssignmentSelector, authoringMacroAssignmentAddButton, authoringMacroAssignmentRemoveButton, authoringMacroRoleSelector, authoringMacroDefaultSlider, authoringMacroMinSlider, authoringMacroMaxSlider, authoringMacroMoveUpButton, authoringMacroMoveDownButton\n";
-    inventory << "- Routing workbench content: authoringFxSelector, authoringFxTypeSelector, authoringFxBypassedToggle, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector\n";
+    inventory << "- Routing workbench content: authoringRoutingSignalPathHeading, authoringRoutingSignalPathLabel, authoringRoutingSelector, authoringRoutingInputSelector, authoringRoutingInsertOneSelector, authoringRoutingInsertTwoSelector, authoringFxSelector, authoringFxIdentityHeading, authoringFxContextLabel, authoringFxTypeSelector, authoringFxBypassedToggle, authoringFxOwnerSelector, authoringFxParameterHeading, authoringFxParameterSlider, authoringFxMacroAssignmentSummary, authoringFxAddButton, authoringFxDeleteButton\n";
     inventory << "- Performance workbench content: authoringPerformanceBankSelector, authoringTriggerSlotSelector, authoringTriggerEventSelector, authoringTargetArticulationSelector, authoringPhraseAssetSelector, authoringChordModeSelector, authoringPhraseImportPath, authoringPhraseImportButton\n";
     inventory << "- Retired temporary IDs absent: authoringModeSelector, authoringWorkbenchPlaceholder, authoringMacroSelector\n";
     inventory << "\n";
@@ -1918,7 +1918,10 @@ void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
         require(component != nullptr, "Missing routing component: " + componentId.toStdString());
         const auto viewportBoundsInPanel = panel.getLocalArea(&viewport, viewport.getLocalBounds());
         const auto componentBoundsInPanel = panel.getLocalArea(component, component->getLocalBounds());
-        require(viewportBoundsInPanel.intersects(componentBoundsInPanel), message);
+        require(viewportBoundsInPanel.intersects(componentBoundsInPanel),
+                message + " viewport=" + viewportBoundsInPanel.toString().toStdString()
+                    + " component=" + componentBoundsInPanel.toString().toStdString()
+                    + " viewY=" + std::to_string(viewport.getViewPositionY()));
     };
 
     viewport.setViewPosition(0, 0);
@@ -1926,18 +1929,24 @@ void exerciseRoutingViewportReachability(drs::app::AuthoringPanel& panel,
                               "Routing scope should be visible at the top of the inspector.");
     requireIntersectsViewport("authoringRoutingSelector",
                               "Routing bus selection should be visible at the top of the inspector.");
+    auto* routingSummary = findDescendantById(panel, "authoringRoutingSummaryLabel");
+    require(routingSummary != nullptr, "Routing summary should remain part of the signal-path region.");
+    viewport.setViewPosition(0, routingSummary->getY());
+    requireIntersectsViewport("authoringRoutingSummaryLabel",
+                              "Routing summary should remain reachable with its signal-path region.");
 
-    viewport.setViewPosition(0, content->getHeight());
+    auto* parameterSlider = findDescendantById(panel, "authoringFxParameterSlider");
+    require(parameterSlider != nullptr, "Routing parameter slider should remain in selected-FX detail.");
+    viewport.setViewPosition(0, parameterSlider->getY());
     require(viewport.getViewPositionY() > 0,
-            "Routing viewport should scroll to its advanced-control region.");
+            "Routing viewport should scroll to its selected-parameter region.");
     requireIntersectsViewport("authoringFxParameterSlider",
                               "FX parameter editing should be reachable after scrolling.");
     requireIntersectsViewport("authoringFxAssignMacroButton",
                               "FX macro assignment should be reachable after scrolling.");
+    viewport.setViewPosition(0, content->getHeight());
     requireIntersectsViewport("authoringFxDiagnosticsLabel",
                               "FX diagnostics should be reachable after scrolling.");
-    requireIntersectsViewport("authoringRoutingSummaryLabel",
-                              "Routing summary should be reachable after scrolling.");
     viewport.setViewPosition(0, 0);
 }
 

@@ -148,11 +148,11 @@ void qualifyExpandedWorkbench()
     auto& routingContent = requireComponent(panel, "authoringRoutingContent");
     auto& fxHeading = requireComponent(panel, "authoringFxSectionLabel");
     auto& busHeading = requireComponent(panel, "authoringRoutingSectionLabel");
-    require(panel.getLocalArea(&fxHeading, fxHeading.getLocalBounds()).getRight()
-                < panel.getLocalArea(&busHeading, busHeading.getLocalBounds()).getX(),
-            "Focused Routing must expose independent FX and bus columns.");
-    require(routingContent.getHeight() - routingViewport.getHeight() <= 54,
-            "Focused Routing must keep normal editing controls in view with only a short overflow path.");
+    require(panel.getLocalArea(&busHeading, busHeading.getLocalBounds()).getRight()
+                < panel.getLocalArea(&fxHeading, fxHeading.getLocalBounds()).getX(),
+            "Focused Routing must expose signal-path then selected-FX regions.");
+    require(routingContent.getHeight() - routingViewport.getHeight() <= 112,
+            "Focused Routing must keep primary path and parameter controls in view with bounded secondary overflow.");
     require(session.getDocumentState().undoDepth == initialUndoDepth,
             "Workbench navigation and sizing must stay outside authored undo history.");
 
