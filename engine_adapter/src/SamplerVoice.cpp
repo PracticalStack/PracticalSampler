@@ -109,13 +109,35 @@ bool SamplerVoice::beginRelease(const double overrideReleaseSeconds) noexcept
     if (lifecycleState != SamplerVoiceLifecycleState::active)
         return false;
 
-    lifecycleState = SamplerVoiceLifecycleState::releasing;
     const auto releaseSeconds = overrideReleaseSeconds > 0.0
         ? overrideReleaseSeconds : (route != nullptr ? route->releaseSeconds : 0.0);
     const auto usesAuthoredRelease = overrideReleaseSeconds <= 0.0
         && route != nullptr && route->releaseSeconds > 0.0;
-    releaseShape = usesAuthoredRelease && std::isfinite(route->releaseShape)
+    return configureRelease(releaseSeconds, usesAuthoredRelease, 1.0f, false, 0);
+}
+
+bool SamplerVoice::beginReleaseForControllerValue(const std::uint8_t controllerValue) noexcept
+{
+    if (lifecycleState != SamplerVoiceLifecycleState::active)
+        return false;
+    if (route == nullptr || !route->damper.dynamicRelease)
+        return beginRelease();
+    return configureRelease(dynamicReleaseSeconds(controllerValue), true, 1.0f,
+                            true, controllerValue);
+}
+
+bool SamplerVoice::configureRelease(const double releaseSeconds,
+                                    const bool retainAuthoredShape,
+                                    const float startingLevel,
+                                    const bool hasControllerValue,
+                                    const std::uint8_t controllerValue) noexcept
+{
+    lifecycleState = SamplerVoiceLifecycleState::releasing;
+    releaseShape = retainAuthoredShape && route != nullptr && std::isfinite(route->releaseShape)
         ? route->releaseShape : 0.0;
+    releaseLevelScale = std::clamp(startingLevel, 0.0f, 1.0f);
+    hasReleaseControllerValue = hasControllerValue;
+    releaseControllerValue = controllerValue;
     if (releaseSeconds > 0.0 && std::isfinite(outputSampleRate) && outputSampleRate > 0.0)
     {
         releaseSamplesTotal = static_cast<std::uint32_t>(
@@ -127,6 +149,56 @@ bool SamplerVoice::beginRelease(const double overrideReleaseSeconds) noexcept
     }
     releaseSamplesRemaining = releaseSamplesTotal;
     return true;
+}
+
+double SamplerVoice::dynamicReleaseSeconds(const std::uint8_t controllerValue) const noexcept
+{
+    if (route == nullptr || !route->damper.dynamicRelease)
+        return route != nullptr ? route->releaseSeconds : 0.0;
+    const auto curveValue = route->damper.releaseCurve[controllerValue];
+    return std::clamp(route->releaseSeconds
+                          + route->damper.releaseAmountSeconds * curveValue,
+                      minimumDynamicReleaseSeconds,
+                      maximumDynamicReleaseSeconds);
+}
+
+float SamplerVoice::getReleaseEnvelopeLevel() const noexcept
+{
+    if (!isReleasing())
+        return lifecycleState == SamplerVoiceLifecycleState::active ? 1.0f : 0.0f;
+    return releaseLevelScale
+        * computeReleaseEnvelope(releaseSamplesRemaining, releaseSamplesTotal, releaseShape);
+}
+
+bool SamplerVoice::updateDynamicRelease(const std::uint8_t controllerNumber,
+                                        const std::uint8_t controllerValue) noexcept
+{
+    if (!isReleasing() || route == nullptr || !route->damper.dynamicRelease
+        || controllerNumber != route->damper.releaseControllerNumber
+        || (hasReleaseControllerValue && releaseControllerValue == controllerValue))
+        return false;
+
+    const auto currentLevel = getReleaseEnvelopeLevel();
+    const auto releaseSeconds = dynamicReleaseSeconds(controllerValue);
+    const auto samples = static_cast<std::uint32_t>(std::max(
+        1ll, static_cast<long long>(std::llround(releaseSeconds * outputSampleRate))));
+    releaseSamplesTotal = samples;
+    releaseSamplesRemaining = samples;
+    releaseLevelScale = currentLevel;
+    hasReleaseControllerValue = true;
+    releaseControllerValue = controllerValue;
+    ++dynamicReleaseUpdateCount;
+    return true;
+}
+
+bool SamplerVoice::isSustainDown(
+    const std::array<std::uint8_t, 128>& controllerValues) const noexcept
+{
+    if (route == nullptr)
+        return false;
+    const auto controller = static_cast<std::size_t>(std::clamp(
+        route->damper.sustainControllerNumber, 0, 127));
+    return static_cast<double>(controllerValues[controller]) >= route->damper.sustainThreshold;
 }
 
 SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
@@ -230,9 +302,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             return current + (next - current) * fraction;
         };
 
-        const auto envelope = isReleasing() && releaseSamplesTotal > 0
-            ? computeReleaseEnvelope(releaseSamplesRemaining, releaseSamplesTotal, releaseShape)
-            : 1.0f;
+        const auto envelope = isReleasing() ? getReleaseEnvelopeLevel() : 1.0f;
         const auto leftSample = readInterpolated(0) * baseGain * panGains.left * envelope;
         const auto rightSource = sourceChannelCount > 1 ? readInterpolated(1) : readInterpolated(0);
         const auto rightSample = rightSource * baseGain * panGains.right * envelope;
@@ -290,6 +360,10 @@ void SamplerVoice::reset() noexcept
     releaseSamplesRemaining = 0;
     releaseSamplesTotal = 0;
     releaseShape = 0.0;
+    releaseLevelScale = 1.0f;
+    hasReleaseControllerValue = false;
+    releaseControllerValue = 0;
+    dynamicReleaseUpdateCount = 0;
     underrunning = false;
     nextLookAheadPublicationFrame = 0;
 }

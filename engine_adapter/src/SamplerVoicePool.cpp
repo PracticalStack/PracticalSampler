@@ -333,6 +333,7 @@ bool SamplerVoicePool::prepare(const SamplerRenderModel& model,
     nextVoiceId = 1;
     nextTriggerId = 1;
     nextGeneratedActivation = 1;
+    controllerStateInitialized = false;
     return activateModel(model, outputSampleRate, activationGeneration);
 }
 
@@ -362,12 +363,17 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
     renderModel = &model;
     sampleRate = outputSampleRate;
     activeGeneration = activationGeneration;
-    controllerValues.fill(0);
     const auto& program = model.getPerformanceProgram();
-    for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
-        if (program.hasControllerDefault[controller])
-            controllerValues[controller] = program.controllerDefaults[controller];
-    sustainPedalDown = controllerValues[64] >= 64;
+    if (!model.usesContinuousDamper() || !controllerStateInitialized)
+    {
+        controllerValues.fill(0);
+        for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
+            if (program.hasControllerDefault[controller])
+                controllerValues[controller] = program.controllerDefaults[controller];
+        controllerStateInitialized = true;
+    }
+    sustainPedalDown = static_cast<double>(controllerValues[static_cast<std::size_t>(
+        model.getSustainControllerNumber())]) >= model.getSustainThreshold();
     rebuildRoundRobinPools(model);
     applyRoundRobinResets(RoundRobinResetEvent::programActivation);
     return true;
@@ -384,6 +390,7 @@ void SamplerVoicePool::clearRenderModel() noexcept
     nextGeneratedActivation = 1;
     resetRoundRobinPools();
     controllerValues.fill(0);
+    controllerStateInitialized = false;
 }
 
 SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferView output,
@@ -517,7 +524,12 @@ SamplerVoiceSlotSnapshot SamplerVoicePool::getSlotSnapshot(std::size_t index) co
              slot.voice.getIncrementFrames(),
              slot.voice.getBaseGain(),
              slot.voice.isLoopActive(),
-             slot.sustainDeferred };
+             slot.sustainDeferred,
+             slot.voice.getReleaseSamplesRemaining(),
+             slot.voice.getReleaseSamplesTotal(),
+             slot.voice.getReleaseEnvelopeLevel(),
+             slot.voice.getDynamicReleaseUpdateCount(),
+             slot.voice.getDamperCurveIndex() };
 }
 
 void SamplerVoicePool::renderRange(SamplerAudioBufferView output,
@@ -947,15 +959,21 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                         slot.sustainDeferred = false;
                         continue;
                     }
-                    if (sustainPedalDown)
+                    if (slot.voice.isSustainDown(controllerValues))
                     {
                         slot.sustainDeferred = true;
                     }
-                    else if (slot.voice.beginRelease())
+                    else
                     {
-                        slot.state = SamplerVoiceSlotState::releasing;
-                        slot.sustainDeferred = false;
-                        ++result.render.releasedVoiceCount;
+                        const auto releaseController = static_cast<std::size_t>(std::clamp(
+                            slot.voice.getReleaseControllerNumber(), 0, 127));
+                        if (slot.voice.beginReleaseForControllerValue(
+                                controllerValues[releaseController]))
+                        {
+                            slot.state = SamplerVoiceSlotState::releasing;
+                            slot.sustainDeferred = false;
+                            ++result.render.releasedVoiceCount;
+                        }
                     }
                 }
             }
@@ -965,9 +983,35 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
         case SamplerRenderEventType::pedalDown:
         case SamplerRenderEventType::pedalUp:
         {
+            const auto isRawSustain = event.type == SamplerRenderEventType::sustainPedal;
+            const auto exactValue = isRawSustain
+                ? (event.controllerNumber == halfPedalReleaseControllerNumber
+                       ? event.controllerValue
+                       : static_cast<std::uint8_t>(std::clamp(
+                           static_cast<int>(std::lround(event.velocity * 127.0f)), 0, 127)))
+                : (event.type == SamplerRenderEventType::pedalDown
+                       ? std::uint8_t { 127 } : std::uint8_t { 0 });
+            if (isRawSustain || renderModel == nullptr || !renderModel->usesContinuousDamper())
+                controllerValues[halfPedalReleaseControllerNumber] = exactValue;
+            if (isRawSustain)
+                for (auto& slot : slots)
+                    if (slot.state == SamplerVoiceSlotState::releasing
+                        && slot.voice.updateDynamicRelease(halfPedalReleaseControllerNumber,
+                                                           exactValue))
+                    {
+                        ++result.dynamicReleaseUpdateCount;
+                    }
+            if (isRawSustain && renderModel != nullptr
+                && renderModel->getSustainControllerNumber()
+                    != halfPedalReleaseControllerNumber)
+            {
+                return;
+            }
             const auto pressed = event.type == SamplerRenderEventType::pedalDown
-                || (event.type == SamplerRenderEventType::sustainPedal && event.velocity >= 0.5f);
-            controllerValues[64] = pressed ? std::uint8_t { 127 } : std::uint8_t { 0 };
+                || (isRawSustain
+                    && static_cast<double>(exactValue)
+                        >= (renderModel != nullptr ? renderModel->getSustainThreshold()
+                                                   : legacySustainThreshold));
             if (pressed == sustainPedalDown)
                 return;
             sustainPedalDown = pressed;
@@ -978,12 +1022,17 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             for (auto& slot : slots)
             {
                 if (slot.state == SamplerVoiceSlotState::active
-                    && slot.sustainDeferred
-                    && slot.voice.beginRelease())
+                    && slot.sustainDeferred)
                 {
-                    slot.state = SamplerVoiceSlotState::releasing;
-                    slot.sustainDeferred = false;
-                    ++result.render.releasedVoiceCount;
+                    const auto releaseController = static_cast<std::size_t>(std::clamp(
+                        slot.voice.getReleaseControllerNumber(), 0, 127));
+                    if (slot.voice.beginReleaseForControllerValue(
+                            controllerValues[releaseController]))
+                    {
+                        slot.state = SamplerVoiceSlotState::releasing;
+                        slot.sustainDeferred = false;
+                        ++result.render.releasedVoiceCount;
+                    }
                 }
             }
             return;
@@ -995,7 +1044,41 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 ++result.render.droppedEventCount;
                 return;
             }
-            controllerValues[event.controllerNumber] = event.controllerValue;
+            {
+                std::array<bool, capacity> wasSustainDown {};
+                for (std::size_t index = 0; index < slots.size(); ++index)
+                    if (slots[index].state == SamplerVoiceSlotState::active
+                        && slots[index].sustainDeferred
+                        && slots[index].voice.getSustainControllerNumber()
+                            == event.controllerNumber)
+                        wasSustainDown[index] = slots[index].voice.isSustainDown(controllerValues);
+
+                controllerValues[event.controllerNumber] = event.controllerValue;
+                for (std::size_t index = 0; index < slots.size(); ++index)
+                {
+                    auto& slot = slots[index];
+                    if (slot.state == SamplerVoiceSlotState::releasing
+                        && slot.voice.updateDynamicRelease(event.controllerNumber,
+                                                           event.controllerValue))
+                    {
+                        ++result.dynamicReleaseUpdateCount;
+                    }
+                    if (slot.state != SamplerVoiceSlotState::active
+                        || !slot.sustainDeferred || !wasSustainDown[index]
+                        || slot.voice.getSustainControllerNumber() != event.controllerNumber
+                        || slot.voice.isSustainDown(controllerValues))
+                        continue;
+                    const auto releaseController = static_cast<std::size_t>(std::clamp(
+                        slot.voice.getReleaseControllerNumber(), 0, 127));
+                    if (slot.voice.beginReleaseForControllerValue(
+                            controllerValues[releaseController]))
+                    {
+                        slot.state = SamplerVoiceSlotState::releasing;
+                        slot.sustainDeferred = false;
+                        ++result.render.releasedVoiceCount;
+                    }
+                }
+            }
             return;
 
         case SamplerRenderEventType::allNotesOff:
@@ -1003,7 +1086,10 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             {
                 if (slot.state == SamplerVoiceSlotState::active)
                 {
-                    if (slot.voice.beginRelease())
+                    const auto releaseController = static_cast<std::size_t>(std::clamp(
+                        slot.voice.getReleaseControllerNumber(), 0, 127));
+                    if (slot.voice.beginReleaseForControllerValue(
+                            controllerValues[releaseController]))
                     {
                         slot.state = SamplerVoiceSlotState::releasing;
                         slot.sustainDeferred = false;
@@ -1033,7 +1119,10 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
                     if (program.hasControllerDefault[controller])
                         controllerValues[controller] = program.controllerDefaults[controller];
-                sustainPedalDown = controllerValues[64] >= 64;
+                controllerStateInitialized = true;
+                sustainPedalDown = static_cast<double>(controllerValues[static_cast<std::size_t>(
+                    renderModel->getSustainControllerNumber())])
+                    >= renderModel->getSustainThreshold();
             }
             return;
     }

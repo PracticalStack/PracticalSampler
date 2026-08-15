@@ -62,7 +62,10 @@ bool SamplerPlaybackContext::prepare(double outputSampleRate) noexcept
                           activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial);
         performanceState.migrateProgram(
             activeRenderModel->getPerformanceProgram(),
-            activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial);
+            activationSlots[static_cast<std::size_t>(activeActivationSlot)].serial,
+            activeRenderModel->usesContinuousDamper(),
+            activeRenderModel->getSustainControllerNumber(),
+            activeRenderModel->getSustainThreshold());
     }
     else
         voicePool.clearRenderModel();
@@ -548,7 +551,10 @@ bool SamplerPlaybackContext::applyPendingActivationAtBlockBoundary() noexcept
     activeDspGeneration = slot.dspGeneration.get();
     activeRevision = model->getRevision();
     activePreparedBuildId = model->getPreparedBuildId();
-    performanceState.migrateProgram(model->getPerformanceProgram(), slot.serial);
+    performanceState.migrateProgram(model->getPerformanceProgram(), slot.serial,
+                                    model->usesContinuousDamper(),
+                                    model->getSustainControllerNumber(),
+                                    model->getSustainThreshold());
     ++counters.appliedActivationCount;
     return true;
 }

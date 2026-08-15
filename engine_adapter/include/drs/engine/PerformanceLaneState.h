@@ -29,6 +29,7 @@ struct PerformanceLaneStateSnapshot
     bool pedalDown = false;
     std::uint32_t heldNoteCount = 0;
     std::uint32_t consumedNoteCount = 0;
+    std::array<std::uint8_t, 128> controllerValues {};
     std::uint64_t actionOverflowCount = 0;
     std::array<std::uint64_t, kPerformanceEventKindCount> semanticEventCounts {};
 };
@@ -57,7 +58,10 @@ public:
 
     void reset() noexcept;
     void migrateProgram(const CompiledPerformanceProgram& program,
-                        std::uint64_t activationGeneration) noexcept;
+                        std::uint64_t activationGeneration,
+                        bool continuousDamperEnabled = false,
+                        int sustainControllerNumber = legacySustainControllerNumber,
+                        double sustainThreshold = legacySustainThreshold) noexcept;
     bool normalize(const SamplerRenderEvent& raw,
                    std::uint64_t activationGeneration,
                    const CompiledPerformanceProgram& program,
@@ -85,6 +89,11 @@ private:
     std::uint64_t selectedArticulationStableId = 0;
     std::uint32_t articulationCount = 0;
     bool pedalIsDown = false;
+    bool controllerStateInitialized = false;
+    bool continuousDamperEnabled = false;
+    int sustainControllerNumber = legacySustainControllerNumber;
+    double sustainThreshold = legacySustainThreshold;
+    std::array<std::uint8_t, 128> controllerValues {};
     std::uint64_t actionOverflowCount = 0;
     std::array<std::uint64_t, kPerformanceEventKindCount> semanticEventCounts {};
 };

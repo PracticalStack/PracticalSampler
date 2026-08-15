@@ -175,6 +175,7 @@ struct SamplerRenderRoute
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
+    ContinuousDamperDefinition damper;
 };
 
 struct SamplerRenderModelBuildResult;
@@ -204,6 +205,9 @@ public:
     const CompiledPerformanceProgram& getPerformanceProgram() const noexcept { return performanceProgram; }
     int getMidiNoteOffset() const noexcept { return midiNoteOffset; }
     int getFixedVelocity() const noexcept { return fixedVelocity; }
+    bool usesContinuousDamper() const noexcept { return continuousDamperEnabled; }
+    int getSustainControllerNumber() const noexcept { return sustainControllerNumber; }
+    double getSustainThreshold() const noexcept { return sustainThreshold; }
     const PlaybackActivationPayloadPtr& getRetainedActivationPayload() const noexcept
     {
         return retainedActivationPayload;
@@ -226,6 +230,9 @@ private:
     CompiledPerformanceProgram performanceProgram;
     int midiNoteOffset = 0;
     int fixedVelocity = 0;
+    bool continuousDamperEnabled = false;
+    int sustainControllerNumber = legacySustainControllerNumber;
+    double sustainThreshold = legacySustainThreshold;
     PlaybackActivationPayloadPtr retainedActivationPayload;
 };
 

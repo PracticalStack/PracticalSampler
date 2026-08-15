@@ -188,14 +188,14 @@ sweep crosses 64 only near its end.
 `drs_all_tests`. Invoke exactly one named seam; exit 1 is expected until its owning
 later slice promotes it to registered green behavior:
 
-- `preserve-continuous-cc64` — HP-03
-- `dynamic-release-envelope` — HP-03
 - `repedal-still-audible` — HP-04
 - `release-trigger-uniqueness` — HP-04
-- `sustain-controller-reassignment` — HP-02/HP-03
-- `generation-owned-damper-update` — HP-03/HP-04
 - `salamander-half-pedal-projection` — promoted by HP-02 on August 15, 2026;
   direct invocation now exits 0 and names the registered HP-02 coverage
+- `preserve-continuous-cc64`, `dynamic-release-envelope`,
+  `sustain-controller-reassignment`, and `generation-owned-damper-update` —
+  promoted by HP-03 on August 15, 2026; direct invocation now exits 0 and names
+  the registered HP-03 coverage
 
 Exit 2 means invalid invocation or fixture setup and is never an expected result.
 Later slices must replace each red seam with behavioral coverage; deleting the seam

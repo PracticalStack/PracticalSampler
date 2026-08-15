@@ -71,12 +71,20 @@ void PerformanceLaneState::reset() noexcept
     selectedArticulationStableId = 0;
     articulationCount = 0;
     pedalIsDown = false;
+    controllerStateInitialized = false;
+    continuousDamperEnabled = false;
+    sustainControllerNumber = legacySustainControllerNumber;
+    sustainThreshold = legacySustainThreshold;
+    controllerValues = {};
     actionOverflowCount = 0;
     semanticEventCounts = {};
 }
 
 void PerformanceLaneState::migrateProgram(const CompiledPerformanceProgram& program,
-                                          const std::uint64_t activationGeneration) noexcept
+                                          const std::uint64_t activationGeneration,
+                                          const bool useContinuousDamper,
+                                          const int configuredSustainController,
+                                          const double configuredSustainThreshold) noexcept
 {
     std::uint32_t migrated = kInvalidPerformanceProgramIndex;
     if (selectedArticulationStableId != 0)
@@ -97,7 +105,19 @@ void PerformanceLaneState::migrateProgram(const CompiledPerformanceProgram& prog
     articulationCount = program.articulationCount;
     selectedArticulationStableId = migrated < program.articulationStableIds.size()
         ? program.articulationStableIds[migrated] : 0;
-    pedalIsDown = program.hasControllerDefault[64] && program.controllerDefaults[64] >= 64;
+    continuousDamperEnabled = useContinuousDamper;
+    sustainControllerNumber = std::clamp(configuredSustainController, 0, 127);
+    sustainThreshold = std::clamp(configuredSustainThreshold, 0.0, 127.0);
+    if (!continuousDamperEnabled || !controllerStateInitialized)
+    {
+        controllerValues.fill(0);
+        for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
+            if (program.hasControllerDefault[controller])
+                controllerValues[controller] = program.controllerDefaults[controller];
+        controllerStateInitialized = true;
+    }
+    pedalIsDown = static_cast<double>(controllerValues[static_cast<std::size_t>(sustainControllerNumber)])
+        >= sustainThreshold;
     // Existing records deliberately retain their original generation and articulation.
     (void) activationGeneration;
 }
@@ -262,6 +282,15 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
         }
         case SamplerRenderEventType::sustainPedal:
         {
+            if (continuousDamperEnabled)
+            {
+                event.type = SamplerRenderEventType::controllerChange;
+                event.controllerNumber = halfPedalReleaseControllerNumber;
+                event.controllerValue = raw.controllerNumber == halfPedalReleaseControllerNumber
+                    ? raw.controllerValue
+                    : toMidiVelocity(raw.velocity);
+                return normalize(event, activationGeneration, program, scratch);
+            }
             const auto down = event.velocity >= (64.0f / 127.0f);
             if (down == pedalIsDown) return true;
             const auto pedalEvent = down ? PerformanceEventKind::pedalDown : PerformanceEventKind::pedalUp;
@@ -350,19 +379,46 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
         }
         case SamplerRenderEventType::controllerChange:
         {
+            if (raw.controllerNumber > 127 || raw.controllerValue > 127)
+                return false;
+            const auto controllerIndex = static_cast<std::size_t>(raw.controllerNumber);
+            const auto oldValue = controllerValues[controllerIndex];
+            const auto targetsSustain = continuousDamperEnabled
+                && raw.controllerNumber == sustainControllerNumber;
+            const auto wasDown = targetsSustain
+                && static_cast<double>(oldValue) >= sustainThreshold;
+            const auto isDown = targetsSustain
+                && static_cast<double>(raw.controllerValue) >= sustainThreshold;
+            const auto pedalEdge = targetsSustain && wasDown != isDown;
             const auto emitsControllerTrigger = hasTriggerRoute(
                 program,
                 PerformanceEventKind::controllerChange,
                 selectedArticulationIndex,
-                pedalIsDown,
+                pedalEdge ? isDown : pedalIsDown,
                 raw.controllerNumber,
                 raw.controllerValue);
-            if (scratch.size() + 1u + (emitsControllerTrigger ? 1u : 0u)
+            const auto pedalEvent = isDown ? PerformanceEventKind::pedalDown
+                                           : PerformanceEventKind::pedalUp;
+            const auto emitsPedalTrigger = pedalEdge
+                && hasTriggerRoute(program, pedalEvent, selectedArticulationIndex, isDown);
+            std::size_t releaseCount = 0;
+            if (pedalEdge && !isDown)
+                for (const auto& held : heldNotes)
+                    if (held.active && !held.consumed && !held.physicalKeyDown
+                        && held.pedalDeferred && !held.releaseEmitted
+                        && hasTriggerRoute(program, PerformanceEventKind::release,
+                                           held.articulationAtAttack, false))
+                        ++releaseCount;
+            const auto actionCount = 1u + (emitsControllerTrigger ? 1u : 0u)
+                + (pedalEdge ? 1u : 0u) + releaseCount
+                + (emitsPedalTrigger ? 1u : 0u);
+            if (scratch.size() + actionCount
                 > PerformanceActionScratch::capacity)
             {
                 ++actionOverflowCount;
                 return false;
             }
+            controllerValues[controllerIndex] = raw.controllerValue;
             scratch.push(raw);
             ++semanticEventCounts[static_cast<std::size_t>(
                 PerformanceEventKind::controllerChange)];
@@ -373,9 +429,38 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                 event.velocity = 1.0f;
                 event.articulationIndex = selectedArticulationIndex;
                 event.performanceEvent = PerformanceEventKind::controllerChange;
-                event.sustainPedalDown = pedalIsDown;
+                event.sustainPedalDown = pedalEdge ? isDown : pedalIsDown;
                 scratch.push(event);
             }
+            if (!pedalEdge)
+                return true;
+
+            setPedal(isDown);
+            auto transition = raw;
+            transition.type = isDown ? SamplerRenderEventType::pedalDown
+                                     : SamplerRenderEventType::pedalUp;
+            transition.performanceEvent = pedalEvent;
+            transition.sustainPedalDown = isDown;
+            ++semanticEventCounts[static_cast<std::size_t>(pedalEvent)];
+            if (!isDown)
+                for (auto& held : heldNotes)
+                    if (held.active && !held.consumed && !held.physicalKeyDown
+                        && held.pedalDeferred && !held.releaseEmitted)
+                    {
+                        if (hasTriggerRoute(program, PerformanceEventKind::release,
+                                            held.articulationAtAttack, false))
+                            scratch.push(makeTriggerEvent(transition, held,
+                                                          PerformanceEventKind::release, false));
+                        held.releaseEmitted = true;
+                        held.pedalDeferred = false;
+                        held.active = false;
+                        ++semanticEventCounts[static_cast<std::size_t>(
+                            PerformanceEventKind::release)];
+                    }
+            scratch.push(transition);
+            if (emitsPedalTrigger)
+                scratch.push(makePedalTriggerEvent(transition, selectedArticulationIndex,
+                                                   pedalEvent, isDown));
             return true;
         }
         case SamplerRenderEventType::allNotesOff:
@@ -393,7 +478,13 @@ bool PerformanceLaneState::normalize(const SamplerRenderEvent& raw,
                 return false;
             }
             heldNotes = {};
-            pedalIsDown = program.hasControllerDefault[64] && program.controllerDefaults[64] >= 64;
+            controllerValues.fill(0);
+            for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
+                if (program.hasControllerDefault[controller])
+                    controllerValues[controller] = program.controllerDefaults[controller];
+            controllerStateInitialized = true;
+            pedalIsDown = static_cast<double>(controllerValues[static_cast<std::size_t>(
+                sustainControllerNumber)]) >= sustainThreshold;
             return scratch.push(event);
     }
     return false;
@@ -404,6 +495,7 @@ PerformanceLaneStateSnapshot PerformanceLaneState::getSnapshot() const noexcept
     PerformanceLaneStateSnapshot result;
     result.selectedArticulationIndex = selectedArticulationIndex;
     result.pedalDown = pedalIsDown;
+    result.controllerValues = controllerValues;
     result.actionOverflowCount = actionOverflowCount;
     result.semanticEventCounts = semanticEventCounts;
     for (const auto& held : heldNotes)

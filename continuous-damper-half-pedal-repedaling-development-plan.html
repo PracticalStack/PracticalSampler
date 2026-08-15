@@ -430,7 +430,7 @@
               <li>Apply CC64 changes to active releasing voices at the incoming sample offset, including voices owned by an older activation generation.</li>
               <li>Preserve bounded voice allocation, stealing order, page streaming, loop behavior, DSP routing, and render diagnostics.</li>
             </ul>
-            <div class="exit"><strong>Exit:</strong> offline renders show monotonically different tail lengths across the Salamander curve points with no 63→64 discontinuity beyond the authored curve itself.</div>
+            <div class="exit"><strong>Exit — complete August 15, 2026:</strong> exact controller values now survive normalization, reset, and continuous-model activation; sustain transitions use the authored controller and threshold; and active releases update at the event sample while preserving their current envelope level and generation-owned curve. Deterministic 48 kHz offline evidence proves strictly monotonic tails across values 0, 20, 32, 42, 54, 62, 63, 64, and 127, with the 63→64 delta limited to the authored curve step. Repedaling lifecycle and release-trigger uniqueness remain HP-04.</div>
           </div>
         </article>
 

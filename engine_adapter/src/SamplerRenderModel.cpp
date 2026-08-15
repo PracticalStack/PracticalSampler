@@ -155,6 +155,7 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.fineTuneCents == preparedZone.fineTuneCents
         && snapshotZone.amplitudeVelocityTracking == preparedZone.amplitudeVelocityTracking
         && snapshotZone.controllerConditions == preparedZone.controllerConditions
+        && snapshotZone.damper == preparedZone.damper
         && snapshotZone.sampleStartFrame == preparedZone.sampleStartFrame
         && snapshotZone.loopEnabled == preparedZone.loopEnabled
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
@@ -661,7 +662,20 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                       ? 0.0f : triggerRoute->chokeReleaseSeconds,
                                   zone.fineTuneCents,
                                   zone.amplitudeVelocityTracking,
-                                  zone.controllerConditions });
+                                  zone.controllerConditions,
+                                  zone.damper });
+    }
+    for (const auto& route : model->routes)
+    {
+        if (route.performanceEvent != PerformanceEventKind::noteOn)
+            continue;
+        model->continuousDamperEnabled = route.damper.dynamicRelease
+            || route.damper.sustainControllerNumber != legacySustainControllerNumber
+            || route.damper.sustainThreshold != legacySustainThreshold;
+        model->sustainControllerNumber = route.damper.sustainControllerNumber;
+        model->sustainThreshold = route.damper.sustainThreshold;
+        if (model->continuousDamperEnabled)
+            break;
     }
     model->performanceProgram.defaultArticulationIndex = resolveSelectedArticulationIndex(
         options,

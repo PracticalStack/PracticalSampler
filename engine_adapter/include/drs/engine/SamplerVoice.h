@@ -57,6 +57,10 @@ public:
 
     bool start(const SamplerRenderModel& model, const SamplerVoiceStartRequest& request) noexcept;
     bool beginRelease(double overrideReleaseSeconds = 0.0) noexcept;
+    bool beginReleaseForControllerValue(std::uint8_t controllerValue) noexcept;
+    bool updateDynamicRelease(std::uint8_t controllerNumber,
+                              std::uint8_t controllerValue) noexcept;
+    bool isSustainDown(const std::array<std::uint8_t, 128>& controllerValues) const noexcept;
     SamplerVoiceRenderResult render(SamplerAudioBufferView output,
                                     std::uint32_t outputStartFrame,
                                     std::uint32_t frameCount) noexcept;
@@ -82,9 +86,34 @@ public:
     SamplerPanGains getPanGains() const noexcept { return panGains; }
     std::uint32_t getReleaseSamplesRemaining() const noexcept { return releaseSamplesRemaining; }
     std::uint32_t getReleaseSamplesTotal() const noexcept { return releaseSamplesTotal; }
+    float getReleaseEnvelopeLevel() const noexcept;
+    std::uint32_t getDynamicReleaseUpdateCount() const noexcept
+    {
+        return dynamicReleaseUpdateCount;
+    }
+    int getDamperCurveIndex() const noexcept
+    {
+        return route != nullptr ? route->damper.releaseCurveIndex : -1;
+    }
+    int getSustainControllerNumber() const noexcept
+    {
+        return route != nullptr ? route->damper.sustainControllerNumber
+                                : legacySustainControllerNumber;
+    }
+    int getReleaseControllerNumber() const noexcept
+    {
+        return route != nullptr ? route->damper.releaseControllerNumber
+                                : halfPedalReleaseControllerNumber;
+    }
     const SamplerRenderModel* getRenderModel() const noexcept { return renderModel; }
 
 private:
+    bool configureRelease(double releaseSeconds,
+                          bool retainAuthoredShape,
+                          float startingLevel,
+                          bool hasControllerValue,
+                          std::uint8_t controllerValue) noexcept;
+    double dynamicReleaseSeconds(std::uint8_t controllerValue) const noexcept;
     void finish() noexcept;
 
     SamplerVoiceLifecycleState lifecycleState = SamplerVoiceLifecycleState::idle;
@@ -106,6 +135,10 @@ private:
     std::uint32_t releaseSamplesRemaining = 0;
     std::uint32_t releaseSamplesTotal = 0;
     double releaseShape = 0.0;
+    float releaseLevelScale = 1.0f;
+    bool hasReleaseControllerValue = false;
+    std::uint8_t releaseControllerValue = 0;
+    std::uint32_t dynamicReleaseUpdateCount = 0;
     bool underrunning = false;
     std::uint64_t nextLookAheadPublicationFrame = 0;
 };

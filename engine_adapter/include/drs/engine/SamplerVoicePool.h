@@ -47,6 +47,11 @@ struct SamplerVoiceSlotSnapshot
     float baseGain = 0.0f;
     bool loopActive = false;
     bool sustainDeferred = false;
+    std::uint32_t releaseSamplesRemaining = 0;
+    std::uint32_t releaseSamplesTotal = 0;
+    float releaseEnvelopeLevel = 0.0f;
+    std::uint32_t dynamicReleaseUpdateCount = 0;
+    int damperCurveIndex = -1;
 };
 
 struct SamplerVoicePoolRenderResult
@@ -60,6 +65,7 @@ struct SamplerVoicePoolRenderResult
     std::uint32_t retiredGenerationVoiceCount = 0;
     std::uint32_t sustainDeferredVoiceCount = 0;
     std::uint32_t resetVoiceCount = 0;
+    std::uint32_t dynamicReleaseUpdateCount = 0;
 };
 
 struct SamplerRouteEligibilityQuery
@@ -180,6 +186,7 @@ private:
     std::uint64_t activeGeneration = 0;
     std::uint64_t nextGeneratedActivation = 1;
     bool sustainPedalDown = false;
+    bool controllerStateInitialized = false;
     std::array<std::uint8_t, 128> controllerValues {};
 };
 } // namespace drs::engine
