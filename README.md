@@ -6,7 +6,7 @@ This repository is currently in Phase 0, where the goal is to establish a reprod
 
 ## Phase 0 decisions
 
-- Repository root: `DecentRhapsodyStudio/`
+- Repository root: `PracticalSampler/`
 - Source hosting: GitHub
 - Primary development platform: Windows
 - Supported IDE: Visual Studio 2022 Community

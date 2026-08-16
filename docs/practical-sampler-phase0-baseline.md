@@ -10,7 +10,7 @@ Source commit: `2cfa6ae462bd581980addd243384172db8f81d05`
 |---|---|---|
 | Plug-in / product name | Decent Rhapsody Studio | Practical Sampler |
 | Company / vendor name | Decent Rhapsody | Practical Sampler Project |
-| Proposed repository name | DecentRhapsodyStudio | PracticalSampler |
+| Repository/root name | DecentRhapsodyStudio | PracticalSampler |
 
 This is an identity-layer change. It does not authorize a logo, image, visual-branding, internal
 component, native-format, schema, namespace, target, plug-in-code, class-ID, parameter-ID, or bundle-ID
@@ -52,9 +52,9 @@ close an audit failure.
 
 | Source / owner | Derived or external copy | Phase 0 disposition |
 |---|---|---|
-| Current workspace HTML plans and mockups | `DecentRhapsodyStudio/DRSWeb/protected-content/reference` | Update the owning source first, then regenerate or synchronize the protected reference copy. |
+| Current workspace HTML plans and mockups | `DRSWeb/protected-content/reference` | Update the owning source first, then regenerate or synchronize the protected reference copy. |
 | Runtime/build configuration and current documentation | `build/`, VST3 bundles, installer staging, generated caches | Never hand-edit; rebuild or regenerate after source presentation changes. |
-| Current host-validation sources and scripts | `DecentRhapsodyStudio/validation/reaper` active `.rpp`, track chunks, and scanner caches | Regenerate for Practical Sampler; old-name recall is not required. |
+| Current host-validation sources and scripts | `PracticalSampler/validation/reaper` active `.rpp`, track chunks, and scanner caches | Regenerate for Practical Sampler; old-name recall is not required. |
 | User-owned workspace `ReaperProjects` | None | Defer; do not rewrite user projects. |
 | Dated reports, logs, backups, and engineering evidence | None | Preserve as historical evidence and keep it out of current guidance. |
 

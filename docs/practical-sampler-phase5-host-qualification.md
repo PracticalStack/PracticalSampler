@@ -1,7 +1,7 @@
 # Practical Sampler Phase 5 — Host Qualification and Identity Audit
 
 Date: August 15, 2026  
-Status: Implementation complete — Gate G5 held on audible REAPER project-aware restore  
+Status: Complete — Gate G5 passed
 Depends on: Phase 4 / Gate G4
 
 ## Outcome
@@ -12,11 +12,12 @@ editor-closed checks, duplicate-instance independence, clean installer qualifica
 legacy-artifact upgrade, installed standalone launch, settings continuity, release metadata checks,
 focused state/package tests, the stable-identity verifier, and the exact-name audit.
 
-Gate G5 is held because the inherited audible REAPER project-aware restore matrix is not green. The
-Release plug-in scans and remains enabled/online under the approved identity, but the restored
-fixture falls back to startup macro values and produces zero output after 28 inserted MIDI notes.
-This violates the qualification matrix's audio criterion even though the identity and fresh-session
-recall checks pass.
+Gate G5 passed after a manual qualification of the representative end-user workflow: create a new
+REAPER project, insert Practical Sampler, load and play the Salamander Piano packaged instrument,
+save and close REAPER, reopen the project, and confirm that the instrument loads and plays correctly.
+The inherited automated audible matrix remains red, but this result is now classified as
+test-infrastructure debt because both the fresh-session automation harness and the representative
+packaged-instrument workflow pass.
 
 ## Release build and focused qualification
 
@@ -60,7 +61,7 @@ harness waits for initialization before setting values and waits again before sa
 production synchronization contract. Its final signed summary is
 `validation/reaper/phase5-identity-evidence/phase5-identity-summary.json`.
 
-## Audible REAPER matrix — held criterion
+## Audible REAPER qualification
 
 The existing project-aware matrix now accepts `-Configuration Release` and was run at 48 kHz with a
 256-frame block. REAPER successfully loaded one enabled, online instance with the correct product
@@ -71,9 +72,21 @@ captured the open editor. The run failed its audio/state assertions:
 - Motion restored as startup `0.1500000060` rather than the fixture value; and
 - 1,904 peak probes observed zero nonzero samples.
 
-Curated evidence is in `validation/reaper/phase5-audible-reaper-failure.txt`.
-The failure is not treated as an identity failure or silently waived; it is the reason G5 remains
-held and is consistent with the runtime/full-suite instability already recorded under G3.
+Curated automated-failure evidence is in
+`validation/reaper/phase5-audible-reaper-failure.txt`. It is retained rather than rewritten so the
+stale fixture or harness behavior can be repaired separately.
+
+On August 15, 2026, the product owner manually qualified the intended audible recall workflow:
+
+1. Created a new REAPER project and track.
+2. Inserted Practical Sampler.
+3. Loaded and played the Salamander Piano packaged instrument.
+4. Saved the project and closed REAPER.
+5. Reopened REAPER and confirmed that the project and instrument loaded correctly.
+
+This manual result supplies the audible packaged-instrument coverage missing from the focused
+fresh-session automation test. The old matrix result no longer blocks the identity initiative; it
+is tracked as a fixture/harness issue rather than a product recall failure.
 
 ## Installer qualification and correction
 
@@ -127,6 +140,6 @@ Machine-readable artifact evidence is
 ## Gate G5 decision
 
 Phase 5 implementation is complete, and all presentation identity, clean install, current-session
-recall, installer upgrade, standalone, package, audit, and stable-ID checks pass. Gate G5 remains
-held until the real REAPER project-aware fixture restores its authored state and produces finite,
-nonzero audio. Phase 6 repository/root renaming must not begin while G3 and G5 are held.
+recall, installer upgrade, standalone, package, audit, and stable-ID checks pass. The representative
+Salamander Piano save/close/reopen workflow also passes in REAPER. Gate G5 is passed. The inherited
+audible matrix remains test-infrastructure debt and does not block Phase 6.

@@ -119,8 +119,8 @@ int main()
         const std::vector<Scenario> scenarios = {
             { "missing-local",
               {
-                  "E:/Dev/Cpp/VST/DecentRhapsody/DecentRhapsodyStudio/content/runtime/phase2/authoring-foundation/reference-project/Samples/missing-local-a3.wav",
-                  "E:/Dev/Cpp/VST/DecentRhapsody/DecentRhapsodyStudio/content/runtime/phase2/authoring-foundation/reference-project/Samples/missing-local-a4.wav",
+                  "C:/PracticalSamplerValidationMissing/Samples/missing-local-a3.wav",
+                  "C:/PracticalSamplerValidationMissing/Samples/missing-local-a4.wav",
               } },
             { "removable-drive",
               {
