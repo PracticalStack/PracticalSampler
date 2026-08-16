@@ -1,6 +1,6 @@
-# Decent Rhapsody Studio
+# Practical Sampler
 
-Decent Rhapsody Studio is a JUCE-based standalone application and plug-in shell built around a HISE-powered sampler runtime.
+Practical Sampler is a JUCE-based standalone application and plug-in shell built around a HISE-powered sampler runtime.
 
 This repository is currently in Phase 0, where the goal is to establish a reproducible Windows-first foundation: repository layout, dependency policy, toolchain requirements, architectural boundaries, and a buildable project skeleton.
 

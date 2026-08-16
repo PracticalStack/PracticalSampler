@@ -4,7 +4,7 @@ Prepared on August 4, 2026 for support and internal QA.
 
 ## What a playable package is
 
-A playable package is a sealed `.drpkg` file that opens in Decent Rhapsody Studio as a performance-only session.
+A playable package is a sealed `.drpkg` file that opens in Practical Sampler as a performance-only session.
 
 It is intentionally different from an editable project:
 

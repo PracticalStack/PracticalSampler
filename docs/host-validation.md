@@ -11,7 +11,7 @@ That means a DAW such as Reaper will only discover the plugin if one of these is
 - the full `.vst3` bundle is copied into `C:\Program Files\Common Files\VST3\`
 - or Reaper is configured to scan the build artefact directory that contains the `.vst3` bundle
 
-Pointing Reaper at the inner `Contents\x86_64-win\` folder is not sufficient. The scan target must be the directory that contains `Decent Rhapsody Studio.vst3`.
+Pointing Reaper at the inner `Contents\x86_64-win\` folder is not sufficient. The scan target must be the directory that contains `Practical Sampler.vst3`.
 
 ## Recommended local workflow
 
@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\install-vst3-windows.ps1
 
 3. In Reaper, force a rescan of VST plugins.
 
-4. Look for `Decent Rhapsody Studio` under instruments, since the current shell is built as a synth.
+4. Look for `Practical Sampler` under instruments, since the current shell is built as a synth.
 
 ## Alternate workflow for a non-installed build
 
@@ -53,7 +53,7 @@ The Phase 0 smoke test now does all of the following:
 
 - verifies the plugin bundle exists after build
 - verifies the bundle can be scanned as VST3 through JUCE's host layer
-- verifies the plugin description resolves as `Decent Rhapsody Studio`
+- verifies the plugin description resolves as `Practical Sampler`
 
 If Reaper still does not discover the plugin after installation or scan-path correction, the next useful artifact is Reaper's scan result for this bundle.
 

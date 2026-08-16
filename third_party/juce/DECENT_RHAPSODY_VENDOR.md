@@ -1,4 +1,4 @@
-# Decent Rhapsody Vendor Provenance
+# Practical Sampler Project Vendor Provenance
 
 - Dependency: `JUCE`
 - Upstream repository: `https://github.com/juce-framework/JUCE.git`

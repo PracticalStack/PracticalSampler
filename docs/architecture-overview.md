@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This note captures the intended Phase 0 boundary lines for Decent Rhapsody Studio so future work grows around stable seams instead of drifting into an accidental HISE fork.
+This note captures the intended Phase 0 boundary lines for Practical Sampler so future work grows around stable seams instead of drifting into an accidental HISE fork.
 
 ## Layer map
 

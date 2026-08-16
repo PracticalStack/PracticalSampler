@@ -1,6 +1,6 @@
 # HISE Project Content
 
-This directory is the product-owned HISE authoring content root for Decent Rhapsody Studio.
+This directory is the product-owned HISE authoring content root for Practical Sampler.
 
 It is intentionally separate from `third_party/hise/` so presets, sample maps, images, scripts,
 and other project assets stay under first-party control while HISE itself remains an external

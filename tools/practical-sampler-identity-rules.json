@@ -15,13 +15,13 @@
     {
       "id": "identity-decision-record",
       "classification": "DEFER",
-      "pathRegex": "^(?:practical-sampler-identity-layer-initiative-plan\\.html|pretty-good-sampler-name-refactor-plan\\.html|DecentRhapsodyStudio/(?:docs/practical-sampler-|tools/(?:practical-sampler-|audit-practical-sampler-|verify-practical-sampler-)))",
+      "pathRegex": "^(?:practical-sampler-identity-layer-initiative-plan\\.html|pretty-good-sampler-name-refactor-plan\\.html|DecentRhapsodyStudio/(?:docs/practical-sampler-|tools/(?:practical-sampler-|audit-practical-sampler-|verify-practical-sampler-))|DRSWeb/protected-content/reference/(?:practical-sampler-identity-layer-initiative-plan\\.html|pretty-good-sampler-name-refactor-plan\\.html|DecentRhapsodyStudio/docs/practical-sampler-))",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration."
     },
     {
       "id": "historical-engineering-evidence",
       "classification": "PRESERVE-HISTORICAL",
-      "pathRegex": "^DecentRhapsodyStudio/(?:PROGRESS\\.md|code-review\\.html|docs/.*evidence[^/]*\\.(?:md|txt)|validation/reaper/(?:Backups/|.*(?:evidence|\\.log)))",
+      "pathRegex": "^(?:DecentRhapsodyStudio/(?:PROGRESS\\.md|code-review\\.html|docs/.*evidence[^/]*\\.(?:md|txt)|validation/reaper/(?:Backups/|.*(?:evidence|\\.log)))|DRSWeb/protected-content/reference/DecentRhapsodyStudio/docs/.*evidence[^/]*\\.(?:md|txt))",
       "reason": "Dated evidence remains truthful to the build or host run that produced it."
     },
     {
@@ -56,7 +56,7 @@
       "classification": "PRESERVE-TECHNICAL",
       "identity": "productName",
       "pathRegex": "^DecentRhapsodyStudio/tools/(?:build-tester-installer|install-vst3-windows)\\.ps1$|^DecentRhapsodyStudio/tools/drs-tester-installer\\.iss$",
-      "lineRegex": "(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\.vst3)",
+      "lineRegex": "(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\.vst3|Type:\\s*filesandordirs;\\s*Name:.*Decent Rhapsody Studio\\.vst3)",
       "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target."
     },
     {

@@ -1,4 +1,4 @@
-# Decent Rhapsody Vendor Provenance
+# Practical Sampler Project Vendor Provenance
 
 - Dependency: `HISE`
 - Upstream repository: `https://github.com/christophhart/HISE.git`

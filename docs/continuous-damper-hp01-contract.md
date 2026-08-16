@@ -6,7 +6,7 @@ Supersedes: the CC64 Boolean-only boundary in `performance-engine-v1-contract.md
 
 ## Outcome
 
-Decent Rhapsody Studio will preserve MIDI CC64 values from 0 through 127 and use
+Practical Sampler will preserve MIDI CC64 values from 0 through 127 and use
 them to alter the remaining amplitude-envelope release time of eligible sounding
 voices. A later increase in CC64 can catch a still-audible release tail without
 restoring energy already lost. Existing projects remain binary-sustain instruments
