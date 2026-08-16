@@ -27,6 +27,7 @@ AppId={{7A99E2F9-AE54-4B4A-B71C-8D9E0F61A9B6}
 AppName={#MyAppName}
 AppVersion={#AppVersion}
 AppPublisher={#MyAppPublisher}
+UninstallDisplayName={#MyAppName}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir={#DRSOutputDir}
@@ -57,6 +58,7 @@ Name: "{commoncf}\VST3"
 
 [InstallDelete]
 Type: filesandordirs; Name: "{commoncf}\VST3\Decent Rhapsody Studio.vst3"
+Type: files; Name: "{app}\Decent Rhapsody Studio.exe"
 
 [Files]
 Source: "{#DRSVst3Source}\*"; DestDir: "{commoncf}\VST3\Practical Sampler.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3

@@ -111,6 +111,7 @@ foreach ($rawEvent in $rawEvents) {
 
         $classification = if ($null -eq $matchedRule) { 'UNCLASSIFIED' } else { [string]$matchedRule.classification }
         $ruleId = if ($null -eq $matchedRule) { '' } else { [string]$matchedRule.id }
+        $owner = if ($null -eq $matchedRule) { '' } else { [string]$matchedRule.owner }
         $reason = if ($null -eq $matchedRule) { 'No classification rule matched.' } else { [string]$matchedRule.reason }
 
         $occurrences.Add([pscustomobject][ordered]@{
@@ -121,6 +122,7 @@ foreach ($rawEvent in $rawEvents) {
             matchedText = $matchedText
             classification = $classification
             rule = $ruleId
+            owner = $owner
             reason = $reason
             excerpt = $excerpt
         })
@@ -140,7 +142,7 @@ foreach ($group in ($orderedOccurrences | Group-Object rule | Sort-Object Name))
 
 $report = [ordered]@{
     schemaName = 'drs.presentationIdentityOccurrenceLedger'
-    schemaVersion = 1
+    schemaVersion = 2
     generatedAtUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
     scope = if ($RepositoryOnly) { 'repository' } else { 'workspace' }
     workspaceRoot = $workspaceRoot

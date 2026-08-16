@@ -1,0 +1,13 @@
+{
+  "schemaName": "drs.practicalSampler.phase5StandaloneQualification",
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-08-16T03:38:09.5938556Z",
+  "executable": "C:\\Program Files\\Practical Sampler\\Practical Sampler.exe",
+  "windowTitle": "Practical Sampler - No Project Loaded",
+  "responding": true,
+  "closedNormally": true,
+  "settingsPath": "C:\\Users\\cgcha\\AppData\\Roaming\\DecentRhapsodyStudio\\DecentRhapsodyStudio.settings",
+  "settingsSha256Before": "58B67C054ECE849314F2BA730286328A0C0F50765B67632A3664DD8B123E98F0",
+  "settingsSha256After": "58B67C054ECE849314F2BA730286328A0C0F50765B67632A3664DD8B123E98F0",
+  "stableSettingsIdentityPreserved": true
+}

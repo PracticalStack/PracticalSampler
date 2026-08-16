@@ -1,6 +1,8 @@
 param(
     [string] $ReaperPath = 'C:\Program Files\REAPER (x64)\reaper.exe',
     [int] $TimeoutSeconds = 90,
+    [ValidateSet('Debug', 'Release')]
+    [string] $Configuration = 'Debug',
     [string[]] $SampleRates = @(44100, 48000),
     [int[]] $BlockSizes = @(128, 256, 512)
 )
@@ -12,7 +14,7 @@ $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $validationRoot '..\..'))
 $templateConfigPath = Join-Path $validationRoot 'reaper.ini'
 $scenarioScriptPath = Join-Path $validationRoot 'validate-scenario.lua'
 $evidenceRoot = Join-Path $validationRoot 'qualification-evidence'
-$bundlePath = Join-Path $repositoryRoot 'build\vs2022-debug\app\drs_plugin_bundle_artefacts\Debug\VST3'
+$bundlePath = Join-Path $repositoryRoot ("build\vs2022-{0}\app\drs_plugin_bundle_artefacts\{1}\VST3" -f $Configuration.ToLowerInvariant(), $Configuration)
 
 if (-not (Test-Path -LiteralPath $ReaperPath -PathType Leaf)) {
     throw "REAPER was not found at '$ReaperPath'."

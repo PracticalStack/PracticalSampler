@@ -1,0 +1,42 @@
+{
+  "schemaName": "drs.practicalSampler.phase5ArtifactIdentityAudit",
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-08-16T03:40:31.9757181Z",
+  "releaseStandalone": {
+    "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\build\\vs2022-release\\app\\DecentRhapsodyStudioApp_artefacts\\Release\\Practical Sampler.exe",
+    "sha256": "8B4C0FFAC95586E23AA57B8B5ED35B35B08E52B0DB8D1D44324C369C76986C64",
+    "productName": "Practical Sampler",
+    "companyName": "Practical Sampler Project",
+    "fileDescription": "Practical Sampler",
+    "containsApprovedProduct": true,
+    "containsLegacyDisplay": false
+  },
+  "releaseVst3": {
+    "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\build\\vs2022-release\\app\\drs_plugin_bundle_artefacts\\Release\\VST3\\Practical Sampler.vst3\\Contents\\x86_64-win\\Practical Sampler.vst3",
+    "sha256": "0749D6EF0FAF043D6FEE8608472F70F6141DBEEDB87B3F5E5CF06186E9A91A81",
+    "productName": "Practical Sampler",
+    "companyName": "Practical Sampler Project",
+    "fileDescription": "Practical Sampler",
+    "moduleInfoApprovedName": true,
+    "moduleInfoApprovedVendor": true,
+    "moduleInfoStableComponentCid": true,
+    "moduleInfoStableControllerCid": true,
+    "containsLegacyDisplay": false
+  },
+  "installer": {
+    "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\build\\installer\\PracticalSampler-Setup-0.1.0-phase5.exe",
+    "length": 7175580,
+    "sha256": "01B644B29F03B0D2B3A0E525DE7A4DBE00A10B81E11AF497C20C21602400267A",
+    "containsApprovedProduct": true,
+    "containsApprovedCompany": true,
+    "containsLegacyUpgradeTarget": false
+  },
+  "installed": {
+    "standaloneExists": true,
+    "vst3Exists": true,
+    "legacyStandaloneAbsent": true,
+    "legacyVst3Absent": true
+  },
+  "oldReleaseArtifactNames": [],
+  "changedSourceImagePaths": []
+}

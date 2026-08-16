@@ -78,6 +78,25 @@ The required matrix is:
 Missing, moved, changed, and invalid content must preserve the safe startup state and expose
 non-modal recovery. They must never present the reference instrument as the recalled project.
 
+## Practical Sampler identity qualification
+
+The Phase 5 identity harness creates a fresh REAPER project against an isolated scan directory,
+adds Practical Sampler, writes Tone automation, changes Motion, saves, closes, reopens, checks both
+editor states, and duplicates the instance to prove independent parameters:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\validation\reaper\run-practical-sampler-identity-qualification.ps1 -Configuration Release
+```
+
+The output is written under `validation/reaper/phase5-identity-evidence/`. The runner requires a
+closed REAPER process and never uses the user's normal scan cache or project directory.
+
+The audible project-aware restore matrix can target either configuration. A release spot-check is:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\validation\reaper\run-host-state-qualification-matrix.ps1 -Configuration Release -SampleRates 48000 -BlockSizes 256
+```
+
 ## WAV import startup validation
 
 WAV startup/import host validation is recorded in

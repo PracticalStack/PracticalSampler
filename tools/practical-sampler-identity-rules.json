@@ -1,6 +1,6 @@
 {
   "schemaName": "drs.presentationIdentityAuditRules",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "workspaceRootRelativeToRepository": "..",
   "legacyIdentity": {
     "productName": "Decent Rhapsody Studio",
@@ -15,30 +15,35 @@
     {
       "id": "identity-decision-record",
       "classification": "DEFER",
+      "owner": "Practical Sampler identity initiative",
       "pathRegex": "^(?:practical-sampler-identity-layer-initiative-plan\\.html|pretty-good-sampler-name-refactor-plan\\.html|DecentRhapsodyStudio/(?:docs/practical-sampler-|tools/(?:practical-sampler-|audit-practical-sampler-|verify-practical-sampler-))|DRSWeb/protected-content/reference/(?:practical-sampler-identity-layer-initiative-plan\\.html|pretty-good-sampler-name-refactor-plan\\.html|DecentRhapsodyStudio/docs/practical-sampler-))",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration."
     },
     {
       "id": "historical-engineering-evidence",
       "classification": "PRESERVE-HISTORICAL",
+      "owner": "Engineering evidence archive",
       "pathRegex": "^(?:DecentRhapsodyStudio/(?:PROGRESS\\.md|code-review\\.html|docs/.*evidence[^/]*\\.(?:md|txt)|validation/reaper/(?:Backups/|.*(?:evidence|\\.log)))|DRSWeb/protected-content/reference/DecentRhapsodyStudio/docs/.*evidence[^/]*\\.(?:md|txt))",
       "reason": "Dated evidence remains truthful to the build or host run that produced it."
     },
     {
       "id": "external-reaper-user-project",
       "classification": "DEFER",
+      "owner": "External REAPER validation corpus",
       "pathRegex": "^ReaperProjects/",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative."
     },
     {
       "id": "derived-reaper-fixture",
       "classification": "REGENERATE",
+      "owner": "REAPER host qualification",
       "pathRegex": "^DecentRhapsodyStudio/validation/reaper/.*(?:\\.rpp|(?:track-chunks|restored-track-chunks)\\.txt|reaper-(?:vstplugins64|fxtags)\\.ini)$",
       "reason": "Active host fixtures and scanner caches will be regenerated for the new plug-in and company names."
     },
     {
       "id": "company-presentation-field",
       "classification": "CHANGE",
+      "owner": "Presentation identity",
       "identity": "companyName",
       "lineRegex": "(?:COMPANY_NAME|MyAppPublisher|JucePlugin_Manufacturer|runtimeCompanyName|<Company(?:Copyright)?\\s|Vendor(?:\\s|\\\"|$)|Vendor Provenance)",
       "reason": "This occurrence is the human-readable company/vendor identity and becomes Practical Sampler Project."
@@ -46,28 +51,32 @@
     {
       "id": "legacy-identity-compatibility-fixture",
       "classification": "PRESERVE-HISTORICAL",
+      "owner": "Serialized-content compatibility tests",
       "identity": "productName",
       "pathRegex": "^DecentRhapsodyStudio/tests/src/(?:Sprint0ImportAndStorageHardeningTests|PerformancePackageExportLifecycleTests)\\.cpp$",
       "lineRegex": "legacy(?:Package)?IdentityNote",
       "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated."
     },
     {
-      "id": "legacy-vst3-upgrade-guard",
+      "id": "legacy-artifact-upgrade-guard",
       "classification": "PRESERVE-TECHNICAL",
+      "owner": "Windows installer and host qualification",
       "identity": "productName",
-      "pathRegex": "^DecentRhapsodyStudio/tools/(?:build-tester-installer|install-vst3-windows)\\.ps1$|^DecentRhapsodyStudio/tools/drs-tester-installer\\.iss$",
-      "lineRegex": "(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\.vst3|Type:\\s*filesandordirs;\\s*Name:.*Decent Rhapsody Studio\\.vst3)",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target."
+      "pathRegex": "^DecentRhapsodyStudio/(?:tools/(?:build-tester-installer|install-vst3-windows)\\.ps1|tools/drs-tester-installer\\.iss|validation/(?:reaper/run-practical-sampler-identity-qualification\\.ps1|installer/(?:run-practical-sampler-phase5-installer-qualification\\.ps1|phase5-legacy-sentinel\\.iss)))$",
+      "lineRegex": "(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\.vst3|Type:\\s*files(?:andordirs)?;\\s*Name:.*Decent Rhapsody Studio\\.(?:vst3|exe)|Dest(?:Name|Dir):.*Decent Rhapsody Studio\\.(?:vst3|exe))",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels."
     },
     {
       "id": "active-product-presentation",
       "classification": "CHANGE",
+      "owner": "Presentation identity",
       "identity": "productName",
       "reason": "The full old product display name becomes Practical Sampler in an active presentation surface."
     },
     {
       "id": "deferred-partial-product-copy",
       "classification": "DEFER",
+      "owner": "Post-initiative copy review",
       "identity": "companyName",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule."
     }

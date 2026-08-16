@@ -1,0 +1,20 @@
+{
+    "schemaName":  "drs.practicalSampler.phase5HostIdentityQualification",
+    "schemaVersion":  1,
+    "capturedAtUtc":  "2026-08-16T03:45:16.7792895Z",
+    "reaperPath":  "C:\\Program Files\\REAPER (x64)\\reaper.exe",
+    "configuration":  "Release",
+    "isolatedScanRoot":  "C:\\Users\\cgcha\\AppData\\Local\\Temp\\PracticalSamplerPhase5Reaper\\VST3",
+    "installedBundles":  [
+                             "Practical Sampler.vst3"
+                         ],
+    "scanEntryCount":  1,
+    "scannedFxName":  "VST3i: Practical Sampler (Practical Sampler Project)",
+    "stableComponentCid":  "ABCDEF019182FAEB4463726844727330",
+    "parameterCount":  2100,
+    "savedReopenedValuesMatch":  true,
+    "editorOpenAndClosed":  true,
+    "duplicateInstancesIndependent":  true,
+    "currentProject":  "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\validation\\reaper\\phase5-identity-evidence\\phase5-current-session.rpp",
+    "duplicateProject":  "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\validation\\reaper\\phase5-identity-evidence\\phase5-duplicate-session.rpp"
+}

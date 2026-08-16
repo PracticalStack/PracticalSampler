@@ -1,7 +1,7 @@
 {
   "schemaName": "drs.presentationIdentityOccurrenceLedger",
-  "schemaVersion": 1,
-  "generatedAtUtc": "2026-08-16T03:13:33Z",
+  "schemaVersion": 2,
+  "generatedAtUtc": "2026-08-16T03:45:44Z",
   "scope": "workspace",
   "workspaceRoot": "E:\\Dev\\Cpp\\VST\\DecentRhapsody",
   "legacyIdentity": {
@@ -13,19 +13,19 @@
     "companyName": "Practical Sampler Project",
     "proposedRepositoryName": "PracticalSampler"
   },
-  "occurrenceCount": 213,
+  "occurrenceCount": 221,
   "classificationSummary": {
-    "DEFER": 164,
+    "DEFER": 165,
     "PRESERVE-HISTORICAL": 43,
-    "PRESERVE-TECHNICAL": 6
+    "PRESERVE-TECHNICAL": 13
   },
   "ruleSummary": {
     "deferred-partial-product-copy": 12,
     "external-reaper-user-project": 84,
     "historical-engineering-evidence": 41,
-    "identity-decision-record": 68,
-    "legacy-identity-compatibility-fixture": 2,
-    "legacy-vst3-upgrade-guard": 6
+    "identity-decision-record": 69,
+    "legacy-artifact-upgrade-guard": 13,
+    "legacy-identity-compatibility-fixture": 2
   },
   "occurrences": [
     {
@@ -36,6 +36,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Open Decent Rhapsody project\","
     },
@@ -47,6 +48,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Open Decent Rhapsody playable package\","
     },
@@ -58,6 +60,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Create Decent Rhapsody project\","
     },
@@ -69,6 +72,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Save Decent Rhapsody project\","
     },
@@ -80,6 +84,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Export Decent Rhapsody playable instrument\","
     },
@@ -91,6 +96,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Open Decent Rhapsody project\","
     },
@@ -102,6 +108,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Open Decent Rhapsody playable package\","
     },
@@ -113,6 +120,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Create Decent Rhapsody project\","
     },
@@ -124,6 +132,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Export Decent Rhapsody playable instrument\","
     },
@@ -135,6 +144,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "activeFileChooser = std::make_unique<juce::FileChooser>(\"Save Decent Rhapsody project\","
     },
@@ -146,6 +156,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "<title>Decent Rhapsody Studio — Code Review</title>"
     },
@@ -157,6 +168,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "A focused review of Decent Rhapsody Studio’s product-owned C++ surfaces, emphasizing host"
     },
@@ -168,6 +180,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "Decent Rhapsody Studio code review · generated from commit a90a7037 · July 29, 2026"
     },
@@ -179,6 +192,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "Plug-in: VST3i Decent Rhapsody Studio"
     },
@@ -190,6 +204,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "- Release VST3: `build/sprint4-closure-release/app/drs_plugin_bundle_artefacts/Release/VST3/Decent Rhapsody Studio.vst3`."
     },
@@ -201,6 +216,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "| Fresh Release VST3 build | Passed; `Decent Rhapsody Studio.vst3` produced |"
     },
@@ -212,6 +228,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "| Fresh Release VST3 build | Passed; `Decent Rhapsody Studio.vst3` produced |"
     },
@@ -223,6 +240,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| Plug-in / product name | Decent Rhapsody Studio | Practical Sampler |"
     },
@@ -234,6 +252,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| Company / vendor name | Decent Rhapsody | Practical Sampler Project |"
     },
@@ -245,6 +264,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.exe` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `BF8DD19FDE8CAE66E19B4C2689C5A2AAEA609490FF9F09E26CBC637AA4511442` |"
     },
@@ -256,6 +276,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.exe` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `BF8DD19FDE8CAE66E19B4C2689C5A2AAEA609490FF9F09E26CBC637AA4511442` |"
     },
@@ -267,6 +288,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.exe` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `BF8DD19FDE8CAE66E19B4C2689C5A2AAEA609490FF9F09E26CBC637AA4511442` |"
     },
@@ -278,6 +300,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -289,6 +312,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -300,6 +324,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -311,6 +336,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -322,6 +348,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| VST3 `moduleinfo.json` | Name: Decent Rhapsody Studio; vendor: Decent Rhapsody; both frozen CIDs present | `0F49685645D0F33CB9DE28EBFFB5F1954065B2C89953EE57E53761C81C32CCB0` |"
     },
@@ -333,6 +360,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| VST3 `moduleinfo.json` | Name: Decent Rhapsody Studio; vendor: Decent Rhapsody; both frozen CIDs present | `0F49685645D0F33CB9DE28EBFFB5F1954065B2C89953EE57E53761C81C32CCB0` |"
     },
@@ -344,6 +372,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "partial phrase “Decent Rhapsody authoring assets” remains unchanged because it is neither the full"
     },
@@ -355,6 +384,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "- The tools reject a stale `Decent Rhapsody Studio.vst3` anywhere in the active build application"
     },
@@ -366,6 +396,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "`[InstallDelete]` rule removes `Decent Rhapsody Studio.vst3` before the same-CID new bundle is"
     },
@@ -377,6 +408,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "- Twelve partial `Decent Rhapsody` strings remain deferred by the exact-name scope; they are not"
     },
@@ -388,6 +420,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "company/vendor fields and were not part of the approved `Decent Rhapsody Studio` replacement."
     },
@@ -399,6 +432,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "\"currentProductName\": \"Decent Rhapsody Studio\","
     },
@@ -410,6 +444,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "\"currentCompanyName\": \"Decent Rhapsody\","
     },
@@ -421,6 +456,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "Plug-in: VST3i Decent Rhapsody Studio"
     },
@@ -432,6 +468,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "// historical Decent Rhapsody linear release and remains the compatibility"
     },
@@ -443,6 +480,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "deferred-partial-product-copy",
+      "owner": "Post-initiative copy review",
       "reason": "This partial phrase is not a company/vendor field and is outside the exact identity-layer replacement rule.",
       "excerpt": "nextSteps.emplace_back(\"Populate content/hise_project/UserPresets and content/hise_project/SampleMaps with the first Decent Rhapsody authoring assets so the adapter can validate real content, not just empty folders.\");"
     },
@@ -454,6 +492,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "one enabled online Decent Rhapsody VST3i instance with the full 2,086-parameter surface and the"
     },
@@ -465,6 +504,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "legacy-identity-compatibility-fixture",
+      "owner": "Serialized-content compatibility tests",
       "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated.",
       "excerpt": "const std::string legacyPackageIdentityNote = \"Exported from the current Decent Rhapsody Studio authoring project.\";"
     },
@@ -476,6 +516,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "legacy-identity-compatibility-fixture",
+      "owner": "Serialized-content compatibility tests",
       "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated.",
       "excerpt": "const std::string legacyIdentityNote = \"Created in Decent Rhapsody Studio before the presentation rename.\";"
     },
@@ -486,8 +527,9 @@
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-TECHNICAL",
-      "rule": "legacy-vst3-upgrade-guard",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target.",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
       "excerpt": "$legacyBundles = @(Get-ChildItem -Path $BuildAppRoot -Recurse -Directory -Filter \"Decent Rhapsody Studio.vst3\" |"
     },
     {
@@ -497,20 +539,34 @@
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-TECHNICAL",
-      "rule": "legacy-vst3-upgrade-guard",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target.",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
       "excerpt": "Where-Object { $_.FullName -like \"*\\$Configuration\\VST3\\Decent Rhapsody Studio.vst3\" })"
     },
     {
       "path": "DecentRhapsodyStudio/tools/drs-tester-installer.iss",
-      "line": 59,
+      "line": 60,
       "column": 46,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-TECHNICAL",
-      "rule": "legacy-vst3-upgrade-guard",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target.",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
       "excerpt": "Type: filesandordirs; Name: \"{commoncf}\\VST3\\Decent Rhapsody Studio.vst3\""
+    },
+    {
+      "path": "DecentRhapsodyStudio/tools/drs-tester-installer.iss",
+      "line": 61,
+      "column": 27,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "Type: files; Name: \"{app}\\Decent Rhapsody Studio.exe\""
     },
     {
       "path": "DecentRhapsodyStudio/tools/install-vst3-windows.ps1",
@@ -519,8 +575,9 @@
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-TECHNICAL",
-      "rule": "legacy-vst3-upgrade-guard",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target.",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
       "excerpt": "$legacyTargetBundle = Join-Path $targetRoot \"Decent Rhapsody Studio.vst3\""
     },
     {
@@ -530,8 +587,9 @@
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-TECHNICAL",
-      "rule": "legacy-vst3-upgrade-guard",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target.",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
       "excerpt": "$legacySourceBundles = @(Get-ChildItem -Path $buildAppRoot -Recurse -Directory -Filter \"Decent Rhapsody Studio.vst3\" |"
     },
     {
@@ -541,8 +599,9 @@
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-TECHNICAL",
-      "rule": "legacy-vst3-upgrade-guard",
-      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target.",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
       "excerpt": "Where-Object { $_.FullName -like \"*\\\\$Configuration\\\\VST3\\\\Decent Rhapsody Studio.vst3\" })"
     },
     {
@@ -553,6 +612,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "\"productName\": \"Decent Rhapsody Studio\","
     },
@@ -564,30 +624,93 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "\"companyName\": \"Decent Rhapsody\""
     },
     {
       "path": "DecentRhapsodyStudio/tools/practical-sampler-identity-rules.json",
-      "line": 59,
+      "line": 66,
       "column": 67,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
-      "excerpt": "\"lineRegex\": \"(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\\\.vst3|Type:\\\\s*filesandordirs;\\\\s*Name:.*Decent Rhapsody Studio\\\\.vst3)\","
+      "excerpt": "\"lineRegex\": \"(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\\\.vst3|Type:\\\\s*files(?:andordirs)?;\\\\s*Name:.*Decent Rhapsody Studio\\\\.(?:vst3|exe)|Dest(?:Name|Dir):.*Decent Rhapsody Studio\\\\.(?:vs..."
     },
     {
       "path": "DecentRhapsodyStudio/tools/practical-sampler-identity-rules.json",
-      "line": 59,
-      "column": 132,
+      "line": 66,
+      "column": 137,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
-      "excerpt": "\"lineRegex\": \"(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\\\.vst3|Type:\\\\s*filesandordirs;\\\\s*Name:.*Decent Rhapsody Studio\\\\.vst3)\","
+      "excerpt": "\"lineRegex\": \"(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\\\.vst3|Type:\\\\s*files(?:andordirs)?;\\\\s*Name:.*Decent Rhapsody Studio\\\\.(?:vst3|exe)|Dest(?:Name|Dir):.*Decent Rhapsody Studio\\\\.(?:vs..."
+    },
+    {
+      "path": "DecentRhapsodyStudio/tools/practical-sampler-identity-rules.json",
+      "line": 66,
+      "column": 194,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "DEFER",
+      "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
+      "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
+      "excerpt": "\"lineRegex\": \"(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\\\.vst3|Type:\\\\s*files(?:andordirs)?;\\\\s*Name:.*Decent Rhapsody Studio\\\\.(?:vst3|exe)|Dest(?:Name|Dir):.*Decent Rhapsody Studio\\\\.(?:vs..."
+    },
+    {
+      "path": "DecentRhapsodyStudio/validation/installer/phase5-legacy-sentinel.iss",
+      "line": 27,
+      "column": 79,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "Source: \"{#DRSCurrentExe}\"; DestDir: \"{autopf}\\Practical Sampler\"; DestName: \"Decent Rhapsody Studio.exe\"; Flags: ignoreversion"
+    },
+    {
+      "path": "DecentRhapsodyStudio/validation/installer/phase5-legacy-sentinel.iss",
+      "line": 28,
+      "column": 58,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "Source: \"{#DRSCurrentVst3}\\*\"; DestDir: \"{commoncf}\\VST3\\Decent Rhapsody Studio.vst3\"; Flags: ignoreversion recursesubdirs createallsubdirs"
+    },
+    {
+      "path": "DecentRhapsodyStudio/validation/installer/run-practical-sampler-phase5-installer-qualification.ps1",
+      "line": 15,
+      "column": 64,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "$legacyVst3Path = [IO.Path]::GetFullPath((Join-Path $vst3Root 'Decent Rhapsody Studio.vst3'))"
+    },
+    {
+      "path": "DecentRhapsodyStudio/validation/installer/run-practical-sampler-phase5-installer-qualification.ps1",
+      "line": 17,
+      "column": 62,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "$legacyExePath = [IO.Path]::GetFullPath((Join-Path $appRoot 'Decent Rhapsody Studio.exe'))"
     },
     {
       "path": "DecentRhapsodyStudio/validation/reaper/Backups/duplicate-instances-2026-07-30_022100.rpp-bak",
@@ -597,6 +720,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -608,6 +732,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -619,6 +744,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -630,6 +756,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -641,6 +768,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -652,6 +780,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -663,6 +792,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -674,6 +804,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -685,6 +816,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -696,6 +828,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -707,6 +840,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -718,6 +852,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -729,6 +864,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -740,6 +876,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -751,6 +888,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -762,6 +900,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -773,6 +912,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -784,6 +924,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -795,6 +936,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -806,6 +948,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -817,6 +960,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -828,6 +972,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -839,6 +984,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -850,6 +996,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -861,6 +1008,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -872,6 +1020,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
     },
@@ -883,8 +1032,33 @@
       "matchedText": "Decent Rhapsody",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "track.0.fx.0.name=VST3i: Decent Rhapsody Studio (Decent Rhapsody)"
+    },
+    {
+      "path": "DecentRhapsodyStudio/validation/reaper/run-practical-sampler-identity-qualification.ps1",
+      "line": 21,
+      "column": 22,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "$legacyBundleName = 'Decent Rhapsody Studio.vst3'"
+    },
+    {
+      "path": "DecentRhapsodyStudio/validation/reaper/run-practical-sampler-identity-qualification.ps1",
+      "line": 22,
+      "column": 23,
+      "identity": "productName",
+      "matchedText": "Decent Rhapsody Studio",
+      "classification": "PRESERVE-TECHNICAL",
+      "rule": "legacy-artifact-upgrade-guard",
+      "owner": "Windows installer and host qualification",
+      "reason": "Old executable and bundle names remain only as explicit stale-artifact guards, upgrade removal targets, or validation sentinels.",
+      "excerpt": "$legacyDisplayName = 'Decent Rhapsody Studio'"
     },
     {
       "path": "DRSWeb/protected-content/reference/DecentRhapsodyStudio/docs/host-state-reaper-validation-evidence.md",
@@ -894,6 +1068,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "Plug-in: VST3i Decent Rhapsody Studio"
     },
@@ -905,6 +1080,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "- Release VST3: `build/sprint4-closure-release/app/drs_plugin_bundle_artefacts/Release/VST3/Decent Rhapsody Studio.vst3`."
     },
@@ -916,6 +1092,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "| Fresh Release VST3 build | Passed; `Decent Rhapsody Studio.vst3` produced |"
     },
@@ -927,6 +1104,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "| Fresh Release VST3 build | Passed; `Decent Rhapsody Studio.vst3` produced |"
     },
@@ -938,6 +1116,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| Plug-in / product name | Decent Rhapsody Studio | Practical Sampler |"
     },
@@ -949,6 +1128,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| Company / vendor name | Decent Rhapsody | Practical Sampler Project |"
     },
@@ -960,6 +1140,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.exe` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `BF8DD19FDE8CAE66E19B4C2689C5A2AAEA609490FF9F09E26CBC637AA4511442` |"
     },
@@ -971,6 +1152,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.exe` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `BF8DD19FDE8CAE66E19B4C2689C5A2AAEA609490FF9F09E26CBC637AA4511442` |"
     },
@@ -982,6 +1164,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.exe` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `BF8DD19FDE8CAE66E19B4C2689C5A2AAEA609490FF9F09E26CBC637AA4511442` |"
     },
@@ -993,6 +1176,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -1004,6 +1188,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -1015,6 +1200,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -1026,6 +1212,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| `Decent Rhapsody Studio.vst3/Contents/x86_64-win/Decent Rhapsody Studio.vst3` | Product / description: Decent Rhapsody Studio; company: Decent Rhapsody; version: 0.1.0 | `4D9F8E099109690AD7EB6F4E22CFD88D4650EE828831..."
     },
@@ -1037,6 +1224,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| VST3 `moduleinfo.json` | Name: Decent Rhapsody Studio; vendor: Decent Rhapsody; both frozen CIDs present | `0F49685645D0F33CB9DE28EBFFB5F1954065B2C89953EE57E53761C81C32CCB0` |"
     },
@@ -1048,6 +1236,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "| VST3 `moduleinfo.json` | Name: Decent Rhapsody Studio; vendor: Decent Rhapsody; both frozen CIDs present | `0F49685645D0F33CB9DE28EBFFB5F1954065B2C89953EE57E53761C81C32CCB0` |"
     },
@@ -1059,6 +1248,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "partial phrase “Decent Rhapsody authoring assets” remains unchanged because it is neither the full"
     },
@@ -1070,6 +1260,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "- The tools reject a stale `Decent Rhapsody Studio.vst3` anywhere in the active build application"
     },
@@ -1081,6 +1272,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "`[InstallDelete]` rule removes `Decent Rhapsody Studio.vst3` before the same-CID new bundle is"
     },
@@ -1092,6 +1284,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "- Twelve partial `Decent Rhapsody` strings remain deferred by the exact-name scope; they are not"
     },
@@ -1103,6 +1296,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "company/vendor fields and were not part of the approved `Decent Rhapsody Studio` replacement."
     },
@@ -1114,6 +1308,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "\"currentProductName\": \"Decent Rhapsody Studio\","
     },
@@ -1125,6 +1320,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "\"currentCompanyName\": \"Decent Rhapsody\","
     },
@@ -1136,6 +1332,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "PRESERVE-HISTORICAL",
       "rule": "historical-engineering-evidence",
+      "owner": "Engineering evidence archive",
       "reason": "Dated evidence remains truthful to the build or host run that produced it.",
       "excerpt": "Plug-in: VST3i Decent Rhapsody Studio"
     },
@@ -1147,6 +1344,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "Rename the product visible to users from <strong>Decent Rhapsody Studio</strong> to <strong>Practical Sampler</strong>, and change the host-visible company name to <strong>Practical Sampler Project</strong>. Preserve ..."
     },
@@ -1158,6 +1356,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<div><strong>Current plug-in / product name</strong><span>Decent Rhapsody Studio</span></div>"
     },
@@ -1169,6 +1368,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<div><strong>Current company name</strong><span>Decent Rhapsody</span></div>"
     },
@@ -1180,6 +1380,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<p>This initiative replaces the exact visible plug-in/product name <strong>Decent Rhapsody Studio</strong> with <strong>Practical Sampler</strong>, and the company display name <strong>Decent Rhapsody</strong> with <s..."
     },
@@ -1191,6 +1392,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<p>This initiative replaces the exact visible plug-in/product name <strong>Decent Rhapsody Studio</strong> with <strong>Practical Sampler</strong>, and the company display name <strong>Decent Rhapsody</strong> with <s..."
     },
@@ -1202,6 +1404,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<li>No broad replacement of partial phrases, hyphenated filenames, URL slugs, or other name variants. The exact phrase “Decent Rhapsody” changes only where it represents the company/vendor display name or occurs insid..."
     },
@@ -1213,28 +1416,31 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<li>Define upgrade behavior for an installed <code>Decent Rhapsody Studio.vst3</code>: remove or explicitly replace the old bundle before installing the same-ID new bundle.</li>"
     },
     {
       "path": "DRSWeb/protected-content/reference/practical-sampler-identity-layer-initiative-plan.html",
-      "line": 661,
+      "line": 669,
       "column": 17,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "rg -n --hidden \"Decent Rhapsody Studio|Decent Rhapsody\" \\"
     },
     {
       "path": "DRSWeb/protected-content/reference/practical-sampler-identity-layer-initiative-plan.html",
-      "line": 661,
+      "line": 669,
       "column": 40,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "rg -n --hidden \"Decent Rhapsody Studio|Decent Rhapsody\" \\"
     },
@@ -1246,6 +1452,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<meta name=\"description\" content=\"Review plan for refactoring Decent Rhapsody Studio into Pretty Good Sampler in a parallel repository.\">"
     },
@@ -1257,6 +1464,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<p class=\"lede\">A clean-break transition from the Decent Rhapsody Studio prototype to Pretty Good Sampler in a parallel repository. The prototype remains frozen, testable, and available as a behavioral reference; the ..."
     },
@@ -1268,6 +1476,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<tr data-kind=\"public\"><td class=\"domain\">Product name</td><td>Decent Rhapsody Studio</td><td class=\"arrow\">→</td><td>Pretty Good Sampler</td><td class=\"quiet\">All active UI, about text, window titles, and generated d..."
     },
@@ -1279,6 +1488,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<tr data-kind=\"delivery\"><td class=\"domain\">Installer / artifacts</td><td class=\"technical\">DecentRhapsodyStudio-* / Decent Rhapsody Studio.vst3</td><td class=\"arrow\">→</td><td class=\"technical\">PrettyGoodSampler-* / ..."
     },
@@ -1290,6 +1500,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "rg -n \"Decent Rhapsody|DecentRhapsody|\\bdrs\\b|DRS_|\\.drsproj|\\.drinst|\\.drpkg|DRSPKG\" \\"
     },
@@ -1301,6 +1512,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "Rename the product visible to users from <strong>Decent Rhapsody Studio</strong> to <strong>Practical Sampler</strong>, and change the host-visible company name to <strong>Practical Sampler Project</strong>. Preserve ..."
     },
@@ -1312,6 +1524,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<div><strong>Current plug-in / product name</strong><span>Decent Rhapsody Studio</span></div>"
     },
@@ -1323,6 +1536,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<div><strong>Current company name</strong><span>Decent Rhapsody</span></div>"
     },
@@ -1334,6 +1548,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<p>This initiative replaces the exact visible plug-in/product name <strong>Decent Rhapsody Studio</strong> with <strong>Practical Sampler</strong>, and the company display name <strong>Decent Rhapsody</strong> with <s..."
     },
@@ -1345,6 +1560,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<p>This initiative replaces the exact visible plug-in/product name <strong>Decent Rhapsody Studio</strong> with <strong>Practical Sampler</strong>, and the company display name <strong>Decent Rhapsody</strong> with <s..."
     },
@@ -1356,6 +1572,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<li>No broad replacement of partial phrases, hyphenated filenames, URL slugs, or other name variants. The exact phrase “Decent Rhapsody” changes only where it represents the company/vendor display name or occurs insid..."
     },
@@ -1367,28 +1584,31 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<li>Define upgrade behavior for an installed <code>Decent Rhapsody Studio.vst3</code>: remove or explicitly replace the old bundle before installing the same-ID new bundle.</li>"
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 661,
+      "line": 669,
       "column": 17,
       "identity": "productName",
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "rg -n --hidden \"Decent Rhapsody Studio|Decent Rhapsody\" \\"
     },
     {
       "path": "practical-sampler-identity-layer-initiative-plan.html",
-      "line": 661,
+      "line": 669,
       "column": 40,
       "identity": "companyName",
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "rg -n --hidden \"Decent Rhapsody Studio|Decent Rhapsody\" \\"
     },
@@ -1400,6 +1620,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<meta name=\"description\" content=\"Review plan for refactoring Decent Rhapsody Studio into Pretty Good Sampler in a parallel repository.\">"
     },
@@ -1411,6 +1632,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<p class=\"lede\">A clean-break transition from the Decent Rhapsody Studio prototype to Pretty Good Sampler in a parallel repository. The prototype remains frozen, testable, and available as a behavioral reference; the ..."
     },
@@ -1422,6 +1644,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<tr data-kind=\"public\"><td class=\"domain\">Product name</td><td>Decent Rhapsody Studio</td><td class=\"arrow\">→</td><td>Pretty Good Sampler</td><td class=\"quiet\">All active UI, about text, window titles, and generated d..."
     },
@@ -1433,6 +1656,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "<tr data-kind=\"delivery\"><td class=\"domain\">Installer / artifacts</td><td class=\"technical\">DecentRhapsodyStudio-* / Decent Rhapsody Studio.vst3</td><td class=\"arrow\">→</td><td class=\"technical\">PrettyGoodSampler-* / ..."
     },
@@ -1444,6 +1668,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "identity-decision-record",
+      "owner": "Practical Sampler identity initiative",
       "reason": "The naming plan, baseline, rules, and audit tooling must mention both identities to control the migration.",
       "excerpt": "rg -n \"Decent Rhapsody|DecentRhapsody|\\bdrs\\b|DRS_|\\.drsproj|\\.drinst|\\.drpkg|DRSPKG\" \\"
     },
@@ -1455,6 +1680,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1466,6 +1692,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1477,6 +1704,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1488,6 +1716,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1499,6 +1728,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1510,6 +1740,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1521,6 +1752,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1532,6 +1764,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1543,6 +1776,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1554,6 +1788,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1565,6 +1800,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1576,6 +1812,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1587,6 +1824,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1598,6 +1836,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1609,6 +1848,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1620,6 +1860,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1631,6 +1872,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1642,6 +1884,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1653,6 +1896,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1664,6 +1908,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1675,6 +1920,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1686,6 +1932,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1697,6 +1944,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1708,6 +1956,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1719,6 +1968,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1730,6 +1980,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1741,6 +1992,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1752,6 +2004,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1763,6 +2016,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1774,6 +2028,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1785,6 +2040,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1796,6 +2052,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1807,6 +2064,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1818,6 +2076,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1829,6 +2088,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1840,6 +2100,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1851,6 +2112,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1862,6 +2124,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1873,6 +2136,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1884,6 +2148,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1895,6 +2160,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1906,6 +2172,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1917,6 +2184,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1928,6 +2196,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1939,6 +2208,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1950,6 +2220,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1961,6 +2232,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1972,6 +2244,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1983,6 +2256,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -1994,6 +2268,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2005,6 +2280,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2016,6 +2292,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2027,6 +2304,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2038,6 +2316,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2049,6 +2328,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2060,6 +2340,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2071,6 +2352,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2082,6 +2364,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2093,6 +2376,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2104,6 +2388,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2115,6 +2400,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2126,6 +2412,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2137,6 +2424,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2148,6 +2436,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2159,6 +2448,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2170,6 +2460,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2181,6 +2472,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2192,6 +2484,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2203,6 +2496,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2214,6 +2508,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2225,6 +2520,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2236,6 +2532,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2247,6 +2544,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2258,6 +2556,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2269,6 +2568,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2280,6 +2580,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2291,6 +2592,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2302,6 +2604,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2313,6 +2616,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2324,6 +2628,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2335,6 +2640,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2346,6 +2652,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2357,6 +2664,7 @@
       "matchedText": "Decent Rhapsody",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     },
@@ -2368,6 +2676,7 @@
       "matchedText": "Decent Rhapsody Studio",
       "classification": "DEFER",
       "rule": "external-reaper-user-project",
+      "owner": "External REAPER validation corpus",
       "reason": "User REAPER projects are not rewritten and backward compatibility is outside this initiative.",
       "excerpt": "<VST \"VST3i: Decent Rhapsody Studio (Decent Rhapsody)\" \"Decent Rhapsody Studio.vst3\" 0 \"\" 741815803{ABCDEF019182FAEB4463726844727330} \"\""
     }
