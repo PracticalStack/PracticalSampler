@@ -63,6 +63,7 @@ $workspaceRoot = if ($RepositoryOnly) {
 $legacyProductName = [string]$rules.legacyIdentity.productName
 $legacyCompanyName = [string]$rules.legacyIdentity.companyName
 $searchPattern = [regex]::Escape($legacyProductName) + '|' + [regex]::Escape($legacyCompanyName)
+$workspaceExcludePathRegexes = @($rules.workspaceExcludePathRegexes)
 
 $rgArguments = @(
     '--json',
@@ -74,9 +75,13 @@ $rgArguments = @(
     '--glob', '!**/artifacts/**',
     '--glob', '!**/tmp/**',
     '--glob', '!**/practical-sampler-phase0-identity-ledger.json',
-    '--regexp', $searchPattern,
-    $workspaceRoot
+    '--regexp', $searchPattern
 )
+
+foreach ($excludeGlob in @($rules.workspaceExcludes)) {
+    $rgArguments += @('--glob', "!$excludeGlob")
+}
+$rgArguments += $workspaceRoot
 
 $rawEvents = & rg @rgArguments
 $rgExitCode = $LASTEXITCODE
@@ -93,6 +98,9 @@ foreach ($rawEvent in $rawEvents) {
 
     $lineText = ([string]$event.data.lines.text).TrimEnd("`r", "`n")
     $relativePath = Get-NormalizedRelativePath -Root $workspaceRoot -Path ([string]$event.data.path.text)
+    if (@($workspaceExcludePathRegexes | Where-Object { $relativePath -match $_ }).Count -gt 0) {
+        continue
+    }
     $excerpt = $lineText.Trim()
     if ($excerpt.Length -gt 220) {
         $excerpt = $excerpt.Substring(0, 217) + '...'

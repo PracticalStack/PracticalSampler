@@ -2,6 +2,12 @@
   "schemaName": "drs.presentationIdentityAuditRules",
   "schemaVersion": 2,
   "workspaceRootRelativeToRepository": "..",
+  "workspaceExcludes": [
+    "DecentRhapsodyStudio/**"
+  ],
+  "workspaceExcludePathRegexes": [
+    "^DecentRhapsodyStudio/"
+  ],
   "legacyIdentity": {
     "productName": "Decent Rhapsody Studio",
     "companyName": "Decent Rhapsody"
