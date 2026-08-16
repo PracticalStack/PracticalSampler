@@ -3,7 +3,7 @@
 #endif
 
 #ifndef DRSVst3Source
-  #error DRSVst3Source must point to the built "Decent Rhapsody Studio.vst3" bundle.
+  #error DRSVst3Source must point to the built "Practical Sampler.vst3" bundle.
 #endif
 
 #ifndef DRSOutputDir
@@ -18,9 +18,9 @@
   #define DRSStandaloneDir ""
 #endif
 
-#define MyAppName "Decent Rhapsody Studio"
-#define MyAppPublisher "Decent Rhapsody"
-#define MyAppExeName "Decent Rhapsody Studio.exe"
+#define MyAppName "Practical Sampler"
+#define MyAppPublisher "Practical Sampler Project"
+#define MyAppExeName "Practical Sampler.exe"
 
 [Setup]
 AppId={{7A99E2F9-AE54-4B4A-B71C-8D9E0F61A9B6}
@@ -30,7 +30,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir={#DRSOutputDir}
-OutputBaseFilename=DecentRhapsodyStudio-Setup-{#AppVersion}
+OutputBaseFilename=PracticalSampler-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -55,8 +55,11 @@ Name: "standalone"; Description: "Standalone app"; Types: tester
 [Dirs]
 Name: "{commoncf}\VST3"
 
+[InstallDelete]
+Type: filesandordirs; Name: "{commoncf}\VST3\Decent Rhapsody Studio.vst3"
+
 [Files]
-Source: "{#DRSVst3Source}\*"; DestDir: "{commoncf}\VST3\Decent Rhapsody Studio.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
+Source: "{#DRSVst3Source}\*"; DestDir: "{commoncf}\VST3\Practical Sampler.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
 #if DRSHasStandalone
 Source: "{#DRSStandaloneDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: standalone
 #endif

@@ -54,7 +54,7 @@ juce::File getBuiltPluginBundle()
         .getChildFile("drs_plugin_bundle_artefacts")
         .getChildFile(configurationName)
         .getChildFile("VST3")
-        .getChildFile("Decent Rhapsody Studio.vst3");
+        .getChildFile("Practical Sampler.vst3");
 
     if (primaryBundle.exists())
         return primaryBundle;
@@ -63,7 +63,7 @@ juce::File getBuiltPluginBundle()
         .getChildFile("DecentRhapsodyStudioPlugin_artefacts")
         .getChildFile(configurationName)
         .getChildFile("VST3")
-        .getChildFile("Decent Rhapsody Studio.vst3");
+        .getChildFile("Practical Sampler.vst3");
 }
 
 juce::Component* findDescendantById(juce::Component& root, const juce::String& componentId)
@@ -567,7 +567,7 @@ int main()
 
         require(scanned, "JUCE VST3 host scan could not discover the built plugin bundle.");
         require(foundTypes.size() == 1, "Expected exactly one plugin description from the built VST3 bundle.");
-        require(foundTypes[0]->name == "Decent Rhapsody Studio", "Scanned VST3 plugin name did not match the built product name.");
+        require(foundTypes[0]->name == "Practical Sampler", "Scanned VST3 plugin name did not match the built product name.");
         require(foundTypes[0]->pluginFormatName == "VST3", "Scanned plugin format did not resolve as VST3.");
 
         std::cout << "Phase 0 and Sprint 1 bootstrap smoke test passed." << std::endl;

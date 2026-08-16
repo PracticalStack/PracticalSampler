@@ -37,7 +37,7 @@ juce::File getBuiltPluginBundle()
     return appDirectory.getChildFile("drs_plugin_bundle_artefacts")
         .getChildFile(configurationName)
         .getChildFile("VST3")
-        .getChildFile("Decent Rhapsody Studio.vst3");
+        .getChildFile("Practical Sampler.vst3");
 }
 
 void dispatchHostedPluginMessages()

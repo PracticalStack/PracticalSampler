@@ -1,5 +1,5 @@
 juce_add_console_app(drs_phase0_smoke_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 0 Smoke Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 0 Smoke Tests"
 )
 
 target_sources(drs_phase0_smoke_tests
@@ -40,7 +40,7 @@ add_test(
 )
 
 juce_add_console_app(drs_vst3_host_state_qualification_tests
-    PRODUCT_NAME "Decent Rhapsody Studio VST3 Host State Qualification Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} VST3 Host State Qualification Tests"
 )
 
 target_sources(drs_vst3_host_state_qualification_tests
@@ -75,7 +75,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_runtime_contract_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Contract Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Runtime Contract Tests"
 )
 
 target_sources(drs_phase1_runtime_contract_tests
@@ -105,7 +105,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_draft_playback_contract_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Draft Playback Contract Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Draft Playback Contract Tests"
 )
 
 target_sources(drs_phase1_draft_playback_contract_tests
@@ -132,7 +132,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_draft_playback_facade_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Draft Playback Facade Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Draft Playback Facade Tests"
 )
 
 target_sources(drs_phase1_draft_playback_facade_tests
@@ -160,7 +160,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_playback_snapshot_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Playback Snapshot Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Playback Snapshot Tests"
 )
 
 target_sources(drs_phase1_playback_snapshot_tests
@@ -185,7 +185,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_prepared_playback_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Prepared Playback Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Prepared Playback Tests"
 )
 
 target_sources(drs_phase1_prepared_playback_tests
@@ -212,7 +212,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_prepared_playback_worker_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Prepared Playback Worker Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Prepared Playback Worker Tests"
 )
 
 target_sources(drs_phase1_prepared_playback_worker_tests
@@ -277,7 +277,7 @@ target_include_directories(drs_large_instrument_qualification PRIVATE ${CMAKE_SO
 
 # Sprint 4 Entry Gate EG1 focused regression matrix.
 juce_add_console_app(drs_sprint4_entry_authored_input_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Authored Input Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Entry Authored Input Tests"
 )
 
 target_sources(drs_sprint4_entry_authored_input_tests
@@ -305,7 +305,7 @@ add_test(
 
 # Sprint 4 Entry Gate EG2 focused lifetime and handoff matrix.
 juce_add_console_app(drs_sprint4_entry_activation_payload_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Activation Payload Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Entry Activation Payload Tests"
 )
 
 target_sources(drs_sprint4_entry_activation_payload_tests
@@ -334,7 +334,7 @@ add_test(
 
 # Sprint 4 Entry Gate EG3 deterministic concurrency regression.
 juce_add_console_app(drs_sprint4_entry_diagnostics_concurrency_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Diagnostics Concurrency Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Entry Diagnostics Concurrency Tests"
 )
 
 target_sources(drs_sprint4_entry_diagnostics_concurrency_tests
@@ -361,7 +361,7 @@ add_test(
 
 # Sprint 4 closure soak: two live contexts, activation churn, retirement, and UI polling.
 juce_add_console_app(drs_sprint4_concurrency_soak_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Concurrency Soak Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Concurrency Soak Tests"
 )
 
 target_sources(drs_sprint4_concurrency_soak_tests
@@ -388,7 +388,7 @@ add_test(
 
 # Sprint 4 Entry Gate EG4 focused real-time guard and negative-injection matrix.
 juce_add_console_app(drs_sprint4_entry_realtime_guard_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Realtime Guard Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Entry Realtime Guard Tests"
 )
 
 target_sources(drs_sprint4_entry_realtime_guard_tests
@@ -415,7 +415,7 @@ add_test(
 
 # Sprint 4 Entry Gate EG5 Preview/Publish parity through standalone and editor-closed plugin shells.
 juce_add_console_app(drs_sprint4_entry_shell_parity_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Entry Shell Parity Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Entry Shell Parity Tests"
 )
 
 target_sources(drs_sprint4_entry_shell_parity_tests
@@ -528,7 +528,7 @@ add_test(
 
 # Sprint 4.6 normalized shell routes, host MIDI cutover, and shell parity matrix.
 juce_add_console_app(drs_sprint4_shell_cutover_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 4 Shell Cutover Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 4 Shell Cutover Tests"
 )
 
 target_sources(drs_sprint4_shell_cutover_tests
@@ -965,7 +965,7 @@ set_target_properties(drs_curated_dsp_contract_red_tests PROPERTIES
 # Sprint 1 converts the Sprint 0 direct-only red seams into the shared-core
 # deterministic and randomized property suite.
 juce_add_console_app(drs_control_law_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Control Law Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Control Law Tests"
 )
 
 target_sources(drs_control_law_tests
@@ -1011,7 +1011,7 @@ add_test(NAME drs.control_law.project_schema COMMAND drs_control_law_project_sch
 set_target_properties(drs_control_law_project_schema_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_control_law_release_proof_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Control Law Release Proof Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Control Law Release Proof Tests"
 )
 target_sources(drs_control_law_release_proof_tests
     PRIVATE
@@ -1032,7 +1032,7 @@ add_test(NAME drs.control_law.release_proof COMMAND drs_control_law_release_proo
 set_target_properties(drs_control_law_release_proof_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_curated_dsp_contract_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Curated DSP Contract Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Curated DSP Contract Tests"
 )
 
 target_sources(drs_curated_dsp_contract_tests
@@ -1135,7 +1135,7 @@ add_test(NAME drs.curated_dsp.scoped_routing COMMAND drs_curated_dsp_scoped_rout
 set_target_properties(drs_curated_dsp_scoped_routing_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_curated_dsp_s0_baseline_report
-    PRODUCT_NAME "Decent Rhapsody Studio Curated DSP S0 Baseline Report"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Curated DSP S0 Baseline Report"
 )
 
 target_sources(drs_curated_dsp_s0_baseline_report
@@ -1243,7 +1243,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_preview_controller_integration_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Controller Integration Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Preview Controller Integration Tests"
 )
 
 target_sources(drs_sprint5_preview_controller_integration_tests
@@ -1269,7 +1269,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_preview_coalescing_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Coalescing Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Preview Coalescing Tests"
 )
 
 target_sources(drs_sprint5_preview_coalescing_tests
@@ -1296,7 +1296,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_preview_preparation_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Preparation Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Preview Preparation Tests"
 )
 
 target_sources(drs_sprint5_preview_preparation_tests
@@ -1323,7 +1323,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_preview_audition_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Audition Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Preview Audition Tests"
 )
 
 target_sources(drs_sprint5_preview_audition_tests
@@ -1349,7 +1349,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_preview_recovery_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Recovery Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Preview Recovery Tests"
 )
 
 target_sources(drs_sprint5_preview_recovery_tests
@@ -1375,7 +1375,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_preview_shell_parity_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Preview Shell Parity Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Preview Shell Parity Tests"
 )
 
 target_sources(drs_sprint5_preview_shell_parity_tests
@@ -1419,7 +1419,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint5_integration_hardening_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 5 Integration Hardening Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 5 Integration Hardening Tests"
 )
 
 target_sources(drs_sprint5_integration_hardening_tests
@@ -1636,7 +1636,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint31_sfz_runtime_playback_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 3.1 SFZ Runtime Playback Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 3.1 SFZ Runtime Playback Tests"
 )
 
 target_sources(drs_sprint31_sfz_runtime_playback_tests
@@ -1889,7 +1889,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_progress_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Progress Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Progress Tests"
 )
 
 target_sources(drs_wav_import_progress_tests
@@ -1914,7 +1914,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_processor_responsiveness_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Processor Responsiveness Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Processor Responsiveness Tests"
 )
 
 target_sources(drs_wav_import_processor_responsiveness_tests
@@ -1949,7 +1949,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_lifecycle_io_audit_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Lifecycle IO Audit Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Lifecycle IO Audit Tests"
 )
 
 target_sources(drs_wav_import_lifecycle_io_audit_tests
@@ -1976,7 +1976,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_lifecycle_stress_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Lifecycle Stress Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Lifecycle Stress Tests"
 )
 
 target_sources(drs_wav_import_lifecycle_stress_tests
@@ -2011,7 +2011,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_ci_budget_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import CI Budget Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import CI Budget Tests"
 )
 
 target_sources(drs_wav_import_ci_budget_tests
@@ -2046,7 +2046,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_host_validation_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Host Validation Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Host Validation Tests"
 )
 
 target_sources(drs_wav_import_host_validation_tests
@@ -2073,7 +2073,7 @@ add_test(
 )
 
 juce_add_console_app(drs_project_source_validation_service_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Project Source Validation Service Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Project Source Validation Service Tests"
 )
 
 target_sources(drs_project_source_validation_service_tests
@@ -2107,7 +2107,7 @@ add_test(
 )
 
 juce_add_console_app(drs_waveform_peak_builder_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Waveform Peak Builder Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Waveform Peak Builder Tests"
 )
 
 target_sources(drs_waveform_peak_builder_tests
@@ -2141,7 +2141,7 @@ add_test(
 )
 
 juce_add_console_app(drs_waveform_preview_service_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Waveform Preview Service Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Waveform Preview Service Tests"
 )
 
 target_sources(drs_waveform_preview_service_tests
@@ -2422,7 +2422,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase3_round_robin_hardening_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 3 Round Robin Sprint 8 Hardening Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 3 Round Robin Sprint 8 Hardening Tests"
 )
 
 target_sources(drs_phase3_round_robin_hardening_tests
@@ -2523,7 +2523,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint6_publish_controller_integration_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Publish Controller Integration Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Publish Controller Integration Tests"
 )
 
 target_sources(drs_sprint6_publish_controller_integration_tests
@@ -2568,7 +2568,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint6_publish_scheduling_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Publish Scheduling Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Publish Scheduling Tests"
 )
 
 target_sources(drs_sprint6_publish_scheduling_tests
@@ -2595,7 +2595,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint6_performance_activation_recovery_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Performance Activation Recovery Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Performance Activation Recovery Tests"
 )
 
 target_sources(drs_sprint6_performance_activation_recovery_tests
@@ -2621,7 +2621,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint6_voice_generation_cutover_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Voice Generation Cutover Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Voice Generation Cutover Tests"
 )
 
 target_sources(drs_sprint6_voice_generation_cutover_tests
@@ -2647,7 +2647,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint6_published_macro_binding_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Published Macro Binding Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Published Macro Binding Tests"
 )
 
 target_sources(drs_sprint6_published_macro_binding_tests
@@ -2682,7 +2682,7 @@ add_test(
 # Sprints 1 through 3 promote the implemented topology, preflight, recovery,
 # and immutable presentation seams into the regular test matrix.
 juce_add_console_app(drs_performance_mixer_s0_red_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Performance Mixer Sprint 0 Red Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Performance Mixer Sprint 0 Red Tests"
 )
 
 target_sources(drs_performance_mixer_s0_red_tests
@@ -2761,7 +2761,7 @@ foreach(DRS_PERFORMANCE_MIXER_S2_SEAM IN ITEMS
 endforeach()
 
 juce_add_console_app(drs_sprint6_publish_shell_parity_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Publish Shell Parity Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Publish Shell Parity Tests"
 )
 
 target_sources(drs_sprint6_publish_shell_parity_tests
@@ -2793,7 +2793,7 @@ add_test(
 )
 
 juce_add_console_app(drs_sprint6_integration_hardening_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 6 Integration Hardening Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 6 Integration Hardening Tests"
 )
 
 target_sources(drs_sprint6_integration_hardening_tests
@@ -2819,7 +2819,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_realtime_safety_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Realtime Safety Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Realtime Safety Tests"
 )
 
 target_sources(drs_phase1_realtime_safety_tests
@@ -2848,7 +2848,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_preset_state_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Preset State Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Preset State Tests"
 )
 
 target_sources(drs_phase1_preset_state_tests
@@ -2878,7 +2878,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_state_recall_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 State Recall Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 State Recall Tests"
 )
 
 target_sources(drs_phase1_state_recall_tests
@@ -2952,7 +2952,7 @@ add_test(
 )
 
 juce_add_console_app(drs_host_state_recovery_ui_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Host State Recovery UI Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Host State Recovery UI Tests"
 )
 
 target_sources(drs_host_state_recovery_ui_tests
@@ -3003,7 +3003,7 @@ add_test(
 
 # Permanent project-aware processor capture/restore integration target.
 juce_add_console_app(drs_host_project_recall_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Host Project Recall Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Host Project Recall Tests"
 )
 
 target_sources(drs_host_project_recall_tests
@@ -3029,7 +3029,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_authoring_foundation_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Foundation Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Authoring Foundation Tests"
 )
 
 target_sources(drs_phase2_authoring_foundation_tests
@@ -3054,7 +3054,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_authoring_import_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Import Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Authoring Import Tests"
 )
 
 target_sources(drs_phase2_authoring_import_tests
@@ -3099,7 +3099,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_mapping_workspace_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Mapping Workspace Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Mapping Workspace Tests"
 )
 
 target_sources(drs_phase2_mapping_workspace_tests
@@ -3156,7 +3156,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_waveform_preview_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Waveform Preview Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Waveform Preview Tests"
 )
 
 target_sources(drs_phase2_waveform_preview_tests
@@ -3186,7 +3186,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_macro_routing_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Macro Routing Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Macro Routing Tests"
 )
 
 target_sources(drs_phase2_macro_routing_tests
@@ -3217,7 +3217,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_performance_bank_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Performance Bank Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Performance Bank Tests"
 )
 
 target_sources(drs_phase2_performance_bank_tests
@@ -3244,7 +3244,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_performance_ui_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Performance UI Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Performance UI Tests"
 )
 
 target_sources(drs_phase2_performance_ui_tests
@@ -3274,7 +3274,7 @@ add_test(
 )
 
 juce_add_console_app(drs_performance_mixer_ui_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Performance Mixer UI Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Performance Mixer UI Tests"
 )
 
 target_sources(drs_performance_mixer_ui_tests
@@ -3300,7 +3300,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_authoring_playback_integration_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring Playback Integration Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Authoring Playback Integration Tests"
 )
 
 target_sources(drs_phase2_authoring_playback_integration_tests
@@ -3327,7 +3327,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_authoring_ui_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Authoring UI Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Authoring UI Tests"
 )
 
 target_sources(drs_phase2_authoring_ui_tests
@@ -3353,7 +3353,7 @@ add_test(
 )
 
 juce_add_console_app(drs_open_workbench_phase0_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 0 Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 0 Tests"
 )
 
 target_sources(drs_open_workbench_phase0_tests
@@ -3381,7 +3381,7 @@ add_test(
 set_target_properties(drs_open_workbench_phase0_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase1_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 1 Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 1 Tests"
 )
 
 target_sources(drs_open_workbench_phase1_tests
@@ -3409,7 +3409,7 @@ add_test(
 set_target_properties(drs_open_workbench_phase1_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase2_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 2 Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 2 Tests"
 )
 
 target_sources(drs_open_workbench_phase2_tests
@@ -3437,7 +3437,7 @@ add_test(
 set_target_properties(drs_open_workbench_phase2_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase3_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 3 Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 3 Tests"
 )
 
 target_sources(drs_open_workbench_phase3_tests
@@ -3466,7 +3466,7 @@ add_test(
 set_target_properties(drs_open_workbench_phase3_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase4_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 4 Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 4 Tests"
 )
 
 target_sources(drs_open_workbench_phase4_tests
@@ -3495,7 +3495,7 @@ add_test(
 set_target_properties(drs_open_workbench_phase4_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase5_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 5 Qualification"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 5 Qualification"
 )
 
 target_sources(drs_open_workbench_phase5_tests
@@ -3531,7 +3531,7 @@ set_tests_properties(drs.open_workbench.phase5 PROPERTIES TIMEOUT 120)
 set_target_properties(drs_open_workbench_phase5_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase6_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 6 Perform Qualification"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 6 Perform Qualification"
 )
 
 target_sources(drs_open_workbench_phase6_tests
@@ -3562,7 +3562,7 @@ set_tests_properties(drs.open_workbench.phase6 PROPERTIES TIMEOUT 60)
 set_target_properties(drs_open_workbench_phase6_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase7_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 7 Macro Qualification"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 7 Macro Qualification"
 )
 
 target_sources(drs_open_workbench_phase7_tests
@@ -3592,7 +3592,7 @@ set_tests_properties(drs.open_workbench.phase7 PROPERTIES TIMEOUT 60)
 set_target_properties(drs_open_workbench_phase7_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase8_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 8 Routing Qualification"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 8 Routing Qualification"
 )
 
 target_sources(drs_open_workbench_phase8_tests
@@ -3622,7 +3622,7 @@ set_tests_properties(drs.open_workbench.phase8 PROPERTIES TIMEOUT 60)
 set_target_properties(drs_open_workbench_phase8_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_open_workbench_phase9_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Open Workbench Phase 9 Convergence Qualification"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Open Workbench Phase 9 Convergence Qualification"
 )
 
 target_sources(drs_open_workbench_phase9_tests
@@ -3658,7 +3658,7 @@ set_tests_properties(drs.open_workbench.phase9 PROPERTIES TIMEOUT 120)
 set_target_properties(drs_open_workbench_phase9_tests PROPERTIES FOLDER "Tests")
 
 juce_add_console_app(drs_performance_engine_s10_articulation_ui_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Sprint 10 Articulation UI Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Sprint 10 Articulation UI Tests"
 )
 
 target_sources(drs_performance_engine_s10_articulation_ui_tests
@@ -3684,7 +3684,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase2_repeated_structure_density_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 2 Repeated Structure Density Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Repeated Structure Density Tests"
 )
 
 target_sources(drs_phase2_repeated_structure_density_tests
@@ -3710,7 +3710,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_diagnostics_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Diagnostics Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Diagnostics Tests"
 )
 
 target_sources(drs_phase1_diagnostics_tests
@@ -3738,7 +3738,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_failure_handling_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Failure Handling Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Failure Handling Tests"
 )
 
 target_sources(drs_phase1_failure_handling_tests
@@ -3766,7 +3766,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_macro_bridge_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Macro Bridge Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Macro Bridge Tests"
 )
 
 target_sources(drs_phase1_macro_bridge_tests
@@ -3793,7 +3793,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_runtime_baseline_report
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Baseline Report"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Runtime Baseline Report"
 )
 
 target_sources(drs_phase1_runtime_baseline_report
@@ -3818,7 +3818,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_sample_import_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Sample Import Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Sample Import Tests"
 )
 
 target_sources(drs_phase1_sample_import_tests
@@ -3850,7 +3850,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_fixture_support_tests
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Fixture Support Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Fixture Support Tests"
 )
 
 target_sources(drs_wav_import_fixture_support_tests
@@ -3884,7 +3884,7 @@ add_test(
 )
 
 juce_add_console_app(drs_wav_import_baseline_report
-    PRODUCT_NAME "Decent Rhapsody Studio WAV Import Baseline Report"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import Baseline Report"
 )
 
 target_sources(drs_wav_import_baseline_report
@@ -3918,7 +3918,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_compile_path_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Compile Path Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Compile Path Tests"
 )
 
 target_sources(drs_phase1_compile_path_tests
@@ -3956,7 +3956,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_performance_package_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Performance Package Tests"
 )
 
 target_sources(drs_phase1_performance_package_tests
@@ -4020,7 +4020,7 @@ set_target_properties(drs_packaged_instrument_fx_routing_contract_tests PROPERTI
 )
 
 juce_add_console_app(drs_packaged_instrument_fx_routing_activation_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Packaged Instrument FX Routing Activation Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Packaged Instrument FX Routing Activation Tests"
 )
 
 target_sources(drs_packaged_instrument_fx_routing_activation_tests
@@ -4063,7 +4063,7 @@ set_target_properties(drs_packaged_instrument_fx_routing_activation_tests PROPER
 )
 
 juce_add_console_app(drs_phase1_performance_package_loader_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Loader Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Performance Package Loader Tests"
 )
 
 target_sources(drs_phase1_performance_package_loader_tests
@@ -4097,7 +4097,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_performance_package_session_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Session Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Performance Package Session Tests"
 )
 
 target_sources(drs_phase1_performance_package_session_tests
@@ -4137,7 +4137,7 @@ add_test(
 )
 
 juce_add_console_app(drs_performance_package_export_lifecycle_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Playable Package Export Lifecycle Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Playable Package Export Lifecycle Tests"
 )
 
 target_sources(drs_performance_package_export_lifecycle_tests
@@ -4172,7 +4172,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_performance_package_host_validation_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Host Validation Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Performance Package Host Validation Tests"
 )
 
 target_sources(drs_phase1_performance_package_host_validation_tests
@@ -4209,7 +4209,7 @@ add_test(
 set_tests_properties(drs.phase1.performance_package_host_validation PROPERTIES RUN_SERIAL TRUE)
 
 juce_add_console_app(drs_playable_instrument_license_contract_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Playable Instrument License Contract Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Playable Instrument License Contract Tests"
 )
 
 target_sources(drs_playable_instrument_license_contract_tests
@@ -4244,7 +4244,7 @@ set_target_properties(drs_playable_instrument_license_contract_tests PROPERTIES
 )
 
 juce_add_console_app(drs_playable_instrument_license_project_import_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Playable Instrument License Project Import Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Playable Instrument License Project Import Tests"
 )
 
 target_sources(drs_playable_instrument_license_project_import_tests
@@ -4273,7 +4273,7 @@ set_target_properties(drs_playable_instrument_license_project_import_tests PROPE
 )
 
 juce_add_console_app(drs_playable_instrument_license_viewer_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Playable Instrument License Viewer Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Playable Instrument License Viewer Tests"
 )
 
 target_sources(drs_playable_instrument_license_viewer_tests
@@ -4318,7 +4318,7 @@ set_target_properties(drs_playable_instrument_license_contract_red_tests PROPERT
 )
 
 juce_add_console_app(drs_phase1_performance_package_release_gate
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Performance Package Release Gate"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Performance Package Release Gate"
 )
 
 target_sources(drs_phase1_performance_package_release_gate
@@ -4364,7 +4364,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_pipeline_report
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Pipeline Report"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Pipeline Report"
 )
 
 target_sources(drs_phase1_pipeline_report
@@ -4400,7 +4400,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_benchmark_scene
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Benchmark Scene"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Benchmark Scene"
 )
 
 target_sources(drs_phase1_benchmark_scene
@@ -4435,7 +4435,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_stream_reader_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Stream Reader Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Stream Reader Tests"
 )
 
 target_sources(drs_phase1_stream_reader_tests
@@ -4465,7 +4465,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_streaming_service_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Streaming Service Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Streaming Service Tests"
 )
 
 target_sources(drs_phase1_streaming_service_tests
@@ -4495,7 +4495,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_voice_runtime_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Voice Runtime Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Voice Runtime Tests"
 )
 
 target_sources(drs_phase1_voice_runtime_tests
@@ -4525,7 +4525,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_note_routing_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Note Routing Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Note Routing Tests"
 )
 
 target_sources(drs_phase1_note_routing_tests
@@ -4555,7 +4555,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_load_profile_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Load Profile Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Load Profile Tests"
 )
 
 target_sources(drs_phase1_load_profile_tests
@@ -4585,7 +4585,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_runtime_counters_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Counter Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Runtime Counter Tests"
 )
 
 target_sources(drs_phase1_runtime_counters_tests
@@ -4615,7 +4615,7 @@ add_test(
 )
 
 juce_add_console_app(drs_phase1_runtime_baseline_guard
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Baseline Guard"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Runtime Baseline Guard"
 )
 
 target_sources(drs_phase1_runtime_baseline_guard
@@ -4649,7 +4649,7 @@ set_tests_properties(drs.phase1.runtime_baseline_guard PROPERTIES
 )
 
 juce_add_console_app(drs_phase1_runtime_fixture_tool
-    PRODUCT_NAME "Decent Rhapsody Studio Phase 1 Runtime Fixture Tool"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 1 Runtime Fixture Tool"
 )
 
 target_sources(drs_phase1_runtime_fixture_tool
@@ -4685,6 +4685,7 @@ add_custom_target(drs_all_tests)
 
 add_dependencies(drs_all_tests
     DecentRhapsodyStudioPlugin
+    drs_vst3_host_state_qualification_tests
     drs_package_v2_tests
     drs_host_session_state_contract_tests
     drs_host_project_recall_tests
@@ -5028,7 +5029,7 @@ set_target_properties(drs_phase1_runtime_fixture_tool PROPERTIES
 )
 
 juce_add_console_app(drs_ui_message_thread_metrics_tests
-    PRODUCT_NAME "Decent Rhapsody Studio UI Message Thread Metrics Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} UI Message Thread Metrics Tests"
 )
 
 target_sources(drs_ui_message_thread_metrics_tests
@@ -5093,7 +5094,7 @@ set_target_properties(drs_host_state_publication_service_tests PROPERTIES
 )
 
 juce_add_console_app(drs_ui_responsiveness_baseline
-    PRODUCT_NAME "Decent Rhapsody Studio UI Responsiveness Baseline"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} UI Responsiveness Baseline"
 )
 
 target_sources(drs_ui_responsiveness_baseline
@@ -5133,7 +5134,7 @@ set_target_properties(drs_ui_responsiveness_baseline PROPERTIES
 )
 
 juce_add_console_app(drs_performance_responsiveness_tests
-    PRODUCT_NAME "Decent Rhapsody Studio Performance Responsiveness Tests"
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Performance Responsiveness Tests"
 )
 
 target_sources(drs_performance_responsiveness_tests

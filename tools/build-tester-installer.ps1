@@ -53,9 +53,19 @@ function Find-BuiltVst3Bundle {
         [string]$Configuration
     )
 
-    return Get-ChildItem -Path $BuildAppRoot -Recurse -Directory -Filter "Decent Rhapsody Studio.vst3" |
-        Where-Object { $_.FullName -like "*\$Configuration\VST3\Decent Rhapsody Studio.vst3" } |
-        Select-Object -First 1 -ExpandProperty FullName
+    $legacyBundles = @(Get-ChildItem -Path $BuildAppRoot -Recurse -Directory -Filter "Decent Rhapsody Studio.vst3" |
+        Where-Object { $_.FullName -like "*\$Configuration\VST3\Decent Rhapsody Studio.vst3" })
+
+    if ($legacyBundles.Count -gt 0) {
+        throw "A legacy same-CID VST3 bundle remains under '$BuildAppRoot'. Run a clean $Configuration build before packaging."
+    }
+
+    $bundle = Join-Path $BuildAppRoot "drs_plugin_bundle_artefacts\$Configuration\VST3\Practical Sampler.vst3"
+    if (Test-Path -LiteralPath $bundle -PathType Container) {
+        return $bundle
+    }
+
+    return $null
 }
 
 function Find-StandaloneDirectory {
@@ -67,10 +77,10 @@ function Find-StandaloneDirectory {
         [string]$Configuration
     )
 
-    $exe = Get-ChildItem -Path $BuildAppRoot -Recurse -File -Filter "Decent Rhapsody Studio.exe" |
+    $exe = Get-ChildItem -Path $BuildAppRoot -Recurse -File -Filter "Practical Sampler.exe" |
         Where-Object {
-            $_.FullName -like "*\$Configuration\Standalone\Decent Rhapsody Studio.exe" -or
-            $_.FullName -like "*\$Configuration\Decent Rhapsody Studio.exe"
+            $_.FullName -like "*\$Configuration\Standalone\Practical Sampler.exe" -or
+            $_.FullName -like "*\$Configuration\Practical Sampler.exe"
         } |
         Select-Object -First 1
 
@@ -91,7 +101,7 @@ $resolvedOutputDir = if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir
 }
 
-Write-Host "== Decent Rhapsody Studio tester installer =="
+Write-Host "== Practical Sampler tester installer =="
 Write-Host "Repo root: $repoRoot"
 Write-Host "Configuration: $Configuration"
 Write-Host "Installer version: $resolvedAppVersion"
@@ -111,7 +121,7 @@ if (-not $vst3Bundle -or -not (Test-Path $vst3Bundle)) {
 }
 
 $standaloneDir = Find-StandaloneDirectory -BuildAppRoot $buildAppRoot -Configuration $Configuration
-$hasStandalone = if ($standaloneDir -and (Test-Path (Join-Path $standaloneDir "Decent Rhapsody Studio.exe"))) { 1 } else { 0 }
+$hasStandalone = if ($standaloneDir -and (Test-Path (Join-Path $standaloneDir "Practical Sampler.exe"))) { 1 } else { 0 }
 $iscc = Find-InnoSetupCompiler
 
 if (-not $iscc) {

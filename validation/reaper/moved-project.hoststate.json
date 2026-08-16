@@ -1,46 +1,44 @@
 {
-    "schemaName":  "drs.hostState",
-    "schemaVersion":  1,
-    "presetState":  {
-                        "schemaName":  "drs.presetState",
-                        "schemaVersion":  1,
-                        "presetId":  "drs.phase1.tiny-open-instrument.default",
-                        "targetInstrumentId":  "drs.phase1.tiny-open-instrument",
-                        "targetInstrumentSchemaName":  "drs.instrument",
-                        "targetInstrumentSchemaVersion":  1,
-                        "loadProfileId":  "balanced",
-                        "selectedArticulationId":  "sustain",
-                        "macroValues":  [
-                                            {
-                                                "id":  "tone",
-                                                "value":  0.62
-                                            },
-                                            {
-                                                "id":  "motion",
-                                                "value":  0.78
-                                            }
-                                        ],
-                        "notes":  [
-
-                                  ]
-                    },
-    "projectBinding":  {
-                           "projectId":  "drs.phase2.authoring-foundation",
-                           "manifestPath":  "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\validation\\reaper\\scenarios\\moved-away\\phase2-authoring-foundation.drsproj",
-                           "manifestFileName":  "phase2-authoring-foundation.drsproj",
-                           "manifestDigest":  "fnv1a64:925ba798ba8a5c3c",
-                           "contentRootHint":  "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\validation\\reaper\\scenarios\\moved-away"
-                       },
-    "authoringState":  {
-                           "revision":  0,
-                           "savedRevision":  0,
-                           "dirty":  false
-                       },
-    "publishedState":  {
-                           "revision":  0,
-                           "projectGeneration":  3,
-                           "authoredContentDigest":  "fnv1a64:68a6c97a5cbda190",
-                           "macroSchemaDigest":  "fnv1a64:40f42c8ebacf8499",
-                           "preparedContentDigest":  "fnv1a64:f1e7c65aeff8d0e1"
-                       }
+  "schemaName": "drs.hostState",
+  "schemaVersion": 1,
+  "presetState": {
+    "schemaName": "drs.presetState",
+    "schemaVersion": 1,
+    "presetId": "drs.phase1.tiny-open-instrument.default",
+    "targetInstrumentId": "drs.phase1.tiny-open-instrument",
+    "targetInstrumentSchemaName": "drs.instrument",
+    "targetInstrumentSchemaVersion": 1,
+    "loadProfileId": "balanced",
+    "selectedArticulationId": "sustain",
+    "macroValues": [
+      {
+        "id": "tone",
+        "value": 0.62
+      },
+      {
+        "id": "motion",
+        "value": 0.78
+      }
+    ],
+    "notes": []
+  },
+  "projectBinding": {
+    "projectId": "drs.phase2.authoring-foundation",
+    "manifestPath": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\validation\\reaper\\scenarios\\moved-away\\phase2-authoring-foundation.drsproj",
+    "manifestFileName": "phase2-authoring-foundation.drsproj",
+    "manifestDigest": "fnv1a64:925ba798ba8a5c3c",
+    "contentRootHint": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\validation\\reaper\\scenarios\\moved-away"
+  },
+  "authoringState": {
+    "revision": 0,
+    "savedRevision": 0,
+    "dirty": false
+  },
+  "publishedState": {
+    "revision": 0,
+    "projectGeneration": 3,
+    "authoredContentDigest": "fnv1a64:68a6c97a5cbda190",
+    "macroSchemaDigest": "fnv1a64:40f42c8ebacf8499",
+    "preparedContentDigest": "fnv1a64:f1e7c65aeff8d0e1"
+  }
 }

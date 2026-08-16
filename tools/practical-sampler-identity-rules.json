@@ -52,6 +52,14 @@
       "reason": "This narrow test fixture proves that free-text notes written under the former presentation identity remain readable and are not migrated."
     },
     {
+      "id": "legacy-vst3-upgrade-guard",
+      "classification": "PRESERVE-TECHNICAL",
+      "identity": "productName",
+      "pathRegex": "^DecentRhapsodyStudio/tools/(?:build-tester-installer|install-vst3-windows)\\.ps1$|^DecentRhapsodyStudio/tools/drs-tester-installer\\.iss$",
+      "lineRegex": "(?:legacy|Legacy|InstallDelete|Configuration.*Decent Rhapsody Studio\\.vst3)",
+      "reason": "The old bundle name remains only as an explicit same-CID stale-artifact guard or upgrade removal target."
+    },
+    {
       "id": "active-product-presentation",
       "classification": "CHANGE",
       "identity": "productName",

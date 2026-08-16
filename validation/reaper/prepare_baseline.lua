@@ -20,7 +20,7 @@ local track = reaper.GetTrack(0, 0)
 reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "DRS baseline", true)
 local fx_index = reaper.TrackFX_AddByName(
   track,
-  "VST3: Decent Rhapsody Studio",
+  "VST3: Practical Sampler",
   false,
   -1)
 
@@ -35,7 +35,7 @@ if chunk_ok then
   write_text(chunk_path, chunk)
 end
 
-reaper.Undo_EndBlock("Create Decent Rhapsody Studio baseline", -1)
+reaper.Undo_EndBlock("Create Practical Sampler baseline", -1)
 reaper.Main_SaveProjectEx(0, project_path, 8)
 write_text(
   log_path,
@@ -43,4 +43,3 @@ write_text(
     .. "fx_name=" .. fx_name .. "\n"
     .. "chunk_ok=" .. tostring(chunk_ok) .. "\n"
     .. "project_path=" .. project_path .. "\n")
-

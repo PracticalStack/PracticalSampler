@@ -12,13 +12,13 @@ Get-Content -LiteralPath $BaselineProject | ForEach-Object { $projectLines.Add($
 
 $vstLine = -1
 for ($index = 0; $index -lt $projectLines.Count; ++$index) {
-    if ($projectLines[$index] -match '^\s*<VST .*Decent Rhapsody Studio') {
+    if ($projectLines[$index] -match '^\s*<VST .*Practical Sampler') {
         $vstLine = $index
         break
     }
 }
 if ($vstLine -lt 0) {
-    throw "The baseline project does not contain Decent Rhapsody Studio."
+    throw "The baseline project does not contain Practical Sampler."
 }
 
 $payloadStart = $vstLine + 2

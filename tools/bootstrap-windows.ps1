@@ -19,7 +19,7 @@ if (-not (Test-Path $vsDevCmd)) {
     throw "VsDevCmd.bat was not found at '$vsDevCmd'. Verify that Visual Studio 2022 Community with Desktop development with C++ is installed."
 }
 
-Write-Host "== Decent Rhapsody Studio Windows bootstrap =="
+Write-Host "== Practical Sampler Windows bootstrap =="
 Write-Host "Repo root: $root"
 Write-Host "Configuration preset: $configurePreset"
 Write-Host "Run smoke tests: $RunTests"
