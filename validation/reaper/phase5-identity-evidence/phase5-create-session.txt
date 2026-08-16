@@ -15,5 +15,5 @@ automation_point_1_time=2.000000000000
 automation_point_1_value=0.810000000000
 editor_open=true
 saved_editor_closed=true
-project_path=E:\Dev\Cpp\VST\DecentRhapsody\DecentRhapsodyStudio\validation\reaper\phase5-identity-evidence\phase5-current-session.rpp
+project_path=E:\Dev\Cpp\VST\DecentRhapsody\PracticalSampler\validation\reaper\phase5-identity-evidence\phase5-current-session.rpp
 chunk_captured=true

@@ -21,4 +21,4 @@ source_motion_after_duplicate_change=0.769999980927
 duplicate_motion_after_change=0.109999999404
 duplicate_independent=true
 chunks_captured=true
-duplicate_project_path=E:\Dev\Cpp\VST\DecentRhapsody\DecentRhapsodyStudio\validation\reaper\phase5-identity-evidence\phase5-duplicate-session.rpp
+duplicate_project_path=E:\Dev\Cpp\VST\DecentRhapsody\PracticalSampler\validation\reaper\phase5-identity-evidence\phase5-duplicate-session.rpp

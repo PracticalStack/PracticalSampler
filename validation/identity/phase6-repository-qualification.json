@@ -1,0 +1,62 @@
+{
+  "schemaName": "drs.practicalSampler.phase6RepositoryQualification",
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-08-16T04:38:36.0315323Z",
+  "gate": "G6",
+  "passed": false,
+  "finalRepositoryRoot": "E:/Dev/Cpp/VST/DecentRhapsody/PracticalSampler",
+  "rollbackRepositoryRoot": "E:/Dev/Cpp/VST/DecentRhapsody/DecentRhapsodyStudio",
+  "rollbackCommit": "8a8a76794fcfe4066c4643c8acbd3718eaa6f50b",
+  "localCleanCloneVerified": true,
+  "hostedOriginConfigured": false,
+  "configuredRemoteCount": 0,
+  "activeOldAbsoluteRootHits": 0,
+  "oldRepositoryUrlHits": 0,
+  "oldRootCmakeCacheHits": 0,
+  "identityAudit": {
+    "occurrences": 221,
+    "unclassified": 0,
+    "change": 0,
+    "regenerate": 0,
+    "missingOwner": 0,
+    "missingReason": 0
+  },
+  "debug": {
+    "configuredFromCleanRoot": true,
+    "allTestsTargetBuilt": true,
+    "fullCtestCount": 198,
+    "fullCtestCompleted": false,
+    "blockingTest": "drs.host_state.vst3_qualification",
+    "additionalHangingTest": "drs.wav_import.host_validation"
+  },
+  "release": {
+    "configuredFromCleanRoot": true,
+    "standaloneBuilt": true,
+    "vst3Built": true,
+    "focusedTestsPassed": 7,
+    "focusedTestsFailed": 0,
+    "focusedTestSeconds": 15.52
+  },
+  "standaloneSmoke": {
+    "responding": true,
+    "closedNormally": true,
+    "windowTitle": "Practical Sampler - No Project Loaded"
+  },
+  "reaperSmoke": {
+    "passed": true,
+    "scanEntryCount": 1,
+    "scannedFxName": "VST3i: Practical Sampler (Practical Sampler Project)",
+    "stableComponentCid": "ABCDEF019182FAEB4463726844727330",
+    "savedReopenedValuesMatch": true,
+    "editorOpenAndClosed": true,
+    "duplicateInstancesIndependent": true
+  },
+  "releaseArtifacts": {
+    "standaloneSha256": "761E7DFBEDF80BAA740E0148B4906603356DAB0E5F3BD0EE91262F556001F57B",
+    "vst3ModuleSha256": "0D842F2C677DFA335706314A4746D5644027824E1D8A12ED7DE93BD276E0FA48"
+  },
+  "blockers": [
+    "No hosted PracticalSampler origin is configured, so origin-based clean-clone proof is pending.",
+    "The inherited GUI-linked Debug tests do not terminate and prevent a complete full-suite result."
+  ]
+}
