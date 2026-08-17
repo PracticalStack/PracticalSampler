@@ -551,6 +551,14 @@ MainComponent::MainComponent(bool enableAudioOutput)
                      [this]()
                      {
                          processor.cancelAuthoringSourceValidation();
+                     },
+                     [this](const std::uint64_t startFrame,
+                            const std::uint64_t endFrameExclusive,
+                            const std::size_t displayPointCount)
+                     {
+                         processor.requestAuthoringWaveformDetail(startFrame,
+                                                                  endFrameExclusive,
+                                                                  displayPointCount);
                      }),
       restoreBanner([this] { locateProjectForRestore(); },
                     [this] { processor.retryProjectRestore(); })

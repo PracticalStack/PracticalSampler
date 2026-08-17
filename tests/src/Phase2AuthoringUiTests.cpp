@@ -7,6 +7,7 @@
 #include "shared/authoring/RepeatedStructureList.h"
 #include "shared/authoring/AuthoringWorkspaceLayout.h"
 #include "shared/authoring/ZoneMappingEditor.h"
+#include "shared/authoring/WaveformDetailView.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -3641,6 +3642,62 @@ void exerciseZoneMapViewportGestures()
             "Resetting the Zone Map viewport should restore the complete mapping extent.");
 }
 
+void exerciseWaveformViewportGestures()
+{
+    drs::app::authoring::WaveformDetailView waveform;
+    waveform.setBounds(0, 0, 800, 240);
+    auto preview = makePreviewFixture();
+    preview.sourceIdentity = "phase2-waveform-fixture";
+    waveform.setPreview(preview);
+
+    int detailRequestCount = 0;
+    std::uint64_t requestedStart = 0;
+    std::uint64_t requestedEnd = 0;
+    waveform.setDetailRequestCallback([&](const std::uint64_t start,
+                                          const std::uint64_t end,
+                                          const std::size_t points)
+    {
+        ++detailRequestCount;
+        requestedStart = start;
+        requestedEnd = end;
+        require(points >= 256 && points <= 4096,
+                "Waveform detail requests should use a bounded display resolution.");
+    });
+
+    require(waveform.getViewportFrames().startFrame == 0
+                && waveform.getViewportFrames().endFrameExclusive == preview.frameCount,
+            "Waveform view should initially fit the whole source.");
+
+    const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();
+    const auto eventTime = juce::Time::getCurrentTime();
+    const auto pointer = waveform.getLocalBounds().toFloat().getCentre();
+    const juce::MouseEvent wheelEvent(mouseSource,
+                                      pointer,
+                                      juce::ModifierKeys {},
+                                      1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                      &waveform, &waveform,
+                                      eventTime, pointer, eventTime, 1, false);
+    juce::MouseWheelDetails wheel {};
+    wheel.deltaY = 0.5f;
+    waveform.mouseWheelMove(wheelEvent, wheel);
+    const auto zoomed = waveform.getViewportFrames();
+    require(zoomed.length() < preview.frameCount && detailRequestCount == 1
+                && requestedStart == zoomed.startFrame && requestedEnd == zoomed.endFrameExclusive,
+            "Waveform wheel zoom should retain a smaller frame viewport and publish one detail request.");
+
+    waveform.setSize(1024, 320);
+    require(waveform.getViewportFrames().startFrame == zoomed.startFrame
+                && waveform.getViewportFrames().endFrameExclusive == zoomed.endFrameExclusive,
+            "Waveform resize should preserve its source-frame viewport.");
+    require(waveform.keyPressed(juce::KeyPress(juce::KeyPress::rightKey))
+                && waveform.getViewportFrames().startFrame > zoomed.startFrame,
+            "Waveform keyboard navigation should pan the detailed viewport.");
+    require(waveform.keyPressed(juce::KeyPress(juce::KeyPress::homeKey))
+                && waveform.getViewportFrames().startFrame == 0
+                && waveform.getViewportFrames().endFrameExclusive == preview.frameCount,
+            "Waveform Home navigation should restore fit-to-source.");
+}
+
 void exerciseZoneMapProportionalMultiZoneExpansion()
 {
     using drs::app::authoring::ZoneMapCanvas;
@@ -3706,6 +3763,7 @@ int main()
     {
         juce::ScopedJuceInitialiser_GUI gui;
         exerciseZoneMapViewportGestures();
+        exerciseWaveformViewportGestures();
         exerciseZoneMapProportionalMultiZoneExpansion();
 
         drs::app::authoring::ZoneMapCanvas dropTargetZoneMap;

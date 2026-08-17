@@ -38,6 +38,7 @@ public:
 
     using WaveformPreviewProvider = std::function<AuthoringWaveformPreview()>;
     using WaveformPreviewRequestCallback = std::function<void()>;
+    using WaveformDetailRequestCallback = authoring::WaveformDetailView::DetailRequestCallback;
     using AuthoringPreviewStatusProvider = std::function<AuthoringPreviewStatusSnapshot()>;
     using ImportResponsivenessProvider = std::function<AuthoringImportResponsivenessSnapshot()>;
     using SourceValidationStatusProvider = std::function<AuthoringSourceValidationSnapshot()>;
@@ -61,7 +62,8 @@ public:
                             WaveformPreviewRequestCallback waveformPreviewRequestCallback = {},
                             SourceValidationStatusProvider sourceValidationStatusProvider = {},
                             DraftPlaybackActionCallback onRequestSourceValidation = {},
-                            DraftPlaybackActionCallback onCancelSourceValidation = {});
+                            DraftPlaybackActionCallback onCancelSourceValidation = {},
+                            WaveformDetailRequestCallback waveformDetailRequestCallback = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -205,6 +207,7 @@ private:
     drs::engine::AuthoringSession& authoringSession;
     WaveformPreviewProvider waveformPreviewProvider;
     WaveformPreviewRequestCallback waveformPreviewRequestCallback;
+    WaveformDetailRequestCallback waveformDetailRequestCallback;
     AuthoringPreviewStatusProvider authoringPreviewStatusProvider;
     ImportResponsivenessProvider importResponsivenessProvider;
     SourceValidationStatusProvider sourceValidationStatusProvider;

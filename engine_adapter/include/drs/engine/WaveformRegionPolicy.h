@@ -47,6 +47,14 @@ double waveformFrameToPixel(std::uint64_t frame,
                             const WaveformViewport& viewport) noexcept;
 std::uint64_t waveformPixelToFrame(double pixel,
                                    const WaveformViewport& viewport) noexcept;
+WaveformFrameRange zoomWaveformViewport(WaveformFrameRange current,
+                                        std::uint64_t anchorFrame,
+                                        double scale,
+                                        std::uint64_t sourceFrameCount,
+                                        std::uint64_t minimumLength = 32) noexcept;
+WaveformFrameRange panWaveformViewport(WaveformFrameRange current,
+                                       std::int64_t deltaFrames,
+                                       std::uint64_t sourceFrameCount) noexcept;
 
 enum class WaveformRegionBoundary : std::uint8_t
 {

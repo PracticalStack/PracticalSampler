@@ -558,6 +558,14 @@ Editor::Editor(Processor& owner)
                      [&owner]()
                      {
                          owner.cancelAuthoringSourceValidation();
+                     },
+                     [&owner](const std::uint64_t startFrame,
+                              const std::uint64_t endFrameExclusive,
+                              const std::size_t displayPointCount)
+                     {
+                         owner.requestAuthoringWaveformDetail(startFrame,
+                                                              endFrameExclusive,
+                                                              displayPointCount);
                      }),
       restoreBanner([this] { locateProjectForRestore(); },
                     [&owner] { owner.retryProjectRestore(); })

@@ -66,6 +66,15 @@ int main()
         require(waveformPixelToFrame(750.0, largeViewport) == maximum - 250,
                 "Pixel-to-frame conversion must preserve deep 64-bit source positions.");
 
+        const auto zoomed = zoomWaveformViewport({ 0, 1000 }, 250, 0.5, 1000, 32);
+        require(zoomed.startFrame == 125 && zoomed.endFrameExclusive == 625,
+                "Pointer-centered zoom should preserve the anchor's relative viewport position.");
+        const auto pannedLeft = panWaveformViewport(zoomed, -500, 1000);
+        const auto pannedRight = panWaveformViewport(zoomed, 900, 1000);
+        require(pannedLeft.startFrame == 0 && pannedLeft.endFrameExclusive == 500
+                    && pannedRight.startFrame == 500 && pannedRight.endFrameExclusive == 1000,
+                "Viewport panning should preserve span while clamping at both source edges.");
+
         WaveformEditableRegions regions { { 10, 90 }, { 30, 70 }, true };
         regions = normalizeBoundaryDrag(regions,
                                         WaveformRegionBoundary::playbackStart,

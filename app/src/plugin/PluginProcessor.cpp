@@ -1506,13 +1506,96 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
 
     const auto selectedZone = authoringSession.getSelectedZone();
     if (!selectedZone.has_value())
-        return { false, "No zone selected" };
+    {
+        drs::app::AuthoringWaveformPreview preview;
+        preview.state = "No zone selected";
+        return preview;
+    }
 
     const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(), selectedZone->sampleSourceId);
     if (!projectSampleSource.has_value())
-        return { false, "Selected zone sample source is missing from the project." };
+    {
+        drs::app::AuthoringWaveformPreview preview;
+        preview.presentationState = drs::app::AuthoringWaveformPresentationState::missingSource;
+        preview.state = "Selected zone sample source is missing from the project.";
+        return preview;
+    }
 
     const auto currentStampIterator = authoringWaveformPreviewCurrentStampBySourceId.find(projectSampleSource->id);
+    const auto enrichWithDetail = [&](drs::app::AuthoringWaveformPreview preview)
+    {
+        preview.sourceIdentity = currentStampIterator == authoringWaveformPreviewCurrentStampBySourceId.end()
+            ? projectSampleSource->id
+            : currentStampIterator->second;
+        preview.viewportStartFrame = authoringWaveformDetailRequestStartFrame;
+        preview.viewportEndFrameExclusive = authoringWaveformDetailRequestEndFrameExclusive;
+        preview.regionProvenance = "Effective SFZ/native region metadata";
+
+        const auto snapshot = waveformPreviewService.getSnapshot();
+        if (snapshot != nullptr)
+        {
+            preview.detailCacheHit = snapshot->cacheHit;
+            preview.peakCacheEntryCount = snapshot->cacheEntryCount;
+            preview.peakCacheBytes = snapshot->cacheBytes;
+            preview.peakCacheEvictionCount = snapshot->cacheEvictionCount;
+        }
+
+        const auto detailMatchesSource = authoringWaveformDetailCacheEntry.has_value()
+            && authoringWaveformDetailCacheEntry->sampleSourceId == projectSampleSource->id
+            && currentStampIterator != authoringWaveformPreviewCurrentStampBySourceId.end()
+            && authoringWaveformDetailCacheEntry->requestStamp.rfind(currentStampIterator->second, 0) == 0;
+        if (detailMatchesSource)
+        {
+            preview.detailStartFrame = authoringWaveformDetailCacheEntry->rangeStartFrame;
+            preview.detailEndFrameExclusive = authoringWaveformDetailCacheEntry->rangeEndFrameExclusive;
+            preview.detailPoints = authoringWaveformDetailCacheEntry->preview.points;
+        }
+
+        const auto detailRequestActive = snapshot != nullptr
+            && snapshot->identity.sampleSourceId == projectSampleSource->id
+            && snapshot->identity.requestStamp == authoringWaveformDetailRequestStamp
+            && isWaveformPreviewServiceActiveStage(snapshot->stage);
+        const auto detailRequestFailed = snapshot != nullptr
+            && snapshot->identity.sampleSourceId == projectSampleSource->id
+            && snapshot->identity.requestStamp == authoringWaveformDetailRequestStamp
+            && snapshot->stage == drs::app::WaveformPreviewServiceStage::failed;
+        const auto detailCoversRequest = detailMatchesSource
+            && authoringWaveformDetailCacheEntry->rangeStartFrame <= authoringWaveformDetailRequestStartFrame
+            && authoringWaveformDetailCacheEntry->rangeEndFrameExclusive
+                >= authoringWaveformDetailRequestEndFrameExclusive;
+
+        if (detailRequestActive)
+        {
+            preview.presentationState = detailMatchesSource
+                ? drs::app::AuthoringWaveformPresentationState::staleCompatible
+                : drs::app::AuthoringWaveformPresentationState::partial;
+            preview.state = detailMatchesSource ? "Loading detail (showing compatible peaks)"
+                                                : "Loading detail";
+        }
+        else if (detailRequestFailed)
+        {
+            preview.presentationState = detailMatchesSource
+                ? drs::app::AuthoringWaveformPresentationState::staleCompatible
+                : drs::app::AuthoringWaveformPresentationState::failed;
+            preview.state = detailMatchesSource ? "Detail failed (showing compatible peaks)"
+                                                : "Detail unavailable";
+        }
+        else if (!authoringWaveformDetailRequestStamp.empty() && detailCoversRequest)
+        {
+            preview.presentationState = drs::app::AuthoringWaveformPresentationState::ready;
+            preview.state = "Ready";
+        }
+        else if (preview.available)
+        {
+            preview.presentationState = drs::app::AuthoringWaveformPresentationState::ready;
+        }
+
+        preview.loopEnabled = selectedZone->loopEnabled;
+        preview.loopStartFrame = selectedZone->loopStartFrame;
+        preview.loopEndFrame = selectedZone->loopEndFrame;
+        return preview;
+    };
+
     if (currentStampIterator != authoringWaveformPreviewCurrentStampBySourceId.end())
     {
         if (const auto* cacheEntry = findAuthoringWaveformPreviewCacheEntryForStamp(currentStampIterator->second);
@@ -1520,21 +1603,20 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
         {
             auto preview = cacheEntry->preview;
             preview.state = "Ready";
-            preview.loopEnabled = selectedZone->loopEnabled;
-            preview.loopStartFrame = selectedZone->loopStartFrame;
-            preview.loopEndFrame = selectedZone->loopEndFrame;
-            return preview;
+            return enrichWithDetail(std::move(preview));
         }
     }
 
     if (!authoringWaveformPreviewLoadAuthorized)
     {
         drs::app::AuthoringWaveformPreview preview;
+        preview.presentationState = drs::app::AuthoringWaveformPresentationState::idle;
         preview.state = "Preview loads on demand";
         return preview;
     }
 
     auto preview = drs::app::AuthoringWaveformPreview {};
+    preview.presentationState = drs::app::AuthoringWaveformPresentationState::loading;
     if (const auto snapshot = waveformPreviewService.getSnapshot();
         snapshot != nullptr
             && snapshot->identity.sampleSourceId == projectSampleSource->id
@@ -1560,7 +1642,13 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
         else if (snapshot->stage == drs::app::WaveformPreviewServiceStage::canceled)
             preview.state = "Canceled";
         else if (snapshot->stage == drs::app::WaveformPreviewServiceStage::failed)
+        {
             preview.state = "Unavailable";
+            preview.presentationState = snapshot->result != nullptr
+                    && snapshot->result->state == "Sample missing"
+                ? drs::app::AuthoringWaveformPresentationState::missingSource
+                : drs::app::AuthoringWaveformPresentationState::failed;
+        }
     }
     else
     {
@@ -1572,12 +1660,10 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
     {
         preview = staleCacheEntry->preview;
         preview.state = "Stale";
+        preview.presentationState = drs::app::AuthoringWaveformPresentationState::staleCompatible;
     }
 
-    preview.loopEnabled = selectedZone->loopEnabled;
-    preview.loopStartFrame = selectedZone->loopStartFrame;
-    preview.loopEndFrame = selectedZone->loopEndFrame;
-    return preview;
+    return enrichWithDetail(std::move(preview));
 }
 
 void Processor::authorizeAuthoringWaveformPreviewLoad()
@@ -1627,6 +1713,67 @@ void Processor::authorizeAuthoringWaveformPreviewLoad()
     request.chunkFrameCount = authoringWaveformPreviewChunkFrameCount;
     request.channelReduction = authoringWaveformPreviewChannelReduction;
     request.requestStamp = requestStamp;
+    waveformPreviewService.submit(std::move(request));
+}
+
+void Processor::requestAuthoringWaveformDetail(const std::uint64_t startFrame,
+                                               const std::uint64_t endFrameExclusive,
+                                               const std::size_t displayPointCount)
+{
+    authoringWaveformPreviewLoadAuthorized = true;
+    consumeAuthoringWaveformPreviewSnapshot();
+
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return;
+    const auto projectSampleSource = findProjectSampleSource(authoringSession.getProject(),
+                                                              selectedZone->sampleSourceId);
+    if (!projectSampleSource.has_value() || endFrameExclusive <= startFrame)
+        return;
+
+    std::uint64_t sourceFileSizeBytes = 0;
+    std::int64_t sourceModificationTicks = 0;
+    describeAuthoringWaveformPreviewSource(*projectSampleSource,
+                                           sourceFileSizeBytes,
+                                           sourceModificationTicks);
+    const auto overviewStamp = buildAuthoringWaveformPreviewRequestStamp(*projectSampleSource,
+                                                                         sourceFileSizeBytes,
+                                                                         sourceModificationTicks);
+    authoringWaveformPreviewCurrentStampBySourceId[projectSampleSource->id] = overviewStamp;
+
+    const auto pointCount = std::max<std::size_t>(1, std::min(displayPointCount,
+        authoringWaveformDetailMaximumPointCount));
+    const auto rangeFrameCount = endFrameExclusive - startFrame;
+    std::ostringstream stamp;
+    stamp << overviewStamp << "|range=" << startFrame << ':' << endFrameExclusive
+          << "|detail-points=" << pointCount;
+    authoringWaveformDetailRequestStamp = stamp.str();
+    authoringWaveformDetailRequestStartFrame = startFrame;
+    authoringWaveformDetailRequestEndFrameExclusive = endFrameExclusive;
+
+    if (const auto snapshot = waveformPreviewService.getSnapshot();
+        snapshot != nullptr
+            && snapshot->identity.requestStamp == authoringWaveformDetailRequestStamp
+            && (isWaveformPreviewServiceActiveStage(snapshot->stage)
+                || snapshot->stage == drs::app::WaveformPreviewServiceStage::completed))
+    {
+        return;
+    }
+
+    drs::app::WaveformPreviewRequest request;
+    request.projectId = authoringSession.getProject().projectId;
+    request.baseRevision = authoringSession.getDocumentState().revision;
+    request.contentRootPath = authoringSession.getProject().contentRootPath;
+    request.sampleSourceId = projectSampleSource->id;
+    request.sourcePath = projectSampleSource->path;
+    request.sourceFileSizeBytes = sourceFileSizeBytes;
+    request.sourceModificationTicks = sourceModificationTicks;
+    request.displayPointCount = pointCount;
+    request.chunkFrameCount = authoringWaveformPreviewChunkFrameCount;
+    request.rangeStartFrame = startFrame;
+    request.rangeFrameCount = rangeFrameCount;
+    request.channelReduction = authoringWaveformPreviewChannelReduction;
+    request.requestStamp = authoringWaveformDetailRequestStamp;
     waveformPreviewService.submit(std::move(request));
 }
 
@@ -3383,6 +3530,7 @@ drs::app::AuthoringWaveformPreview Processor::buildAuthoringWaveformPreview(
 {
     drs::app::AuthoringWaveformPreview preview;
     preview.available = true;
+    preview.presentationState = drs::app::AuthoringWaveformPresentationState::ready;
     preview.state = "Ready";
     preview.sourcePath = waveform.metadata.sourcePath;
     preview.formatName = waveform.metadata.formatName;
@@ -3393,6 +3541,8 @@ drs::app::AuthoringWaveformPreview Processor::buildAuthoringWaveformPreview(
     preview.loopEnabled = loopEnabled;
     preview.loopStartFrame = loopStartFrame;
     preview.loopEndFrame = loopEndFrame;
+    preview.detailStartFrame = waveform.rangeStartFrame;
+    preview.detailEndFrameExclusive = waveform.rangeEndFrameExclusive;
     preview.points.reserve(waveform.points.size());
     for (const auto& point : waveform.points)
         preview.points.push_back({ point.minValue, point.maxValue });
@@ -3427,7 +3577,16 @@ void Processor::consumeAuthoringWaveformPreviewSnapshot()
     cacheEntry.displayPointCount = snapshot->identity.displayPointCount;
     cacheEntry.channelReduction = snapshot->identity.channelReduction;
     cacheEntry.requestStamp = snapshot->identity.requestStamp;
+    cacheEntry.rangeStartFrame = snapshot->result->rangeStartFrame;
+    cacheEntry.rangeEndFrameExclusive = snapshot->result->rangeEndFrameExclusive;
     cacheEntry.preview = buildAuthoringWaveformPreview(*snapshot->result, false, 0, 0);
+
+    if (snapshot->identity.rangeFrameCount != 0)
+    {
+        authoringWaveformDetailCacheEntry = std::move(cacheEntry);
+        return;
+    }
+
     authoringWaveformPreviewCache[cacheEntry.requestStamp] = cacheEntry;
     authoringWaveformPreviewLatestStampBySourceId[cacheEntry.sampleSourceId] = cacheEntry.requestStamp;
 }
@@ -3489,6 +3648,10 @@ void Processor::clearAuthoringWaveformPreviewCache()
     authoringWaveformPreviewCache.clear();
     authoringWaveformPreviewLatestStampBySourceId.clear();
     authoringWaveformPreviewCurrentStampBySourceId.clear();
+    authoringWaveformDetailCacheEntry.reset();
+    authoringWaveformDetailRequestStamp.clear();
+    authoringWaveformDetailRequestStartFrame = 0;
+    authoringWaveformDetailRequestEndFrameExclusive = 0;
 }
 
 void Processor::resetAuthoringPreviewPreparationAuthorization() noexcept

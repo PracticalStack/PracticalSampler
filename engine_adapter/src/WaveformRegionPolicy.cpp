@@ -105,6 +105,64 @@ std::uint64_t waveformPixelToFrame(const double pixel,
     return viewport.frames.startFrame + std::min(offset, viewport.frames.length());
 }
 
+WaveformFrameRange zoomWaveformViewport(WaveformFrameRange current,
+                                        const std::uint64_t anchorFrame,
+                                        const double scale,
+                                        const std::uint64_t sourceFrameCount,
+                                        const std::uint64_t minimumLength) noexcept
+{
+    current = normalizeWaveformFrameRange(current,
+                                          { 0, sourceFrameCount },
+                                          std::min(minimumLength, sourceFrameCount));
+    if (sourceFrameCount == 0 || !std::isfinite(scale) || scale <= 0.0)
+        return current;
+
+    const auto oldLength = current.length();
+    const auto targetLength = std::min<std::uint64_t>(
+        sourceFrameCount,
+        std::max<std::uint64_t>(std::min(minimumLength, sourceFrameCount),
+                                static_cast<std::uint64_t>(std::llround(
+                                    static_cast<long double>(oldLength) * scale))));
+    const auto clampedAnchor = clampFrame(anchorFrame, current.startFrame, current.endFrameExclusive);
+    const auto anchorRatio = oldLength == 0
+        ? 0.5L
+        : static_cast<long double>(clampedAnchor - current.startFrame)
+            / static_cast<long double>(oldLength);
+    const auto beforeAnchor = static_cast<std::uint64_t>(
+        std::llround(anchorRatio * static_cast<long double>(targetLength)));
+    const auto proposedStart = clampedAnchor > beforeAnchor ? clampedAnchor - beforeAnchor : 0;
+    const auto start = std::min(proposedStart, sourceFrameCount - targetLength);
+    return normalizeWaveformFrameRange({ start, start + targetLength },
+                                       { 0, sourceFrameCount },
+                                       targetLength);
+}
+
+WaveformFrameRange panWaveformViewport(WaveformFrameRange current,
+                                       const std::int64_t deltaFrames,
+                                       const std::uint64_t sourceFrameCount) noexcept
+{
+    current = normalizeWaveformFrameRange(current, { 0, sourceFrameCount }, 0);
+    const auto length = current.length();
+    if (length >= sourceFrameCount || deltaFrames == 0)
+        return current;
+
+    std::uint64_t start = current.startFrame;
+    if (deltaFrames < 0)
+    {
+        const auto magnitude = static_cast<std::uint64_t>(-(deltaFrames + 1)) + 1;
+        start = magnitude >= start ? 0 : start - magnitude;
+    }
+    else
+    {
+        const auto maximumStart = sourceFrameCount - length;
+        const auto magnitude = static_cast<std::uint64_t>(deltaFrames);
+        start = magnitude >= maximumStart - std::min(start, maximumStart)
+            ? maximumStart
+            : start + magnitude;
+    }
+    return { start, start + length };
+}
+
 WaveformEditableRegions normalizeBoundaryDrag(WaveformEditableRegions regions,
                                                const WaveformRegionBoundary boundary,
                                                const std::uint64_t candidateFrame,

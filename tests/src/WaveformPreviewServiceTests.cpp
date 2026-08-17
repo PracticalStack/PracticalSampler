@@ -98,6 +98,50 @@ int main()
                     "Canceled waveform preview request should terminate in the canceled state.");
         }
 
+        {
+            drs::app::WaveformPreviewServiceOptions options;
+            options.sampleImportHooks = &hooks;
+            options.maximumCacheEntries = 2;
+            options.maximumCacheBytes = 4096;
+            drs::app::WaveformPreviewService service(options);
+
+            auto ranged = makeRequest("project-c", "source-a", sourceA, "range-a");
+            ranged.rangeStartFrame = 1024;
+            ranged.rangeFrameCount = 2048;
+            drs::engine::resetSampleImportIoCounters();
+            require(service.submit(ranged).accepted && service.waitForTerminal(5s),
+                    "Visible-range waveform request should complete.");
+            auto snapshot = service.getSnapshot();
+            require(snapshot != nullptr && snapshot->result != nullptr
+                        && snapshot->result->rangeStartFrame == 1024
+                        && snapshot->result->rangeEndFrameExclusive == 3072,
+                    "Visible-range service result should retain exact source-frame coverage.");
+            const auto readsAfterBuild = drs::engine::getSampleImportIoCounters().peakChunkReadCount;
+
+            ranged.requestStamp = "range-a-again";
+            require(service.submit(ranged).accepted && service.waitForTerminal(5s),
+                    "Repeated visible-range request should complete from cache.");
+            snapshot = service.getSnapshot();
+            require(snapshot != nullptr && snapshot->cacheHit
+                        && drs::engine::getSampleImportIoCounters().peakChunkReadCount == readsAfterBuild,
+                    "An exact tile cache hit must not perform additional sample reads.");
+
+            for (int index = 0; index < 3; ++index)
+            {
+                auto tile = makeRequest("project-c", "source-a", sourceA,
+                                        "eviction-" + std::to_string(index));
+                tile.rangeStartFrame = static_cast<std::uint64_t>(index) * 1024;
+                tile.rangeFrameCount = 512;
+                require(service.submit(std::move(tile)).accepted && service.waitForTerminal(5s),
+                        "Cache eviction coverage tile should complete.");
+            }
+            snapshot = service.getSnapshot();
+            require(snapshot != nullptr && snapshot->cacheEntryCount <= 2
+                        && snapshot->cacheBytes <= options.maximumCacheBytes
+                        && snapshot->cacheEvictionCount > 0,
+                    "Waveform tile cache must remain bounded and report evictions.");
+        }
+
         std::cout << "Waveform preview service tests passed." << std::endl;
         return 0;
     }

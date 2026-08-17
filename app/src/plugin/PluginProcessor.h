@@ -234,6 +234,9 @@ public:
     bool cancelAuthoringSourceValidation();
     drs::app::AuthoringSourceValidationSnapshot getAuthoringSourceValidationSnapshot() const;
     void authorizeAuthoringWaveformPreviewLoad();
+    void requestAuthoringWaveformDetail(std::uint64_t startFrame,
+                                        std::uint64_t endFrameExclusive,
+                                        std::size_t displayPointCount);
     juce::AudioProcessorValueTreeState& getParameterState() { return parameterState; }
     const juce::AudioProcessorValueTreeState& getParameterState() const { return parameterState; }
     drs::app::AuthoringWaveformPreview getAuthoringWaveformPreview();
@@ -389,10 +392,13 @@ private:
         drs::engine::WaveformPeakChannelReduction channelReduction
             = drs::engine::WaveformPeakChannelReduction::channelExtrema;
         std::string requestStamp;
+        std::uint64_t rangeStartFrame = 0;
+        std::uint64_t rangeEndFrameExclusive = 0;
         drs::app::AuthoringWaveformPreview preview;
     };
 
     static constexpr std::size_t authoringWaveformPreviewPointCount = 192;
+    static constexpr std::size_t authoringWaveformDetailMaximumPointCount = 4096;
     static constexpr std::uint64_t authoringWaveformPreviewChunkFrameCount = 4096;
     static constexpr auto authoringWaveformPreviewChannelReduction
         = drs::engine::WaveformPeakChannelReduction::channelExtrema;
@@ -553,6 +559,10 @@ private:
     std::unordered_map<std::string, WaveformPreviewCacheEntry> authoringWaveformPreviewCache;
     std::unordered_map<std::string, std::string> authoringWaveformPreviewLatestStampBySourceId;
     std::unordered_map<std::string, std::string> authoringWaveformPreviewCurrentStampBySourceId;
+    std::optional<WaveformPreviewCacheEntry> authoringWaveformDetailCacheEntry;
+    std::string authoringWaveformDetailRequestStamp;
+    std::uint64_t authoringWaveformDetailRequestStartFrame = 0;
+    std::uint64_t authoringWaveformDetailRequestEndFrameExclusive = 0;
     std::uint64_t authoringWaveformPreviewConsumedGeneration = 0;
     bool authoringWaveformPreviewLoadAuthorized = false;
     bool authoringPreviewPreparationAuthorized = false;

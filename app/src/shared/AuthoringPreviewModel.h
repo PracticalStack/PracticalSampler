@@ -15,10 +15,24 @@ struct AuthoringWaveformPreviewPoint
     float maxValue = 0.0f;
 };
 
+enum class AuthoringWaveformPresentationState
+{
+    idle,
+    loading,
+    partial,
+    ready,
+    staleCompatible,
+    missingSource,
+    failed
+};
+
 struct AuthoringWaveformPreview
 {
     bool available = false;
+    AuthoringWaveformPresentationState presentationState
+        = AuthoringWaveformPresentationState::idle;
     std::string state;
+    std::string sourceIdentity;
     std::string sourcePath;
     std::string formatName;
     double durationSeconds = 0.0;
@@ -28,6 +42,21 @@ struct AuthoringWaveformPreview
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    std::uint64_t viewportStartFrame = 0;
+    std::uint64_t viewportEndFrameExclusive = 0;
+    std::uint64_t detailStartFrame = 0;
+    std::uint64_t detailEndFrameExclusive = 0;
+    std::vector<AuthoringWaveformPreviewPoint> detailPoints;
+    bool selectionActive = false;
+    std::uint64_t selectionStartFrame = 0;
+    std::uint64_t selectionEndFrameExclusive = 0;
+    bool playheadVisible = false;
+    std::uint64_t playheadFrame = 0;
+    std::string regionProvenance;
+    bool detailCacheHit = false;
+    std::size_t peakCacheEntryCount = 0;
+    std::size_t peakCacheBytes = 0;
+    std::uint64_t peakCacheEvictionCount = 0;
     std::vector<AuthoringWaveformPreviewPoint> points;
 };
 

@@ -1133,10 +1133,12 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                WaveformPreviewRequestCallback nextWaveformPreviewRequestCallback,
                                SourceValidationStatusProvider nextSourceValidationStatusProvider,
                                DraftPlaybackActionCallback nextRequestSourceValidation,
-                               DraftPlaybackActionCallback nextCancelSourceValidation)
+                               DraftPlaybackActionCallback nextCancelSourceValidation,
+                               WaveformDetailRequestCallback nextWaveformDetailRequestCallback)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       waveformPreviewRequestCallback(std::move(nextWaveformPreviewRequestCallback)),
+      waveformDetailRequestCallback(std::move(nextWaveformDetailRequestCallback)),
       authoringPreviewStatusProvider(std::move(nextAuthoringPreviewStatusProvider)),
       importResponsivenessProvider(std::move(responsivenessProvider)),
       sourceValidationStatusProvider(std::move(nextSourceValidationStatusProvider)),
@@ -1284,6 +1286,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     sourceValidationButton.setComponentID("authoringWaveformValidationButton");
     sourceValidationButton.setButtonText("Validate Sources");
     waveformPreview.setComponentID("authoringWaveformPreview");
+    waveformPreview.setDetailRequestCallback(waveformDetailRequestCallback);
     macroAssignmentSelector.setComponentID("authoringMacroAssignmentSelector");
     macroRoleSelector.setComponentID("authoringMacroRoleSelector");
     macroDefaultSlider.setComponentID("authoringMacroDefaultSlider");
@@ -3048,41 +3051,38 @@ void AuthoringPanel::resized()
 
     if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
     {
-        if (workbenchEditorArea.getWidth() >= 620)
+        const auto footerHeight = workbenchEditorArea.getWidth() >= 620 ? 52 : 82;
+        auto footer = workbenchEditorArea.removeFromBottom(
+            std::min(footerHeight, std::max(0, workbenchEditorArea.getHeight() / 2)));
+        workbenchEditorArea.removeFromBottom(std::min(6, workbenchEditorArea.getHeight()));
+        waveformPreview.setBounds(workbenchEditorArea);
+
+        if (footer.getWidth() >= 620)
         {
-            auto previewArea = workbenchEditorArea.removeFromLeft(
-                std::max(320, static_cast<int>(workbenchEditorArea.getWidth() * 0.58f)));
-            workbenchEditorArea.removeFromLeft(std::min(12, workbenchEditorArea.getWidth()));
-            waveformPreview.setBounds(previewArea);
-
-            auto metadataLeft = workbenchEditorArea.removeFromLeft(
-                std::max(1, (workbenchEditorArea.getWidth() - 10) / 2));
-            workbenchEditorArea.removeFromLeft(std::min(10, workbenchEditorArea.getWidth()));
-            auto metadataRight = workbenchEditorArea;
-            waveformStatusLabel.setBounds(metadataLeft.removeFromTop(18));
-            metadataLeft.removeFromTop(3);
-            waveformInfoLabel.setBounds(metadataLeft.removeFromTop(18));
-            metadataLeft.removeFromTop(3);
-            loopInfoLabel.setBounds(metadataLeft.removeFromTop(18));
-            metadataLeft.removeFromTop(3);
-            importMetricsLabel.setBounds(metadataLeft.removeFromTop(std::min(24, metadataLeft.getHeight())));
-
-            sourceValidationButton.setBounds(metadataRight.removeFromTop(24));
-            metadataRight.removeFromTop(4);
-            sourceValidationLabel.setBounds(metadataRight.removeFromTop(std::min(36, metadataRight.getHeight())));
+            auto firstRow = footer.removeFromTop(22);
+            waveformStatusLabel.setBounds(firstRow.removeFromLeft(std::min(210, firstRow.getWidth() / 3)));
+            firstRow.removeFromLeft(std::min(8, firstRow.getWidth()));
+            waveformInfoLabel.setBounds(firstRow);
+            auto secondRow = footer.removeFromTop(24);
+            sourceValidationButton.setBounds(secondRow.removeFromRight(std::min(122, secondRow.getWidth())));
+            secondRow.removeFromRight(std::min(8, secondRow.getWidth()));
+            sourceValidationLabel.setBounds(secondRow.removeFromRight(std::min(250, secondRow.getWidth() / 2)));
+            secondRow.removeFromRight(std::min(8, secondRow.getWidth()));
+            loopInfoLabel.setBounds(secondRow.removeFromLeft(std::min(300, secondRow.getWidth() * 2 / 3)));
+            secondRow.removeFromLeft(std::min(8, secondRow.getWidth()));
+            importMetricsLabel.setBounds(secondRow);
         }
         else
         {
-            const auto metadataHeight = std::min(84, workbenchEditorArea.getHeight() / 2);
-            waveformPreview.setBounds(workbenchEditorArea.removeFromTop(
-                std::max(1, workbenchEditorArea.getHeight() - metadataHeight - 4)));
-            workbenchEditorArea.removeFromTop(4);
-            waveformStatusLabel.setBounds(workbenchEditorArea.removeFromTop(16));
-            waveformInfoLabel.setBounds(workbenchEditorArea.removeFromTop(16));
-            loopInfoLabel.setBounds(workbenchEditorArea.removeFromTop(16));
-            importMetricsLabel.setBounds(workbenchEditorArea.removeFromTop(16));
-            sourceValidationButton.setBounds(workbenchEditorArea.removeFromTop(std::min(20, workbenchEditorArea.getHeight())));
-            sourceValidationLabel.setBounds(workbenchEditorArea);
+            waveformStatusLabel.setBounds(footer.removeFromTop(16));
+            waveformInfoLabel.setBounds(footer.removeFromTop(16));
+            loopInfoLabel.setBounds(footer.removeFromTop(16));
+            importMetricsLabel.setBounds(footer.removeFromTop(16));
+            auto validationRow = footer;
+            sourceValidationButton.setBounds(validationRow.removeFromRight(
+                std::min(112, validationRow.getWidth())));
+            validationRow.removeFromRight(std::min(6, validationRow.getWidth()));
+            sourceValidationLabel.setBounds(validationRow);
         }
     }
 
@@ -5212,6 +5212,15 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
                     + " - " + juce::String(static_cast<int>(preview.loopEndFrame))
                 : "Loop disabled for selected zone",
             juce::dontSendNotification);
+        if (preview.peakCacheEntryCount > 0)
+        {
+            loopInfoLabel.setText(
+                loopInfoLabel.getText() + " | peaks "
+                    + juce::String(static_cast<int>(preview.peakCacheEntryCount))
+                    + " / " + juce::String(static_cast<int>((preview.peakCacheBytes + 1023) / 1024))
+                    + " KiB" + (preview.detailCacheHit ? " hit" : ""),
+                juce::dontSendNotification);
+        }
     }
     else
     {

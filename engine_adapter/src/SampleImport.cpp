@@ -1319,8 +1319,15 @@ WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
         return result;
     }
 
-    const auto totalFrames = result.metadata.frameCount;
-    if (totalFrames == 0)
+    const auto sourceFrameCount = result.metadata.frameCount;
+    result.rangeStartFrame = std::min(options.rangeStartFrame, sourceFrameCount);
+    const auto availableFrameCount = sourceFrameCount - result.rangeStartFrame;
+    const auto requestedFrameCount = options.rangeFrameCount == 0
+        ? availableFrameCount
+        : std::min(options.rangeFrameCount, availableFrameCount);
+    result.rangeEndFrameExclusive = result.rangeStartFrame + requestedFrameCount;
+
+    if (requestedFrameCount == 0)
     {
         result.built = true;
         result.state = "Waveform peaks built";
@@ -1329,10 +1336,10 @@ WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
 
     const auto displayPointCount = std::max<std::size_t>(
         1,
-        std::min<std::size_t>(options.displayPointCount, static_cast<std::size_t>(totalFrames)));
+        std::min<std::size_t>(options.displayPointCount, static_cast<std::size_t>(requestedFrameCount)));
     const auto chunkFrameCount = std::max<std::uint64_t>(1, options.chunkFrameCount);
     const auto readerChannelCount = static_cast<int>(result.metadata.channelCount);
-    const auto bufferFrameCapacity = static_cast<int>(std::min<std::uint64_t>(chunkFrameCount, totalFrames));
+    const auto bufferFrameCapacity = static_cast<int>(std::min<std::uint64_t>(chunkFrameCount, requestedFrameCount));
     juce::AudioBuffer<float> chunkBuffer(readerChannelCount, bufferFrameCapacity);
     std::vector<bool> pointInitialized(displayPointCount, false);
     result.points.resize(displayPointCount);
@@ -1344,10 +1351,13 @@ WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
 
         WaveformPeakBuildProgress progress;
         progress.framesProcessed = framesProcessed;
-        progress.totalFrames = totalFrames;
+        progress.totalFrames = requestedFrameCount;
         progress.pointsCompleted = std::min<std::size_t>(
             displayPointCount,
-            static_cast<std::size_t>((framesProcessed * displayPointCount + totalFrames - 1) / totalFrames));
+            static_cast<std::size_t>(std::ceil(
+                static_cast<long double>(framesProcessed)
+                * static_cast<long double>(displayPointCount)
+                / static_cast<long double>(requestedFrameCount))));
         progress.totalPointCount = displayPointCount;
         options.callbacks->onProgress(progress);
     };
@@ -1368,7 +1378,7 @@ WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
     };
 
     std::uint64_t framesProcessed = 0;
-    while (framesProcessed < totalFrames)
+    while (framesProcessed < requestedFrameCount)
     {
         if (options.callbacks != nullptr && options.callbacks->isCancellationRequested())
         {
@@ -1377,17 +1387,17 @@ WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
             addIssue(result,
                      "Waveform peak build was canceled after reading "
                          + std::to_string(framesProcessed) + " of "
-                         + std::to_string(totalFrames) + " frames.");
+                         + std::to_string(requestedFrameCount) + " frames.");
             return result;
         }
 
-        const auto framesRemaining = totalFrames - framesProcessed;
+        const auto framesRemaining = requestedFrameCount - framesProcessed;
         const auto framesThisChunk = static_cast<int>(std::min<std::uint64_t>(chunkFrameCount, framesRemaining));
         chunkBuffer.clear();
         if (!reader->read(&chunkBuffer,
                           0,
                           framesThisChunk,
-                          static_cast<juce::int64>(framesProcessed),
+                          static_cast<juce::int64>(result.rangeStartFrame + framesProcessed),
                           true,
                           true))
         {
@@ -1401,10 +1411,13 @@ WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,
 
         for (int frameIndex = 0; frameIndex < framesThisChunk; ++frameIndex)
         {
-            const auto absoluteFrame = framesProcessed + static_cast<std::uint64_t>(frameIndex);
+            const auto rangeFrame = framesProcessed + static_cast<std::uint64_t>(frameIndex);
             const auto pointIndex = std::min<std::size_t>(
                 displayPointCount - 1,
-                static_cast<std::size_t>((absoluteFrame * displayPointCount) / totalFrames));
+                static_cast<std::size_t>(
+                    static_cast<long double>(rangeFrame)
+                    * static_cast<long double>(displayPointCount)
+                    / static_cast<long double>(requestedFrameCount)));
 
             float frameMin = chunkBuffer.getSample(0, frameIndex);
             float frameMax = frameMin;

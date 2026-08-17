@@ -108,6 +108,11 @@ struct WaveformPeakBuildOptions
     std::uint64_t chunkFrameCount = 4096;
     WaveformPeakChannelReduction channelReduction = WaveformPeakChannelReduction::channelExtrema;
     const WaveformPeakBuildCallbacks* callbacks = nullptr;
+    // A zero rangeFrameCount means "from rangeStartFrame to end of source".
+    // These fields deliberately follow the original aggregate members so existing
+    // four-field aggregate initializers retain their meaning.
+    std::uint64_t rangeStartFrame = 0;
+    std::uint64_t rangeFrameCount = 0;
 };
 
 struct WaveformPeakBuildResult
@@ -119,6 +124,8 @@ struct WaveformPeakBuildResult
     std::string state;
     std::vector<std::string> issues;
     ImportedSampleMetadata metadata;
+    std::uint64_t rangeStartFrame = 0;
+    std::uint64_t rangeEndFrameExclusive = 0;
     std::vector<WaveformPeakPoint> points;
 };
 

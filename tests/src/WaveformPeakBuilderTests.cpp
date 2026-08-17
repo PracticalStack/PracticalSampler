@@ -145,6 +145,23 @@ int main()
 
         {
             drs::engine::ScopedSampleImportHooksOverride scope(hooks);
+            drs::engine::resetSampleImportIoCounters();
+            drs::engine::WaveformPeakBuildOptions rangeOptions;
+            rangeOptions.displayPointCount = 32;
+            rangeOptions.chunkFrameCount = 256;
+            rangeOptions.rangeStartFrame = 2048;
+            rangeOptions.rangeFrameCount = 1024;
+            const auto ranged = drs::engine::buildWaveformPeaks(syntheticPath, {}, rangeOptions);
+            require(ranged.built && ranged.points.size() == 32,
+                    "Visible-range waveform peaks should honor the requested display resolution.");
+            require(ranged.rangeStartFrame == 2048 && ranged.rangeEndFrameExclusive == 3072,
+                    "Visible-range waveform peaks should report their exact source-frame coverage.");
+            require(drs::engine::getSampleImportIoCounters().peakChunkReadCount == 4,
+                    "Visible-range waveform peaks should read only the requested bounded range.");
+        }
+
+        {
+            drs::engine::ScopedSampleImportHooksOverride scope(hooks);
             CancelAfterFirstProgress callbacks;
             drs::engine::resetSampleImportIoCounters();
             drs::engine::WaveformPeakBuildOptions cancelOptions;

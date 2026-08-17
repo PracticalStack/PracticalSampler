@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 namespace drs::app
 {
@@ -40,6 +41,8 @@ struct WaveformPreviewRequestIdentity
     std::uint64_t sourceFileSizeBytes = 0;
     std::int64_t sourceModificationTicks = 0;
     std::size_t displayPointCount = 0;
+    std::uint64_t rangeStartFrame = 0;
+    std::uint64_t rangeFrameCount = 0;
     drs::engine::WaveformPeakChannelReduction channelReduction
         = drs::engine::WaveformPeakChannelReduction::channelExtrema;
     std::string requestStamp;
@@ -56,6 +59,8 @@ struct WaveformPreviewRequest
     std::int64_t sourceModificationTicks = 0;
     std::size_t displayPointCount = 192;
     std::uint64_t chunkFrameCount = 4096;
+    std::uint64_t rangeStartFrame = 0;
+    std::uint64_t rangeFrameCount = 0;
     drs::engine::WaveformPeakChannelReduction channelReduction
         = drs::engine::WaveformPeakChannelReduction::channelExtrema;
     std::string requestStamp;
@@ -70,7 +75,14 @@ struct WaveformPreviewServiceSnapshot
     std::uint64_t totalFrames = 0;
     std::size_t pointsCompleted = 0;
     std::size_t totalPointCount = 0;
+    bool cacheHit = false;
+    std::size_t cacheEntryCount = 0;
+    std::size_t cacheBytes = 0;
+    std::uint64_t cacheEvictionCount = 0;
     std::shared_ptr<const drs::engine::WaveformPeakBuildResult> result;
+    // A source-compatible completed result can remain visible while a newer
+    // level-of-detail tile is queued or building.
+    std::shared_ptr<const drs::engine::WaveformPeakBuildResult> compatibleResult;
 };
 
 struct WaveformPreviewSubmitResult
@@ -83,6 +95,8 @@ struct WaveformPreviewServiceOptions
 {
     const drs::engine::SampleImportHooks* sampleImportHooks = nullptr;
     std::function<void(WaveformPreviewServiceStage)> stageObserver;
+    std::size_t maximumCacheBytes = 8u * 1024u * 1024u;
+    std::size_t maximumCacheEntries = 64;
 };
 
 class WaveformPreviewService
@@ -114,6 +128,21 @@ private:
     void process(PendingRequest pending);
     void publish(WaveformPreviewServiceSnapshot snapshot);
     bool isTerminal(WaveformPreviewServiceStage stage) const noexcept;
+    static std::string buildCacheKey(const WaveformPreviewRequestIdentity& identity);
+
+    struct CacheEntry
+    {
+        WaveformPreviewRequestIdentity identity;
+        std::shared_ptr<const drs::engine::WaveformPeakBuildResult> result;
+        std::size_t bytes = 0;
+        std::uint64_t lastUse = 0;
+    };
+
+    std::shared_ptr<const drs::engine::WaveformPeakBuildResult> findCompatibleResultLocked(
+        const WaveformPreviewRequestIdentity& identity) const;
+    void addToCacheLocked(const WaveformPreviewRequestIdentity& identity,
+                          std::shared_ptr<const drs::engine::WaveformPeakBuildResult> result);
+    void populateCacheMetricsLocked(WaveformPreviewServiceSnapshot& snapshot) const noexcept;
 
     WaveformPreviewServiceOptions options;
     std::uint64_t nextGeneration = 0;
@@ -122,6 +151,10 @@ private:
     mutable std::condition_variable terminalCondition;
     std::optional<PendingRequest> pending;
     std::optional<PendingRequest> active;
+    std::unordered_map<std::string, CacheEntry> cache;
+    std::size_t cacheBytes = 0;
+    std::uint64_t cacheClock = 0;
+    std::uint64_t cacheEvictionCount = 0;
     std::shared_ptr<const WaveformPreviewServiceSnapshot> snapshot;
     bool shutdownRequested = false;
     mutable std::mutex shutdownMutex;

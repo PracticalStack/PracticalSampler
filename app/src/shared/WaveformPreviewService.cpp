@@ -1,5 +1,7 @@
 #include "shared/WaveformPreviewService.h"
 
+#include <algorithm>
+#include <sstream>
 #include <utility>
 
 namespace drs::app
@@ -42,7 +44,7 @@ WaveformPreviewSubmitResult WaveformPreviewService::submit(WaveformPreviewReques
     WaveformPreviewServiceSnapshot supersededPending;
     auto hasSupersededPending = false;
     {
-        std::lock_guard<std::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         if (shutdownRequested)
             return result;
 
@@ -56,8 +58,44 @@ WaveformPreviewSubmitResult WaveformPreviewService::submit(WaveformPreviewReques
         result.identity.sourceFileSizeBytes = request.sourceFileSizeBytes;
         result.identity.sourceModificationTicks = request.sourceModificationTicks;
         result.identity.displayPointCount = request.displayPointCount;
+        result.identity.rangeStartFrame = request.rangeStartFrame;
+        result.identity.rangeFrameCount = request.rangeFrameCount;
         result.identity.channelReduction = request.channelReduction;
         result.identity.requestStamp = request.requestStamp;
+
+        const auto cacheKey = buildCacheKey(result.identity);
+        if (const auto cached = cache.find(cacheKey); cached != cache.end())
+        {
+            cached->second.lastUse = ++cacheClock;
+            if (active.has_value())
+            {
+                active->cancellationStage = WaveformPreviewServiceStage::superseded;
+                active->cancellationReason = "Waveform preview request superseded by cached detail";
+                active->cancellation->store(true, std::memory_order_release);
+            }
+            if (pending.has_value())
+                pending->cancellation->store(true, std::memory_order_release);
+            pending.reset();
+
+            WaveformPreviewServiceSnapshot completed;
+            completed.identity = result.identity;
+            completed.stage = WaveformPreviewServiceStage::completed;
+            completed.status = "Waveform preview ready (cache)";
+            completed.totalPointCount = result.identity.displayPointCount;
+            completed.pointsCompleted = result.identity.displayPointCount;
+            completed.cacheHit = true;
+            completed.result = cached->second.result;
+            populateCacheMetricsLocked(completed);
+            auto published = std::make_shared<const WaveformPreviewServiceSnapshot>(std::move(completed));
+            std::atomic_store_explicit(&snapshot,
+                                       std::shared_ptr<const WaveformPreviewServiceSnapshot>(published),
+                                       std::memory_order_release);
+            lock.unlock();
+            if (options.stageObserver)
+                options.stageObserver(published->stage);
+            terminalCondition.notify_all();
+            return result;
+        }
 
         if (pending.has_value())
         {
@@ -89,6 +127,11 @@ WaveformPreviewSubmitResult WaveformPreviewService::submit(WaveformPreviewReques
     queued.stage = WaveformPreviewServiceStage::queued;
     queued.status = "Waveform preview queued";
     queued.totalPointCount = result.identity.displayPointCount;
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        queued.compatibleResult = findCompatibleResultLocked(result.identity);
+        populateCacheMetricsLocked(queued);
+    }
     publish(std::move(queued));
     condition.notify_one();
     return result;
@@ -232,6 +275,8 @@ void WaveformPreviewService::process(PendingRequest pendingRequest)
     buildOptions.chunkFrameCount = pendingRequest.request.chunkFrameCount;
     buildOptions.channelReduction = pendingRequest.request.channelReduction;
     buildOptions.callbacks = &callbacks;
+    buildOptions.rangeStartFrame = pendingRequest.request.rangeStartFrame;
+    buildOptions.rangeFrameCount = pendingRequest.request.rangeFrameCount;
 
     std::optional<drs::engine::ScopedSampleImportHooksOverride> hookScope;
     if (options.sampleImportHooks != nullptr)
@@ -252,6 +297,10 @@ void WaveformPreviewService::process(PendingRequest pendingRequest)
     {
         terminal.stage = WaveformPreviewServiceStage::completed;
         terminal.status = "Waveform preview ready";
+        std::lock_guard<std::mutex> lock(mutex);
+        if (pendingRequest.identity.generation == nextGeneration)
+            addToCacheLocked(pendingRequest.identity, built);
+        populateCacheMetricsLocked(terminal);
     }
     else if (built->canceled || pendingRequest.cancellation->load(std::memory_order_acquire))
     {
@@ -271,6 +320,17 @@ void WaveformPreviewService::process(PendingRequest pendingRequest)
 
 void WaveformPreviewService::publish(WaveformPreviewServiceSnapshot nextSnapshot)
 {
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (nextSnapshot.identity.generation != 0
+            && nextSnapshot.identity.generation < nextGeneration)
+        {
+            return;
+        }
+        if (nextSnapshot.compatibleResult == nullptr)
+            nextSnapshot.compatibleResult = findCompatibleResultLocked(nextSnapshot.identity);
+        populateCacheMetricsLocked(nextSnapshot);
+    }
     auto published = std::make_shared<const WaveformPreviewServiceSnapshot>(std::move(nextSnapshot));
     std::atomic_store_explicit(&snapshot,
                                std::shared_ptr<const WaveformPreviewServiceSnapshot>(published),
@@ -279,6 +339,92 @@ void WaveformPreviewService::publish(WaveformPreviewServiceSnapshot nextSnapshot
         options.stageObserver(published->stage);
     if (isTerminal(published->stage))
         terminalCondition.notify_all();
+}
+
+std::string WaveformPreviewService::buildCacheKey(const WaveformPreviewRequestIdentity& identity)
+{
+    std::ostringstream key;
+    key << identity.projectId << '\n'
+        << identity.sampleSourceId << '\n'
+        << identity.sourcePath << '\n'
+        << identity.sourceFileSizeBytes << ':' << identity.sourceModificationTicks << ':'
+        << identity.rangeStartFrame << ':' << identity.rangeFrameCount << ':'
+        << identity.displayPointCount << ':' << static_cast<int>(identity.channelReduction);
+    return key.str();
+}
+
+std::shared_ptr<const drs::engine::WaveformPeakBuildResult>
+WaveformPreviewService::findCompatibleResultLocked(
+    const WaveformPreviewRequestIdentity& identity) const
+{
+    const CacheEntry* newest = nullptr;
+    for (const auto& [key, entry] : cache)
+    {
+        static_cast<void>(key);
+        const auto& cachedIdentity = entry.identity;
+        if (cachedIdentity.projectId == identity.projectId
+            && cachedIdentity.sampleSourceId == identity.sampleSourceId
+            && cachedIdentity.sourcePath == identity.sourcePath
+            && cachedIdentity.sourceFileSizeBytes == identity.sourceFileSizeBytes
+            && cachedIdentity.sourceModificationTicks == identity.sourceModificationTicks
+            && (newest == nullptr || entry.lastUse > newest->lastUse))
+        {
+            newest = &entry;
+        }
+    }
+    return newest == nullptr ? nullptr : newest->result;
+}
+
+void WaveformPreviewService::addToCacheLocked(
+    const WaveformPreviewRequestIdentity& identity,
+    std::shared_ptr<const drs::engine::WaveformPeakBuildResult> result)
+{
+    if (options.maximumCacheBytes == 0 || options.maximumCacheEntries == 0 || result == nullptr)
+        return;
+
+    const auto key = buildCacheKey(identity);
+    auto bytes = sizeof(CacheEntry) + key.size()
+        + sizeof(drs::engine::WaveformPeakBuildResult)
+        + result->points.capacity() * sizeof(drs::engine::WaveformPeakPoint)
+        + identity.projectId.size() + identity.contentRootPath.size()
+        + identity.sampleSourceId.size() + identity.sourcePath.size()
+        + identity.requestStamp.size()
+        + result->sourcePath.size() + result->state.size()
+        + result->metadata.sourcePath.size() + result->metadata.formatName.size()
+        + result->metadata.sourceChecksumHex.size() + result->metadata.channelLayout.size();
+    for (const auto& issue : result->issues)
+        bytes += sizeof(std::string) + issue.size();
+    if (bytes > options.maximumCacheBytes)
+        return;
+
+    if (const auto existing = cache.find(key); existing != cache.end())
+    {
+        cacheBytes -= existing->second.bytes;
+        cache.erase(existing);
+    }
+
+    cache.emplace(key, CacheEntry { identity, std::move(result), bytes, ++cacheClock });
+    cacheBytes += bytes;
+
+    while (!cache.empty()
+           && (cache.size() > options.maximumCacheEntries || cacheBytes > options.maximumCacheBytes))
+    {
+        const auto oldest = std::min_element(cache.begin(), cache.end(), [](const auto& left, const auto& right)
+        {
+            return left.second.lastUse < right.second.lastUse;
+        });
+        cacheBytes -= oldest->second.bytes;
+        cache.erase(oldest);
+        ++cacheEvictionCount;
+    }
+}
+
+void WaveformPreviewService::populateCacheMetricsLocked(
+    WaveformPreviewServiceSnapshot& nextSnapshot) const noexcept
+{
+    nextSnapshot.cacheEntryCount = cache.size();
+    nextSnapshot.cacheBytes = cacheBytes;
+    nextSnapshot.cacheEvictionCount = cacheEvictionCount;
 }
 
 bool WaveformPreviewService::isTerminal(const WaveformPreviewServiceStage stage) const noexcept
