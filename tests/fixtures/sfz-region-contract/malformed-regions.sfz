@@ -1,0 +1,4 @@
+<region> sample=negative-end.wav offset=0 end=-2
+<region> sample=bad-offset.wav offset=not-a-frame
+<region> sample=bad-mode.wav loop_mode=ping_pong loop_start=10 loop_end=20
+<region> sample=reversed-loop.wav loop_mode=loop_continuous loop_start=30 loop_end=10

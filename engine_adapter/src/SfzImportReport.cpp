@@ -1,9 +1,12 @@
 #include "drs/engine/SfzImportReport.h"
+#include "drs/engine/SfzRegionContract.h"
 #include "drs/engine/VelocityCrossfade.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cctype>
 #include <filesystem>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -346,6 +349,20 @@ std::optional<int> parseIntValue(const std::string& text)
     {
         return std::nullopt;
     }
+}
+
+std::optional<std::uint64_t> parseUnsignedFrameValue(const std::string& text) noexcept
+{
+    if (text.empty())
+        return std::nullopt;
+
+    std::uint64_t value = 0;
+    const auto* begin = text.data();
+    const auto* end = begin + text.size();
+    const auto result = std::from_chars(begin, end, value, 10);
+    if (result.ec != std::errc {} || result.ptr != end)
+        return std::nullopt;
+    return value;
 }
 
 int normalizePlayableVelocityLowerBound(const int velocity) noexcept
@@ -1260,6 +1277,93 @@ void updateSupportSummary(std::map<SupportKey, SfzImportOpcodeSupportSummary>& s
 OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
 {
     const auto opcodeName = toLowerAscii(opcode.name);
+
+    const auto invalidFrameClassification = [&]()
+    {
+        return OpcodeClassification {
+            SfzImportSupportDisposition::blocking,
+            "report.region.invalidFrame",
+            "Region frame positions must be non-negative integers representable by the native 64-bit frame contract.",
+            "sfz.region." + opcodeName + ".invalid",
+            "Invalid SFZ region frame",
+            "Opcode '" + opcode.name + "' has an invalid source-frame value and cannot be converted safely." };
+    };
+
+    if (opcodeName == "offset")
+    {
+        if (!parseUnsignedFrameValue(opcode.value).has_value())
+            return invalidFrameClassification();
+        return { SfzImportSupportDisposition::converted,
+                 "zone.sampleStartFrame",
+                 "SFZ offset maps directly to the native inclusive playback-start frame." };
+    }
+
+    if (opcodeName == "end")
+    {
+        if (opcode.value == "-1")
+        {
+            return { SfzImportSupportDisposition::converted,
+                     "projection.omittedSilentRegion",
+                     "The SFZ end=-1 silent-region sentinel is preserved by omitting the region from audible native projection." };
+        }
+        const auto value = parseUnsignedFrameValue(opcode.value);
+        if (!value.has_value() || *value == std::numeric_limits<std::uint64_t>::max())
+            return invalidFrameClassification();
+        return { SfzImportSupportDisposition::reportedOnly,
+                 "regionContract.playbackEndExclusive",
+                 "SFZ end is normalized from inclusive N to native exclusive N+1, but project persistence and playback cutover land in the dedicated playback-end schema phase.",
+                 "sfz.region.end.pending_schema",
+                 "SFZ playback end is recognized but not yet persisted",
+                 "The importer validates and normalizes the inclusive endpoint, but the current project schema cannot retain it yet." };
+    }
+
+    if (opcodeName == "loop_start")
+    {
+        if (!parseUnsignedFrameValue(opcode.value).has_value())
+            return invalidFrameClassification();
+        return { SfzImportSupportDisposition::converted,
+                 "zone.loopStartFrame",
+                 "SFZ loop_start maps directly to the native inclusive loop-start frame." };
+    }
+
+    if (opcodeName == "loop_end")
+    {
+        const auto value = parseUnsignedFrameValue(opcode.value);
+        if (!value.has_value() || *value == std::numeric_limits<std::uint64_t>::max())
+            return invalidFrameClassification();
+        return { SfzImportSupportDisposition::converted,
+                 "zone.loopEndFrameExclusive",
+                 "SFZ loop_end is normalized once from inclusive N to native exclusive N+1 at import." };
+    }
+
+    if (opcodeName == "loop_mode")
+    {
+        const auto mode = parseSfzRegionLoopMode(opcode.value);
+        if (!mode.has_value())
+        {
+            return { SfzImportSupportDisposition::reportedOnly,
+                     "report.region.loopMode",
+                     "The value is outside the portable SFZ v1 loop-mode contract.",
+                     "sfz.region.loop_mode.unsupported",
+                     "Unsupported SFZ loop mode",
+                     "The importer recognizes loop_mode but cannot safely convert this value." };
+        }
+
+        if (*mode == SfzRegionLoopMode::noLoop
+            || *mode == SfzRegionLoopMode::loopContinuous)
+        {
+            return { SfzImportSupportDisposition::converted,
+                     "regionContract.loopMode + zone.loopEnabled",
+                     "The typed SFZ loop mode has an exact current compatibility projection." };
+        }
+
+        return { SfzImportSupportDisposition::approximated,
+                 "regionContract.loopMode + zone.loopEnabled",
+                 "The typed SFZ loop mode is retained by the region contract, while the current boolean playback model cannot yet preserve its distinct note-off lifecycle.",
+                 "sfz.region.loop_mode.compatibility_projection",
+                 "SFZ loop mode requires a typed playback model",
+                 "The current project model approximates one_shot as unlooped playback and loop_sustain as a continuous enabled loop until typed runtime support lands." };
+    }
 
     if (opcodeName == "default_path")
     {

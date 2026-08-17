@@ -1,0 +1,7 @@
+id,frame_count,channel_count,wav_loop_start,wav_loop_end_inclusive,purpose
+zero-length,0,1,,,empty-source normalization
+one-frame,1,1,,,minimum legal playback region
+short-mono,16,1,2,13,exact boundary sequence
+short-stereo,32,2,4,27,stereo peak and loop baseline
+multichannel,64,6,,,channel-reduction baseline
+long-mono,2147483648,1,1073741824,2147483646,64-bit transform and deep-loop baseline

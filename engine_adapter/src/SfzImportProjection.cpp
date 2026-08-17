@@ -2,6 +2,7 @@
 
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/SfzRegionContract.h"
 
 #include <algorithm>
 #include <cctype>
@@ -276,21 +277,6 @@ std::vector<RuntimeControllerCondition> buildControllerConditions(
         }
     }
     return conditions;
-}
-
-std::optional<std::uint64_t> parseFrameValue(const std::string& text)
-{
-    try
-    {
-        const auto value = std::stoll(text);
-        if (value >= 0)
-            return static_cast<std::uint64_t>(value);
-    }
-    catch (...)
-    {
-    }
-
-    return std::nullopt;
 }
 
 std::optional<double> parseDoubleValue(const std::string& text)
@@ -636,23 +622,6 @@ std::optional<RoundRobinDescriptor> buildSequentialRoundRobinDescriptor(
         zone.roundRobinPosition,
         RoundRobinMode::sequential
     };
-}
-
-bool shouldEnableLoop(const SfzNormalizedSection& section)
-{
-    const auto* loopStart = findEffectiveOpcode(section, "loop_start");
-    const auto* loopEnd = findEffectiveOpcode(section, "loop_end");
-    if (loopStart == nullptr || loopEnd == nullptr)
-        return false;
-
-    if (const auto* loopMode = findEffectiveOpcode(section, "loop_mode"))
-    {
-        const auto lowered = toLowerAscii(loopMode->value);
-        if (lowered == "no_loop" || lowered == "one_shot")
-            return false;
-    }
-
-    return true;
 }
 
 bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
@@ -1374,6 +1343,25 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         if (unsafeRegionDocumentOrders.count(section.documentOrder) > 0)
             continue;
 
+        const auto regionResolution = resolveSfzRegionContract(section);
+        if (!regionResolution.valid)
+        {
+            result.blocking = true;
+            for (const auto& finding : regionResolution.findings)
+            {
+                if (finding.severity == SfzImportFindingSeverity::error
+                    || finding.disposition == SfzImportSupportDisposition::blocking)
+                {
+                    result.issues.push_back(
+                        "Region at document order " + std::to_string(section.documentOrder)
+                        + ": " + finding.detail);
+                }
+            }
+            continue;
+        }
+        if (regionResolution.region.playbackSuppressed)
+            continue;
+
         const auto scopedGainContribution = buildScopedGainContribution(section, scopedGainState);
         const auto* sampleOpcode = findEffectiveOpcode(section, "sample");
         if (sampleOpcode == nullptr || sampleOpcode->value.empty())
@@ -1485,19 +1473,13 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                     + std::to_string(section.documentOrder) + ": " + damperIssue);
             continue;
         }
-        zone.sampleStartFrame = parseFrameValue(findEffectiveOpcode(section, "offset") != nullptr
-                                                    ? findEffectiveOpcode(section, "offset")->value
-                                                    : "0")
-                                    .value_or(0);
-        zone.loopEnabled = shouldEnableLoop(section);
-        zone.loopStartFrame = parseFrameValue(findEffectiveOpcode(section, "loop_start") != nullptr
-                                                  ? findEffectiveOpcode(section, "loop_start")->value
-                                                  : "0")
-                                  .value_or(0);
-        zone.loopEndFrame = parseFrameValue(findEffectiveOpcode(section, "loop_end") != nullptr
-                                                ? findEffectiveOpcode(section, "loop_end")->value
-                                                : "0")
-                                .value_or(0);
+        zone.sampleStartFrame = regionResolution.region.playbackStart.frame;
+        zone.loopEnabled = regionResolution.region.loopEnabledCompatibility()
+            && regionResolution.region.hasResolvedLoopRange();
+        zone.loopStartFrame = regionResolution.region.loopStart.present
+            ? regionResolution.region.loopStart.frame : 0;
+        zone.loopEndFrame = regionResolution.region.loopEndExclusive.present
+            ? regionResolution.region.loopEndExclusive.frame : 0;
         const auto sequentialRoundRobin = parseSequentialRoundRobinSlot(section);
         zone.roundRobinLength = sequentialRoundRobin.length;
         zone.roundRobinPosition = sequentialRoundRobin.position;

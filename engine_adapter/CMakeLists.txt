@@ -222,6 +222,8 @@ add_library(drs_engine_adapter STATIC
     src/SfzImportProjection.cpp
     src/SfzImportReport.cpp
     src/SfzImport.cpp
+    src/SfzRegionContract.cpp
+    src/WaveformRegionPolicy.cpp
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
@@ -275,6 +277,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/SfzImportReport.h
     include/drs/engine/SfzImport.h
     include/drs/engine/SfzImportContract.h
+    include/drs/engine/SfzRegionContract.h
+    include/drs/engine/WaveformRegionPolicy.h
 )
 
 target_include_directories(drs_engine_adapter
@@ -353,6 +357,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/RuntimeVoice.cpp
     src/SfzImportReport.cpp
     src/SfzImport.cpp
+    src/SfzRegionContract.cpp
+    src/WaveformRegionPolicy.cpp
     src/SamplerPlaybackContext.cpp
     src/SamplerRenderModel.cpp
     src/SamplerVoice.cpp
@@ -397,6 +403,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/SampleImport.h
     include/drs/engine/SfzImport.h
     include/drs/engine/SfzImportContract.h
+    include/drs/engine/SfzRegionContract.h
+    include/drs/engine/WaveformRegionPolicy.h
     include/drs/engine/SamplerRenderModel.h
     include/drs/engine/SamplerVoice.h
     include/drs/engine/SamplerVoicePool.h

@@ -1490,6 +1490,45 @@ add_test(
     COMMAND drs_sprint31_sfz_contract_tests
 )
 
+# SFZ non-destructive region editing Sprint 1: pure import-boundary contract,
+# provenance, interaction policy, and deterministic baseline fixtures.
+add_executable(drs_sfz_region_contract_tests
+    src/SfzRegionContractTests.cpp
+)
+
+target_link_libraries(drs_sfz_region_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sfz_region_contract_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sfz_region_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sfz_region.contract
+    COMMAND drs_sfz_region_contract_tests
+)
+
+add_executable(drs_waveform_region_policy_tests
+    src/WaveformRegionPolicyTests.cpp
+)
+
+target_link_libraries(drs_waveform_region_policy_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_waveform_region_policy_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.waveform_region.policy
+    COMMAND drs_waveform_region_policy_tests
+)
+
 add_executable(drs_sprint31_sfz_fixture_characterization_tests
     src/Sprint31SfzFixtureCharacterizationTests.cpp
 )
