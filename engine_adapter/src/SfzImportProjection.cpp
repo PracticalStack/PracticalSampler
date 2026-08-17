@@ -1474,8 +1474,17 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             continue;
         }
         zone.sampleStartFrame = regionResolution.region.playbackStart.frame;
+        switch (regionResolution.region.loopMode.mode)
+        {
+            case SfzRegionLoopMode::noLoop: zone.loopMode = RegionLoopMode::noLoop; break;
+            case SfzRegionLoopMode::oneShot: zone.loopMode = RegionLoopMode::oneShot; break;
+            case SfzRegionLoopMode::loopContinuous: zone.loopMode = RegionLoopMode::loopContinuous; break;
+            case SfzRegionLoopMode::loopSustain: zone.loopMode = RegionLoopMode::loopSustain; break;
+        }
         zone.loopEnabled = regionResolution.region.loopEnabledCompatibility()
             && regionResolution.region.hasResolvedLoopRange();
+        if (zone.loopMode == RegionLoopMode::oneShot)
+            zone.triggerMode = ZoneTriggerMode::oneShot;
         zone.loopStartFrame = regionResolution.region.loopStart.present
             ? regionResolution.region.loopStart.frame : 0;
         zone.loopEndFrame = regionResolution.region.loopEndExclusive.present

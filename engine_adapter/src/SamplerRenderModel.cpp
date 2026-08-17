@@ -160,6 +160,7 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.loopEnabled == preparedZone.loopEnabled
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
         && snapshotZone.loopEndFrame == preparedZone.loopEndFrame
+        && snapshotZone.loopMode == preparedZone.loopMode
         && snapshotZone.releaseSeconds == preparedZone.releaseSeconds
         && snapshotZone.releaseShape == preparedZone.releaseShape
         && snapshotZone.roundRobin == preparedZone.roundRobin
@@ -664,6 +665,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.amplitudeVelocityTracking,
                                   zone.controllerConditions,
                                   zone.damper });
+        model->routes.back().loopMode = zone.loopMode;
     }
     for (const auto& route : model->routes)
     {

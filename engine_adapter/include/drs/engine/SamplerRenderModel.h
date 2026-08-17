@@ -176,6 +176,7 @@ struct SamplerRenderRoute
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    RegionLoopMode loopMode = RegionLoopMode::noLoop;
 };
 
 struct SamplerRenderModelBuildResult;

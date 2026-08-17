@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace drs::app::authoring
 {
@@ -24,6 +25,14 @@ void WaveformDetailView::setPreview(AuthoringWaveformPreview nextPreview)
 {
     const auto sourceChanged = preview.sourceIdentity != nextPreview.sourceIdentity
         || preview.frameCount != nextPreview.frameCount;
+    if (sourceChanged && gesture != Gesture::none)
+        cancelRegionGesture();
+    if (!sourceChanged && preview.selectionActive)
+    {
+        nextPreview.selectionActive = true;
+        nextPreview.selectionStartFrame = preview.selectionStartFrame;
+        nextPreview.selectionEndFrameExclusive = preview.selectionEndFrameExclusive;
+    }
     preview = std::move(nextPreview);
     if (sourceChanged || viewportFrames.empty())
         fitToSource(false);
@@ -33,6 +42,27 @@ void WaveformDetailView::setPreview(AuthoringWaveformPreview nextPreview)
 void WaveformDetailView::setDetailRequestCallback(DetailRequestCallback callback)
 {
     detailRequestCallback = std::move(callback);
+}
+
+void WaveformDetailView::setLoopRegionCommitCallback(LoopRegionCommitCallback callback)
+{
+    loopRegionCommitCallback = std::move(callback);
+}
+
+drs::engine::WaveformFrameRange WaveformDetailView::getSelectionFrames() const noexcept
+{
+    return preview.selectionActive
+        ? drs::engine::normalizeSelectionRegion(
+            { preview.selectionStartFrame, preview.selectionEndFrameExclusive }, preview.frameCount)
+        : drs::engine::WaveformFrameRange {};
+}
+
+void WaveformDetailView::clearSelection()
+{
+    preview.selectionActive = false;
+    preview.selectionStartFrame = 0;
+    preview.selectionEndFrameExclusive = 0;
+    repaint();
 }
 
 juce::Rectangle<float> WaveformDetailView::getCanvasBounds() const
@@ -154,9 +184,26 @@ void WaveformDetailView::paint(juce::Graphics& g)
             drs::engine::waveformFrameToPixel(preview.loopStartFrame, viewport));
         const auto endX = inner.getX() + static_cast<float>(
             drs::engine::waveformFrameToPixel(preview.loopEndFrame, viewport));
+        const auto visibleLeft = juce::jlimit(inner.getX(), inner.getRight(), startX);
+        const auto visibleRight = juce::jlimit(inner.getX(), inner.getRight(), endX);
+        if (visibleRight > visibleLeft)
+        {
+            g.setColour(waveformAccent.withAlpha(0.10f));
+            g.fillRect(juce::Rectangle<float>(visibleLeft, inner.getY(),
+                                              visibleRight - visibleLeft, inner.getHeight()));
+        }
         g.setColour(waveformAccent);
         g.drawVerticalLine(static_cast<int>(startX), inner.getY(), inner.getBottom());
         g.drawVerticalLine(static_cast<int>(endX), inner.getY(), inner.getBottom());
+        g.fillRect(startX - 3.0f, inner.getY(), 6.0f, 8.0f);
+        g.fillRect(endX - 3.0f, inner.getBottom() - 8.0f, 6.0f, 8.0f);
+        g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+        g.drawFittedText("LOOP IN", juce::Rectangle<int>(static_cast<int>(startX + 5.0f),
+                                                         static_cast<int>(inner.getY()), 54, 14),
+                         juce::Justification::centredLeft, 1);
+        g.drawFittedText("LOOP OUT", juce::Rectangle<int>(static_cast<int>(endX - 59.0f),
+                                                          static_cast<int>(inner.getBottom() - 14.0f), 54, 14),
+                         juce::Justification::centredRight, 1);
     };
 
     if (!preview.available || preview.points.empty())
@@ -207,17 +254,100 @@ void WaveformDetailView::paint(juce::Graphics& g)
     }
 }
 
+std::uint64_t WaveformDetailView::frameAtX(const float x) const noexcept
+{
+    const auto inner = getCanvasBounds();
+    return drs::engine::waveformPixelToFrame(
+        static_cast<double>(x - inner.getX()),
+        { viewportFrames, inner.getWidth() });
+}
+
+void WaveformDetailView::cancelRegionGesture()
+{
+    if (gesture == Gesture::loopStart || gesture == Gesture::loopEnd)
+    {
+        preview.loopStartFrame = originalLoopStartFrame;
+        preview.loopEndFrame = originalLoopEndFrame;
+    }
+    gesture = Gesture::none;
+    dragging = false;
+    repaint();
+}
+
 void WaveformDetailView::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
     dragging = true;
     dragStartPosition = event.position;
     dragStartViewport = viewportFrames;
+    originalLoopStartFrame = preview.loopStartFrame;
+    originalLoopEndFrame = preview.loopEndFrame;
+
+    if (preview.loopEnabled && !viewportFrames.empty())
+    {
+        const auto inner = getCanvasBounds();
+        const drs::engine::WaveformViewport viewport { viewportFrames, inner.getWidth() };
+        const auto startX = inner.getX() + static_cast<float>(
+            drs::engine::waveformFrameToPixel(preview.loopStartFrame, viewport));
+        const auto endX = inner.getX() + static_cast<float>(
+            drs::engine::waveformFrameToPixel(preview.loopEndFrame, viewport));
+        constexpr auto handleTolerance = 9.0f;
+        if (std::abs(event.position.x - startX) <= handleTolerance)
+            gesture = selectedBoundary = Gesture::loopStart;
+        else if (std::abs(event.position.x - endX) <= handleTolerance)
+            gesture = selectedBoundary = Gesture::loopEnd;
+    }
+
+    if (gesture == Gesture::none && event.mods.isShiftDown())
+    {
+        selectedBoundary = Gesture::none;
+        gesture = Gesture::selection;
+        gestureAnchorFrame = frameAtX(event.position.x);
+        preview.selectionActive = true;
+        preview.selectionStartFrame = gestureAnchorFrame;
+        preview.selectionEndFrameExclusive = gestureAnchorFrame;
+    }
+    else if (gesture == Gesture::none)
+    {
+        selectedBoundary = Gesture::none;
+        gesture = Gesture::pan;
+    }
 }
 
 void WaveformDetailView::mouseDrag(const juce::MouseEvent& event)
 {
     if (!dragging || dragStartViewport.empty())
+        return;
+    if (gesture == Gesture::loopStart || gesture == Gesture::loopEnd)
+    {
+        drs::engine::WaveformEditableRegions regions {
+            { preview.playbackStartFrame, preview.frameCount },
+            { preview.loopStartFrame, preview.loopEndFrame },
+            preview.loopEnabled
+        };
+        if (regions.playback.startFrame >= regions.playback.endFrameExclusive)
+            regions.playback = { 0, preview.frameCount };
+        regions = drs::engine::normalizeBoundaryDrag(
+            regions,
+            gesture == Gesture::loopStart
+                ? drs::engine::WaveformRegionBoundary::loopStart
+                : drs::engine::WaveformRegionBoundary::loopEnd,
+            frameAtX(event.position.x),
+            preview.frameCount);
+        preview.loopStartFrame = regions.loop.startFrame;
+        preview.loopEndFrame = regions.loop.endFrameExclusive;
+        repaint();
+        return;
+    }
+    if (gesture == Gesture::selection)
+    {
+        const auto frame = frameAtX(event.position.x);
+        preview.selectionStartFrame = std::min(gestureAnchorFrame, frame);
+        preview.selectionEndFrameExclusive = std::max(gestureAnchorFrame, frame);
+        repaint();
+        return;
+    }
+    if (gesture != Gesture::pan)
         return;
     const auto width = std::max(1.0f, getCanvasBounds().getWidth());
     const auto deltaPixels = event.position.x - dragStartPosition.x;
@@ -235,7 +365,22 @@ void WaveformDetailView::mouseUp(const juce::MouseEvent&)
     if (!dragging)
         return;
     dragging = false;
-    publishDetailRequest();
+    const auto completedGesture = gesture;
+    gesture = Gesture::none;
+    if ((completedGesture == Gesture::loopStart || completedGesture == Gesture::loopEnd)
+        && (preview.loopStartFrame != originalLoopStartFrame
+            || preview.loopEndFrame != originalLoopEndFrame))
+    {
+        if (loopRegionCommitCallback)
+            loopRegionCommitCallback(preview.loopStartFrame,
+                                     preview.loopEndFrame,
+                                     completedGesture == Gesture::loopStart
+                                         ? "Move SFZ loop start" : "Move SFZ loop end");
+    }
+    else if (completedGesture == Gesture::pan)
+    {
+        publishDetailRequest();
+    }
 }
 
 void WaveformDetailView::mouseDoubleClick(const juce::MouseEvent&)
@@ -265,6 +410,40 @@ bool WaveformDetailView::keyPressed(const juce::KeyPress& key)
 {
     if (preview.frameCount == 0 || viewportFrames.empty())
         return false;
+    if (key.getKeyCode() == juce::KeyPress::escapeKey && gesture != Gesture::none)
+    {
+        cancelRegionGesture();
+        return true;
+    }
+
+    if ((selectedBoundary == Gesture::loopStart || selectedBoundary == Gesture::loopEnd)
+        && (key.getKeyCode() == juce::KeyPress::leftKey
+            || key.getKeyCode() == juce::KeyPress::rightKey)
+        && preview.loopEnabled)
+    {
+        const auto current = selectedBoundary == Gesture::loopStart
+            ? preview.loopStartFrame : preview.loopEndFrame;
+        const auto candidate = key.getKeyCode() == juce::KeyPress::leftKey
+            ? (current == 0 ? 0 : current - 1)
+            : (current == std::numeric_limits<std::uint64_t>::max() ? current : current + 1);
+        auto regions = drs::engine::normalizeBoundaryDrag(
+            { { preview.playbackStartFrame, preview.frameCount },
+              { preview.loopStartFrame, preview.loopEndFrame }, true },
+            selectedBoundary == Gesture::loopStart
+                ? drs::engine::WaveformRegionBoundary::loopStart
+                : drs::engine::WaveformRegionBoundary::loopEnd,
+            candidate,
+            preview.frameCount);
+        preview.loopStartFrame = regions.loop.startFrame;
+        preview.loopEndFrame = regions.loop.endFrameExclusive;
+        if (loopRegionCommitCallback)
+            loopRegionCommitCallback(preview.loopStartFrame, preview.loopEndFrame,
+                                     selectedBoundary == Gesture::loopStart
+                                         ? "Nudge SFZ loop start" : "Nudge SFZ loop end");
+        repaint();
+        return true;
+    }
+
     const auto step = std::max<std::uint64_t>(1, viewportFrames.length() / 10);
     if (key.getKeyCode() == juce::KeyPress::leftKey)
         panByFrames(-static_cast<std::int64_t>(step), true);
@@ -291,5 +470,10 @@ bool WaveformDetailView::keyPressed(const juce::KeyPress& key)
     else
         return false;
     return true;
+}
+
+void WaveformDetailView::focusLost(FocusChangeType)
+{
+    cancelRegionGesture();
 }
 } // namespace drs::app::authoring

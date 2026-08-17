@@ -21,6 +21,7 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -131,6 +132,14 @@ private:
     void refreshWaveformWorkbenchContent();
     void updateSourceValidationAction();
     void requestWaveformPreviewLoad(bool refreshImmediately = false);
+    void commitWaveformLoopRegion(std::uint64_t startFrame,
+                                  std::uint64_t endFrameExclusive,
+                                  const std::string& label);
+    void commitWaveformLoopControls(const std::string& label);
+    void setWaveformLoopToSelection();
+    void auditionWaveformLoop();
+    std::optional<std::uint64_t> parseWaveformFrameText(const juce::String& text,
+                                                        double sampleRate) const;
     void refreshDraftPlaybackBanner();
     void refreshFromSession();
     void refreshSelectionFromSession();
@@ -236,6 +245,8 @@ private:
         double nextAtMillis = 0.0;
     };
     CrossfadeAuditionSequence crossfadeAuditionSequence;
+    bool waveformAuditionCueActive = false;
+    double waveformAuditionCueStartedMillis = 0.0;
     bool isRefreshing = false;
     bool hasObservedSessionRevisions = false;
     std::size_t observedDocumentRevision = 0;
@@ -275,6 +286,13 @@ private:
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
+    juce::ComboBox waveformLoopModeSelector;
+    juce::TextEditor waveformLoopStartEditor;
+    juce::TextEditor waveformLoopEndEditor;
+    juce::TextButton waveformLoopApplyButton;
+    juce::TextButton waveformSetLoopSelectionButton;
+    juce::TextButton waveformLoopAuditionButton;
+    juce::Label waveformLoopGuidanceLabel;
     juce::Label sourceValidationLabel;
     juce::TextButton sourceValidationButton;
     juce::Component workbenchRegion;

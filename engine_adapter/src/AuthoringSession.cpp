@@ -1222,6 +1222,7 @@ std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& 
         summary.gainDb = zone.gainDb;
         summary.pan = zone.pan;
         summary.loopEnabled = zone.loopEnabled;
+        summary.loopMode = zone.loopMode;
         summary.roundRobin = zone.roundRobin;
         summary.roundRobinLength = zone.roundRobinLength;
         summary.roundRobinPosition = zone.roundRobinPosition;

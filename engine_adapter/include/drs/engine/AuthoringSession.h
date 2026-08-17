@@ -26,6 +26,7 @@ struct AuthoringZoneSummary
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    RegionLoopMode loopMode = RegionLoopMode::noLoop;
     std::optional<RoundRobinDescriptor> roundRobin;
     int roundRobinLength = 0;
     int roundRobinPosition = 0;

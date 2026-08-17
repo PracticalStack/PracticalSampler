@@ -97,7 +97,9 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     outputSampleRate = request.outputSampleRate;
     baseGain = static_cast<float>(gain);
     panGains = computeSamplerPanGains(selectedRoute.pan);
-    loopActive = selectedRoute.loopEnabled
+    const auto effectiveLoopMode = effectiveRegionLoopMode(selectedRoute.loopMode,
+                                                            selectedRoute.loopEnabled);
+    loopActive = regionLoopModeLoops(effectiveLoopMode)
         && selectedRoute.loopStartFrame < selectedRoute.loopEndFrame
         && selectedRoute.loopEndFrame <= selectedSample.frameCount
         && selectedRoute.sampleStartFrame < selectedRoute.loopEndFrame;
@@ -111,6 +113,9 @@ bool SamplerVoice::beginRelease(const double overrideReleaseSeconds) noexcept
     if (lifecycleState != SamplerVoiceLifecycleState::active)
         return false;
 
+    if (route != nullptr && route->loopMode == RegionLoopMode::loopSustain)
+        loopActive = false;
+
     const auto releaseSeconds = overrideReleaseSeconds > 0.0
         ? overrideReleaseSeconds : (route != nullptr ? route->releaseSeconds : 0.0);
     const auto usesAuthoredRelease = overrideReleaseSeconds <= 0.0
@@ -122,6 +127,8 @@ bool SamplerVoice::beginReleaseForControllerValue(const std::uint8_t controllerV
 {
     if (lifecycleState != SamplerVoiceLifecycleState::active)
         return false;
+    if (route != nullptr && route->loopMode == RegionLoopMode::loopSustain)
+        loopActive = false;
     if (route == nullptr || !route->damper.dynamicRelease)
         return beginRelease();
     return configureRelease(dynamicReleaseSeconds(controllerValue), true, 1.0f,

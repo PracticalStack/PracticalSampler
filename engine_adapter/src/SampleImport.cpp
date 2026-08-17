@@ -1487,6 +1487,7 @@ ParsedSampleFilenameHeuristics parseSampleFilenameHeuristics(const std::string& 
         suggestion.zone.loopEnabled = true;
         suggestion.zone.loopStartFrame = metadata->loopStartFrame;
         suggestion.zone.loopEndFrame = metadata->loopEndFrame;
+        suggestion.zone.loopMode = RegionLoopMode::loopContinuous;
     }
 
     if (context.detectedArticulation.has_value())

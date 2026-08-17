@@ -19,6 +19,40 @@ enum class ZoneTriggerMode : std::uint8_t
     oneShot
 };
 
+// Portable SFZ v1 region playback behavior. The historical loopEnabled field
+// remains a derived compatibility projection for older project data.
+enum class RegionLoopMode : std::uint8_t
+{
+    noLoop = 0,
+    oneShot,
+    loopContinuous,
+    loopSustain
+};
+
+inline const char* regionLoopModeName(const RegionLoopMode mode) noexcept
+{
+    switch (mode)
+    {
+        case RegionLoopMode::noLoop: return "no_loop";
+        case RegionLoopMode::oneShot: return "one_shot";
+        case RegionLoopMode::loopContinuous: return "loop_continuous";
+        case RegionLoopMode::loopSustain: return "loop_sustain";
+    }
+    return "no_loop";
+}
+
+inline bool regionLoopModeLoops(const RegionLoopMode mode) noexcept
+{
+    return mode == RegionLoopMode::loopContinuous || mode == RegionLoopMode::loopSustain;
+}
+
+inline RegionLoopMode effectiveRegionLoopMode(const RegionLoopMode mode,
+                                              const bool legacyLoopEnabled) noexcept
+{
+    return mode == RegionLoopMode::noLoop && legacyLoopEnabled
+        ? RegionLoopMode::loopContinuous : mode;
+}
+
 enum class RoundRobinMode : std::uint8_t
 {
     sequential,
@@ -170,6 +204,7 @@ struct RuntimeProjectZoneDefinition
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    RegionLoopMode loopMode = RegionLoopMode::noLoop;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The

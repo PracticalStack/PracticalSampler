@@ -575,6 +575,10 @@ ZoneMappingEditor::CommitValues ZoneMappingEditor::collectCurrentValues() const
     values.gainDb = gainRow.getSlider().getValue();
     values.pan = panRow.getSlider().getValue();
     values.loopEnabled = loopToggleRow.getToggle().getToggleState();
+    if (!values.loopEnabled)
+        values.loopMode = drs::engine::RegionLoopMode::noLoop;
+    else if (!drs::engine::regionLoopModeLoops(values.loopMode))
+        values.loopMode = drs::engine::RegionLoopMode::loopContinuous;
     values.releaseSeconds = releaseRow.getSlider().getValue();
     values.releaseShape = releaseShapeRow.getSlider().getValue();
     values.triggerMode = triggerModeRow.getComboBox().getSelectedId() == 2

@@ -323,6 +323,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        zoneObject["loopMode"] = regionLoopModeName(zone.loopMode);
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
         ordered_json damperCurve = ordered_json::array();
@@ -1574,6 +1575,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.controllerConditions,
             zone.damper
         });
+        result.prepared.zones.back().loopMode = zone.loopMode;
     }
 
     std::unordered_set<std::string> preparedZoneIds;
@@ -2491,6 +2493,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEnabled"] = zone.loopEnabled;
         value["loopStartFrame"] = zone.loopStartFrame;
         value["loopEndFrame"] = zone.loopEndFrame;
+        value["loopMode"] = regionLoopModeName(zone.loopMode);
         value["releaseSeconds"] = zone.releaseSeconds;
         value["releaseShape"] = zone.releaseShape;
         if (zone.roundRobin.has_value())
@@ -2536,6 +2539,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEnabled"] = handle.loopEnabled;
         value["loopStartFrame"] = handle.loopStartFrame;
         value["loopEndFrame"] = handle.loopEndFrame;
+        value["loopMode"] = regionLoopModeName(handle.loopMode);
         value["releaseSeconds"] = handle.releaseSeconds;
         value["releaseShape"] = handle.releaseShape;
         if (handle.roundRobin.has_value())
@@ -2793,6 +2797,7 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.loopEnabled == right.loopEnabled
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
+        && left.loopMode == right.loopMode
         && left.releaseSeconds == right.releaseSeconds
         && left.releaseShape == right.releaseShape
         && left.roundRobin == right.roundRobin

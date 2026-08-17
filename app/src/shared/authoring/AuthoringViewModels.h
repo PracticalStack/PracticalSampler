@@ -51,6 +51,7 @@ struct ZoneFieldValuesViewModel
     double gainDb = 0.0;
     double pan = 0.0;
     bool loopEnabled = false;
+    drs::engine::RegionLoopMode loopMode = drs::engine::RegionLoopMode::noLoop;
     double releaseSeconds = drs::engine::nativeDefaultReleaseSeconds;
     double releaseShape = 0.0;
     bool roundRobinEnabled = false;

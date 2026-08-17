@@ -4712,6 +4712,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
             zone.releaseSeconds, zone.releaseShape, zone.roundRobin, zone.roundRobinLength,
             zone.roundRobinPosition, zone.triggerMode, zone.fineTuneCents,
             zone.amplitudeVelocityTracking, zone.controllerConditions, zone.damper });
+        prepared.zones.back().loopMode = zone.loopMode;
     }
     for (const auto& group : result.snapshotResult.snapshot.groupRoutes)
     {

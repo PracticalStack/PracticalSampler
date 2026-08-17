@@ -171,6 +171,7 @@ struct PlaybackSnapshotZone
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    RegionLoopMode loopMode = RegionLoopMode::noLoop;
 };
 
 // S3.7-T5 deferral note: this remains a public aggregate for current builder, facade, and

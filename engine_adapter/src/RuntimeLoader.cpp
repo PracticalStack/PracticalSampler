@@ -925,6 +925,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        zoneObject["loopMode"] = regionLoopModeName(
+            effectiveRegionLoopMode(zone.loopMode, zone.loopEnabled));
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
         if (useContinuousDamper)
@@ -1436,6 +1438,21 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         zone.loopStartFrame = *loopStartFrame;
                     if (const auto loopEndFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(zoneObject, result, "loopEndFrame", context.c_str()))
                         zone.loopEndFrame = *loopEndFrame;
+                    if (const auto loopMode = readOptional<RuntimeProjectLoadResult, std::string>(
+                            zoneObject, result, "loopMode", context.c_str()))
+                    {
+                        if (*loopMode == "no_loop") zone.loopMode = RegionLoopMode::noLoop;
+                        else if (*loopMode == "one_shot") zone.loopMode = RegionLoopMode::oneShot;
+                        else if (*loopMode == "loop_continuous") zone.loopMode = RegionLoopMode::loopContinuous;
+                        else if (*loopMode == "loop_sustain") zone.loopMode = RegionLoopMode::loopSustain;
+                        else addIssue(result, context + " field 'loopMode' must be a portable SFZ v1 loop mode.");
+                        zone.loopEnabled = regionLoopModeLoops(zone.loopMode);
+                    }
+                    else
+                    {
+                        zone.loopMode = zone.loopEnabled
+                            ? RegionLoopMode::loopContinuous : RegionLoopMode::noLoop;
+                    }
                     if (const auto releaseSeconds = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseSeconds", context.c_str()))
                         zone.releaseSeconds = *releaseSeconds;
                     if (const auto releaseShape = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "releaseShape", context.c_str()))
@@ -2506,7 +2523,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                     addIssue(result, buildVelocityCrossfadeIssue("Project zone '" + zone.id + "'", crossfadeIssue));
             }
 
-            if (zone.loopEnabled && zone.loopStartFrame > zone.loopEndFrame)
+            if (zone.loopEnabled && zone.loopMode == RegionLoopMode::oneShot)
+                addIssue(result, "Project zone '" + zone.id + "' enables a loop for a non-looping loopMode.");
+
+            if (zone.loopEnabled && zone.loopStartFrame >= zone.loopEndFrame)
                 addIssue(result, "Project zone '" + zone.id + "' has loopStartFrame greater than loopEndFrame.");
 
             if (zone.releaseSeconds < 0.0)

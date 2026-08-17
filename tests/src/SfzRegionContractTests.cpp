@@ -291,9 +291,10 @@ int main()
                 "Production projection should consume the region contract and omit end=-1 silent regions.");
         require(projection.zones.front().sampleStartFrame == 1
                     && projection.zones.front().loopEnabled
+                    && projection.zones.front().loopMode == RegionLoopMode::loopContinuous
                     && projection.zones.front().loopStartFrame == 2
                     && projection.zones.front().loopEndFrame == 6,
-                "Production projection must convert inclusive SFZ loop_end exactly once.");
+                "Production projection must retain the typed mode and convert inclusive SFZ loop_end exactly once.");
 
         std::ifstream fixtureManifest(fixturePath("baseline-fixtures.csv"));
         require(fixtureManifest.good(),

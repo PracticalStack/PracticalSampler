@@ -42,6 +42,7 @@ bool zonesMatch(const PlaybackSnapshotZone& authored, const PreparedPlaybackZone
         && authored.loopEnabled == prepared.loopEnabled
         && authored.loopStartFrame == prepared.loopStartFrame
         && authored.loopEndFrame == prepared.loopEndFrame
+        && authored.loopMode == prepared.loopMode
         && authored.releaseSeconds == prepared.releaseSeconds
         && authored.releaseShape == prepared.releaseShape
         && authored.damper == prepared.damper

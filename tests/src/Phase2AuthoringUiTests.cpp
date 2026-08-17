@@ -537,6 +537,7 @@ drs::app::AuthoringWaveformPreview makePreviewFixture()
     preview.frameCount = 116064;
     preview.channelCount = 2;
     preview.loopEnabled = true;
+    preview.loopMode = drs::engine::RegionLoopMode::loopContinuous;
     preview.loopStartFrame = 12000;
     preview.loopEndFrame = 88000;
 
@@ -1570,6 +1571,7 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
 }
 
 void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
+                            drs::engine::AuthoringSession& session,
                             const std::string& shellName,
                             std::vector<std::string>& baselineFindings,
                             drs::app::AuthoringSourceValidationSnapshot& validationSnapshot,
@@ -1607,6 +1609,12 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformImportLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformValidationLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformValidationButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopMode", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopStart", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopEnd", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopApply", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformSetLoopSelection", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopAudition", panelBounds);
 
     const auto initialZoneId = zoneSelector->getSelectedId();
     const auto alternateZoneId = initialZoneId == 2 ? 1 : 2;
@@ -1715,6 +1723,21 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
             "Waveform workbench should restore its original breadcrumb when the original zone is reselected.");
     require(requireLabel(panel, "authoringWaveformInfoLabel").getText().toStdString() == initialWaveformInfo,
             "Waveform workbench should restore its original metadata when the original zone is reselected.");
+
+    auto& loopModeSelector = requireComboBox(panel, "authoringWaveformLoopMode");
+    const auto loopModeUndoDepth = session.getDocumentState().undoDepth;
+    const auto previousLoopMode = session.getSelectedZone()->loopMode;
+    loopModeSelector.setSelectedId(4, juce::sendNotificationSync);
+    require(session.getSelectedZone()->loopMode == drs::engine::RegionLoopMode::loopSustain
+                && session.getSelectedZone()->loopEnabled
+                && session.getDocumentState().undoDepth == loopModeUndoDepth + 1,
+            "Changing the SFZ loop mode should create exactly one enabled, undoable zone transaction.");
+    requireButton(panel, "authoringUndoButton").onClick();
+    require(session.getSelectedZone()->loopMode == previousLoopMode,
+            "Undo should restore the prior typed SFZ loop mode.");
+    requireButton(panel, "authoringRedoButton").onClick();
+    require(session.getSelectedZone()->loopMode == drs::engine::RegionLoopMode::loopSustain,
+            "Redo should restore the typed SFZ loop mode transaction.");
 
     if (shellName == "compact")
     {
@@ -3663,6 +3686,17 @@ void exerciseWaveformViewportGestures()
         require(points >= 256 && points <= 4096,
                 "Waveform detail requests should use a bounded display resolution.");
     });
+    int loopCommitCount = 0;
+    std::uint64_t committedLoopStart = 0;
+    std::uint64_t committedLoopEnd = 0;
+    waveform.setLoopRegionCommitCallback([&](const std::uint64_t start,
+                                              const std::uint64_t end,
+                                              const std::string&)
+    {
+        ++loopCommitCount;
+        committedLoopStart = start;
+        committedLoopEnd = end;
+    });
 
     require(waveform.getViewportFrames().startFrame == 0
                 && waveform.getViewportFrames().endFrameExclusive == preview.frameCount,
@@ -3696,6 +3730,69 @@ void exerciseWaveformViewportGestures()
                 && waveform.getViewportFrames().startFrame == 0
                 && waveform.getViewportFrames().endFrameExclusive == preview.frameCount,
             "Waveform Home navigation should restore fit-to-source.");
+
+    const auto canvas = waveform.getLocalBounds().toFloat().reduced(12.0f);
+    const auto loopStartX = canvas.getX() + canvas.getWidth()
+        * static_cast<float>(preview.loopStartFrame) / static_cast<float>(preview.frameCount);
+    const auto dragTarget = juce::Point<float>(loopStartX + 42.0f, canvas.getCentreY());
+    const auto loopStartPoint = juce::Point<float>(loopStartX, canvas.getCentreY());
+    const juce::MouseEvent loopMouseDown(mouseSource,
+                                         loopStartPoint,
+                                         juce::ModifierKeys::leftButtonModifier,
+                                         1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                         &waveform, &waveform,
+                                         eventTime, loopStartPoint, eventTime, 1, false);
+    const juce::MouseEvent loopMouseDrag(mouseSource,
+                                         dragTarget,
+                                         juce::ModifierKeys::leftButtonModifier,
+                                         1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                         &waveform, &waveform,
+                                         eventTime, loopStartPoint, eventTime, 1, true);
+    waveform.mouseDown(loopMouseDown);
+    waveform.mouseDrag(loopMouseDrag);
+    require(loopCommitCount == 0,
+            "Waveform loop handle motion must remain preview-only until pointer release.");
+    waveform.mouseUp(loopMouseDrag);
+    require(loopCommitCount == 1
+                && committedLoopStart > preview.loopStartFrame
+                && committedLoopEnd == preview.loopEndFrame,
+            "One waveform loop-handle drag must publish exactly one normalized transaction.");
+    const auto draggedLoopStart = committedLoopStart;
+    require(waveform.keyPressed(juce::KeyPress(juce::KeyPress::rightKey))
+                && loopCommitCount == 2
+                && committedLoopStart == draggedLoopStart + 1,
+            "A focused loop handle must support a single-frame keyboard nudge transaction.");
+
+    const auto selectionStartPoint = juce::Point<float>(canvas.getX() + 180.0f, canvas.getCentreY());
+    const auto selectionEndPoint = juce::Point<float>(canvas.getX() + 310.0f, canvas.getCentreY());
+    const auto shiftDragModifiers = juce::ModifierKeys::leftButtonModifier
+        | juce::ModifierKeys::shiftModifier;
+    const juce::MouseEvent selectionMouseDown(mouseSource,
+                                               selectionStartPoint,
+                                               shiftDragModifiers,
+                                               1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                               &waveform, &waveform,
+                                               eventTime, selectionStartPoint, eventTime, 1, false);
+    const juce::MouseEvent selectionMouseDrag(mouseSource,
+                                               selectionEndPoint,
+                                               shiftDragModifiers,
+                                               1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                               &waveform, &waveform,
+                                               eventTime, selectionStartPoint, eventTime, 1, true);
+    waveform.mouseDown(selectionMouseDown);
+    waveform.mouseDrag(selectionMouseDrag);
+    waveform.mouseUp(selectionMouseDrag);
+    const auto selection = waveform.getSelectionFrames();
+    require(!selection.empty() && loopCommitCount == 2,
+            "Shift-drag must create a temporary non-persistent selection without editing the loop.");
+    waveform.setPreview(preview);
+    require(waveform.getSelectionFrames().startFrame == selection.startFrame
+                && waveform.getSelectionFrames().endFrameExclusive == selection.endFrameExclusive,
+            "A refresh for the same source must preserve the temporary waveform selection.");
+    preview.sourceIdentity = "phase2-waveform-fixture-reselected";
+    waveform.setPreview(preview);
+    require(!waveform.hasSelection(),
+            "Changing the selected waveform source must cancel its temporary selection.");
 }
 
 void exerciseZoneMapProportionalMultiZoneExpansion()
@@ -3940,6 +4037,7 @@ int main()
                                   lastPreviewVelocity);
             exerciseKeyboardOnlyWorkflowSmoke(panel, session, shellName);
             exerciseWorkbenchBehavior(panel,
+                                   session,
                                    shellName,
                                    baselineFindings,
                                    validationSnapshot,

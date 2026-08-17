@@ -2,6 +2,7 @@
 
 #include "drs/engine/AuthoringPreviewContract.h"
 #include "drs/engine/AuthoringPreviewRecovery.h"
+#include "drs/engine/RuntimeModel.h"
 
 #include <cstdint>
 #include <string>
@@ -40,8 +41,11 @@ struct AuthoringWaveformPreview
     std::uint64_t frameCount = 0;
     std::uint32_t channelCount = 0;
     bool loopEnabled = false;
+    drs::engine::RegionLoopMode loopMode = drs::engine::RegionLoopMode::noLoop;
+    std::uint64_t playbackStartFrame = 0;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    double releaseSeconds = 0.0;
     std::uint64_t viewportStartFrame = 0;
     std::uint64_t viewportEndFrameExclusive = 0;
     std::uint64_t detailStartFrame = 0;

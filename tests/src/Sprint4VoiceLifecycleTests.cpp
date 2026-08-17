@@ -44,6 +44,7 @@ struct ModelOptions
     int rootKey = 60;
     std::uint64_t sampleStartFrame = 0;
     bool loopEnabled = false;
+    drs::engine::RegionLoopMode loopMode = drs::engine::RegionLoopMode::noLoop;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
     double releaseSeconds = 0.0;
@@ -68,6 +69,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     snapshotZone.rootKey = options.rootKey;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
     snapshotZone.loopEnabled = options.loopEnabled;
+    snapshotZone.loopMode = options.loopMode;
     snapshotZone.loopStartFrame = options.loopStartFrame;
     snapshotZone.loopEndFrame = options.loopEndFrame;
     snapshotZone.releaseSeconds = options.releaseSeconds;
@@ -103,6 +105,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     preparedZone.rootKey = options.rootKey;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
     preparedZone.loopEnabled = options.loopEnabled;
+    preparedZone.loopMode = options.loopMode;
     preparedZone.loopStartFrame = options.loopStartFrame;
     preparedZone.loopEndFrame = options.loopEndFrame;
     preparedZone.releaseSeconds = options.releaseSeconds;
@@ -315,6 +318,59 @@ void runReleaseLawMatrix()
             "The positive slow curve should retain more level than a linear envelope at its midpoint.");
 }
 
+void runTypedLoopModeMatrix()
+{
+    ModelOptions continuous;
+    continuous.loopEnabled = true;
+    continuous.loopMode = drs::engine::RegionLoopMode::loopContinuous;
+    continuous.loopStartFrame = 2;
+    continuous.loopEndFrame = 5;
+    const auto continuousModel = buildModel(
+        { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f }, continuous);
+    drs::engine::SamplerVoice continuousVoice;
+    require(continuousVoice.start(*continuousModel, startRequest())
+                && continuousVoice.isLoopActive()
+                && continuousVoice.beginRelease()
+                && continuousVoice.isLoopActive(),
+            "loop_continuous must keep wrapping after note-off while its release runs.");
+    StereoOutput continuousOutput(16);
+    const auto continuousResult = continuousVoice.render(continuousOutput.view(), 0, 16);
+    require(!continuousResult.voiceFinished && continuousVoice.isReleasing(),
+            "loop_continuous should not run into the natural sample end during release.");
+
+    auto sustain = continuous;
+    sustain.loopMode = drs::engine::RegionLoopMode::loopSustain;
+    const auto sustainModel = buildModel(
+        { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f }, sustain);
+    drs::engine::SamplerVoice sustainVoice;
+    require(sustainVoice.start(*sustainModel, startRequest())
+                && sustainVoice.isLoopActive()
+                && sustainVoice.beginRelease()
+                && !sustainVoice.isLoopActive(),
+            "loop_sustain must stop wrapping at note-off so playback can enter the tail.");
+    StereoOutput sustainOutput(16);
+    const auto sustainResult = sustainVoice.render(sustainOutput.view(), 0, 16);
+    require(sustainResult.voiceFinished,
+            "loop_sustain should reach the natural source end after leaving its loop.");
+
+    ModelOptions oneShot;
+    oneShot.loopMode = drs::engine::RegionLoopMode::oneShot;
+    const auto oneShotModel = buildModel({ 1.0f, 1.0f, 1.0f, 1.0f }, oneShot);
+    drs::engine::SamplerVoice oneShotVoice;
+    require(oneShotVoice.start(*oneShotModel, startRequest())
+                && oneShotVoice.ignoresNoteOff()
+                && !oneShotVoice.isLoopActive(),
+            "one_shot must ignore note-off without enabling a repeating loop.");
+
+    ModelOptions noLoop;
+    const auto noLoopModel = buildModel({ 1.0f, 1.0f, 1.0f, 1.0f }, noLoop);
+    drs::engine::SamplerVoice noLoopVoice;
+    require(noLoopVoice.start(*noLoopModel, startRequest())
+                && !noLoopVoice.ignoresNoteOff()
+                && !noLoopVoice.isLoopActive(),
+            "no_loop must retain ordinary gated note-off behavior.");
+}
+
 void runReleasePartitionInvariance()
 {
     ModelOptions loop;
@@ -445,6 +501,7 @@ int main()
     {
         runLoopBoundaryMatrix();
         runReleaseLawMatrix();
+        runTypedLoopModeMatrix();
         runReleasePartitionInvariance();
         runPoolLifecycleMatrix();
         runStealAndRepeatedResetMatrix();

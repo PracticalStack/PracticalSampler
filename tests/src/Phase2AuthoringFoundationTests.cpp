@@ -465,6 +465,26 @@ int main()
         require(roundTripJson.find("\"triggerMode\": \"one-shot\"") != std::string::npos,
                 "One-shot zones must serialize their trigger mode explicitly.");
 
+        auto typedLoopProject = controller.getProject();
+        typedLoopProject.authoring.zones.front().loopMode = drs::engine::RegionLoopMode::loopSustain;
+        typedLoopProject.authoring.zones.front().loopEnabled = true;
+        typedLoopProject.authoring.zones.front().loopStartFrame = 24;
+        typedLoopProject.authoring.zones.front().loopEndFrame = 96;
+        const auto typedLoopPath = tempDirectory / "typed-loop-roundtrip.drsproj";
+        const auto typedLoopJson = drs::engine::serializeRuntimeProjectManifest(
+            typedLoopProject, typedLoopPath.generic_string());
+        writeTextFile(typedLoopPath, typedLoopJson);
+        const auto typedLoopLoad = drs::engine::loadRuntimeProjectManifest(typedLoopPath.generic_string());
+        require(typedLoopLoad.loaded
+                    && typedLoopLoad.project.authoring.zones.front().loopMode
+                        == drs::engine::RegionLoopMode::loopSustain
+                    && typedLoopLoad.project.authoring.zones.front().loopEnabled
+                    && typedLoopLoad.project.authoring.zones.front().loopStartFrame == 24
+                    && typedLoopLoad.project.authoring.zones.front().loopEndFrame == 96,
+                "Typed SFZ loop mode and exclusive loop bounds must survive project save/restore.");
+        require(typedLoopJson.find("\"loopMode\": \"loop_sustain\"") != std::string::npos,
+                "Project persistence must use the portable SFZ loop-mode spelling.");
+
         const auto blankProjectPath = tempDirectory / "blank-project-roundtrip.drsproj";
         writeTextFile(blankProjectPath,
                       drs::engine::serializeRuntimeProjectManifest(blankProject, blankProjectPath.generic_string()));
