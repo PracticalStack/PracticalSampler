@@ -363,6 +363,21 @@ int main()
         require(afterDamperMigration == beforeDamperMigration,
                 "Binary-default damper migration must not invalidate an existing DAW binding.");
 
+        const auto schemaEight = drs::engine::migrateRuntimeProjectToPlaybackRegionSchema(
+            schemaSeven.project);
+        require(schemaEight.valid,
+                "The legacy digest fixture must migrate to playback-region project schema 8.");
+        const auto afterPlaybackRegionMigration = drs::engine::computeHostProjectManifestDigest(
+            schemaEight.project, firstLocation);
+        require(afterPlaybackRegionMigration == beforeDamperMigration,
+                "A zero playback-end sentinel must not invalidate an existing DAW binding.");
+
+        auto authoredPlaybackRegion = schemaEight.project;
+        authoredPlaybackRegion.authoring.zones.front().sampleEndFrame = 100;
+        require(drs::engine::computeHostProjectManifestDigest(
+                    authoredPlaybackRegion, firstLocation) != afterPlaybackRegionMigration,
+                "An authored playback end must participate in host binding identity.");
+
         auto authoredDamper = schemaSeven.project;
         authoredDamper.authoring.zones.front().damper.sustainControllerNumber = 90;
         require(drs::engine::computeHostProjectManifestDigest(authoredDamper, firstLocation)

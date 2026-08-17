@@ -254,6 +254,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
         zone.velocityCrossfade = projectZone.velocityCrossfade;
         zone.gainDb = projectZone.gainDb;
         zone.sampleStartFrame = projectZone.sampleStartFrame;
+        zone.sampleEndFrame = projectZone.sampleEndFrame;
         zone.releaseSeconds = projectZone.releaseSeconds;
         zone.releaseShape = projectZone.releaseShape;
         zone.roundRobin = projectZone.roundRobin;

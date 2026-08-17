@@ -43,6 +43,7 @@ struct ModelOptions
     double sourceSampleRate = 48000.0;
     int rootKey = 60;
     std::uint64_t sampleStartFrame = 0;
+    std::uint64_t sampleEndFrame = 0;
     bool loopEnabled = false;
     drs::engine::RegionLoopMode loopMode = drs::engine::RegionLoopMode::noLoop;
     std::uint64_t loopStartFrame = 0;
@@ -68,6 +69,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     snapshotZone.articulationId = "sustain";
     snapshotZone.rootKey = options.rootKey;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
+    snapshotZone.sampleEndFrame = options.sampleEndFrame;
     snapshotZone.loopEnabled = options.loopEnabled;
     snapshotZone.loopMode = options.loopMode;
     snapshotZone.loopStartFrame = options.loopStartFrame;
@@ -104,6 +106,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     preparedZone.streamSampleId = "lifecycle-stream";
     preparedZone.rootKey = options.rootKey;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
+    preparedZone.sampleEndFrame = options.sampleEndFrame;
     preparedZone.loopEnabled = options.loopEnabled;
     preparedZone.loopMode = options.loopMode;
     preparedZone.loopStartFrame = options.loopStartFrame;
@@ -130,7 +133,11 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<float> source,
     payload->snapshot = std::make_shared<const drs::engine::ImmutablePlaybackSnapshot>(std::move(snapshot));
     payload->prepared = std::make_shared<const drs::engine::ImmutablePreparedPlayback>(std::move(prepared));
     const auto result = drs::engine::buildSamplerRenderModel(payload);
-    require(result.built && result.model != nullptr, "Lifecycle fixture model should validate.");
+    std::string findingSummary;
+    for (const auto& finding : result.findings)
+        findingSummary += " [" + finding.code + "] " + finding.message;
+    require(result.built && result.model != nullptr,
+            "Lifecycle fixture model should validate." + findingSummary);
     return result.model;
 }
 
@@ -203,7 +210,7 @@ void runLoopBoundaryMatrix()
                   { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 2.0f, 3.0f, 4.0f, 2.0f, 3.0f },
                   "Unity loop sequence changed");
 
-    loop.sampleStartFrame = 4;
+    loop.sampleStartFrame = 2;
     const auto fractionalModel = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f }, loop);
     drs::engine::SamplerVoice fractional;
     require(fractional.start(*fractionalModel, startRequest(60, 96000.0)),
@@ -211,7 +218,7 @@ void runLoopBoundaryMatrix()
     StereoOutput fractionalOutput(6);
     fractional.render(fractionalOutput.view(), 0, 6);
     requireVector(fractionalOutput.left,
-                  { 4.0f, 3.0f, 2.0f, 2.5f, 3.0f, 3.5f },
+                  { 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 3.0f },
                   "Fractional loop-boundary interpolation changed");
 
     ModelOptions multipleWraps;
@@ -242,18 +249,107 @@ void runLoopBoundaryMatrix()
 
     ModelOptions afterLoop;
     afterLoop.sampleStartFrame = 5;
-    afterLoop.loopEnabled = true;
+    afterLoop.loopEnabled = false;
     afterLoop.loopStartFrame = 1;
     afterLoop.loopEndFrame = 4;
     const auto afterModel = buildModel({ 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f }, afterLoop);
     drs::engine::SamplerVoice afterVoice;
-    require(afterVoice.start(*afterModel, startRequest()), "Post-loop start voice should start.");
+    require(afterVoice.start(*afterModel, startRequest()), "Natural-tail start voice should start.");
     StereoOutput afterOutput(4);
     const auto afterResult = afterVoice.render(afterOutput.view(), 0, 4);
     require(afterResult.mixedFrameCount == 3 && afterResult.voiceFinished,
-            "A start at/after loop end must play the natural tail without wrapping.");
+            "A non-looping playback region must play its natural tail without wrapping.");
     requireVector(afterOutput.left, { 5.0f, 6.0f, 7.0f, 0.0f },
                   "Post-loop natural tail changed");
+}
+
+void runPlaybackRegionMatrix()
+{
+    ModelOptions bounded;
+    bounded.sampleEndFrame = 3;
+    const auto boundedModel = buildModel({ 0.0f, 1.0f, 2.0f, 90.0f, 100.0f }, bounded);
+    drs::engine::SamplerVoice boundedVoice;
+    require(boundedVoice.start(*boundedModel, startRequest()),
+            "A non-empty authored playback region should start.");
+    StereoOutput boundedOutput(5);
+    const auto boundedResult = boundedVoice.render(boundedOutput.view(), 0, 5);
+    require(boundedResult.mixedFrameCount == 3 && boundedResult.voiceFinished,
+            "A non-looping voice must finish at the authored exclusive end.");
+    requireVector(boundedOutput.left, { 0.0f, 1.0f, 2.0f, 0.0f, 0.0f },
+                  "Authored playback end changed");
+
+    ModelOptions oneFrame;
+    oneFrame.sampleEndFrame = 1;
+    const auto oneFrameModel = buildModel({ 7.0f, 80.0f }, oneFrame);
+    drs::engine::SamplerVoice oneFrameVoice;
+    require(oneFrameVoice.start(*oneFrameModel, startRequest()),
+            "The maximum-short legal playback region should start.");
+    StereoOutput oneFrameOutput(2);
+    const auto oneFrameResult = oneFrameVoice.render(oneFrameOutput.view(), 0, 2);
+    require(oneFrameResult.mixedFrameCount == 1 && oneFrameResult.voiceFinished,
+            "An exclusive end of one must render exactly one frame.");
+    requireVector(oneFrameOutput.left, { 7.0f, 0.0f }, "One-frame playback region changed");
+
+    ModelOptions interpolated;
+    interpolated.sampleEndFrame = 2;
+    const auto interpolatedModel = buildModel({ 1.0f, 1.0f, 100.0f }, interpolated);
+    drs::engine::SamplerVoice interpolatedVoice;
+    require(interpolatedVoice.start(*interpolatedModel, startRequest(60, 96000.0)),
+            "Fractional bounded voice should start.");
+    StereoOutput interpolatedOutput(5);
+    const auto interpolatedResult = interpolatedVoice.render(interpolatedOutput.view(), 0, 5);
+    require(interpolatedResult.mixedFrameCount == 4 && interpolatedResult.voiceFinished,
+            "Fractional playback must finish at the authored boundary.");
+    requireVector(interpolatedOutput.left, { 1.0f, 1.0f, 1.0f, 1.0f, 0.0f },
+                  "Interpolation read beyond the authored playback end");
+
+    ModelOptions containedLoop;
+    containedLoop.sampleStartFrame = 1;
+    containedLoop.sampleEndFrame = 5;
+    containedLoop.loopEnabled = true;
+    containedLoop.loopStartFrame = 2;
+    containedLoop.loopEndFrame = 4;
+    const auto containedLoopModel = buildModel(
+        { 0.0f, 1.0f, 2.0f, 3.0f, 90.0f, 100.0f }, containedLoop);
+    drs::engine::SamplerVoice containedLoopVoice;
+    require(containedLoopVoice.start(*containedLoopModel, startRequest()),
+            "A loop contained by the playback region should start.");
+    StereoOutput containedLoopOutput(7);
+    containedLoopVoice.render(containedLoopOutput.view(), 0, 7);
+    requireVector(containedLoopOutput.left, { 1.0f, 2.0f, 3.0f, 2.0f, 3.0f, 2.0f, 3.0f },
+                  "Contained playback-region loop changed");
+
+    auto invalidLoop = containedLoop;
+    invalidLoop.loopEndFrame = 6;
+    bool rejectedInvalidLoop = false;
+    try
+    {
+        static_cast<void>(buildModel(
+            { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f }, invalidLoop));
+    }
+    catch (const std::runtime_error& error)
+    {
+        rejectedInvalidLoop = std::string(error.what()).find("render-model-loop-range-invalid")
+            != std::string::npos;
+    }
+    require(rejectedInvalidLoop,
+            "A loop outside the authored playback region must be rejected before render.");
+
+    ModelOptions beyondPhysicalEnd;
+    beyondPhysicalEnd.sampleEndFrame = 7;
+    bool rejectedBeyondPhysicalEnd = false;
+    try
+    {
+        static_cast<void>(buildModel(
+            { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f }, beyondPhysicalEnd));
+    }
+    catch (const std::runtime_error& error)
+    {
+        rejectedBeyondPhysicalEnd = std::string(error.what()).find(
+            "render-model-end-frame-invalid") != std::string::npos;
+    }
+    require(rejectedBeyondPhysicalEnd,
+            "An authored playback end beyond the physical source must be rejected before render.");
 }
 
 void runReleaseLawMatrix()
@@ -499,6 +595,7 @@ int main()
 {
     try
     {
+        runPlaybackRegionMatrix();
         runLoopBoundaryMatrix();
         runReleaseLawMatrix();
         runTypedLoopModeMatrix();

@@ -1309,12 +1309,9 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
         const auto value = parseUnsignedFrameValue(opcode.value);
         if (!value.has_value() || *value == std::numeric_limits<std::uint64_t>::max())
             return invalidFrameClassification();
-        return { SfzImportSupportDisposition::reportedOnly,
-                 "regionContract.playbackEndExclusive",
-                 "SFZ end is normalized from inclusive N to native exclusive N+1, but project persistence and playback cutover land in the dedicated playback-end schema phase.",
-                 "sfz.region.end.pending_schema",
-                 "SFZ playback end is recognized but not yet persisted",
-                 "The importer validates and normalizes the inclusive endpoint, but the current project schema cannot retain it yet." };
+        return { SfzImportSupportDisposition::converted,
+                 "zone.sampleEndFrame",
+                 "SFZ end is normalized once from inclusive N to native exclusive N+1 and persisted in the playback-region schema." };
     }
 
     if (opcodeName == "loop_start")
@@ -1349,20 +1346,9 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                      "The importer recognizes loop_mode but cannot safely convert this value." };
         }
 
-        if (*mode == SfzRegionLoopMode::noLoop
-            || *mode == SfzRegionLoopMode::loopContinuous)
-        {
-            return { SfzImportSupportDisposition::converted,
-                     "regionContract.loopMode + zone.loopEnabled",
-                     "The typed SFZ loop mode has an exact current compatibility projection." };
-        }
-
-        return { SfzImportSupportDisposition::approximated,
-                 "regionContract.loopMode + zone.loopEnabled",
-                 "The typed SFZ loop mode is retained by the region contract, while the current boolean playback model cannot yet preserve its distinct note-off lifecycle.",
-                 "sfz.region.loop_mode.compatibility_projection",
-                 "SFZ loop mode requires a typed playback model",
-                 "The current project model approximates one_shot as unlooped playback and loop_sustain as a continuous enabled loop until typed runtime support lands." };
+        return { SfzImportSupportDisposition::converted,
+                 "zone.loopMode",
+                 "The portable SFZ loop mode is retained as a typed runtime and authoring value." };
     }
 
     if (opcodeName == "default_path")

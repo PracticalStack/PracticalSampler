@@ -57,9 +57,11 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         return false;
 
     const auto& selectedSample = model.getSamples()[selectedRoute.preparedSampleIndex];
+    const auto resolvedPlaybackEnd = resolveSampleEndFrame(selectedRoute.sampleEndFrame,
+                                                            selectedSample.frameCount);
     if (selectedSample.dataSource == nullptr
         || selectedSample.frameCount == 0
-        || selectedRoute.sampleStartFrame >= selectedSample.frameCount
+        || selectedRoute.sampleStartFrame >= resolvedPlaybackEnd
         || !std::isfinite(selectedSample.sampleRate) || selectedSample.sampleRate <= 0.0)
     {
         return false;
@@ -92,6 +94,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     route = &selectedRoute;
     sample = &selectedSample;
     positionFrames = static_cast<double>(selectedRoute.sampleStartFrame);
+    playbackEndFrame = resolvedPlaybackEnd;
     nextLookAheadPublicationFrame = selectedRoute.sampleStartFrame;
     incrementFrames = increment;
     outputSampleRate = request.outputSampleRate;
@@ -101,8 +104,8 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
                                                             selectedRoute.loopEnabled);
     loopActive = regionLoopModeLoops(effectiveLoopMode)
         && selectedRoute.loopStartFrame < selectedRoute.loopEndFrame
-        && selectedRoute.loopEndFrame <= selectedSample.frameCount
-        && selectedRoute.sampleStartFrame < selectedRoute.loopEndFrame;
+        && selectedRoute.loopStartFrame >= selectedRoute.sampleStartFrame
+        && selectedRoute.loopEndFrame <= playbackEndFrame;
     return true;
 }
 
@@ -236,7 +239,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
     const auto sourceChannelCount = static_cast<std::size_t>(sample->channelCount);
     for (std::uint32_t outputFrame = 0; outputFrame < frameCount; ++outputFrame)
     {
-        if (positionFrames >= static_cast<double>(sample->frameCount))
+        if (positionFrames >= static_cast<double>(playbackEndFrame))
         {
             finish();
             break;
@@ -244,7 +247,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
 
         const auto frameIndex = static_cast<std::size_t>(positionFrames);
         auto nextFrameIndex = std::min(frameIndex + 1,
-                                       static_cast<std::size_t>(sample->frameCount - 1));
+                                       static_cast<std::size_t>(playbackEndFrame - 1));
         if (loopActive
             && frameIndex < route->loopEndFrame
             && nextFrameIndex >= route->loopEndFrame)
@@ -283,7 +286,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
                     break;
                 }
             }
-            else if (!loopActive && positionFrames >= static_cast<double>(sample->frameCount))
+            else if (!loopActive && positionFrames >= static_cast<double>(playbackEndFrame))
             {
                 finish();
                 break;
@@ -298,7 +301,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
         if (frameIndex >= nextLookAheadPublicationFrame)
         {
             const auto lookAheadFrame = std::min<std::uint64_t>(
-                sample->frameCount - 1, frameIndex + pageLookAheadFrames);
+                playbackEndFrame - 1, frameIndex + pageLookAheadFrames);
             sample->dataSource->publishPageIntent(
                 lookAheadFrame, SamplePageRequestPriority::lookAhead, voiceId);
             nextLookAheadPublicationFrame = frameIndex > std::numeric_limits<std::uint64_t>::max()
@@ -340,7 +343,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
                 break;
             }
         }
-        else if (!loopActive && positionFrames >= static_cast<double>(sample->frameCount))
+        else if (!loopActive && positionFrames >= static_cast<double>(playbackEndFrame))
         {
             finish();
             break;
@@ -365,6 +368,7 @@ void SamplerVoice::reset() noexcept
     route = nullptr;
     sample = nullptr;
     positionFrames = 0.0;
+    playbackEndFrame = 0;
     incrementFrames = 1.0;
     outputSampleRate = 48000.0;
     baseGain = 0.0f;
@@ -385,8 +389,8 @@ void SamplerVoice::reset() noexcept
 void SamplerVoice::finish() noexcept
 {
     lifecycleState = SamplerVoiceLifecycleState::finished;
-    if (sample != nullptr)
-        positionFrames = std::min(positionFrames, static_cast<double>(sample->frameCount));
+    if (playbackEndFrame != 0)
+        positionFrames = std::min(positionFrames, static_cast<double>(playbackEndFrame));
     renderModel = nullptr;
     route = nullptr;
     sample = nullptr;

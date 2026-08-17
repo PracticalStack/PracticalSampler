@@ -1,6 +1,7 @@
 #include "drs/engine/SfzImportReport.h"
 #include "drs/engine/SfzImportProjection.h"
 #include "drs/engine/SfzRegionContract.h"
+#include "drs/engine/PlaybackRegionContract.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -250,13 +251,13 @@ int main()
         const auto* portableOffset = findSupport(portableAnalysis.report, "offset");
         const auto* portableEnd = findSupport(portableAnalysis.report, "end");
         const auto* portableLoopEnd = findSupport(portableAnalysis.report, "loop_end");
-        const auto hasApproximatedLoopMode = std::any_of(
+        const auto hasConvertedLoopMode = std::any_of(
             portableAnalysis.report.opcodeSupport.begin(),
             portableAnalysis.report.opcodeSupport.end(),
             [](const SfzImportOpcodeSupportSummary& value)
             {
                 return value.opcodeName == "loop_mode"
-                    && value.disposition == SfzImportSupportDisposition::approximated;
+                    && value.disposition == SfzImportSupportDisposition::converted;
             });
         require(portableOffset != nullptr
                     && portableOffset->disposition == SfzImportSupportDisposition::converted
@@ -264,10 +265,10 @@ int main()
                     && portableLoopEnd->disposition == SfzImportSupportDisposition::converted,
                 "Implemented offset and inclusive loop-end conversion should be reported as converted.");
         require(portableEnd != nullptr
-                    && portableEnd->disposition == SfzImportSupportDisposition::reportedOnly,
-                "SFZ end must remain honestly pending until the playback-end project schema lands.");
-        require(hasApproximatedLoopMode,
-                "Mixed loop modes should disclose the current boolean compatibility approximation.");
+                    && portableEnd->disposition == SfzImportSupportDisposition::converted,
+                "SFZ end must report the typed playback-region conversion.");
+        require(hasConvertedLoopMode,
+                "Portable loop modes should report the typed loop-mode conversion.");
 
         const auto projectionRoot = fs::temp_directory_path()
             / "drs-sfz-region-contract-projection";
@@ -281,13 +282,15 @@ int main()
             std::ofstream sfz(projectionSfz, std::ios::binary);
             sfz << "<region> sample=fixture.wav offset=1 loop_mode=loop_continuous "
                    "loop_start=2 loop_end=5\n"
-                   "<region> sample=fixture.wav end=-1\n";
+                   "<region> sample=fixture.wav end=-1\n"
+                   "<region> sample=fixture.wav key=61 end=0\n"
+                   "<region> sample=fixture.wav key=62 end=5\n";
         }
         const auto projection = projectSfzImportDocument(
             makeProjectionProject(projectionRoot),
             projectionSfz.generic_string());
         require(projection.projected && !projection.blocking
-                    && projection.zones.size() == 1,
+                    && projection.zones.size() == 3,
                 "Production projection should consume the region contract and omit end=-1 silent regions.");
         require(projection.zones.front().sampleStartFrame == 1
                     && projection.zones.front().loopEnabled
@@ -295,6 +298,20 @@ int main()
                     && projection.zones.front().loopStartFrame == 2
                     && projection.zones.front().loopEndFrame == 6,
                 "Production projection must retain the typed mode and convert inclusive SFZ loop_end exactly once.");
+        require(projection.zones[0].sampleEndFrame == 0,
+                "Omitted SFZ end must preserve the zero sentinel for physical source end.");
+        require(projection.zones[1].sampleEndFrame == 1,
+                "SFZ end=0 must convert from an inclusive endpoint to exclusive frame one.");
+        require(projection.zones[2].sampleEndFrame == 6,
+                "SFZ end must convert from inclusive to exclusive exactly once.");
+        AuthoringSession projectionSession(makeProjectionProject(projectionRoot));
+        const auto applyResult = applySfzImportProjection(
+            projectionSession, projection, "Import playback-region contract fixture");
+        require(applyResult.applied
+                    && projectionSession.getProject().schemaVersion == playbackRegionProjectSchemaVersion
+                    && projectionSession.getProject().authoring.schemaVersion == playbackRegionAuthoringSchemaVersion
+                    && sfzRegionPlaybackContractSchemaVersion == 2,
+                "Applying a projection must promote old inputs to the named playback-region schema contract.");
 
         std::ifstream fixtureManifest(fixturePath("baseline-fixtures.csv"));
         require(fixtureManifest.good(),

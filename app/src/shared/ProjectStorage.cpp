@@ -258,10 +258,13 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
 {
     drs::engine::RuntimeInstrumentModel instrument;
     instrument.schemaName = "drs.instrument";
-    instrument.schemaVersion = project.schemaVersion >= drs::engine::continuousDamperProjectSchemaVersion
+    instrument.schemaVersion = project.schemaVersion >= drs::engine::playbackRegionProjectSchemaVersion
+            && project.authoring.schemaVersion >= drs::engine::playbackRegionAuthoringSchemaVersion
+        ? drs::engine::playbackRegionInstrumentSchemaVersion
+        : (project.schemaVersion >= drs::engine::continuousDamperProjectSchemaVersion
             && project.authoring.schemaVersion >= drs::engine::continuousDamperAuthoringSchemaVersion
         ? drs::engine::continuousDamperInstrumentSchemaVersion
-        : (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5 ? 3 : 2);
+        : (project.schemaVersion >= 6 && project.authoring.schemaVersion >= 5 ? 3 : 2));
     instrument.instrumentId = project.projectId.empty() ? "instrument" : project.projectId + ".instrument";
     instrument.displayName = project.displayName;
     instrument.sourceProjectPath = projectFile.getFullPathName().toStdString();
@@ -364,6 +367,8 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.velocityLow = projectZone.velocityLow;
         zone.velocityHigh = projectZone.velocityHigh;
         zone.velocityCrossfade = projectZone.velocityCrossfade;
+        zone.sampleStartFrame = projectZone.sampleStartFrame;
+        zone.sampleEndFrame = projectZone.sampleEndFrame;
         zone.streamOffsetBytes = 0;
         zone.prefetchBytes = 16384;
         zone.releaseSeconds = projectZone.releaseSeconds;

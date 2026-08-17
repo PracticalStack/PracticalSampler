@@ -1355,6 +1355,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.gainDb = zone.gainDb;
         snapshotZone.pan = 0.0;
         snapshotZone.sampleStartFrame = zone.sampleStartFrame;
+        snapshotZone.sampleEndFrame = zone.sampleEndFrame;
         snapshotZone.releaseSeconds = zone.releaseSeconds;
         snapshotZone.releaseShape = zone.releaseShape;
         snapshotZone.roundRobin = zone.roundRobin;
@@ -4713,6 +4714,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
             zone.roundRobinPosition, zone.triggerMode, zone.fineTuneCents,
             zone.amplitudeVelocityTracking, zone.controllerConditions, zone.damper });
         prepared.zones.back().loopMode = zone.loopMode;
+        prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
     }
     for (const auto& group : result.snapshotResult.snapshot.groupRoutes)
     {

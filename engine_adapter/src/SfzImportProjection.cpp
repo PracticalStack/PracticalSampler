@@ -937,6 +937,17 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
         project.schemaVersion = continuousDamperProjectSchemaVersion;
         project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
     }
+    if (project.schemaVersion == 6 && project.authoring.schemaVersion == 5)
+    {
+        project.schemaVersion = continuousDamperProjectSchemaVersion;
+        project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    }
+    if (project.schemaVersion == continuousDamperProjectSchemaVersion
+        && project.authoring.schemaVersion == continuousDamperAuthoringSchemaVersion)
+    {
+        project.schemaVersion = playbackRegionProjectSchemaVersion;
+        project.authoring.schemaVersion = playbackRegionAuthoringSchemaVersion;
+    }
     project.sampleSources.insert(project.sampleSources.end(),
                                  projection.sampleSources.begin(),
                                  projection.sampleSources.end());
@@ -1474,6 +1485,13 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             continue;
         }
         zone.sampleStartFrame = regionResolution.region.playbackStart.frame;
+        const auto explicitPlaybackEnd = regionResolution.region.playbackEndExclusive.present
+            && (regionResolution.region.playbackEndExclusive.provenance.origin
+                    == SfzRegionValueOrigin::localOpcode
+                || regionResolution.region.playbackEndExclusive.provenance.origin
+                    == SfzRegionValueOrigin::inheritedOpcode);
+        zone.sampleEndFrame = explicitPlaybackEnd
+            ? regionResolution.region.playbackEndExclusive.frame : 0;
         switch (regionResolution.region.loopMode.mode)
         {
             case SfzRegionLoopMode::noLoop: zone.loopMode = RegionLoopMode::noLoop; break;

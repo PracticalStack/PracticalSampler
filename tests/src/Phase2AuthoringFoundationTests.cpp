@@ -1,5 +1,7 @@
 #include "drs/engine/AuthoringSession.h"
+#include "drs/engine/HostSessionState.h"
 #include "drs/engine/ProjectDocument.h"
+#include "drs/engine/PlaybackRegionContract.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
 
@@ -484,6 +486,95 @@ int main()
                 "Typed SFZ loop mode and exclusive loop bounds must survive project save/restore.");
         require(typedLoopJson.find("\"loopMode\": \"loop_sustain\"") != std::string::npos,
                 "Project persistence must use the portable SFZ loop-mode spelling.");
+
+        const auto curatedPlaybackBase = drs::engine::migrateRuntimeProjectToCuratedDspSchema(
+            controller.getProject());
+        const auto articulationPlaybackBase = drs::engine::migrateRuntimeProjectToPerformanceArticulationSchema(
+            curatedPlaybackBase.project);
+        const auto damperPlaybackBase = drs::engine::migrateRuntimeProjectToContinuousDamperSchema(
+            articulationPlaybackBase.project);
+        require(curatedPlaybackBase.valid && articulationPlaybackBase.valid
+                    && damperPlaybackBase.valid,
+                "Playback-region migration fixture must reach the preceding schema cleanly.");
+        auto legacyPlaybackProject = damperPlaybackBase.project;
+        for (auto& zone : legacyPlaybackProject.authoring.zones)
+        {
+            zone.sampleEndFrame = 0;
+            zone.loopEnabled = false;
+            zone.loopMode = drs::engine::RegionLoopMode::noLoop;
+        }
+        const auto legacyPlaybackPath = tempDirectory / "legacy-playback-region.drsproj";
+        const auto legacyPlaybackJson = drs::engine::serializeRuntimeProjectManifest(
+            legacyPlaybackProject, legacyPlaybackPath.generic_string());
+        require(legacyPlaybackJson.find("\"sampleEndFrame\"") == std::string::npos,
+                "The pre-Sprint-4 project fixture must remain genuinely field-absent.");
+        writeTextFile(legacyPlaybackPath, legacyPlaybackJson);
+        const auto legacyPlaybackLoad = drs::engine::loadRuntimeProjectManifest(
+            legacyPlaybackPath.generic_string());
+        std::string legacyPlaybackIssues;
+        for (const auto& issue : legacyPlaybackLoad.issues)
+            legacyPlaybackIssues += " [" + issue + "]";
+        require(legacyPlaybackLoad.loaded
+                    && std::all_of(legacyPlaybackLoad.project.authoring.zones.begin(),
+                                   legacyPlaybackLoad.project.authoring.zones.end(),
+                                   [](const auto& zone) { return zone.sampleEndFrame == 0; }),
+                "Older projects missing sampleEndFrame must load with source-end semantics."
+                    + legacyPlaybackIssues);
+
+        const auto playbackMigration = drs::engine::migrateRuntimeProjectToPlaybackRegionSchema(
+            legacyPlaybackLoad.project);
+        require(playbackMigration.valid && playbackMigration.migrated
+                    && playbackMigration.project.schemaVersion
+                        == drs::engine::playbackRegionProjectSchemaVersion
+                    && playbackMigration.project.authoring.schemaVersion
+                        == drs::engine::playbackRegionAuthoringSchemaVersion
+                    && std::all_of(playbackMigration.project.authoring.zones.begin(),
+                                   playbackMigration.project.authoring.zones.end(),
+                                   [](const auto& zone) { return zone.sampleEndFrame == 0; }),
+                "Playback-region migration must preserve legacy source-end behavior with a zero sentinel.");
+        const auto legacyHostDigest = drs::engine::computeHostProjectManifestDigest(
+            legacyPlaybackLoad.project, legacyPlaybackPath.generic_string());
+        const auto migratedHostDigest = drs::engine::computeHostProjectManifestDigest(
+            playbackMigration.project, legacyPlaybackPath.generic_string());
+        require(migratedHostDigest == legacyHostDigest,
+                "Default playback-region migration must preserve an existing host binding digest.");
+
+        auto authoredPlaybackProject = playbackMigration.project;
+        authoredPlaybackProject.authoring.zones.front().sampleStartFrame = 10;
+        authoredPlaybackProject.authoring.zones.front().sampleEndFrame = 100;
+        require(drs::engine::computeHostProjectManifestDigest(
+                    authoredPlaybackProject, legacyPlaybackPath.generic_string())
+                    != migratedHostDigest,
+                "An authored playback end must change the host binding digest.");
+        const auto authoredPlaybackPath = tempDirectory / "authored-playback-region.drsproj";
+        const auto authoredPlaybackJson = drs::engine::serializeRuntimeProjectManifest(
+            authoredPlaybackProject, authoredPlaybackPath.generic_string());
+        require(authoredPlaybackJson.find("\"sampleEndFrame\": 100") != std::string::npos,
+                "Current projects must persist the authored exclusive playback end.");
+        writeTextFile(authoredPlaybackPath, authoredPlaybackJson);
+        const auto authoredPlaybackLoad = drs::engine::loadRuntimeProjectManifest(
+            authoredPlaybackPath.generic_string());
+        require(authoredPlaybackLoad.loaded
+                    && authoredPlaybackLoad.project.authoring.zones.front().sampleStartFrame == 10
+                    && authoredPlaybackLoad.project.authoring.zones.front().sampleEndFrame == 100,
+                "Playback-region bounds must survive project save/load round-tripping.");
+
+        drs::engine::AuthoringSession playbackSession(playbackMigration.project);
+        auto playbackZone = *playbackSession.getSelectedZone();
+        playbackZone.sampleEndFrame = 120;
+        require(playbackSession.updateSelectedZone(playbackZone, "Set playback end").applied
+                    && playbackSession.getSelectedZone()->sampleEndFrame == 120,
+                "Authoring transactions must commit playback-end edits.");
+        const auto playbackCheckpoint = playbackSession.exportCheckpoint();
+        require(std::any_of(playbackCheckpoint.project.authoring.zones.begin(),
+                            playbackCheckpoint.project.authoring.zones.end(),
+                            [](const auto& zone) { return zone.sampleEndFrame == 120; }),
+                "Document checkpoints must retain the authored playback end.");
+        require(playbackSession.undo().applied
+                    && playbackSession.getSelectedZone()->sampleEndFrame == 0
+                    && playbackSession.redo().applied
+                    && playbackSession.getSelectedZone()->sampleEndFrame == 120,
+                "Playback-end edits must survive undo and redo without touching source audio.");
 
         const auto blankProjectPath = tempDirectory / "blank-project-roundtrip.drsproj";
         writeTextFile(blankProjectPath,

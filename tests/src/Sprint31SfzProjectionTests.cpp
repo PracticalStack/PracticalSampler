@@ -529,9 +529,10 @@ int main()
             "Import Sprint 3.1.4 SFZ fixture into schema 6 project");
         require(phase6ApplyResult.applied,
                 "Sprint 3.1.4 should apply projected SFZ content into a fresh schema 6 project.");
-        require(phase6Session.getProject().schemaVersion == 6
-                    && phase6Session.getProject().authoring.schemaVersion == 5,
-                "Applying SFZ content into a schema 6 project should preserve the current project schema versions.");
+        require(phase6Session.getProject().schemaVersion == playbackRegionProjectSchemaVersion
+                    && phase6Session.getProject().authoring.schemaVersion
+                        == playbackRegionAuthoringSchemaVersion,
+                "Applying SFZ content into a schema 6 project should advance through the current playback-region schema.");
         require(std::abs(phase6Session.getProject().authoring.masterGainDb - phase6Projection.masterGainDb) < 1.0e-9,
                 "Applying SFZ content into a schema 6 project should commit imported master gain.");
         require(phase6Session.getProject().authoring.groups.size() == phase6Projection.groups.size(),

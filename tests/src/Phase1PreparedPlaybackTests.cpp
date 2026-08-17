@@ -918,6 +918,14 @@ int main()
                        replaceSampleMetadata);
         auto replaceSampleProject = phase2Project.project;
         replaceSampleProject.sampleSources[0].path = replaceSamplePath.generic_string();
+        for (auto& zone : replaceSampleProject.authoring.zones)
+        {
+            if (zone.sampleSourceId == replaceSampleProject.sampleSources[0].id)
+            {
+                zone.loopEnabled = false;
+                zone.loopMode = drs::engine::RegionLoopMode::noLoop;
+            }
+        }
         auto replaceSampleStream = referenceStream;
         const auto replaceSampleImport = drs::engine::importSampleFile(replaceSamplePath.generic_string());
         applyImportedMetadataToStreamSample(replaceSampleImport,
@@ -977,6 +985,14 @@ int main()
                        loopMetadata);
         auto checksumShiftProject = phase2Project.project;
         checksumShiftProject.sampleSources[0].path = checksumShiftPath.generic_string();
+        for (auto& zone : checksumShiftProject.authoring.zones)
+        {
+            if (zone.sampleSourceId == checksumShiftProject.sampleSources[0].id)
+            {
+                zone.loopEnabled = false;
+                zone.loopMode = drs::engine::RegionLoopMode::noLoop;
+            }
+        }
         auto checksumBaselineStream = referenceStream;
         const auto checksumBaselineImport = drs::engine::importSampleFile(checksumShiftPath.generic_string());
         applyImportedMetadataToStreamSample(checksumBaselineImport,

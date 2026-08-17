@@ -945,12 +945,21 @@ HostSessionStateSerializeResult serializeHostSessionState(
 std::string computeHostProjectManifestDigest(const RuntimeProjectModel& project,
                                              const std::string& manifestPath)
 {
-    // Schema-7 migration adds only compatibility-default damper declarations to
-    // older projects that do not author continuous behavior. Canonicalize that
-    // case back to its schema-6 shape so an existing DAW binding keeps the same
-    // digest after opening in an HP-capable build. Projects that author any
-    // non-default damper metadata retain schema 7 in their identity.
+    // Schema 8 adds a zero playback-end sentinel and schema 7 adds only
+    // compatibility-default damper declarations to older projects. Canonicalize
+    // those default-only migrations back to their prior shapes so an existing
+    // DAW binding keeps the same digest. Authored playback ends and non-default
+    // damper metadata remain part of project identity.
     auto canonicalProject = project;
+    if (canonicalProject.schemaVersion == playbackRegionProjectSchemaVersion
+        && canonicalProject.authoring.schemaVersion == playbackRegionAuthoringSchemaVersion
+        && std::all_of(canonicalProject.authoring.zones.begin(),
+                       canonicalProject.authoring.zones.end(),
+                       [](const auto& zone) { return zone.sampleEndFrame == 0; }))
+    {
+        canonicalProject.schemaVersion = continuousDamperProjectSchemaVersion;
+        canonicalProject.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    }
     if (canonicalProject.schemaVersion == continuousDamperProjectSchemaVersion
         && canonicalProject.authoring.schemaVersion == continuousDamperAuthoringSchemaVersion
         && std::all_of(canonicalProject.authoring.zones.begin(),

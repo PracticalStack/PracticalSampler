@@ -3684,6 +3684,7 @@ authoring::ZoneFieldValuesViewModel AuthoringPanel::buildZoneFieldValuesViewMode
         viewModel.pan = zone->pan;
         viewModel.loopEnabled = zone->loopEnabled;
         viewModel.loopMode = zone->loopMode;
+        viewModel.sampleEndFrame = zone->sampleEndFrame;
         viewModel.releaseSeconds = zone->releaseSeconds;
         viewModel.releaseShape = zone->releaseShape;
         viewModel.triggerMode = zone->triggerMode;
@@ -5365,7 +5366,9 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
             }
         }
 
-        if (elapsedSeconds <= cueDuration && playheadFrame < preview.frameCount)
+        const auto playbackEnd = preview.playbackEndFrameExclusive == 0
+            ? preview.frameCount : preview.playbackEndFrameExclusive;
+        if (elapsedSeconds <= cueDuration && playheadFrame < playbackEnd)
         {
             preview.playheadVisible = true;
             preview.playheadFrame = playheadFrame;
@@ -5571,12 +5574,14 @@ void AuthoringPanel::commitWaveformLoopRegion(const std::uint64_t startFrame,
     AuthoringWaveformPreview preview;
     if (waveformPreviewProvider)
         preview = waveformPreviewProvider();
-    if (!preview.available || preview.frameCount <= preview.playbackStartFrame)
+    const auto playbackEnd = preview.playbackEndFrameExclusive == 0
+        ? preview.frameCount : preview.playbackEndFrameExclusive;
+    if (!preview.available || playbackEnd <= preview.playbackStartFrame)
         return;
 
     const auto loop = drs::engine::normalizeLoopRegion(
         { startFrame, endFrameExclusive },
-        { preview.playbackStartFrame, preview.frameCount });
+        { preview.playbackStartFrame, playbackEnd });
     if (loop.empty())
         return;
 
@@ -5611,7 +5616,9 @@ void AuthoringPanel::commitWaveformLoopControls(const std::string& label)
     AuthoringWaveformPreview preview;
     if (waveformPreviewProvider)
         preview = waveformPreviewProvider();
-    if (!preview.available || preview.frameCount <= preview.playbackStartFrame)
+    const auto playbackEnd = preview.playbackEndFrameExclusive == 0
+        ? preview.frameCount : preview.playbackEndFrameExclusive;
+    if (!preview.available || playbackEnd <= preview.playbackStartFrame)
         return;
 
     auto editedZone = *selectedZone;
@@ -5629,7 +5636,7 @@ void AuthoringPanel::commitWaveformLoopControls(const std::string& label)
     if (!start.has_value() || !end.has_value())
         return;
     const auto loop = drs::engine::normalizeLoopRegion(
-        { *start, *end }, { preview.playbackStartFrame, preview.frameCount });
+        { *start, *end }, { preview.playbackStartFrame, playbackEnd });
     editedZone.loopStartFrame = loop.startFrame;
     editedZone.loopEndFrame = loop.endFrameExclusive;
     editedZone.loopEnabled = drs::engine::regionLoopModeLoops(editedZone.loopMode)
@@ -6589,6 +6596,7 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
     editedZone.pan = values.pan;
     editedZone.loopEnabled = values.loopEnabled;
     editedZone.loopMode = values.loopMode;
+    editedZone.sampleEndFrame = values.sampleEndFrame;
     editedZone.releaseSeconds = values.releaseSeconds;
     editedZone.releaseShape = values.releaseShape;
     editedZone.triggerMode = values.triggerMode;

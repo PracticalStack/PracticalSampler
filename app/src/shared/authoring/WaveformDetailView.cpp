@@ -321,7 +321,9 @@ void WaveformDetailView::mouseDrag(const juce::MouseEvent& event)
     if (gesture == Gesture::loopStart || gesture == Gesture::loopEnd)
     {
         drs::engine::WaveformEditableRegions regions {
-            { preview.playbackStartFrame, preview.frameCount },
+            { preview.playbackStartFrame,
+              preview.playbackEndFrameExclusive == 0
+                  ? preview.frameCount : preview.playbackEndFrameExclusive },
             { preview.loopStartFrame, preview.loopEndFrame },
             preview.loopEnabled
         };
@@ -427,7 +429,9 @@ bool WaveformDetailView::keyPressed(const juce::KeyPress& key)
             ? (current == 0 ? 0 : current - 1)
             : (current == std::numeric_limits<std::uint64_t>::max() ? current : current + 1);
         auto regions = drs::engine::normalizeBoundaryDrag(
-            { { preview.playbackStartFrame, preview.frameCount },
+            { { preview.playbackStartFrame,
+                preview.playbackEndFrameExclusive == 0
+                    ? preview.frameCount : preview.playbackEndFrameExclusive },
               { preview.loopStartFrame, preview.loopEndFrame }, true },
             selectedBoundary == Gesture::loopStart
                 ? drs::engine::WaveformRegionBoundary::loopStart

@@ -50,6 +50,7 @@ struct ModelOptions
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
     std::uint64_t sampleStartFrame = 0;
+    std::uint64_t sampleEndFrame = 0;
 };
 
 drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> channels,
@@ -76,6 +77,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     snapshotZone.fineTuneCents = options.fineTuneCents;
     snapshotZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
+    snapshotZone.sampleEndFrame = options.sampleEndFrame;
     snapshot.zones.push_back(std::move(snapshotZone));
     drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
     snapshotGroup.groupId = "voice-group";
@@ -115,6 +117,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     preparedZone.fineTuneCents = options.fineTuneCents;
     preparedZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
+    preparedZone.sampleEndFrame = options.sampleEndFrame;
     prepared.zones.push_back(std::move(preparedZone));
     drs::engine::PreparedPlaybackGroupRoute preparedGroup;
     preparedGroup.groupId = "voice-group";
@@ -527,6 +530,24 @@ void runPagedBoundaryAndUnderrunMatrix()
     require(recordingSource->publicationCount.load(std::memory_order_relaxed) == 1
                 && recordingSource->lastRequestedFrame.load(std::memory_order_relaxed) == 11,
             "The voice must publish one bounded proactive look-ahead intent before leaving its head.");
+
+    auto boundedReadySource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
+        makePagedDescriptor(source.size()), std::vector<std::vector<float>> { source },
+        4, 4, std::vector<bool> { true, true });
+    auto boundedRecordingSource = std::make_shared<IntentRecordingSource>(boundedReadySource);
+    ModelOptions boundedOptions;
+    boundedOptions.sampleEndFrame = 7;
+    const auto boundedPagedModel = buildModel(
+        { source }, boundedOptions, boundedRecordingSource);
+    drs::engine::SamplerVoice boundedPaged;
+    require(boundedPaged.start(*boundedPagedModel, makeStart()),
+            "Bounded paged voice should start.");
+    StereoOutput boundedPagedOutput(8);
+    const auto boundedPagedResult = boundedPaged.render(boundedPagedOutput.view(), 0, 8);
+    require(boundedPagedResult.mixedFrameCount == 7 && boundedPagedResult.voiceFinished
+                && boundedRecordingSource->publicationCount.load(std::memory_order_relaxed) == 1
+                && boundedRecordingSource->lastRequestedFrame.load(std::memory_order_relaxed) == 6,
+            "Paged look-ahead and completion must clamp to the authored exclusive end.");
 
     auto recoveringSource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
         makePagedDescriptor(source.size()), std::vector<std::vector<float>> { source },

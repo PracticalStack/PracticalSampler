@@ -161,6 +161,7 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.loopStartFrame == preparedZone.loopStartFrame
         && snapshotZone.loopEndFrame == preparedZone.loopEndFrame
         && snapshotZone.loopMode == preparedZone.loopMode
+        && snapshotZone.sampleEndFrame == preparedZone.sampleEndFrame
         && snapshotZone.releaseSeconds == preparedZone.releaseSeconds
         && snapshotZone.releaseShape == preparedZone.releaseShape
         && snapshotZone.roundRobin == preparedZone.roundRobin
@@ -413,13 +414,19 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         if (!std::isfinite(zone.pan) || zone.pan < -1.0 || zone.pan > 1.0)
             addError(result, "render-model-pan-invalid", path + ".pan",
                      "Zone pan must be finite and normalized to -1 through 1.");
-        if (zone.sampleStartFrame >= sample.frameCount)
+        const auto playbackEndFrame = resolveSampleEndFrame(zone.sampleEndFrame, sample.frameCount);
+        if (zone.sampleEndFrame > sample.frameCount)
+            addError(result, "render-model-end-frame-invalid", path + ".sampleEndFrame",
+                     "Authored playback end must not exceed the retained source frame count.");
+        if (zone.sampleStartFrame >= playbackEndFrame)
             addError(result, "render-model-start-frame-invalid", path + ".sampleStartFrame",
-                     "Zone start frame must address retained decoded PCM.");
+                     "Zone start frame must precede the resolved exclusive playback end.");
         if (zone.loopEnabled
-            && (zone.loopStartFrame >= zone.loopEndFrame || zone.loopEndFrame > sample.frameCount))
+            && (zone.loopStartFrame < zone.sampleStartFrame
+                || zone.loopStartFrame >= zone.loopEndFrame
+                || zone.loopEndFrame > playbackEndFrame))
             addError(result, "render-model-loop-range-invalid", path + ".loopStartFrame",
-                     "Enabled loops require an ordered half-open range inside retained PCM.");
+                     "Enabled loops require an ordered half-open range inside the playback region.");
 
         const auto snapshotZoneEntry = snapshotZonesById.find(zone.zoneId);
         const auto* snapshotZone = snapshotZoneEntry == snapshotZonesById.end()
@@ -666,6 +673,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.controllerConditions,
                                   zone.damper });
         model->routes.back().loopMode = zone.loopMode;
+        model->routes.back().sampleEndFrame = zone.sampleEndFrame;
     }
     for (const auto& route : model->routes)
     {

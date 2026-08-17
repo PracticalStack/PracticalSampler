@@ -1,8 +1,10 @@
 #pragma once
 
 #include "drs/engine/ContinuousDamper.h"
+#include "drs/engine/PlaybackRegionContract.h"
 #include "drs/engine/VelocityCrossfade.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -51,6 +53,13 @@ inline RegionLoopMode effectiveRegionLoopMode(const RegionLoopMode mode,
 {
     return mode == RegionLoopMode::noLoop && legacyLoopEnabled
         ? RegionLoopMode::loopContinuous : mode;
+}
+
+inline std::uint64_t resolveSampleEndFrame(const std::uint64_t authoredEndFrame,
+                                           const std::uint64_t sourceFrameCount) noexcept
+{
+    return authoredEndFrame == 0
+        ? sourceFrameCount : std::min(authoredEndFrame, sourceFrameCount);
 }
 
 enum class RoundRobinMode : std::uint8_t
@@ -205,6 +214,7 @@ struct RuntimeProjectZoneDefinition
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
+    std::uint64_t sampleEndFrame = 0;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The
@@ -444,6 +454,7 @@ struct RuntimeZoneDefinition
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    std::uint64_t sampleEndFrame = 0;
 };
 
 struct RuntimeInstrumentModel

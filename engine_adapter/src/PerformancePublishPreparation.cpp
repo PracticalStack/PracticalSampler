@@ -43,6 +43,7 @@ bool zonesMatch(const PlaybackSnapshotZone& authored, const PreparedPlaybackZone
         && authored.loopStartFrame == prepared.loopStartFrame
         && authored.loopEndFrame == prepared.loopEndFrame
         && authored.loopMode == prepared.loopMode
+        && authored.sampleEndFrame == prepared.sampleEndFrame
         && authored.releaseSeconds == prepared.releaseSeconds
         && authored.releaseShape == prepared.releaseShape
         && authored.damper == prepared.damper
@@ -402,11 +403,14 @@ PerformancePublishPreparationResult validatePerformancePublishPreparationImpl(
             || sample.streamSampleId != zone.streamSampleId || stream.streamSampleId != zone.streamSampleId)
             addError(result, "publish-prepared-zone-binding-mismatch", path,
                      "Prepared zone bindings do not agree with their sample and stream handles.");
-        if (zone.sampleStartFrame >= sample.frameCount
-            || (zone.loopEnabled && (zone.loopStartFrame >= zone.loopEndFrame
-                                     || zone.loopEndFrame > sample.frameCount)))
+        const auto playbackEndFrame = resolveSampleEndFrame(zone.sampleEndFrame, sample.frameCount);
+        if (zone.sampleEndFrame > sample.frameCount
+            || zone.sampleStartFrame >= playbackEndFrame
+            || (zone.loopEnabled && (zone.loopStartFrame < zone.sampleStartFrame
+                                     || zone.loopStartFrame >= zone.loopEndFrame
+                                     || zone.loopEndFrame > playbackEndFrame)))
             addError(result, "publish-prepared-zone-range-invalid", path,
-                     "Prepared sample start and loop ranges must fit the decoded source.");
+                     "Prepared playback and loop ranges must fit the decoded source.");
     }
     for (std::size_t index = 0; index < snapshot.zones.size(); ++index)
     {

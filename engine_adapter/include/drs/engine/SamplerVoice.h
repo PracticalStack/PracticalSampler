@@ -133,6 +133,7 @@ private:
     const SamplerRenderRoute* route = nullptr;
     const SamplerRenderSample* sample = nullptr;
     double positionFrames = 0.0;
+    std::uint64_t playbackEndFrame = 0;
     double incrementFrames = 1.0;
     double outputSampleRate = 48000.0;
     float baseGain = 0.0f;

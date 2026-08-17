@@ -456,6 +456,8 @@ int main()
         require(defaultPreview.sampleRate == 44100.0, "Phase 2 default waveform fixture sample rate changed unexpectedly.");
         require(defaultPreview.channelCount == 2, "Phase 2 default waveform fixture channel count changed unexpectedly.");
         require(defaultPreview.frameCount == 44100, "Phase 2 default waveform fixture frame count changed unexpectedly.");
+        require(defaultPreview.playbackEndFrameExclusive == defaultPreview.frameCount,
+                "An omitted playback end must resolve to the physical source end in preview metadata.");
         require(!defaultPreview.points.empty(), "Phase 2 default waveform fixture should include preview points.");
         require(hasVisibleWaveform(defaultPreview),
                 "Phase 2 default waveform fixture should render visible waveform amplitude data.");
@@ -480,6 +482,8 @@ int main()
         require(loopPreview.sampleRate == 44100.0, "Looping Phase 2 waveform sample rate changed unexpectedly.");
         require(loopPreview.channelCount == 1, "Looping Phase 2 waveform channel count changed unexpectedly.");
         require(loopPreview.frameCount == 88200, "Looping Phase 2 waveform frame count changed unexpectedly.");
+        require(loopPreview.playbackEndFrameExclusive == loopPreview.frameCount,
+                "Legacy looping zones must preview through the physical source end.");
         require(!loopPreview.points.empty(), "Looping Phase 2 waveform preview should include preview points.");
         require(hasVisibleWaveform(loopPreview),
                 "Looping Phase 2 waveform preview should render visible waveform amplitude data.");
@@ -491,6 +495,17 @@ int main()
                 "Looping waveform preview should also avoid full-frame decode reads.");
         require(loopPreviewCounters.peakChunkReadCount > 0,
                 "Looping waveform preview should record bounded waveform peak chunk reads.");
+
+        auto boundedPreviewZone = *processor.getAuthoringSession().getSelectedZone();
+        boundedPreviewZone.sampleEndFrame = 30000;
+        require(processor.getAuthoringSession().updateSelectedZone(
+                    boundedPreviewZone, "Set preview playback end").applied,
+                "Waveform preview coverage must accept a non-destructive playback end edit.");
+        processor.authorizeAuthoringWaveformPreviewLoad();
+        drs::app::AuthoringWaveformPreview boundedPreview;
+        require(waitForWaveformPreviewReady(processor, boundedPreview)
+                    && boundedPreview.playbackEndFrameExclusive == 30000,
+                "Waveform preview metadata must expose the authored exclusive playback end.");
 
         const auto leadRender = renderSelectedZonePreview("lead-a4-sustain");
         const auto padRender = renderSelectedZonePreview("pad-a3-high");

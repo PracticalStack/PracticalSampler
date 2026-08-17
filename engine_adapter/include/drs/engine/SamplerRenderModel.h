@@ -177,6 +177,7 @@ struct SamplerRenderRoute
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
+    std::uint64_t sampleEndFrame = 0;
 };
 
 struct SamplerRenderModelBuildResult;

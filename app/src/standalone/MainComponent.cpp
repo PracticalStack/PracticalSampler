@@ -173,6 +173,19 @@ std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSche
         upgradedProject = damperMigration.project;
     }
 
+    if (upgradedProject.schemaVersion == drs::engine::continuousDamperProjectSchemaVersion
+        && upgradedProject.authoring.schemaVersion == drs::engine::continuousDamperAuthoringSchemaVersion)
+    {
+        const auto playbackRegionMigration =
+            drs::engine::migrateRuntimeProjectToPlaybackRegionSchema(upgradedProject);
+        if (!playbackRegionMigration.valid)
+        {
+            issues = playbackRegionMigration.issues;
+            return std::nullopt;
+        }
+        upgradedProject = playbackRegionMigration.project;
+    }
+
     return upgradedProject;
 }
 
@@ -2104,10 +2117,10 @@ drs::engine::RuntimeProjectModel MainComponent::buildUnloadedProjectState() cons
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 6;
+    project.schemaVersion = drs::engine::playbackRegionProjectSchemaVersion;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 5;
+    project.authoring.schemaVersion = drs::engine::playbackRegionAuthoringSchemaVersion;
     project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
@@ -2121,13 +2134,13 @@ drs::engine::RuntimeProjectModel MainComponent::buildEmptyProjectTemplate() cons
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = 6;
+    project.schemaVersion = drs::engine::playbackRegionProjectSchemaVersion;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
     project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
     project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = 5;
+    project.authoring.schemaVersion = drs::engine::playbackRegionAuthoringSchemaVersion;
     project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
     project.authoring.notes = { "Created in the standalone authoring shell." };
     project.notes = {

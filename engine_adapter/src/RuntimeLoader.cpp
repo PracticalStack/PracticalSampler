@@ -900,7 +900,8 @@ ordered_json serializeContinuousDamper(const ContinuousDamperDefinition& damper)
 ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones,
                                    bool useExplicitRoundRobin,
                                    bool usePerformanceRules,
-                                   bool useContinuousDamper)
+                                   bool useContinuousDamper,
+                                   bool usePlaybackRegion)
 {
     ordered_json array = ordered_json::array();
 
@@ -922,6 +923,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["pan"] = zone.pan;
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
+        if (usePlaybackRegion)
+            zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
@@ -1309,7 +1312,7 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
     if (project.schemaVersion >= 2
-        && project.schemaVersion <= continuousDamperProjectSchemaVersion)
+        && project.schemaVersion <= playbackRegionProjectSchemaVersion)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1432,6 +1435,12 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         zone.pan = *pan;
                     if (const auto sampleStartFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(zoneObject, result, "sampleStartFrame", context.c_str()))
                         zone.sampleStartFrame = *sampleStartFrame;
+                    if (project.schemaVersion >= playbackRegionProjectSchemaVersion)
+                    {
+                        if (const auto sampleEndFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(
+                                zoneObject, result, "sampleEndFrame", context.c_str()))
+                            zone.sampleEndFrame = *sampleEndFrame;
+                    }
                     if (const auto loopEnabled = readRequired<RuntimeProjectLoadResult, bool>(zoneObject, result, "loopEnabled", context.c_str()))
                         zone.loopEnabled = *loopEnabled;
                     if (const auto loopStartFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(zoneObject, result, "loopStartFrame", context.c_str()))
@@ -2042,9 +2051,14 @@ RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
     {
         for (std::size_t index = 0; index < instrument.zones.size(); ++index)
         {
+            const auto& zone = instrument.zones[index];
+            if (zone.sampleEndFrame != 0 && zone.sampleStartFrame >= zone.sampleEndFrame)
+                addFinding("runtime-zone-playback-region-invalid",
+                           "zones[" + std::to_string(index) + "].sampleEndFrame",
+                           "Runtime zones must keep sampleStartFrame before an authored sampleEndFrame.");
             std::string findingCode;
             std::string detail;
-            if (!validateContinuousDamperDefinition(instrument.zones[index].damper,
+            if (!validateContinuousDamperDefinition(zone.damper,
                                                      findingCode, detail))
                 addFinding(findingCode, "zones[" + std::to_string(index) + "].damper", detail);
         }
@@ -2348,9 +2362,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
     if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3
         && project.schemaVersion != 4 && project.schemaVersion != 5 && project.schemaVersion != 6
-        && project.schemaVersion != continuousDamperProjectSchemaVersion)
+        && project.schemaVersion != continuousDamperProjectSchemaVersion
+        && project.schemaVersion != playbackRegionProjectSchemaVersion)
     {
-        addIssue(result, "Project schemaVersion must be 1, 2, 3, 4, 5, 6, or 7.");
+        addIssue(result, "Project schemaVersion must be between 1 and 8.");
     }
 
     if (project.projectId.empty())
@@ -2385,7 +2400,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= continuousDamperProjectSchemaVersion)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= playbackRegionProjectSchemaVersion)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -2409,6 +2424,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         if (project.schemaVersion == continuousDamperProjectSchemaVersion
             && authoring.schemaVersion != continuousDamperAuthoringSchemaVersion)
             addIssue(result, "Project authoring schemaVersion must be 6 for schemaVersion 7 projects.");
+        if (project.schemaVersion == playbackRegionProjectSchemaVersion
+            && authoring.schemaVersion != playbackRegionAuthoringSchemaVersion)
+            addIssue(result, "Project authoring schemaVersion must be 7 for schemaVersion 8 projects.");
 
         if (!std::isfinite(authoring.masterGainDb))
             addIssue(result, "Project authoring masterGainDb must be finite.");
@@ -2528,6 +2546,12 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
             if (zone.loopEnabled && zone.loopStartFrame >= zone.loopEndFrame)
                 addIssue(result, "Project zone '" + zone.id + "' has loopStartFrame greater than loopEndFrame.");
+            if (zone.sampleEndFrame != 0 && zone.sampleStartFrame >= zone.sampleEndFrame)
+                addIssue(result, "Project zone '" + zone.id + "' must keep sampleStartFrame before sampleEndFrame.");
+            if (zone.sampleEndFrame != 0 && zone.loopEnabled
+                && (zone.loopStartFrame < zone.sampleStartFrame
+                    || zone.loopEndFrame > zone.sampleEndFrame))
+                addIssue(result, "Project zone '" + zone.id + "' must keep its enabled loop inside the playback region.");
 
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, "Project zone '" + zone.id + "' must not have a negative releaseSeconds.");
@@ -3173,6 +3197,43 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToContinuousDamperSchema(
     return result;
 }
 
+RuntimeProjectMigrationResult migrateRuntimeProjectToPlaybackRegionSchema(
+    const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project playback-region migration failed";
+    if (project.schemaVersion == playbackRegionProjectSchemaVersion
+        && project.authoring.schemaVersion == playbackRegionAuthoringSchemaVersion)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid ? "Project already uses the playback-region schema"
+                                        : validation.state;
+        return result;
+    }
+    if (project.schemaVersion != continuousDamperProjectSchemaVersion
+        || project.authoring.schemaVersion != continuousDamperAuthoringSchemaVersion)
+    {
+        addIssue(result, "Only Project schemaVersion 7 with authoring schemaVersion 6 can migrate to the playback-region schema.");
+        return result;
+    }
+
+    result.project = project;
+    result.project.schemaVersion = playbackRegionProjectSchemaVersion;
+    result.project.authoring.schemaVersion = playbackRegionAuthoringSchemaVersion;
+    for (auto& zone : result.project.authoring.zones)
+        zone.sampleEndFrame = 0;
+    const auto validation = validateRuntimeProjectModel(result.project);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to the playback-region schema"
+                                    : validation.state;
+    return result;
+}
+
 RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawText,
                                                          const std::string& manifestPath,
                                                          const bool validateReferencedPaths)
@@ -3526,6 +3587,12 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             {
                 zone.sampleStartFrame = *sampleStartFrame;
             }
+            if (instrument.schemaVersion >= playbackRegionInstrumentSchemaVersion)
+            {
+                if (const auto sampleEndFrame = readRequired<RuntimeManifestLoadResult, std::uint64_t>(
+                        zoneObject, result, "sampleEndFrame", context.c_str()))
+                    zone.sampleEndFrame = *sampleEndFrame;
+            }
 
             if (const auto streamOffsetBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "streamOffsetBytes", context.c_str()))
                 zone.streamOffsetBytes = *streamOffsetBytes;
@@ -3643,6 +3710,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, context + " must not have a negative releaseSeconds.");
+            if (zone.sampleEndFrame != 0 && zone.sampleStartFrame >= zone.sampleEndFrame)
+                addIssue(result, context + " must keep sampleStartFrame before sampleEndFrame.");
             if (!std::isfinite(zone.releaseShape))
                 addIssue(result, context + " field 'releaseShape' must be finite.");
             if (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion)
@@ -3864,8 +3933,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
 
     if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2
         && instrument.schemaVersion != 3 && instrument.schemaVersion != 4
-        && instrument.schemaVersion != continuousDamperInstrumentSchemaVersion)
-        addIssue(result, "Manifest schemaVersion must be 1, 2, 3, 4, or 5.");
+        && instrument.schemaVersion != continuousDamperInstrumentSchemaVersion
+        && instrument.schemaVersion != playbackRegionInstrumentSchemaVersion)
+        addIssue(result, "Manifest schemaVersion must be between 1 and 6.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -3971,7 +4041,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         }
         authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3,
                                                      project.schemaVersion >= 6,
-                                                     project.schemaVersion >= continuousDamperProjectSchemaVersion);
+                                                     project.schemaVersion >= continuousDamperProjectSchemaVersion,
+                                                     project.schemaVersion >= playbackRegionProjectSchemaVersion);
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
@@ -4070,6 +4141,8 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
             zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
+        if (instrument.schemaVersion >= playbackRegionInstrumentSchemaVersion)
+            zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;

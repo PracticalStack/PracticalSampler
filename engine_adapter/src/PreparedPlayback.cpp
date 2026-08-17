@@ -324,6 +324,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["loopMode"] = regionLoopModeName(zone.loopMode);
+        zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
         ordered_json damperCurve = ordered_json::array();
@@ -1544,6 +1545,23 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                        "Prepared playback could not bind zone '" + zone.id + "' to a prepared sample handle.");
             continue;
         }
+        const auto& preparedSample = result.prepared.samples[sampleIterator->second];
+        const auto playbackEndFrame = resolveSampleEndFrame(zone.sampleEndFrame,
+                                                             preparedSample.frameCount);
+        if (zone.sampleEndFrame > preparedSample.frameCount
+            || zone.sampleStartFrame >= playbackEndFrame
+            || (zone.loopEnabled
+                && (zone.loopStartFrame < zone.sampleStartFrame
+                    || zone.loopStartFrame >= zone.loopEndFrame
+                    || zone.loopEndFrame > playbackEndFrame)))
+        {
+            addFinding(result,
+                       PlaybackSnapshotFindingSeverity::error,
+                       "invalid-prepared-playback-region",
+                       "zones[" + std::to_string(index) + "].sampleEndFrame",
+                       "Prepared playback requires a non-empty playback region with any enabled loop fully contained inside it.");
+            continue;
+        }
 
         result.prepared.zones.push_back({
             zone.id,
@@ -1576,6 +1594,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             zone.damper
         });
         result.prepared.zones.back().loopMode = zone.loopMode;
+        result.prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
     }
 
     std::unordered_set<std::string> preparedZoneIds;
@@ -2494,6 +2513,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopStartFrame"] = zone.loopStartFrame;
         value["loopEndFrame"] = zone.loopEndFrame;
         value["loopMode"] = regionLoopModeName(zone.loopMode);
+        value["sampleEndFrame"] = zone.sampleEndFrame;
         value["releaseSeconds"] = zone.releaseSeconds;
         value["releaseShape"] = zone.releaseShape;
         if (zone.roundRobin.has_value())
@@ -2540,6 +2560,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopStartFrame"] = handle.loopStartFrame;
         value["loopEndFrame"] = handle.loopEndFrame;
         value["loopMode"] = regionLoopModeName(handle.loopMode);
+        value["sampleEndFrame"] = handle.sampleEndFrame;
         value["releaseSeconds"] = handle.releaseSeconds;
         value["releaseShape"] = handle.releaseShape;
         if (handle.roundRobin.has_value())
@@ -2798,6 +2819,7 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.loopStartFrame == right.loopStartFrame
         && left.loopEndFrame == right.loopEndFrame
         && left.loopMode == right.loopMode
+        && left.sampleEndFrame == right.sampleEndFrame
         && left.releaseSeconds == right.releaseSeconds
         && left.releaseShape == right.releaseShape
         && left.roundRobin == right.roundRobin

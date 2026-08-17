@@ -1223,6 +1223,7 @@ std::vector<AuthoringZoneSummary> buildZoneSummaries(const RuntimeProjectModel& 
         summary.pan = zone.pan;
         summary.loopEnabled = zone.loopEnabled;
         summary.loopMode = zone.loopMode;
+        summary.sampleEndFrame = zone.sampleEndFrame;
         summary.roundRobin = zone.roundRobin;
         summary.roundRobinLength = zone.roundRobinLength;
         summary.roundRobinPosition = zone.roundRobinPosition;
@@ -2909,6 +2910,17 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
         // appended. Reserve 7/6 inside this one final validated document commit.
         project.schemaVersion = continuousDamperProjectSchemaVersion;
         project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    }
+    if (project.schemaVersion == 6 && project.authoring.schemaVersion == 5)
+    {
+        project.schemaVersion = continuousDamperProjectSchemaVersion;
+        project.authoring.schemaVersion = continuousDamperAuthoringSchemaVersion;
+    }
+    if (project.schemaVersion == continuousDamperProjectSchemaVersion
+        && project.authoring.schemaVersion == continuousDamperAuthoringSchemaVersion)
+    {
+        project.schemaVersion = playbackRegionProjectSchemaVersion;
+        project.authoring.schemaVersion = playbackRegionAuthoringSchemaVersion;
     }
     std::vector<std::pair<std::string, RoundRobinMode>> enabledGroups;
     for (const auto& group : project.authoring.groups)

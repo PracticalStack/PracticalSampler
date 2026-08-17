@@ -43,6 +43,7 @@ struct AuthoringWaveformPreview
     bool loopEnabled = false;
     drs::engine::RegionLoopMode loopMode = drs::engine::RegionLoopMode::noLoop;
     std::uint64_t playbackStartFrame = 0;
+    std::uint64_t playbackEndFrameExclusive = 0;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
     double releaseSeconds = 0.0;

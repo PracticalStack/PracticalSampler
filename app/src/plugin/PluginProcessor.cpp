@@ -697,6 +697,7 @@ std::string buildSelectedZonePreviewFingerprint(
         + "|" + std::to_string(zone.velocityCrossfade.fadeOutHighVelocity)
         + "|" + std::to_string(zone.gainDb) + "|" + std::to_string(zone.pan)
         + "|" + std::to_string(zone.sampleStartFrame)
+        + "|" + std::to_string(zone.sampleEndFrame)
         + "|" + std::to_string(zone.loopEnabled)
         + "|" + std::to_string(static_cast<int>(zone.loopMode))
         + "|" + std::to_string(static_cast<int>(zone.triggerMode))
@@ -1595,6 +1596,8 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
         preview.loopMode = drs::engine::effectiveRegionLoopMode(selectedZone->loopMode,
                                                                 selectedZone->loopEnabled);
         preview.playbackStartFrame = selectedZone->sampleStartFrame;
+        preview.playbackEndFrameExclusive = drs::engine::resolveSampleEndFrame(
+            selectedZone->sampleEndFrame, preview.frameCount);
         preview.loopStartFrame = selectedZone->loopStartFrame;
         preview.loopEndFrame = selectedZone->loopEndFrame;
         preview.releaseSeconds = selectedZone->releaseSeconds;

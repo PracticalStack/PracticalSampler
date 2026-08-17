@@ -433,12 +433,19 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || zone.damper.sustainControllerNumber != legacySustainControllerNumber
                 || zone.damper.sustainThreshold != legacySustainThreshold;
         });
+    const auto requiresPlaybackRegionInstrumentSchema = std::any_of(
+        plan.zones.begin(), plan.zones.end(), [](const RuntimeCompileZoneDefinition& zone)
+        {
+            return zone.sampleEndFrame != 0;
+        });
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = requiresContinuousDamperInstrumentSchema
+    result.instrument.schemaVersion = requiresPlaybackRegionInstrumentSchema
+        ? playbackRegionInstrumentSchemaVersion
+        : (requiresContinuousDamperInstrumentSchema
         ? continuousDamperInstrumentSchemaVersion
         : (requiresFxRoutingInstrumentSchema ? runtimeInstrumentFxRoutingSchemaVersion
             : (requiresPerformanceInstrumentSchema ? 3
-                : (requiresExtendedInstrumentSchema ? 2 : 1)));
+                : (requiresExtendedInstrumentSchema ? 2 : 1))));
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -488,6 +495,12 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
 
         if (zonePlan.velocityLow > zonePlan.velocityHigh)
             addIssue(result, "Zone '" + zonePlan.id + "' has velocityLow greater than velocityHigh.");
+        const auto sourceFrameCount = sourceIterator->second.metadata.frameCount;
+        if (zonePlan.sampleStartFrame >= resolveSampleEndFrame(zonePlan.sampleEndFrame,
+                                                               sourceFrameCount))
+            addIssue(result, "Zone '" + zonePlan.id + "' has an empty or out-of-range playback region.");
+        if (zonePlan.sampleEndFrame > sourceFrameCount)
+            addIssue(result, "Zone '" + zonePlan.id + "' has sampleEndFrame beyond its source length.");
         if (zonePlan.damper.dynamicRelease
             || zonePlan.damper.sustainControllerNumber != legacySustainControllerNumber
             || zonePlan.damper.sustainThreshold != legacySustainThreshold)
@@ -636,6 +649,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.velocityCrossfade = zonePlan.velocityCrossfade;
         zone.gainDb = zonePlan.gainDb;
         zone.sampleStartFrame = zonePlan.sampleStartFrame;
+        zone.sampleEndFrame = zonePlan.sampleEndFrame;
         zone.releaseSeconds = zonePlan.releaseSeconds;
         zone.releaseShape = zonePlan.releaseShape;
         zone.streamOffsetBytes = streamOffsetBySourceId.at(zonePlan.sourceId);

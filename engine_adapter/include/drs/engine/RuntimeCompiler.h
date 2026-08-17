@@ -47,6 +47,7 @@ struct RuntimeCompileZoneDefinition
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    std::uint64_t sampleEndFrame = 0;
 };
 
 struct RuntimeCompilePlan

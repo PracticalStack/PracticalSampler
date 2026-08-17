@@ -53,6 +53,7 @@ struct ModelSpec
     double gainDb = 0.0;
     double pan = 0.0;
     std::uint64_t sampleStartFrame = 0;
+    std::uint64_t sampleEndFrame = 0;
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
@@ -127,6 +128,7 @@ drs::engine::SamplerRenderModelPtr makeGroupedModel(const std::string& id,
         snapshotZone.gainDb = spec.gainDb;
         snapshotZone.pan = spec.pan;
         snapshotZone.sampleStartFrame = spec.sampleStartFrame;
+        snapshotZone.sampleEndFrame = spec.sampleEndFrame;
         snapshotZone.loopEnabled = spec.loopEnabled;
         snapshotZone.loopStartFrame = spec.loopStartFrame;
         snapshotZone.loopEndFrame = spec.loopEndFrame;
@@ -157,6 +159,7 @@ drs::engine::SamplerRenderModelPtr makeGroupedModel(const std::string& id,
         preparedZone.gainDb = spec.gainDb;
         preparedZone.pan = spec.pan;
         preparedZone.sampleStartFrame = spec.sampleStartFrame;
+        preparedZone.sampleEndFrame = spec.sampleEndFrame;
         preparedZone.loopEnabled = spec.loopEnabled;
         preparedZone.loopStartFrame = spec.loopStartFrame;
         preparedZone.loopEndFrame = spec.loopEndFrame;
@@ -315,6 +318,16 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
                 && completion.summary.finishedVoiceCount == 1,
             "Sample completion should finish exactly one voice.");
     artifacts.push_back(std::move(completion));
+
+    ModelSpec boundedSample { { { 1.0f, 0.5f, 0.25f, 99.0f, 100.0f } } };
+    boundedSample.sampleEndFrame = 3;
+    const auto boundedCompletion = render(
+        "playback-region-completion", boundedSample, 5, { noteOn(0) });
+    requireFrame(boundedCompletion, 0, 2, 0.25, "Playback-region final frame");
+    requireFrame(boundedCompletion, 0, 3, 0.0, "Playback-region post-end silence");
+    require(boundedCompletion.summary.counters.completedVoiceCount == 1
+                && boundedCompletion.summary.finishedVoiceCount == 1,
+            "Offline playback must complete exactly at the authored exclusive end.");
 
     auto accumulation = render("mixed-accumulation", constant, 4,
                                { noteOn(0), noteOn(0) });

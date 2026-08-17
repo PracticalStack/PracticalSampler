@@ -246,6 +246,37 @@ int main()
                     && valid.publishResult.preparedMacroSchemaDigest == fixture.identity.macroSchemaDigest,
                 "The eligible result must carry every immutable conformance digest.");
 
+        auto boundedSnapshot = fixture.snapshot;
+        boundedSnapshot.snapshot.zones[1].sampleEndFrame = 112;
+        boundedSnapshot.snapshot.contentDigest = computePlaybackSnapshotContentDigest(
+            boundedSnapshot.snapshot);
+        auto boundedPrepared = fixture.prepared;
+        boundedPrepared.prepared.snapshotContentDigest = boundedSnapshot.snapshot.contentDigest;
+        boundedPrepared.prepared.zones[1].sampleEndFrame = 112;
+        boundedPrepared.prepared.routeDigest = computePreparedPlaybackRouteDigest(
+            boundedSnapshot.snapshot, boundedPrepared.prepared);
+        boundedPrepared.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(
+            boundedPrepared.prepared);
+        auto boundedIdentity = fixture.identity;
+        boundedIdentity.authoredContentDigest = boundedSnapshot.snapshot.contentDigest;
+        const auto boundedResult = validatePerformancePublishPreparation(
+            boundedIdentity, boundedSnapshot, boundedPrepared);
+        require(boundedResult.completeProject && boundedResult.activationEligible
+                    && boundedResult.findings.empty(),
+                "A playback end containing the authored loop must remain publish-eligible.");
+
+        auto invalidBoundedPrepared = boundedPrepared;
+        invalidBoundedPrepared.prepared.zones[1].sampleEndFrame = 80;
+        invalidBoundedPrepared.prepared.routeDigest = computePreparedPlaybackRouteDigest(
+            boundedSnapshot.snapshot, invalidBoundedPrepared.prepared);
+        invalidBoundedPrepared.prepared.preparedContentDigest = computePreparedPlaybackContentDigest(
+            invalidBoundedPrepared.prepared);
+        const auto invalidBoundedResult = validatePerformancePublishPreparation(
+            boundedIdentity, boundedSnapshot, invalidBoundedPrepared);
+        require(!invalidBoundedResult.activationEligible
+                    && containsCode(invalidBoundedResult, "publish-prepared-zone-range-invalid"),
+                "Publish preparation must reject a loop that crosses the playback end.");
+
         auto paged = fixture.prepared;
         for (auto& sample : paged.prepared.samples)
         {

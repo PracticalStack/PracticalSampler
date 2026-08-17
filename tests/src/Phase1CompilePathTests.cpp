@@ -2,6 +2,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
+#include "drs/engine/PlaybackRegionContract.h"
 
 #include <json/json.hpp>
 
@@ -350,6 +351,34 @@ int main(const int argc, char** argv)
 
         auto tempCompile = drs::engine::compileRuntimeInstrument(tempCompilePlan);
         require(tempCompile.compiled, "Temp compile plan should compile successfully.");
+
+        auto playbackRegionPlan = tempCompilePlan;
+        playbackRegionPlan.zones.front().sampleStartFrame = 10;
+        playbackRegionPlan.zones.front().sampleEndFrame = 100;
+        const auto playbackRegionCompile = drs::engine::compileRuntimeInstrument(playbackRegionPlan);
+        require(playbackRegionCompile.compiled
+                    && playbackRegionCompile.instrument.schemaVersion
+                        == drs::engine::playbackRegionInstrumentSchemaVersion
+                    && playbackRegionCompile.instrument.zones.front().sampleStartFrame == 10
+                    && playbackRegionCompile.instrument.zones.front().sampleEndFrame == 100,
+                "Runtime compilation must retain authored playback bounds in instrument schema 6.");
+        const auto playbackRegionInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(
+            playbackRegionCompile.instrument, playbackRegionPlan.outputInstrumentPath);
+        const auto playbackRegionInstrumentRoundTrip = drs::engine::parseRuntimeInstrumentManifest(
+            playbackRegionInstrumentJson, playbackRegionPlan.outputInstrumentPath, false);
+        require(playbackRegionInstrumentRoundTrip.loaded
+                    && playbackRegionInstrumentRoundTrip.instrument.zones.front().sampleEndFrame == 100,
+                "Packaged runtime-instrument serialization must round-trip the playback end.");
+
+        auto maxBoundaryPlan = tempCompilePlan;
+        maxBoundaryPlan.zones.front().sampleEndFrame
+            = maxBoundaryPlan.sampleSources.front().metadata.frameCount;
+        require(drs::engine::compileRuntimeInstrument(maxBoundaryPlan).compiled,
+                "The physical source frame count must remain the maximum legal exclusive boundary.");
+        auto beyondBoundaryPlan = maxBoundaryPlan;
+        ++beyondBoundaryPlan.zones.front().sampleEndFrame;
+        require(!drs::engine::compileRuntimeInstrument(beyondBoundaryPlan).compiled,
+                "Runtime compilation must reject playback ends beyond the physical source.");
 
         runPackagedFxRoutingCompileContract(compileOutputDirectory);
 

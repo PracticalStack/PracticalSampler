@@ -606,6 +606,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["loopMode"] = regionLoopModeName(zone.loopMode);
+        zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
         ordered_json damperCurve = ordered_json::array();
@@ -1309,6 +1310,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.damper
         });
         result.snapshot.zones.back().loopMode = zone.loopMode;
+        result.snapshot.zones.back().sampleEndFrame = zone.sampleEndFrame;
 
         if (!zone.articulationId.empty())
         {

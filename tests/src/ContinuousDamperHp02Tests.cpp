@@ -170,9 +170,9 @@ void verifyInstrumentAndPackageRoundTrip(const RuntimeProjectModel& project,
     const auto projectPath = tempRoot / "hp02.drsproj";
     const auto instrument = drs::app::buildInstrumentManifestForProject(
         project, juce::File(projectPath.generic_string()));
-    require(instrument.schemaVersion == continuousDamperInstrumentSchemaVersion
+    require(instrument.schemaVersion == playbackRegionInstrumentSchemaVersion
                 && !instrument.zones.empty() && instrument.zones.front().damper.dynamicRelease,
-            "Schema-7 projects must emit runtime instrument schema 5 with damper metadata");
+            "Current playback-region projects must emit runtime instrument schema 6 with damper metadata");
 
     const auto instrumentPath = tempRoot / "hp02.drinst";
     const auto serialized = serializeRuntimeInstrumentManifest(instrument,
@@ -180,10 +180,10 @@ void verifyInstrumentAndPackageRoundTrip(const RuntimeProjectModel& project,
     const auto parsed = parseRuntimeInstrumentManifest(serialized,
                                                         instrumentPath.generic_string(), false);
     require(parsed.loaded && parsed.instrument.zones.front().damper == instrument.zones.front().damper,
-            "Runtime instrument 5 must round-trip exact damper metadata: " + join(parsed.issues));
+            "Runtime instrument 6 must round-trip exact damper metadata: " + join(parsed.issues));
     require(serializeRuntimeInstrumentManifest(parsed.instrument, instrumentPath.generic_string())
                 == serialized,
-            "Runtime instrument 5 serialization must be byte deterministic");
+            "Runtime instrument 6 serialization must be byte deterministic");
 
     PerformancePackageWritePlan writePlan;
     writePlan.outputPackagePath = (tempRoot / "hp02.drpkg").generic_string();
@@ -196,7 +196,7 @@ void verifyInstrumentAndPackageRoundTrip(const RuntimeProjectModel& project,
         std::vector<std::uint8_t>(serialized.begin(), serialized.end())
     });
     const auto written = writePerformancePackage(writePlan);
-    require(written.written, "The unchanged package container must carry instrument schema 5");
+    require(written.written, "The unchanged package container must carry instrument schema 6");
     const auto inspected = inspectPerformancePackage(writePlan.outputPackagePath);
     require(inspected.valid, "The HP-02 package must reopen and authenticate");
     const auto payload = std::find_if(inspected.payloads.begin(), inspected.payloads.end(),
@@ -262,9 +262,9 @@ int main()
         AuthoringSession session(baseProject);
         const auto applied = applySfzImportProjection(session, projection, "Import HP-02 fixture");
         require(applied.applied
-                    && session.getProject().schemaVersion == continuousDamperProjectSchemaVersion
-                    && session.getProject().authoring.schemaVersion == continuousDamperAuthoringSchemaVersion,
-                "Applying damper content must atomically migrate project 6/authoring 5 to 7/6");
+                    && session.getProject().schemaVersion == playbackRegionProjectSchemaVersion
+                    && session.getProject().authoring.schemaVersion == playbackRegionAuthoringSchemaVersion,
+                "Applying imported content must atomically advance through damper schema 7/6 to playback-region schema 8/7");
         const auto projectJson = serializeRuntimeProjectManifest(session.getProject(),
                                                                  (fs::path(DRS_HP02_FIXTURE_ROOT) / "hp02.drsproj").generic_string());
         const auto reloadedProject = parseRuntimeProjectManifest(projectJson,
@@ -272,7 +272,7 @@ int main()
                                                                   false);
         require(reloadedProject.loaded
                     && reloadedProject.project.authoring.zones.front().damper == damper,
-                "Project schema 7 must round-trip exact damper metadata");
+                "Current project schema must round-trip exact damper metadata");
 
         verifyProjectSnapshotAndPreparedPropagation(damper);
         const auto tempRoot = fs::temp_directory_path() / "drs-hp02-tests";
