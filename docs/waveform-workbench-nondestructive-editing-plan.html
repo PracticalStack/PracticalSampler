@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - SFZ Non-Destructive Region Import and Authoring Implementation Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --blue-soft: #deedf1;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+
+    a { color: var(--blue); }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1, h2, h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+    h1 { max-width: 1120px; margin-bottom: 18px; font-size: clamp(2.35rem, 5vw, 4.65rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    h4 { margin-bottom: 7px; font-size: 0.97rem; letter-spacing: 0.02em; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code {
+      padding: 0.12em 0.35em;
+      border-radius: 5px;
+      color: #26343c;
+      background: #e9edeb;
+      font: 0.9em "Cascadia Code", Consolas, monospace;
+    }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 48px;
+      border-radius: 27px;
+      color: #fffaf3;
+      background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2));
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "SFZ REGION";
+      position: absolute;
+      right: 18px;
+      bottom: -32px;
+      color: rgba(255, 255, 255, 0.042);
+      font: 700 7rem/1 Georgia, serif;
+      pointer-events: none;
+    }
+    .eyebrow, .section-label {
+      display: inline-block;
+      margin-bottom: 10px;
+      color: #efc39f;
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 1020px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+
+    .summary-grid, .grid-2, .grid-3, .grid-4, .gate-grid { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .gate-grid { grid-template-columns: 1.15fr 0.85fr; }
+
+    .toc, .section, .phase, .callout {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .phase { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.violet { border-top: 4px solid var(--violet); }
+
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+
+    .flow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 164px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+
+    .wireframe { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #f4f1ea; }
+    .wire-toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; color: #fff; background: var(--charcoal); }
+    .wire-control { padding: 5px 9px; border: 1px solid rgba(255,255,255,0.18); border-radius: 7px; background: rgba(255,255,255,0.08); font-size: 0.78rem; }
+    .wire-wave { position: relative; min-height: 190px; padding: 70px 18px; color: var(--blue); background: repeating-linear-gradient(90deg, transparent 0 89px, rgba(37,50,56,0.07) 90px), linear-gradient(#fffdf8, #f7f3eb); text-align: center; }
+    .wire-wave::before { content: ""; position: absolute; left: 12%; right: 18%; top: 42px; bottom: 42px; border-left: 4px solid var(--green); border-right: 4px solid var(--green); background: rgba(36,113,94,0.08); }
+    .wire-wave::after { content: "LOOP REGION"; position: absolute; left: 38%; right: 39%; top: 55px; bottom: 55px; display: grid; place-items: center; border-left: 3px solid var(--brown); border-right: 3px solid var(--brown); color: var(--brown); background: rgba(138,70,21,0.11); font-size: 0.72rem; font-weight: 850; }
+    .wire-footer { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border-top: 1px solid var(--line); background: var(--line); }
+    .wire-footer div { padding: 10px 12px; background: var(--surface); font-size: 0.78rem; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 980px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242, 238, 230, 0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: var(--red-soft); }
+    .status.should { color: var(--amber); background: var(--amber-soft); }
+    .status.later { color: var(--violet); background: var(--violet-soft); }
+
+    .phase { overflow: hidden; padding: 0; }
+    .phase-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .phase-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .phase-head h2 { margin: 0; font-size: 1.65rem; }
+    .phase-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .phase-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .phase-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+
+    .timeline { display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)); gap: 6px; margin-top: 16px; overflow-x: auto; }
+    .timeline div { min-width: 110px; padding: 12px 7px; border-radius: 10px; color: #fff; background: var(--blue); font-size: 0.75rem; font-weight: 800; text-align: center; }
+    .timeline div:nth-child(-n+2) { background: var(--brown); }
+    .timeline div:nth-child(n+3):nth-child(-n+5) { background: var(--green); }
+    .timeline div:nth-child(n+6) { background: var(--violet); }
+
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+
+    @media (max-width: 1160px) {
+      .summary-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .gate-grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(4, 1fr); }
+      .flow-step:nth-child(4)::after { display: none; }
+      .toc ol { columns: 2; }
+    }
+    @media (max-width: 700px) {
+      .page { width: calc(100% - 22px); padding-top: 18px; }
+      .hero, .section { padding: 25px 22px; }
+      .summary-grid, .grid-3, .grid-4, .flow, .wire-footer { grid-template-columns: 1fr; }
+      .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; }
+      .flow-step:nth-child(4)::after { display: block; }
+      .toc ol { columns: 1; }
+      .phase-head { grid-template-columns: auto 1fr; }
+      .phase-focus { grid-column: 2; text-align: left; }
+      .phase-body { padding: 20px; }
+      .hero::after { display: none; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero, .toc, .section, .phase { box-shadow: none; }
+      .phase, .card, .callout, table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Implementation Plan | August 17, 2026</span>
+      <h1>SFZ Non-Destructive Region Import and Authoring Plan</h1>
+      <p class="lede">
+        This plan makes SFZ non-destructive sample-region semantics first-class Practical Sampler authoring
+        features. Practical Sampler will import SFZ playback boundaries and loop behavior accurately, compile
+        them into its native project and runtime models, and expose them through a responsive Waveform workbench.
+        Creators can then refine the imported instrument, add Practical Sampler DSP, macros, routing, and future
+        native capabilities without modifying or replacing the source audio. This is a one-way conversion and
+        authoring workflow; customer-facing SFZ export is not a product goal.
+      </p>
+      <div class="meta">
+        <span class="chip">Product frame: SFZ-first import</span>
+        <span class="chip">Authoring model: non-destructive</span>
+        <span class="chip">Scope: selected zone</span>
+        <span class="chip">Source WAV bytes: immutable</span>
+        <span class="chip">Delivery: project + playable package</span>
+        <span class="chip">Loop ranges: half-open frames</span>
+        <span class="chip">SFZ export: out of scope</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <strong>7</strong>
+          <span>Phased implementation gates</span>
+        </div>
+        <div class="summary-card">
+          <strong>5</strong>
+          <span>Portable SFZ v1 region opcodes in the baseline</span>
+        </div>
+        <div class="summary-card">
+          <strong>1</strong>
+          <span>Undo record per completed edit gesture</span>
+        </div>
+        <div class="summary-card">
+          <strong>0</strong>
+          <span>Source-audio writes permitted</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#goal">Goal and Product Frame</a></li>
+        <li><a href="#baseline">Current Codebase Baseline</a></li>
+        <li><a href="#decisions">Locked Product Decisions</a></li>
+        <li><a href="#experience">Target Editing Experience</a></li>
+        <li><a href="#contracts">Data and Runtime Contracts</a></li>
+        <li><a href="#architecture">Target Architecture</a></li>
+        <li><a href="#workstreams">Workstreams and Ownership</a></li>
+        <li><a href="#phases">Phased Implementation</a></li>
+        <li><a href="#validation">Validation Matrix</a></li>
+        <li><a href="#future-testing">Future Audible-Parity Testing</a></li>
+        <li><a href="#risks">Risks and Guardrails</a></li>
+        <li><a href="#gates">Release Gates</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="goal">
+      <span class="section-label">01 | Product frame</span>
+      <div class="heading"><h2>Goal and boundaries</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Creator outcome</h3>
+          <p>A creator imports an SFZ instrument, sees its effective playback and loop regions, and can visually refine those same musical semantics as native Practical Sampler authoring data.</p>
+        </article>
+        <article class="card good">
+          <h3>Engineering outcome</h3>
+          <p>SFZ <code>offset</code>, <code>end</code>, <code>loop_mode</code>, <code>loop_start</code>, and <code>loop_end</code> resolve into typed, testable project and runtime contracts with an authoring surface and package parity.</p>
+        </article>
+        <article class="card warn">
+          <h3>Explicit non-goal</h3>
+          <p>This initiative does not export SFZ, crop or overwrite source audio, or constrain native DSP, macros, and routing to what SFZ can represent. Practical Sampler is the destination format.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Core product rule</h3>
+        <p>When SFZ already defines a non-destructive region behavior, Practical Sampler implements that semantic contract first and exposes it in authoring. After import, the value is native Practical Sampler project data and may participate in richer DSP, macro, routing, and package workflows.</p>
+      </div>
+      <div class="callout decision">
+        <h3>One-way conversion rule</h3>
+        <p>The supported path is <strong>SFZ → Practical Sampler project → playable Practical Sampler package</strong>. SFZ header inheritance must be resolved correctly during import, but source formatting, comments, include layout, and opcode placement do not need to be retained for re-export.</p>
+      </div>
+      <div class="callout warning">
+        <h3>Repository rule</h3>
+        <p>All new work, tests, documentation, and migration logic land in <code>PracticalSampler</code>. Existing <code>drs</code> C++ namespaces and artifact extensions remain unchanged unless a separate naming initiative explicitly replaces them.</p>
+      </div>
+    </section>
+
+    <section class="section" id="baseline">
+      <span class="section-label">02 | Ground truth</span>
+      <div class="heading"><h2>Current codebase baseline</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Area</th><th>Current behavior</th><th>Consequence for this initiative</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">Waveform view</td>
+              <td><code>WaveformDetailView</code> paints min/max peak lines, a center line, and two loop markers. It has no mouse, keyboard, viewport, selection, playhead, or editing behavior.</td>
+              <td>Replace the passive paint-only contract with a dedicated view model and interaction controller while preserving JUCE component accessibility.</td>
+            </tr>
+            <tr>
+              <td class="id">Peak generation</td>
+              <td><code>buildWaveformPeaks</code> reads the source in bounded chunks and reduces it to a fixed default of 192 display points. The background service supports cancellation, supersession, progress, and source identity.</td>
+              <td>Retain the qualified worker lifecycle and bounded I/O, but add visible-range and level-of-detail requests suitable for zooming.</td>
+            </tr>
+            <tr>
+              <td class="id">Authored zone fields</td>
+              <td>The project model persists <code>sampleStartFrame</code>, <code>loopEnabled</code>, <code>loopStartFrame</code>, and <code>loopEndFrame</code>.</td>
+              <td>Loop editing can ship against the existing model before playback-end schema work is complete.</td>
+            </tr>
+            <tr>
+              <td class="id">Playback end</td>
+              <td>There is no zone-level playback-end field. A non-looping voice continues to the source frame count.</td>
+              <td>Add a backward-compatible exclusive <code>sampleEndFrame</code> contract, map SFZ's inclusive <code>end</code> into it, and propagate it through every project, runtime, host-state, and package seam.</td>
+            </tr>
+            <tr>
+              <td class="id">Loop semantics</td>
+              <td>The render model validates enabled loops as an ordered half-open range inside the source, and <code>SamplerVoice</code> wraps when position reaches <code>loopEndFrame</code>.</td>
+              <td>Keep half-open frame semantics in the editor and numeric fields; do not introduce an incompatible inclusive UI model.</td>
+            </tr>
+            <tr>
+              <td class="id">Undo and draft edits</td>
+              <td><code>AuthoringSession::updateSelectedZone</code> is the existing transactional selected-zone edit path.</td>
+              <td>Commit one zone transaction at gesture end. Pointer movement updates only transient presentation state.</td>
+            </tr>
+            <tr>
+              <td class="id">Preview workflow</td>
+              <td>Waveform loading and authoring playback preparation are asynchronous, revisioned, cancelable, and latest-request-wins.</td>
+              <td>Region edits must use coalesced background requests and must never poll, wait, validate a full project, or serialize host state on the message thread.</td>
+            </tr>
+            <tr>
+              <td class="id">Playable package parity</td>
+              <td><code>PerformancePackageProjection</code> currently rejects loop settings because the projection does not preserve them.</td>
+              <td>Loop and playback-region package parity are release requirements; a creator must not lose imported or authored behavior when publishing the Practical Sampler instrument.</td>
+            </tr>
+            <tr>
+              <td class="id">SFZ import</td>
+              <td>The importer already maps <code>offset</code>, <code>loop_mode</code>, <code>loop_start</code>, and <code>loop_end</code>.</td>
+              <td>Add <code>end</code>, correct inclusive-to-exclusive end conversion, make loop-mode behavior explicit, respect inherited effective values and WAV loop metadata, and report unsupported semantics.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout problem">
+        <h3>Primary architectural gap</h3>
+        <p>A fixed 192-point result is appropriate for a thumbnail, but not for an editor. Enlarging those points would create a misleading waveform and would make zero-crossing and precise boundary work impossible.</p>
+      </div>
+    </section>
+
+    <section class="section" id="decisions">
+      <span class="section-label">03 | Locked decisions</span>
+      <div class="heading"><h2>Product and interaction decisions</h2></div>
+      <div class="grid-2">
+        <article class="card good">
+          <h3>Included in the committed scope</h3>
+          <ul>
+            <li>Waveform zoom, horizontal navigation, fit, and overview recovery.</li>
+            <li>Playback start and end handles, with source audio outside the region visibly dimmed.</li>
+            <li>Forward-loop enablement and loop start/end handles.</li>
+            <li>Temporary range selection with commands to set playback or loop region.</li>
+            <li>Selection, playback-region, and loop audition modes.</li>
+            <li>Frame and time readouts, direct numeric entry, keyboard adjustment, and snapping.</li>
+            <li>Exact import of the portable SFZ v1 region subset: <code>offset</code>, <code>end</code>, <code>loop_mode</code>, <code>loop_start</code>, and <code>loop_end</code>.</li>
+            <li>Undo, redo, save/restore, host-state, Preview, Publish, and playable-package parity.</li>
+          </ul>
+        </article>
+        <article class="card warn">
+          <h3>Excluded from this initiative</h3>
+          <ul>
+            <li>Writing changes into WAV, AIFF, FLAC, or any other source file.</li>
+            <li>Creating cropped or processed derivative audio files.</li>
+            <li>Normalize, reverse, destructive fades, resampling, denoising, or spectral editing.</li>
+            <li>Multitrack, splice, comp, or DAW-style clip editing.</li>
+            <li>Automatic source replacement for zones sharing a sample.</li>
+            <li>Background analysis that starts merely because the editor opens.</li>
+            <li>Customer-facing SFZ export or preservation of SFZ source-file formatting and structure.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="grid-3" style="margin-top:15px">
+        <article class="card accent">
+          <h3>Selection is transient</h3>
+          <p>Dragging an arbitrary selection does not dirty the project. Only an explicit command or boundary-handle commit changes the selected zone.</p>
+        </article>
+        <article class="card violet">
+          <h3>Edits are zone-scoped</h3>
+          <p>Editing one zone does not silently modify sibling zones that reference the same <code>sampleSourceId</code>.</p>
+        </article>
+        <article class="card good">
+          <h3>One gesture, one history item</h3>
+          <p>Mouse-down begins a transient edit, dragging updates the local overlay, and mouse-up commits exactly one labeled authoring transaction.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="experience">
+      <span class="section-label">04 | Target experience</span>
+      <div class="heading"><h2>Waveform workbench interaction model</h2></div>
+      <div class="wireframe" aria-label="Conceptual layout of the target Waveform workbench">
+        <div class="wire-toolbar">
+          <span class="wire-control">Play Region</span>
+          <span class="wire-control">Play Selection</span>
+          <span class="wire-control">Stop</span>
+          <span class="wire-control">Loop On</span>
+          <span class="wire-control">Snap: Zero Crossing</span>
+          <span class="wire-control">Zoom - / +</span>
+          <span class="wire-control">Fit</span>
+        </div>
+        <div class="wire-wave">FULL-WIDTH ZOOMABLE WAVEFORM &#160; | &#160; PLAYBACK REGION</div>
+        <div class="wire-footer">
+          <div><strong>Start</strong><br />0 fr / 0.000 s</div>
+          <div><strong>End</strong><br />source end</div>
+          <div><strong>Loop</strong><br />512 – 22016 fr</div>
+          <div><strong>View</strong><br />37.5% / Fit</div>
+        </div>
+      </div>
+      <div class="grid-3" style="margin-top:15px">
+        <article class="card accent">
+          <h3>Primary gestures</h3>
+          <ul>
+            <li>Drag empty waveform space to create a temporary selection.</li>
+            <li>Drag a boundary handle to move one authored endpoint.</li>
+            <li>Drag inside a region to move the region without changing its length when valid.</li>
+            <li>Wheel or trackpad zooms around the pointer; modified wheel pans.</li>
+          </ul>
+        </article>
+        <article class="card good">
+          <h3>Keyboard parity</h3>
+          <ul>
+            <li>Tab reaches toolbar controls and each boundary handle.</li>
+            <li>Arrow keys nudge by one frame; modifiers select larger steps.</li>
+            <li>Home/End move the focused boundary to its legal extreme.</li>
+            <li>Enter applies a selection command; Escape cancels a transient gesture.</li>
+          </ul>
+        </article>
+        <article class="card warn">
+          <h3>Visual hierarchy</h3>
+          <ul>
+            <li>The waveform owns the majority of the tab.</li>
+            <li>Excluded source audio is dimmed, not removed.</li>
+            <li>The loop has a distinct translucent fill and labeled handles.</li>
+            <li>Diagnostics move to a compact footer or collapsible disclosure.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="contracts">
+      <span class="section-label">05 | Contracts</span>
+      <div class="heading"><h2>SFZ conversion, range, and edit contracts</h2></div>
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table>
+          <thead>
+            <tr><th>SFZ opcode</th><th>Imported Practical Sampler meaning</th><th>Authoring exposure</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id"><code>offset=N</code></td>
+              <td>Inclusive playback start: <code>sampleStartFrame=N</code>.</td>
+              <td>Playback Start handle and numeric field.</td>
+            </tr>
+            <tr>
+              <td class="id"><code>end=N</code></td>
+              <td>SFZ's inclusive endpoint converts to internal exclusive <code>sampleEndFrame=N+1</code>. An absent opcode resolves to source end.</td>
+              <td>Playback End handle and numeric field, with SFZ provenance available in import diagnostics.</td>
+            </tr>
+            <tr>
+              <td class="id"><code>loop_mode</code></td>
+              <td>Typed behavior for <code>no_loop</code>, <code>one_shot</code>, <code>loop_continuous</code>, and <code>loop_sustain</code>; compile each value into explicit voice-lifecycle semantics.</td>
+              <td>Loop Mode selector. The existing <code>loopEnabled</code> boolean is an interim compatibility representation, not the final SFZ authoring contract.</td>
+            </tr>
+            <tr>
+              <td class="id"><code>loop_start=N</code></td>
+              <td>Inclusive loop start: <code>loopStartFrame=N</code>.</td>
+              <td>Loop Start handle and numeric field.</td>
+            </tr>
+            <tr>
+              <td class="id"><code>loop_end=N</code></td>
+              <td>SFZ's inclusive endpoint converts to internal exclusive <code>loopEndFrame=N+1</code>.</td>
+              <td>Loop End handle and numeric field.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Contract</th><th>Canonical rule</th><th>Compatibility behavior</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">Playback range</td>
+              <td><code>[sampleStartFrame, resolvedSampleEndFrame)</code>. The start is inclusive and the end is exclusive.</td>
+              <td>Add <code>sampleEndFrame</code>; value <code>0</code> resolves to the source frame count so existing projects retain full-tail playback. SFZ <code>end=0</code> remains representable because it converts to exclusive value <code>1</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">Loop range</td>
+              <td><code>[loopStartFrame, loopEndFrame)</code>, valid only when <code>loopEnabled</code> and fully contained inside the resolved playback region.</td>
+              <td>Existing disabled-loop values may remain stored, but enabling a loop requires a valid ordered contained range.</td>
+            </tr>
+            <tr>
+              <td class="id">Temporary selection</td>
+              <td>A workspace-only half-open frame range associated with the current source identity and zone selection revision.</td>
+              <td>Selection clears when the selected zone or source identity changes; it is not serialized and does not enter undo history.</td>
+            </tr>
+            <tr>
+              <td class="id">Boundary normalization</td>
+              <td>All proposed changes pass through one pure normalization/validation function before presentation preview or commit.</td>
+              <td>SFZ import, UI, loader, snapshot, prepared model, package projection, and tests use the same ordering and containment rules.</td>
+            </tr>
+            <tr>
+              <td class="id">Edit transaction</td>
+              <td>A completed handle drag or explicit selection command produces one <code>updateSelectedZone</code> action with a stable label.</td>
+              <td>Cancel, lost capture, zone change, editor close, or invalid input restores the pre-gesture presentation and produces no history item.</td>
+            </tr>
+            <tr>
+              <td class="id">Source identity</td>
+              <td>Peak and snap results are keyed by sample-source ID, normalized path, size, modification ticks/fingerprint, channel reduction, visible frame range, and level of detail.</td>
+              <td>Stale worker completions are rejected when any identity or request generation differs.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout decision">
+        <h3>Schema recommendation</h3>
+        <p>Introduce named SFZ-region schema constants rather than scattering literal version checks. The migration should advance the current project/authoring pair, default missing <code>sampleEndFrame</code> to <code>0</code>, and replace the long-term loop boolean with a typed mode capable of preserving all portable SFZ v1 loop behaviors. Save canonical new-schema documents with explicit native fields; do not retain an editable SFZ document inside the project.</p>
+      </div>
+      <div class="callout warning">
+        <h3>Import findings contract</h3>
+        <p>Every recognized region opcode must be classified as exact, transformed, approximated, or unsupported. Unsupported or partially represented SFZ behavior produces an actionable import finding; it is never silently presented as fully converted.</p>
+      </div>
+      <div class="callout warning">
+        <h3>Loop containment migration</h3>
+        <p>Legacy projects may contain a loop that begins before an authored sample start. Loading must remain deterministic: report the incompatibility and require correction, or migrate only under an explicitly tested rule. Never silently move musical boundaries merely to satisfy the new editor.</p>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <span class="section-label">06 | Architecture</span>
+      <div class="heading"><h2>Presentation, worker, and audio ownership</h2></div>
+      <div class="flow">
+        <div class="flow-step"><strong>Imported/native region</strong><span>SFZ effective values or native project edits enter one typed Practical Sampler region contract.</span></div>
+        <div class="flow-step"><strong>Pure region policy</strong><span>Clamp, order, contain, snap, and format frames without project copies or file I/O.</span></div>
+        <div class="flow-step"><strong>Local overlay</strong><span>Paint proposed boundaries immediately; do not rebuild playback per pixel.</span></div>
+        <div class="flow-step"><strong>Commit</strong><span>Gesture end creates one selected-zone transaction and increments the authored revision.</span></div>
+        <div class="flow-step"><strong>Background prepare</strong><span>Coalesce waveform, snap-analysis, host-state, and scoped Preview work by generation.</span></div>
+        <div class="flow-step"><strong>Immutable publish</strong><span>Adopt only the newest matching peaks, prepared graph, and serialized state.</span></div>
+        <div class="flow-step"><strong>Audio render</strong><span>Voice reads immutable start/end/loop fields with no locks, allocation, disk access, or editor dependency.</span></div>
+      </div>
+      <div class="grid-2" style="margin-top:18px">
+        <article class="card accent">
+          <h3>Multiresolution waveform strategy</h3>
+          <p>Use a hybrid cache: retain a whole-source overview level, then build fixed-size visible-range tiles at the level of detail required by the current pixels-per-frame ratio. Coarser levels aggregate from finer cached tiles where possible. Deep zoom may request bounded source reads, but it must never decode or retain an entire large source merely to draw a small range.</p>
+          <ul>
+            <li>Key tiles by immutable source identity, channel reduction, frame span, and level.</li>
+            <li>Prioritize visible tiles, then one viewport of look-ahead on each side.</li>
+            <li>Keep the last complete compatible view while replacements build.</li>
+            <li>Bound cache memory and evict least-recently-used, unleased tiles off the audio thread.</li>
+          </ul>
+        </article>
+        <article class="card good">
+          <h3>Gesture and preview strategy</h3>
+          <p>Boundary movement is visually live but transactionally deferred. During drag, the component paints a proposed region from small value types. At commit, the session receives one zone snapshot. Scoped Preview preparation is requested after commit and follows the existing asynchronous latest-request-wins contract.</p>
+          <ul>
+            <li>No full project clone, validation, digest, host serialization, or playback wait inside pointer callbacks.</li>
+            <li>Optional audible drag feedback may be added only through a bounded, explicitly qualified preview control path.</li>
+            <li>Until that path exists, commit-time audition is the supported behavior.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="workstreams">
+      <span class="section-label">07 | Workstreams</span>
+      <div class="heading"><h2>Implementation seams and ownership</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Workstream</th><th>Primary responsibilities</th><th>Representative files</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">W1 — Region policy</td>
+              <td>Half-open range types, normalization, constraints, formatting, drag state, snapping decisions, and deterministic edit labels.</td>
+              <td><code>app/src/shared/authoring/</code> new policy/view-model files; <code>engine_adapter/include/drs/engine/</code> shared contract where runtime validation needs it.</td>
+            </tr>
+            <tr>
+              <td class="id">W2 — Editor UI</td>
+              <td>Viewport, rendering, handles, hit targets, selection, toolbar, numeric fields, keyboard control, accessibility, responsive layout, and playhead presentation.</td>
+              <td><code>WaveformDetailView.*</code>, <code>AuthoringPanel.*</code>, <code>OpenWorkbenchVisualSystem.h</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">W3 — Peak service</td>
+              <td>Visible-range peak requests, multiresolution tiles, cache policy, worker prioritization, cancellation, stale-result rejection, and metrics.</td>
+              <td><code>SampleImport.*</code>, <code>WaveformPreviewService.*</code>, <code>AuthoringPreviewModel.h</code>, processor waveform publication.</td>
+            </tr>
+            <tr>
+              <td class="id">W4 — SFZ authoring/schema</td>
+              <td>Typed SFZ loop mode, <code>sampleEndFrame</code>, schema migration, serialization, validation, undo/redo, checkpoint, host-state, digest, and selection-command commits.</td>
+              <td><code>RuntimeModel.h</code>, <code>RuntimeLoader.cpp</code>, <code>AuthoringSession.*</code>, <code>HostSessionState.*</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">W5 — Playback</td>
+              <td>Snapshot and prepared propagation, render validation, voice termination at playback end, loop containment, interpolation at boundaries, page intent, offline rendering, and real-time qualification.</td>
+              <td><code>PlaybackSnapshot.*</code>, <code>PreparedPlayback.*</code>, <code>SamplerRenderModel.*</code>, <code>SamplerVoice.*</code>.</td>
+            </tr>
+            <tr>
+              <td class="id">W6 — SFZ conversion and delivery</td>
+              <td>Effective SFZ opcode resolution, inclusive/exclusive boundary conversion, WAV metadata fallback, import findings, playable-package projection/compiler preservation, reader compatibility, and removal of obsolete loop rejection. No SFZ writer is included.</td>
+              <td><code>SfzImportProjection.cpp</code>, <code>PerformancePackageProjection.cpp</code>, runtime compiler/model, package reader/writer tests.</td>
+            </tr>
+            <tr>
+              <td class="id">W7 — Qualification</td>
+              <td>Unit, integration, UI, accessibility, lifecycle, responsiveness, large-source, package, host-state, streaming, offline render, and audio real-time tests.</td>
+              <td><code>tests/src/Phase2WaveformPreviewTests.cpp</code>, authoring UI suites, Sprint 4/5/6 render and lifecycle suites, new focused executables.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="phases">
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">1</span>
+          <h2>SFZ region contract, interaction policy, and baseline fixtures</h2>
+          <span class="phase-focus">Conversion semantics first</span>
+        </header>
+        <p class="phase-intent">Lock the portable SFZ v1 region mapping and build pure, testable conversion and edit policy before adding stateful component behavior.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-1.1</span> Define the one-way mapping for <code>offset</code>, <code>end</code>, <code>loop_mode</code>, <code>loop_start</code>, and <code>loop_end</code>, including whether each effective value came from SFZ inheritance, an explicit region opcode, WAV metadata, or a native authoring edit.</li>
+            <li><span class="task-id">WF-1.2</span> Add canonical frame-range and viewport value types with explicit half-open semantics. Convert inclusive SFZ <code>end=N</code> and <code>loop_end=N</code> to internal exclusive <code>N+1</code> exactly once at the import boundary.</li>
+            <li><span class="task-id">WF-1.3</span> Define typed internal loop modes for <code>no_loop</code>, <code>one_shot</code>, <code>loop_continuous</code>, and <code>loop_sustain</code>; treat the existing loop-enabled boolean as an interim compatibility projection, not the final contract.</li>
+            <li><span class="task-id">WF-1.4</span> Implement pure normalization for playback, loop, selection, drag, and legal-boundary constraints, with explicit import findings for unsupported, malformed, or partially represented SFZ behavior.</li>
+            <li><span class="task-id">WF-1.5</span> Define pointer-to-frame and frame-to-pixel transforms with overflow-safe 64-bit math, plus edit gesture state for begin, update, commit, cancel, lost capture, zone change, and source change.</li>
+            <li><span class="task-id">WF-1.6</span> Add deterministic SFZ/WAV fixtures for omitted and explicit opcodes, inheritance, metadata fallback, <code>end=0</code>, one-frame ranges, malformed regions, every portable loop mode, and mono, stereo, multichannel, short, and long sources.</li>
+            <li><span class="task-id">WF-1.7</span> Record current waveform build I/O, paint, selection, Preview dispatch, SFZ projection, and package-loop behavior as a before-change baseline.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 1 exit gate</h3>
+            <p>Every supported SFZ region value has a documented exact or normalized mapping, unsupported behavior produces a finding, and every range invariant and gesture transition is covered without constructing a JUCE editor. Existing waveform, authoring, render, streaming, and package suites remain unchanged and green.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> new waveform region policy/view-model files, focused unit tests, baseline artifact under the existing test output convention.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">2</span>
+          <h2>Interactive viewer and scalable peak pipeline</h2>
+          <span class="phase-focus">Read-only navigation milestone</span>
+        </header>
+        <p class="phase-intent">Deliver a trustworthy editor-grade view before any gesture mutates the project.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-2.1</span> Refactor <code>WaveformDetailView</code> around a presentation model containing source identity, viewport, cached peak segments, effective SFZ-derived/native regions, selection, playhead, provenance, and status.</li>
+            <li><span class="task-id">WF-2.2</span> Add fit, zoom-around-pointer, pan, horizontal navigation, reset, and resize-stable viewport behavior.</li>
+            <li><span class="task-id">WF-2.3</span> Replace the single 192-point editor dependency with overview plus visible-range level-of-detail requests.</li>
+            <li><span class="task-id">WF-2.4</span> Add a bounded tile cache with visible-first priority, cancellation, request generations, memory metrics, and stale-result rejection.</li>
+            <li><span class="task-id">WF-2.5</span> Keep peak reads on the existing worker-owned bounded I/O path; never trigger waveform I/O from paint or pointer callbacks.</li>
+            <li><span class="task-id">WF-2.6</span> Rebalance the Waveform tab so the canvas owns the available space and diagnostics occupy a compact footer or disclosure.</li>
+            <li><span class="task-id">WF-2.7</span> Expose loading, partial, ready, stale-compatible, missing-source, and failed states without blanking a valid prior view.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 2 exit gate</h3>
+            <p>Creators can fluidly inspect a large source from whole-file overview to detailed frames. Zoom never magnifies coarse 192-point data as if it were detailed audio, selection churn activates only the newest peak result, and no full-frame decode is introduced.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> <code>WaveformDetailView.*</code>, <code>WaveformPreviewService.*</code>, <code>SampleImport.*</code>, processor preview publication, authoring layout and focused preview tests.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">3</span>
+          <h2>SFZ loop-mode and loop-region authoring</h2>
+          <span class="phase-focus">First SFZ editing milestone</span>
+        </header>
+        <p class="phase-intent">Import, represent, play, and author the portable SFZ v1 loop contract while preserving source audio and making the opcode meaning visible in the authoring workspace.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-3.1</span> Add a typed loop-mode control for <code>no_loop</code>, <code>one_shot</code>, <code>loop_continuous</code>, and <code>loop_sustain</code>, with creator-facing explanations of their SFZ playback semantics.</li>
+            <li><span class="task-id">WF-3.2</span> Add visible, labeled, high-contrast loop start/end handles, a translucent loop region, direct frame/time entry, focusable controls, and single-frame keyboard nudging.</li>
+            <li><span class="task-id">WF-3.3</span> Add temporary selection and an explicit <em>Set Loop to Selection</em> command without persisting the selection.</li>
+            <li><span class="task-id">WF-3.4</span> Commit each drag or command through one labeled <code>updateSelectedZone</code> transaction; wire undo, redo, dirty state, save, restore, and host-state publication.</li>
+            <li><span class="task-id">WF-3.5</span> Request coalesced selected-zone Preview preparation after commit. Do not rebuild or wait for playback during pointer movement.</li>
+            <li><span class="task-id">WF-3.6</span> Add loop-region audition and playhead presentation using existing authoring Preview ownership and stop behavior; exercise the distinct note-off lifecycle of continuous and sustain loops.</li>
+            <li><span class="task-id">WF-3.7</span> Cover inclusive SFZ loop-end conversion, WAV metadata fallback, every loop mode, handle crossing, disabled loops, source end, selection changes mid-drag, lost mouse capture, rapid edits, and undo during pending Preview.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 3 exit gate</h3>
+            <p>An imported or newly authored portable SFZ loop can be inspected, changed, auditioned, saved, restored, undone, and redone with the correct loop-mode lifecycle. The source file hash, length, and modification time remain unchanged.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> waveform editor UI and view model, <code>AuthoringPanel.*</code>, <code>AuthoringSession.*</code>, Preview command presentation, authoring UI and waveform preview suites.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">4</span>
+          <h2>Playback-region schema and render cutover</h2>
+          <span class="phase-focus">End-to-end model migration</span>
+        </header>
+        <p class="phase-intent">Add the missing internal representation of SFZ <code>end</code> and qualify it through import, authoring, persistence, preparation, rendering, and recall before exposing selection-based region semantics.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-4.1</span> Add <code>sampleEndFrame</code> to the authored zone contract, with <code>0</code> resolving to source end for backward compatibility; map SFZ <code>end=N</code> to internal exclusive <code>N+1</code>, so legal <code>end=0</code> becomes <code>1</code> rather than colliding with the sentinel.</li>
+            <li><span class="task-id">WF-4.2</span> Advance named SFZ-region, project, and authoring schema constants; implement import, load, migration, validation, canonical save, checkpoint, digest, and host-state round trips.</li>
+            <li><span class="task-id">WF-4.3</span> Propagate the field through playback snapshots, prepared zones, compile plans, runtime zones, render routes, diagnostics, and topology equality.</li>
+            <li><span class="task-id">WF-4.4</span> Update <code>SamplerVoice</code> to stop non-looping playback at the resolved end and to require an enabled loop to remain inside the playback region.</li>
+            <li><span class="task-id">WF-4.5</span> Audit interpolation and look-ahead at the exclusive end so the voice never requests or blends a frame outside the authored region merely to interpolate.</li>
+            <li><span class="task-id">WF-4.6</span> Update resident, paged-streaming, offline-render, voice-lifecycle, preview, publish, and last-known-good paths together.</li>
+            <li><span class="task-id">WF-4.7</span> Add fixtures for omitted SFZ <code>end</code>, <code>end=0</code>, the maximum legal imported boundary, and old projects without <code>sampleEndFrame</code>; old projects must sound identical.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 4 exit gate</h3>
+            <p>Imported SFZ <code>end</code> and native playback-end edits produce sample-accurate non-looping termination in resident, streaming, offline, standalone, and plug-in paths. Old projects and host states retain their previous source-end behavior without manual migration.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> <code>RuntimeModel.h</code>, <code>RuntimeLoader.cpp</code>, snapshot/prepared/compiler/render/voice files, host-session state, project fixtures, focused playback and migration tests.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">5</span>
+          <h2>Playback-region editing, audition, and snapping</h2>
+          <span class="phase-focus">Complete v1 creator workflow</span>
+        </header>
+        <p class="phase-intent">Expose the new contract as an efficient creator workflow with precise selection commands and safe assistance.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-5.1</span> Add playback start/end handles, region move, dimmed excluded audio, numeric fields, reset-to-source commands, and labels/tooltips that connect the controls to effective SFZ <code>offset</code>/<code>end</code> semantics and value provenance.</li>
+            <li><span class="task-id">WF-5.2</span> Add <em>Set Playback Region to Selection</em>, <em>Set Loop to Selection</em>, <em>Select Playback Region</em>, and <em>Select Loop Region</em>.</li>
+            <li><span class="task-id">WF-5.3</span> Add audition modes for playback region, loop, and temporary selection, with a visible playhead and one authoritative Stop action.</li>
+            <li><span class="task-id">WF-5.4</span> Implement frame snapping and bounded zero-crossing search. Search runs off the message and audio threads and publishes generation-checked candidates.</li>
+            <li><span class="task-id">WF-5.5</span> Add optional transient snapping only after zero-crossing behavior, cache identity, false-positive presentation, and cancellation are qualified.</li>
+            <li><span class="task-id">WF-5.6</span> Preserve direct unsnapped editing through an explicit modifier and show when a boundary was adjusted by a snap policy.</li>
+            <li><span class="task-id">WF-5.7</span> Complete screen-reader names, values, descriptions, focus order, keyboard parity, minimum hit targets, and high-contrast states.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 5 exit gate</h3>
+            <p>A keyboard- or pointer-driven creator can isolate, audition, refine, and recall a playback region and contained loop without touching the source. Snapping is cancellable, transparent, and never blocks ordinary unsnapped work.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> waveform UI/controller, snap-analysis worker and cache, Preview commands, accessible metadata, authoring UI interaction tests.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">6</span>
+          <h2>SFZ conversion fidelity, package parity, and advanced region behavior</h2>
+          <span class="phase-focus">One-way conversion; no SFZ writer</span>
+        </header>
+        <p class="phase-intent">Prove that effective SFZ region behavior converts into the native project model and survives host state and playable-package delivery, then add optional native enhancements on top of that stable baseline.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-6.1</span> Resolve SFZ inheritance and WAV metadata fallback for the supported v1 region subset, convert inclusive boundaries at import, and record explicit conversion findings whenever semantics are unsupported, malformed, or only partially represented.</li>
+            <li><span class="task-id">WF-6.2</span> Preserve typed loop mode, <code>sampleStartFrame</code>, <code>sampleEndFrame</code>, loop start, and loop end through native project persistence, host state, playable-package projection, and runtime compilation.</li>
+            <li><span class="task-id">WF-6.3</span> Remove the existing package loop-compatibility rejection only after project save/reopen and package build/open/render tests prove parity. Do not add a customer-facing or test-only SFZ exporter.</li>
+            <li><span class="task-id">WF-6.4</span> Add one-way import fixtures covering inherited values, explicit-region overrides, inclusive <code>end</code>/<code>loop_end</code>, omitted values, embedded WAV loop fallback, explicit-SFZ-versus-metadata precedence, and unsupported-opcode findings.</li>
+            <li><span class="task-id">WF-6.5</span> Optionally add <code>loopCrossfadeFrames</code> as a separate schema/runtime increment after baseline package parity is green.</li>
+            <li><span class="task-id">WF-6.6</span> If loop crossfade ships, qualify dual-read streaming, page intent, wrap interpolation, gain law, short loops, pitch ratios, voice stealing, offline parity, and CPU budget.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 6 exit gate</h3>
+            <p>For each source SFZ fixture, the imported model, saved/reopened Practical Sampler project, restored host state, and opened playable package agree on audible region and loop behavior. No SFZ export path is required or implied. Advanced crossfade work cannot delay the baseline region editor release unless separately promoted to a release requirement.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> <code>SfzImportProjection.cpp</code>, import findings, package projection/compiler/reader/writer, runtime schema, and deterministic conversion/package suites.</p>
+        </div>
+      </article>
+
+      <article class="phase">
+        <header class="phase-head">
+          <span class="phase-number">7</span>
+          <h2>Large-source qualification and release activation</h2>
+          <span class="phase-focus">Cross-path evidence gate</span>
+        </header>
+        <p class="phase-intent">Prove that the feature remains responsive, deterministic, portable, and real-time safe under the repository's qualified large-instrument and lifecycle conditions.</p>
+        <div class="phase-body">
+          <ul class="task-list">
+            <li><span class="task-id">WF-7.1</span> Run focused unit and UI suites in Debug, then full waveform, authoring, host-state, Preview, Publish, package, streaming, voice, and offline-render regression groups.</li>
+            <li><span class="task-id">WF-7.2</span> Exercise rapid zone selection, zoom churn, tile supersession, repeated handle drags, undo/redo churn, project replacement, editor close, and source invalidation.</li>
+            <li><span class="task-id">WF-7.3</span> Qualify both a single long source and a multi-source instrument totaling approximately 500 MB, including offsets and loop points deep into files, with bounded cache memory, targeted start/loop prewarm, no UI-thread file I/O, and newest-request-only publication.</li>
+            <li><span class="task-id">WF-7.4</span> Verify source hashes, file sizes, and modification timestamps before and after every editing workflow.</li>
+            <li><span class="task-id">WF-7.5</span> Run standalone and plug-in host validation, state recall, editor reopen, package export/open, and MIDI playback checks.</li>
+            <li><span class="task-id">WF-7.6</span> Record responsiveness, cache, I/O, cancellation, Preview latency, audio guard, and package parity evidence in a checked-in progress artifact.</li>
+            <li><span class="task-id">WF-7.7</span> Update creator help, keyboard reference, migration notes, and the exact/normalized/unsupported SFZ region coverage table before activation.</li>
+          </ul>
+          <div class="exit" style="margin-top:18px">
+            <h3>Phase 7 exit gate</h3>
+            <p>Every release gate below has recorded evidence. No known failure is waived merely because it predates the UI work when the new region fields or interactions can reach that path.</p>
+          </div>
+          <p class="files"><strong>Expected touchpoints:</strong> focused and broad test executables, UI responsiveness baseline, REAPER validation assets, user-facing documentation, initiative progress artifact.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="section" id="validation">
+      <span class="section-label">08 | Evidence</span>
+      <div class="heading"><h2>Validation matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Layer</th><th>Required evidence</th><th>Failure modes to force</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">Pure policy</td>
+              <td>SFZ-to-native conversion invariants, transform round trips, ordering, containment, snapping, cancel behavior, one-frame ranges, 64-bit frame counts, and deterministic labels.</td>
+              <td>Inclusive maximums, <code>end=0</code>, crossed handles, overflow boundaries, zero-width viewport, missing frame count, stale selection identity.</td>
+            </tr>
+            <tr>
+              <td class="id">Peak pipeline</td>
+              <td>Reference-equivalent min/max peaks for every level and partial tile; bounded reads; cache hit/miss/eviction; cancellation; newest-result publication.</td>
+              <td>Missing source, changed file, short final tile, rapid zoom, source replacement, worker shutdown while active.</td>
+            </tr>
+            <tr>
+              <td class="id">Authoring UI</td>
+              <td>Pointer and keyboard parity, component IDs, accessibility metadata, focus order, responsive layouts, one undo per gesture, selection not dirtying the project.</td>
+              <td>Lost capture, tab switch, editor close, zone deletion/change during drag, invalid numeric text, undo during pending Preview.</td>
+            </tr>
+            <tr>
+              <td class="id">Persistence</td>
+              <td>New-schema save/load, old-schema migration, checkpoint, undo/redo, host-state, digest, project replacement, and mark-saved behavior.</td>
+              <td>Missing field, invalid end, loop outside region, schema mismatch, last-known-good restore after rejected edit.</td>
+            </tr>
+            <tr>
+              <td class="id">Playback</td>
+              <td>Sample-accurate start/end/loop behavior at unity and pitched rates across resident, paged, offline, Preview, Publish, standalone, and plug-in paths.</td>
+              <td>End interpolation, one-frame tail, loop at end, release during loop, page miss at wrap, voice steal, choke, round robin, pedal routes.</td>
+            </tr>
+            <tr>
+              <td class="id">SFZ conversion and package delivery</td>
+              <td>SFZ fixture import produces the expected normalized native model; project save/reopen, host-state restore, and playable-package build/open/render preserve its audible boundaries and loop mode. No SFZ output round trip is part of the contract.</td>
+              <td>Inclusive/exclusive conversion, zero sentinel, inheritance override, embedded-loop precedence, unsupported finding, source-end region, encrypted package reopen.</td>
+            </tr>
+            <tr>
+              <td class="id">Non-destructive guarantee</td>
+              <td>Before/after hashes, sizes, and modification timestamps remain identical across edit, undo, redo, save, Preview, Publish, package export, and reopen.</td>
+              <td>Shared source across zones, source outside content root, read-only source, editor lifecycle churn.</td>
+            </tr>
+            <tr>
+              <td class="id">Performance</td>
+              <td>Pointer callbacks and ordinary paint remain within a 60 Hz frame; file I/O stays off the message/audio threads; cache memory is bounded; audio guard counters remain clean.</td>
+              <td>Long source, high-DPI focused workbench, continuous zoom, selection churn, slow disk, cache pressure, Preview supersession.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="future-testing">
+      <span class="section-label">09 | Future iteration</span>
+      <div class="heading"><h2>Automated audible-parity testing</h2></div>
+      <div class="callout warning">
+        <h3>Deferred, not a baseline release dependency</h3>
+        <p>Listening comparisons remain the final musical judgment. A later iteration can automate repeatable waveform-output checks around those comparisons, but it must validate the one-way SFZ conversion and native delivery pipeline—not create a hidden SFZ exporter.</p>
+      </div>
+      <div class="grid-2">
+        <article class="card good">
+          <h3>Start with analytic fixtures</h3>
+          <p>Generate small synthetic WAV sources whose sample values make <code>offset</code>, <code>end</code>, loop boundaries, and note-off behavior unambiguous. Render each portable loop mode and assert the expected frame sequence exactly.</p>
+        </article>
+        <article class="card good">
+          <h3>Compare every native stage</h3>
+          <p>Render the imported model, saved/reopened <code>.drsproj</code>, restored host state, Preview/Publish preparation, and opened playable package from the same MIDI/event script. Compare aligned stereo buffers per sample and retain peak, RMS, checksum, and first/last-nonzero summaries.</p>
+        </article>
+        <article class="card violet">
+          <h3>Add curated reference-player renders</h3>
+          <p>For a small licensed fixture set, capture 32-bit float WAV output from a trusted SFZ player and compare it with Practical Sampler using deterministic event timing, latency alignment, null/difference energy, RMS/SNR, spectral, and envelope tolerances. Use this as compatibility evidence, not as proof that every implementation must null exactly.</p>
+        </article>
+        <article class="card violet">
+          <h3>Make failures listenable</h3>
+          <p>Emit <code>expected.wav</code>, <code>actual.wav</code>, <code>difference.wav</code>, <code>comparison.json</code>, and compact waveform/spectral images so a failed automation check can immediately become a focused listening comparison.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Existing foundation</h3>
+        <p><code>tests/support/Sprint4OfflineRenderHarness.*</code> already retains stereo samples, compares them at a <code>1.0e-6</code> tolerance, and records peak, RMS, checksum, and first/last-nonzero evidence. The next iteration should extend that harness with reusable WAV artifact output, alignment/tolerance profiles, and SFZ-region fixture orchestration rather than replace it.</p>
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <span class="section-label">10 | Risk control</span>
+      <div class="heading"><h2>Risks and guardrails</h2></div>
+      <div class="grid-2">
+        <article class="card warn">
+          <h3>Schema breadth</h3>
+          <p><code>sampleEndFrame</code> touches more than the visible editor. Missing one equality, digest, snapshot, prepared, package, or host-state seam can create a UI that appears correct but plays or recalls incorrectly.</p>
+          <p><strong>Control:</strong> land the field as a dedicated end-to-end phase with compile-time and round-trip coverage before exposing playback-region commands.</p>
+        </article>
+        <article class="card warn">
+          <h3>Gesture-driven preparation churn</h3>
+          <p>Calling the existing project edit and preparation path for every pointer move would recreate the responsiveness problems already removed from authoring.</p>
+          <p><strong>Control:</strong> local transient overlay during drag, one commit at gesture end, coalesced background Preview afterward.</p>
+        </article>
+        <article class="card warn">
+          <h3>Misleading zoom detail</h3>
+          <p>Scaling cached overview peaks can imply precision that the data does not contain.</p>
+          <p><strong>Control:</strong> visible-range level-of-detail identity, partial/loading presentation, and no boundary snapping against coarse display buckets.</p>
+        </article>
+        <article class="card warn">
+          <h3>Streaming boundary reads</h3>
+          <p>An exclusive playback end changes interpolation and page look-ahead behavior. A naive stop check can read beyond the region or truncate the final valid interpolation.</p>
+          <p><strong>Control:</strong> explicit boundary interpolation tests for resident and paged sources at multiple pitch ratios.</p>
+        </article>
+        <article class="card warn">
+          <h3>Package/editor divergence</h3>
+          <p>The current package projection does not preserve loops. Shipping richer authoring without delivery parity would create creator-visible data loss.</p>
+          <p><strong>Control:</strong> package export/open/render parity is a release gate, and the existing rejection is removed only after preservation is proven.</p>
+        </article>
+        <article class="card warn">
+          <h3>SFZ semantics flattened incorrectly</h3>
+          <p>Resolving inheritance, WAV metadata fallback, inclusive ends, or loop modes incorrectly can produce a plausible-looking native region that does not sound like the source instrument.</p>
+          <p><strong>Control:</strong> resolve effective values before projection, convert boundaries once, retain value provenance for diagnostics, and emit findings instead of silently claiming complete support.</p>
+        </article>
+        <article class="card warn">
+          <h3>Feature creep into destructive editing</h3>
+          <p>Selection terminology can quickly turn into requests for crop, fade, normalize, or file replacement.</p>
+          <p><strong>Control:</strong> commands are named <em>Set Playback Region</em> and <em>Set Loop</em>, never <em>Crop</em> or <em>Trim File</em>. Source integrity tests remain mandatory.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Primary engineering guardrail</h3>
+        <p>Do not redesign the qualified streaming, asynchronous Preview/Publish, or background host-state publication architectures to implement this editor. Extend their immutable request/result contracts and preserve their ownership rules.</p>
+      </div>
+    </section>
+
+    <section class="section" id="gates">
+      <span class="section-label">11 | Activation</span>
+      <div class="heading"><h2>Release gates and delivery sequence</h2></div>
+      <div class="gate-grid">
+        <div class="card good">
+          <h3>Mandatory release gates</h3>
+          <ul>
+            <li><span class="status must">Must</span> The source file hash, size, and modification time never change.</li>
+            <li><span class="status must">Must</span> A completed gesture creates exactly one undoable selected-zone edit; canceled gestures create none.</li>
+            <li><span class="status must">Must</span> Existing projects without <code>sampleEndFrame</code> retain full-tail playback.</li>
+            <li><span class="status must">Must</span> The supported SFZ v1 region subset resolves inheritance and WAV metadata precedence correctly, converts inclusive ends exactly once, preserves all four loop modes, and emits findings for unsupported or partial behavior.</li>
+            <li><span class="status must">Must</span> Playback and loop regions are sample-accurate and identical across resident, streaming, offline, Preview, and published playback.</li>
+            <li><span class="status must">Must</span> Playable-package export/open preserves all supported region and loop fields.</li>
+            <li><span class="status must">Must</span> Ordinary waveform input, paint, and tab refresh stay within one 60 Hz frame on the reference system.</li>
+            <li><span class="status must">Must</span> The message thread performs no sample reads, full project validation, full serialization, preparation waits, or polling.</li>
+            <li><span class="status must">Must</span> The audio thread performs no allocation, lock acquisition, file I/O, or editor-state access.</li>
+            <li><span class="status must">Must</span> Rapid selection, zoom, snap, and Preview churn publish only the newest eligible result.</li>
+            <li><span class="status must">Must</span> Keyboard and assistive-technology users can reach and edit every boundary exposed to pointer users.</li>
+          </ul>
+        </div>
+        <div class="card violet">
+          <h3>Deferrable enhancements</h3>
+          <ul>
+            <li><span class="status later">Later</span> Transient detection and transient snapping.</li>
+            <li><span class="status later">Later</span> Loop crossfade and crossfade visualization.</li>
+            <li><span class="status later">Later</span> SFZ v2 and implementation-specific region features beyond the portable v1 baseline, including alternate/reverse loop types, finite loop counts, and modulated offsets.</li>
+            <li><span class="status later">Later</span> Stereo split-lane waveform presentation.</li>
+            <li><span class="status later">Later</span> Batch application of one region to multiple selected zones.</li>
+          </ul>
+          <div class="callout warning">
+            <p>Deferrable enhancements must not weaken file immutability, interoperability, or real-time gates when they are later activated.</p>
+          </div>
+        </div>
+      </div>
+      <h3 style="margin-top:24px">Recommended delivery sequence</h3>
+      <div class="timeline" aria-label="Recommended phase delivery sequence">
+        <div>1<br />Policy</div>
+        <div>2<br />Viewer + Peaks</div>
+        <div>3<br />SFZ Loops</div>
+        <div>4<br />SFZ End</div>
+        <div>5<br />Region Authoring</div>
+        <div>6<br />Conversion + Package</div>
+        <div>7<br />Qualification</div>
+      </div>
+      <div class="callout decision">
+        <h3>First shippable slice</h3>
+        <p>Phases 1–3 form a coherent early slice: an editor-grade viewer plus import and authoring support for portable SFZ loop semantics. Phases 4–7 complete SFZ <code>end</code>, playback-region authoring, one-way conversion/package parity, and production activation. If the early slice is distributed, it must remain explicitly labeled as SFZ loop editing only and must not imply package loop parity until Phase 6 passes.</p>
+      </div>
+    </section>
+
+    <footer>
+      <p><strong>Status:</strong> Proposed implementation plan. Scope is locked to one-way SFZ non-destructive region import, selected-zone authoring, native project persistence, and playable-package delivery in Practical Sampler.</p>
+      <p><strong>Source of truth:</strong> Practical Sampler codebase baseline inspected August 17, 2026. Update this document when phase gates, SFZ conversion coverage, schema decisions, or package requirements change. Customer-facing SFZ export is intentionally out of scope.</p>
+    </footer>
+  </main>
+</body>
+</html>
