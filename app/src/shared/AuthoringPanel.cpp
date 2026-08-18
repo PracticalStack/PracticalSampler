@@ -1297,6 +1297,33 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         {
             commitWaveformLoopRegion(startFrame, endFrameExclusive, label);
         });
+    waveformPreview.setPlaybackRegionCommitCallback(
+        [this](const std::uint64_t startFrame,
+               const std::uint64_t endFrameExclusive,
+               const std::string& label)
+        {
+            commitWaveformPlaybackRegion(startFrame, endFrameExclusive, label);
+        });
+    waveformPlaybackStartEditor.setComponentID("authoringWaveformPlaybackStart");
+    waveformPlaybackStartEditor.setTextToShowWhenEmpty("offset frame or seconds", authoringPanelMuted);
+    waveformPlaybackEndEditor.setComponentID("authoringWaveformPlaybackEnd");
+    waveformPlaybackEndEditor.setTextToShowWhenEmpty("end frame or seconds", authoringPanelMuted);
+    waveformPlaybackApplyButton.setComponentID("authoringWaveformPlaybackApply");
+    waveformPlaybackApplyButton.setButtonText("Apply Region");
+    waveformPlaybackResetButton.setComponentID("authoringWaveformPlaybackReset");
+    waveformPlaybackResetButton.setButtonText("Reset Source");
+    waveformSetPlaybackSelectionButton.setComponentID("authoringWaveformSetPlaybackSelection");
+    waveformSetPlaybackSelectionButton.setButtonText("Playback = Selection");
+    waveformSelectPlaybackButton.setComponentID("authoringWaveformSelectPlayback");
+    waveformSelectPlaybackButton.setButtonText("Select Playback");
+    waveformSelectLoopButton.setComponentID("authoringWaveformSelectLoop");
+    waveformSelectLoopButton.setButtonText("Select Loop");
+    waveformPlaybackAuditionButton.setComponentID("authoringWaveformPlaybackAudition");
+    waveformPlaybackAuditionButton.setButtonText("Audition Region");
+    waveformSelectionAuditionButton.setComponentID("authoringWaveformSelectionAudition");
+    waveformSelectionAuditionButton.setButtonText("Audition Selection");
+    waveformSnapToggle.setComponentID("authoringWaveformSnapToggle");
+    waveformSnapToggle.setButtonText("Zero Snap");
     waveformLoopModeSelector.setComponentID("authoringWaveformLoopMode");
     waveformLoopModeSelector.addItem("no_loop", 1);
     waveformLoopModeSelector.addItem("one_shot", 2);
@@ -1437,6 +1464,35 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     waveformLoopEndEditor.onReturnKey = [this]
     {
         commitWaveformLoopControls("Set SFZ loop region");
+    };
+    waveformPlaybackApplyButton.onClick = [this]
+    {
+        commitWaveformPlaybackControls("Set SFZ playback region");
+    };
+    waveformPlaybackStartEditor.onReturnKey = [this]
+    {
+        commitWaveformPlaybackControls("Set SFZ playback region");
+    };
+    waveformPlaybackEndEditor.onReturnKey = [this]
+    {
+        commitWaveformPlaybackControls("Set SFZ playback region");
+    };
+    waveformPlaybackResetButton.onClick = [this] { resetWaveformPlaybackRegion(); };
+    waveformSetPlaybackSelectionButton.onClick = [this] { setWaveformPlaybackToSelection(); };
+    waveformSelectPlaybackButton.onClick = [this] { selectWaveformPlaybackRegion(); };
+    waveformSelectLoopButton.onClick = [this] { selectWaveformLoopRegion(); };
+    waveformPlaybackAuditionButton.onClick = [this]
+    {
+        auditionWaveformRegion(drs::engine::WaveformAuditionMode::playbackRegion);
+    };
+    waveformSelectionAuditionButton.onClick = [this]
+    {
+        auditionWaveformRegion(drs::engine::WaveformAuditionMode::selection);
+    };
+    waveformSnapToggle.onClick = [this]
+    {
+        waveformPreview.setZeroCrossingSnapEnabled(waveformSnapToggle.getToggleState());
+        refreshWaveformWorkbenchContent();
     };
     workbenchGroupsTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::groups); };
     workbenchMacrosTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::macros); };
@@ -1798,6 +1854,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         {
             crossfadeAuditionSequence.active = false;
             waveformAuditionCueActive = false;
+            waveformAuditionRegion = {};
         }
         if (!previewEnabledToggle.getToggleState() && previewCommandCallback)
         {
@@ -1812,6 +1869,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     {
         crossfadeAuditionSequence.active = false;
         waveformAuditionCueActive = false;
+        waveformAuditionRegion = {};
         for (auto& timedNote : timedPreviewNotes)
             timedNote = {};
         stopTimer(previewReleaseTimerId);
@@ -2166,6 +2224,16 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
              static_cast<juce::Component*>(&importMetricsLabel),
+             static_cast<juce::Component*>(&waveformPlaybackStartEditor),
+             static_cast<juce::Component*>(&waveformPlaybackEndEditor),
+             static_cast<juce::Component*>(&waveformPlaybackApplyButton),
+             static_cast<juce::Component*>(&waveformPlaybackResetButton),
+             static_cast<juce::Component*>(&waveformSetPlaybackSelectionButton),
+             static_cast<juce::Component*>(&waveformSelectPlaybackButton),
+             static_cast<juce::Component*>(&waveformSelectLoopButton),
+             static_cast<juce::Component*>(&waveformPlaybackAuditionButton),
+             static_cast<juce::Component*>(&waveformSelectionAuditionButton),
+             static_cast<juce::Component*>(&waveformSnapToggle),
              static_cast<juce::Component*>(&waveformLoopModeSelector),
              static_cast<juce::Component*>(&waveformLoopStartEditor),
              static_cast<juce::Component*>(&waveformLoopEndEditor),
@@ -2586,8 +2654,38 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Shows the selection path for the active workbench.");
     configureAccessibleMetadata(waveformPreview,
                                 "Waveform preview",
-                                "Displays the selected zone waveform and editable SFZ loop region.",
-                                "Drag labeled loop handles, Shift-drag a temporary selection, or use the loop controls below the canvas.");
+                                "Displays editable SFZ playback and loop regions for the selected zone.",
+                                "Drag playback or loop handles, Command-drag the playback region, Shift-drag a temporary selection, or use the numeric controls. Hold Alt to bypass zero-crossing snap.");
+    configureAccessibleMetadata(waveformPlaybackStartEditor,
+                                "Playback offset",
+                                "Effective SFZ offset in source frames, or a time value ending in s.");
+    configureAccessibleMetadata(waveformPlaybackEndEditor,
+                                "Playback end",
+                                "Effective exclusive playback end; imported SFZ end values are converted from inclusive coordinates.");
+    configureAccessibleMetadata(waveformPlaybackApplyButton,
+                                "Apply playback region",
+                                "Commits offset and end as one undoable non-destructive edit.");
+    configureAccessibleMetadata(waveformPlaybackResetButton,
+                                "Reset playback to source",
+                                "Restores offset zero and source-end playback without changing the source file.");
+    configureAccessibleMetadata(waveformSetPlaybackSelectionButton,
+                                "Set playback region to selection",
+                                "Commits the temporary selection as the playback region.");
+    configureAccessibleMetadata(waveformSelectPlaybackButton,
+                                "Select playback region",
+                                "Creates a temporary selection matching the current playback region.");
+    configureAccessibleMetadata(waveformSelectLoopButton,
+                                "Select loop region",
+                                "Creates a temporary selection matching the current loop.");
+    configureAccessibleMetadata(waveformPlaybackAuditionButton,
+                                "Audition playback region",
+                                "Auditions only the effective non-destructive playback region.");
+    configureAccessibleMetadata(waveformSelectionAuditionButton,
+                                "Audition waveform selection",
+                                "Auditions only the temporary waveform selection without authoring it.");
+    configureAccessibleMetadata(waveformSnapToggle,
+                                "Zero-crossing snap",
+                                "Searches a bounded window on a worker thread; hold Alt while dragging for direct frame editing.");
     configureAccessibleMetadata(waveformLoopModeSelector,
                                 "SFZ loop mode",
                                 "Chooses no_loop, one_shot, loop_continuous, or loop_sustain.");
@@ -2627,8 +2725,18 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Press to validate the current project sources or cancel an active validation.");
     sourceValidationButton.setExplicitFocusOrder(66);
     waveformLoopModeSelector.setExplicitFocusOrder(67);
-    waveformLoopStartEditor.setExplicitFocusOrder(68);
-    waveformLoopEndEditor.setExplicitFocusOrder(69);
+    waveformPlaybackStartEditor.setExplicitFocusOrder(68);
+    waveformPlaybackEndEditor.setExplicitFocusOrder(69);
+    waveformPlaybackApplyButton.setExplicitFocusOrder(70);
+    waveformPlaybackResetButton.setExplicitFocusOrder(71);
+    waveformSetPlaybackSelectionButton.setExplicitFocusOrder(72);
+    waveformSelectPlaybackButton.setExplicitFocusOrder(73);
+    waveformSelectLoopButton.setExplicitFocusOrder(74);
+    waveformPlaybackAuditionButton.setExplicitFocusOrder(75);
+    waveformSelectionAuditionButton.setExplicitFocusOrder(76);
+    waveformSnapToggle.setExplicitFocusOrder(77);
+    waveformLoopStartEditor.setExplicitFocusOrder(78);
+    waveformLoopEndEditor.setExplicitFocusOrder(79);
 
     configureAccessibleMetadata(macroList,
                                 "Macro list",
@@ -3129,49 +3237,74 @@ void AuthoringPanel::resized()
 
     if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
     {
-        const auto wideLoopControls = workbenchEditorArea.getWidth() >= 760;
-        auto loopControls = workbenchEditorArea.removeFromTop(
-            std::min(wideLoopControls ? 28 : 54,
-                     std::max(0, workbenchEditorArea.getHeight() / 3)));
+        auto regionControls = workbenchEditorArea.removeFromTop(
+            std::min(112, std::max(0, workbenchEditorArea.getHeight() / 2)));
         workbenchEditorArea.removeFromTop(std::min(4, workbenchEditorArea.getHeight()));
-        if (wideLoopControls)
+        const auto controlRowHeight = std::max(1,
+            std::min(25, std::max(0, regionControls.getHeight() - 9) / 4));
+        const auto gap = [](juce::Rectangle<int>& row)
         {
-            waveformLoopModeSelector.setBounds(loopControls.removeFromLeft(146));
-            loopControls.removeFromLeft(6);
-            waveformLoopStartEditor.setBounds(loopControls.removeFromLeft(108));
-            loopControls.removeFromLeft(6);
-            waveformLoopEndEditor.setBounds(loopControls.removeFromLeft(108));
-            loopControls.removeFromLeft(6);
-            waveformLoopApplyButton.setBounds(loopControls.removeFromLeft(62));
-            loopControls.removeFromLeft(6);
-            waveformSetLoopSelectionButton.setBounds(loopControls.removeFromLeft(150));
-            loopControls.removeFromLeft(6);
-            waveformLoopAuditionButton.setBounds(loopControls.removeFromLeft(106));
-            loopControls.removeFromLeft(std::min(8, loopControls.getWidth()));
-            waveformLoopGuidanceLabel.setBounds(loopControls);
-        }
-        else
-        {
-            auto firstControlRow = loopControls.removeFromTop(25);
-            waveformLoopModeSelector.setBounds(firstControlRow.removeFromLeft(
-                std::min(138, firstControlRow.getWidth() / 3)));
-            firstControlRow.removeFromLeft(std::min(4, firstControlRow.getWidth()));
-            waveformLoopStartEditor.setBounds(firstControlRow.removeFromLeft(
-                std::min(100, firstControlRow.getWidth() / 3)));
-            firstControlRow.removeFromLeft(std::min(4, firstControlRow.getWidth()));
-            waveformLoopEndEditor.setBounds(firstControlRow.removeFromLeft(
-                std::min(100, firstControlRow.getWidth() / 2)));
-            firstControlRow.removeFromLeft(std::min(4, firstControlRow.getWidth()));
-            waveformLoopApplyButton.setBounds(firstControlRow);
-            auto secondControlRow = loopControls.removeFromBottom(25);
-            waveformSetLoopSelectionButton.setBounds(secondControlRow.removeFromLeft(
-                std::min(146, secondControlRow.getWidth() / 3)));
-            secondControlRow.removeFromLeft(std::min(4, secondControlRow.getWidth()));
-            waveformLoopAuditionButton.setBounds(secondControlRow.removeFromLeft(
-                std::min(104, secondControlRow.getWidth() / 3)));
-            secondControlRow.removeFromLeft(std::min(6, secondControlRow.getWidth()));
-            waveformLoopGuidanceLabel.setBounds(secondControlRow);
-        }
+            row.removeFromLeft(std::min(4, row.getWidth()));
+        };
+        auto playbackRow = regionControls.removeFromTop(
+            std::min(controlRowHeight, regionControls.getHeight()));
+        waveformPlaybackStartEditor.setBounds(playbackRow.removeFromLeft(
+            std::min(126, playbackRow.getWidth() / 4)));
+        gap(playbackRow);
+        waveformPlaybackEndEditor.setBounds(playbackRow.removeFromLeft(
+            std::min(126, playbackRow.getWidth() / 3)));
+        gap(playbackRow);
+        waveformPlaybackApplyButton.setBounds(playbackRow.removeFromLeft(
+            std::min(94, playbackRow.getWidth() / 2)));
+        gap(playbackRow);
+        waveformPlaybackResetButton.setBounds(playbackRow.removeFromLeft(
+            std::min(98, playbackRow.getWidth())));
+
+        regionControls.removeFromTop(std::min(3, regionControls.getHeight()));
+        auto selectionRow = regionControls.removeFromTop(
+            std::min(controlRowHeight, regionControls.getHeight()));
+        waveformSetPlaybackSelectionButton.setBounds(selectionRow.removeFromLeft(
+            std::min(156, selectionRow.getWidth() / 3)));
+        gap(selectionRow);
+        waveformSelectPlaybackButton.setBounds(selectionRow.removeFromLeft(
+            std::min(118, selectionRow.getWidth() / 2)));
+        gap(selectionRow);
+        waveformSelectLoopButton.setBounds(selectionRow.removeFromLeft(
+            std::min(96, selectionRow.getWidth())));
+
+        regionControls.removeFromTop(std::min(3, regionControls.getHeight()));
+        auto loopRow = regionControls.removeFromTop(
+            std::min(controlRowHeight, regionControls.getHeight()));
+        waveformLoopModeSelector.setBounds(loopRow.removeFromLeft(
+            std::min(138, loopRow.getWidth() / 5)));
+        gap(loopRow);
+        waveformLoopStartEditor.setBounds(loopRow.removeFromLeft(
+            std::min(104, loopRow.getWidth() / 4)));
+        gap(loopRow);
+        waveformLoopEndEditor.setBounds(loopRow.removeFromLeft(
+            std::min(104, loopRow.getWidth() / 3)));
+        gap(loopRow);
+        waveformLoopApplyButton.setBounds(loopRow.removeFromLeft(
+            std::min(62, loopRow.getWidth() / 2)));
+        gap(loopRow);
+        waveformSetLoopSelectionButton.setBounds(loopRow.removeFromLeft(
+            std::min(150, loopRow.getWidth())));
+
+        regionControls.removeFromTop(std::min(3, regionControls.getHeight()));
+        auto auditionRow = regionControls;
+        waveformPlaybackAuditionButton.setBounds(auditionRow.removeFromLeft(
+            std::min(112, auditionRow.getWidth() / 5)));
+        gap(auditionRow);
+        waveformLoopAuditionButton.setBounds(auditionRow.removeFromLeft(
+            std::min(104, auditionRow.getWidth() / 4)));
+        gap(auditionRow);
+        waveformSelectionAuditionButton.setBounds(auditionRow.removeFromLeft(
+            std::min(130, auditionRow.getWidth() / 3)));
+        gap(auditionRow);
+        waveformSnapToggle.setBounds(auditionRow.removeFromLeft(
+            std::min(94, auditionRow.getWidth() / 2)));
+        gap(auditionRow);
+        waveformLoopGuidanceLabel.setBounds(auditionRow);
 
         const auto footerHeight = workbenchEditorArea.getWidth() >= 620 ? 52 : 82;
         auto footer = workbenchEditorArea.removeFromBottom(
@@ -4393,6 +4526,16 @@ void AuthoringPanel::refreshWorkbenchVisibility()
         || isComponentFocusedWithin(focusedComponent, waveformInfoLabel)
         || isComponentFocusedWithin(focusedComponent, loopInfoLabel)
         || isComponentFocusedWithin(focusedComponent, importMetricsLabel)
+        || isComponentFocusedWithin(focusedComponent, waveformPlaybackStartEditor)
+        || isComponentFocusedWithin(focusedComponent, waveformPlaybackEndEditor)
+        || isComponentFocusedWithin(focusedComponent, waveformPlaybackApplyButton)
+        || isComponentFocusedWithin(focusedComponent, waveformPlaybackResetButton)
+        || isComponentFocusedWithin(focusedComponent, waveformSetPlaybackSelectionButton)
+        || isComponentFocusedWithin(focusedComponent, waveformSelectPlaybackButton)
+        || isComponentFocusedWithin(focusedComponent, waveformSelectLoopButton)
+        || isComponentFocusedWithin(focusedComponent, waveformPlaybackAuditionButton)
+        || isComponentFocusedWithin(focusedComponent, waveformSelectionAuditionButton)
+        || isComponentFocusedWithin(focusedComponent, waveformSnapToggle)
         || isComponentFocusedWithin(focusedComponent, waveformLoopModeSelector)
         || isComponentFocusedWithin(focusedComponent, waveformLoopStartEditor)
         || isComponentFocusedWithin(focusedComponent, waveformLoopEndEditor)
@@ -4474,6 +4617,16 @@ void AuthoringPanel::refreshWorkbenchVisibility()
     setVisibleAndAccessible(waveformInfoLabel, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(loopInfoLabel, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(importMetricsLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackStartEditor, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackEndEditor, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackApplyButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackResetButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformSetPlaybackSelectionButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformSelectPlaybackButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformSelectLoopButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackAuditionButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformSelectionAuditionButton, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformSnapToggle, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopModeSelector, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopStartEditor, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopEndEditor, workbenchContentVisible && waveformTab);
@@ -5319,39 +5472,48 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
 
     if (waveformAuditionCueActive && preview.available && preview.sampleRate > 0.0)
     {
-        constexpr auto heldSeconds = 0.180;
+        const auto audition = waveformAuditionRegion.valid
+            ? waveformAuditionRegion
+            : drs::engine::resolveWaveformAuditionRegion(
+                drs::engine::WaveformAuditionMode::playbackRegion,
+                { { preview.playbackStartFrame,
+                    preview.playbackEndFrameExclusive == 0
+                        ? preview.frameCount : preview.playbackEndFrameExclusive },
+                  { preview.loopStartFrame, preview.loopEndFrame }, preview.loopEnabled },
+                {}, preview.frameCount);
+        const auto heldSeconds = audition.loopActive ? 0.350
+            : static_cast<double>(audition.playback.length()) / preview.sampleRate;
         const auto elapsedSeconds = std::max(
             0.0, (juce::Time::getMillisecondCounterHiRes() - waveformAuditionCueStartedMillis) / 1000.0);
         const auto compatibilityReleaseSeconds = 2048.0 / preview.sampleRate;
         const auto releaseSeconds = preview.releaseSeconds > 0.0
             ? preview.releaseSeconds : compatibilityReleaseSeconds;
-        const auto oneShot = preview.loopMode == drs::engine::RegionLoopMode::oneShot;
-        const auto cueDuration = oneShot
-            ? std::max(0.0, preview.durationSeconds)
-            : heldSeconds + releaseSeconds;
+        const auto cueDuration = heldSeconds + releaseSeconds;
 
         const auto linearFrameAt = [&](const double seconds)
         {
             const auto advanced = static_cast<long double>(seconds)
                 * static_cast<long double>(preview.sampleRate);
             const auto maximumAdvance = static_cast<long double>(
-                std::numeric_limits<std::uint64_t>::max() - preview.playbackStartFrame);
-            return preview.playbackStartFrame
+                std::numeric_limits<std::uint64_t>::max() - audition.playback.startFrame);
+            return audition.playback.startFrame
                 + static_cast<std::uint64_t>(std::min(advanced, maximumAdvance));
         };
         const auto wrapFrame = [&](const std::uint64_t linearFrame)
         {
-            if (!preview.loopEnabled || preview.loopStartFrame >= preview.loopEndFrame
-                || linearFrame < preview.loopStartFrame)
+            if (!audition.loopActive || audition.loop.empty()
+                || linearFrame < audition.loop.startFrame)
                 return linearFrame;
-            const auto loopLength = preview.loopEndFrame - preview.loopStartFrame;
-            return preview.loopStartFrame + (linearFrame - preview.loopStartFrame) % loopLength;
+            const auto loopLength = audition.loop.length();
+            return audition.loop.startFrame + (linearFrame - audition.loop.startFrame) % loopLength;
         };
 
         auto playheadFrame = linearFrameAt(elapsedSeconds);
-        if (preview.loopMode == drs::engine::RegionLoopMode::loopContinuous)
+        if (audition.loopActive
+            && preview.loopMode == drs::engine::RegionLoopMode::loopContinuous)
             playheadFrame = wrapFrame(playheadFrame);
-        else if (preview.loopMode == drs::engine::RegionLoopMode::loopSustain)
+        else if (audition.loopActive
+                 && preview.loopMode == drs::engine::RegionLoopMode::loopSustain)
         {
             if (elapsedSeconds <= heldSeconds)
                 playheadFrame = wrapFrame(playheadFrame);
@@ -5366,9 +5528,8 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
             }
         }
 
-        const auto playbackEnd = preview.playbackEndFrameExclusive == 0
-            ? preview.frameCount : preview.playbackEndFrameExclusive;
-        if (elapsedSeconds <= cueDuration && playheadFrame < playbackEnd)
+        if (elapsedSeconds <= cueDuration
+            && playheadFrame < audition.playback.endFrameExclusive)
         {
             preview.playheadVisible = true;
             preview.playheadFrame = playheadFrame;
@@ -5376,6 +5537,7 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
         else
         {
             waveformAuditionCueActive = false;
+            waveformAuditionRegion = {};
         }
     }
 
@@ -5393,6 +5555,12 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
         return 1;
     }();
     waveformLoopModeSelector.setSelectedId(modeSelectorId, juce::dontSendNotification);
+    const auto playbackEnd = preview.playbackEndFrameExclusive == 0
+        ? preview.frameCount : preview.playbackEndFrameExclusive;
+    waveformPlaybackStartEditor.setText(juce::String(preview.playbackStartFrame),
+                                         juce::dontSendNotification);
+    waveformPlaybackEndEditor.setText(juce::String(playbackEnd),
+                                       juce::dontSendNotification);
     waveformLoopStartEditor.setText(juce::String(preview.loopStartFrame), juce::dontSendNotification);
     waveformLoopEndEditor.setText(juce::String(preview.loopEndFrame), juce::dontSendNotification);
     const auto hasEditableSource = preview.available && preview.frameCount > preview.playbackStartFrame;
@@ -5402,6 +5570,20 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
     waveformLoopApplyButton.setEnabled(hasEditableSource);
     waveformSetLoopSelectionButton.setEnabled(hasEditableSource);
     waveformLoopAuditionButton.setEnabled(hasEditableSource && previewStatus.auditionAvailable);
+    waveformPlaybackStartEditor.setEnabled(hasEditableSource);
+    waveformPlaybackEndEditor.setEnabled(hasEditableSource);
+    waveformPlaybackApplyButton.setEnabled(hasEditableSource);
+    waveformPlaybackResetButton.setEnabled(hasEditableSource
+        && (preview.playbackStartFrame != 0 || playbackEnd != preview.frameCount));
+    waveformSetPlaybackSelectionButton.setEnabled(hasEditableSource && waveformPreview.hasSelection());
+    waveformSelectPlaybackButton.setEnabled(hasEditableSource);
+    waveformSelectLoopButton.setEnabled(hasEditableSource && preview.loopEnabled);
+    waveformPlaybackAuditionButton.setEnabled(hasEditableSource && previewStatus.auditionAvailable);
+    waveformSelectionAuditionButton.setEnabled(hasEditableSource
+        && waveformPreview.hasSelection() && previewStatus.auditionAvailable);
+    waveformSnapToggle.setEnabled(hasEditableSource && !preview.sourcePath.empty());
+    waveformSnapToggle.setToggleState(waveformPreview.isZeroCrossingSnapEnabled(),
+                                      juce::dontSendNotification);
     const auto loopGuidance = [&]() -> juce::String
     {
         switch (preview.loopMode)
@@ -5417,7 +5599,13 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
         }
         return {};
     }();
-    waveformLoopGuidanceLabel.setText(loopGuidance, juce::dontSendNotification);
+    waveformLoopGuidanceLabel.setText(
+        "SFZ offset/end · "
+            + juce::String::fromUTF8(preview.regionProvenance.empty()
+                  ? "authored/default" : preview.regionProvenance.c_str())
+            + " | " + loopGuidance
+            + " | " + juce::String::fromUTF8(waveformPreview.getSnapStatus().c_str()),
+        juce::dontSendNotification);
     waveformStatusLabel.setText(formatAuthoringPreviewStatus(previewStatus), juce::dontSendNotification);
     previewStopButton.setEnabled(previewStatus.stopAvailable);
     previewStopButton.setDescription(previewStatus.stopAvailable
@@ -5563,6 +5751,101 @@ std::optional<std::uint64_t> AuthoringPanel::parseWaveformFrameText(
     return frames;
 }
 
+void AuthoringPanel::commitWaveformPlaybackRegion(const std::uint64_t startFrame,
+                                                  const std::uint64_t endFrameExclusive,
+                                                  const std::string& label)
+{
+    const auto selectedZone = authoringSession.getSelectedZone();
+    if (!selectedZone.has_value())
+        return;
+    AuthoringWaveformPreview preview;
+    if (waveformPreviewProvider)
+        preview = waveformPreviewProvider();
+    if (!preview.available || preview.frameCount == 0)
+        return;
+
+    const auto playback = drs::engine::normalizePlaybackRegion(
+        { startFrame, endFrameExclusive }, preview.frameCount);
+    if (playback.empty())
+        return;
+    auto editedZone = *selectedZone;
+    editedZone.sampleStartFrame = playback.startFrame;
+    editedZone.sampleEndFrame = playback.endFrameExclusive == preview.frameCount
+        ? 0 : playback.endFrameExclusive;
+    if (editedZone.loopEnabled && editedZone.loopStartFrame < editedZone.loopEndFrame)
+    {
+        const auto loop = drs::engine::normalizeLoopRegion(
+            { editedZone.loopStartFrame, editedZone.loopEndFrame }, playback);
+        editedZone.loopStartFrame = loop.startFrame;
+        editedZone.loopEndFrame = loop.endFrameExclusive;
+    }
+    if (editedZone.sampleStartFrame == selectedZone->sampleStartFrame
+        && editedZone.sampleEndFrame == selectedZone->sampleEndFrame
+        && editedZone.loopStartFrame == selectedZone->loopStartFrame
+        && editedZone.loopEndFrame == selectedZone->loopEndFrame)
+        return;
+    const auto result = authoringSession.updateSelectedZone(editedZone, label);
+    if (!result.applied)
+        return;
+    refreshFromSession();
+    if (onPrepareDraftPlaybackRequested)
+        onPrepareDraftPlaybackRequested();
+}
+
+void AuthoringPanel::commitWaveformPlaybackControls(const std::string& label)
+{
+    if (isRefreshing)
+        return;
+    AuthoringWaveformPreview preview;
+    if (waveformPreviewProvider)
+        preview = waveformPreviewProvider();
+    const auto start = parseWaveformFrameText(waveformPlaybackStartEditor.getText(),
+                                               preview.sampleRate);
+    const auto end = parseWaveformFrameText(waveformPlaybackEndEditor.getText(),
+                                             preview.sampleRate);
+    if (start.has_value() && end.has_value())
+        commitWaveformPlaybackRegion(*start, *end, label);
+}
+
+void AuthoringPanel::resetWaveformPlaybackRegion()
+{
+    AuthoringWaveformPreview preview;
+    if (waveformPreviewProvider)
+        preview = waveformPreviewProvider();
+    if (preview.frameCount > 0)
+        commitWaveformPlaybackRegion(0, preview.frameCount,
+                                     "Reset SFZ playback region to source");
+}
+
+void AuthoringPanel::setWaveformPlaybackToSelection()
+{
+    const auto selection = waveformPreview.getSelectionFrames();
+    if (selection.empty())
+        return;
+    commitWaveformPlaybackRegion(selection.startFrame, selection.endFrameExclusive,
+                                 "Set SFZ playback region to waveform selection");
+    waveformPreview.clearSelection();
+}
+
+void AuthoringPanel::selectWaveformPlaybackRegion()
+{
+    AuthoringWaveformPreview preview;
+    if (waveformPreviewProvider)
+        preview = waveformPreviewProvider();
+    const auto end = preview.playbackEndFrameExclusive == 0
+        ? preview.frameCount : preview.playbackEndFrameExclusive;
+    waveformPreview.setSelectionFrames({ preview.playbackStartFrame, end });
+}
+
+void AuthoringPanel::selectWaveformLoopRegion()
+{
+    AuthoringWaveformPreview preview;
+    if (waveformPreviewProvider)
+        preview = waveformPreviewProvider();
+    if (preview.loopEnabled)
+        waveformPreview.setSelectionFrames({ preview.loopStartFrame, preview.loopEndFrame });
+}
+
 void AuthoringPanel::commitWaveformLoopRegion(const std::uint64_t startFrame,
                                                const std::uint64_t endFrameExclusive,
                                                const std::string& label)
@@ -5675,16 +5958,55 @@ void AuthoringPanel::setWaveformLoopToSelection()
 
 void AuthoringPanel::auditionWaveformLoop()
 {
-    if (!previewEnabledToggle.getToggleState())
+    auditionWaveformRegion(drs::engine::WaveformAuditionMode::loopRegion);
+}
+
+void AuthoringPanel::auditionWaveformRegion(const drs::engine::WaveformAuditionMode mode)
+{
+    if (!previewEnabledToggle.getToggleState() || !previewCommandCallback)
         return;
     AuthoringWaveformPreview preview;
     if (waveformPreviewProvider)
         preview = waveformPreviewProvider();
-    if (!preview.available)
+    const auto playbackEnd = preview.playbackEndFrameExclusive == 0
+        ? preview.frameCount : preview.playbackEndFrameExclusive;
+    const auto audition = drs::engine::resolveWaveformAuditionRegion(
+        mode,
+        { { preview.playbackStartFrame, playbackEnd },
+          { preview.loopStartFrame, preview.loopEndFrame }, preview.loopEnabled },
+        waveformPreview.getSelectionFrames(), preview.frameCount);
+    const auto request = authoringSession.buildSelectedZonePreviewRequest();
+    if (!preview.available || !audition.valid || !request.available)
         return;
+
+    constexpr auto source = drs::engine::AuthoringPreviewAuditionSource::inspector;
+    const auto sourceIndex = static_cast<std::size_t>(source);
+    releaseTimedPreview(sourceIndex);
+    drs::engine::AuthoringPreviewCommand command;
+    command.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+    command.source = source;
+    command.midiNote = request.midiNote;
+    command.velocity = static_cast<float>(request.velocity) / 127.0f;
+    command.selectedZoneId = authoringSession.getSelectedZone()->id;
+    command.hasAuditionRegion = true;
+    command.auditionStartFrame = audition.playback.startFrame;
+    command.auditionEndFrameExclusive = audition.playback.endFrameExclusive;
+    command.auditionLoopEnabled = audition.loopActive;
+    command.auditionLoopStartFrame = audition.loop.startFrame;
+    command.auditionLoopEndFrameExclusive = audition.loop.endFrameExclusive;
+    previewCommandCallback(command);
+
+    waveformAuditionRegion = audition;
     waveformAuditionCueActive = true;
     waveformAuditionCueStartedMillis = juce::Time::getMillisecondCounterHiRes();
-    previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
+    const auto durationMillis = preview.sampleRate > 0.0
+        ? 1000.0 * static_cast<double>(audition.playback.length()) / preview.sampleRate
+        : 180.0;
+    const auto releaseDelay = audition.loopActive ? 350.0
+        : std::clamp(durationMillis + 20.0, 180.0, 3000.0);
+    timedPreviewNotes[sourceIndex] = { true, request.midiNote,
+                                       waveformAuditionCueStartedMillis + releaseDelay };
+    startTimer(previewReleaseTimerId, 10);
     refreshWaveformWorkbenchContent();
 }
 

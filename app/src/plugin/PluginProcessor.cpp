@@ -1445,7 +1445,13 @@ bool Processor::submitAuthoringPreviewCommand(
         eventType,
         clampMidiValue(dispatch.event.midiNote),
         std::clamp(dispatch.event.velocity, 0.0f, 1.0f),
-        dispatch.event.sampleOffset
+        dispatch.event.sampleOffset,
+        dispatch.event.hasAuditionRegion,
+        dispatch.event.auditionStartFrame,
+        dispatch.event.auditionEndFrameExclusive,
+        dispatch.event.auditionLoopEnabled,
+        dispatch.event.auditionLoopStartFrame,
+        dispatch.event.auditionLoopEndFrameExclusive
     };
     if (dispatch.preparationRequested)
     {
@@ -4008,12 +4014,19 @@ void Processor::drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
         const auto sampleOffset = frameCount == 0
             ? 0u
             : std::min(event.sampleOffset, frameCount - 1u);
-        destination.push({ event.type,
-                           sampleOffset,
-                           static_cast<std::uint8_t>(clampMidiValue(event.midiNoteNumber)),
-                           event.type == drs::engine::SamplerRenderEventType::noteOn
-                               ? std::max(event.velocity, 1.0f / 127.0f)
-                               : 0.0f });
+        drs::engine::SamplerRenderEvent renderEvent;
+        renderEvent.type = event.type;
+        renderEvent.sampleOffset = sampleOffset;
+        renderEvent.midiNote = static_cast<std::uint8_t>(clampMidiValue(event.midiNoteNumber));
+        renderEvent.velocity = event.type == drs::engine::SamplerRenderEventType::noteOn
+            ? std::max(event.velocity, 1.0f / 127.0f) : 0.0f;
+        renderEvent.hasPlaybackRegionOverride = event.hasPlaybackRegionOverride;
+        renderEvent.playbackStartFrameOverride = event.playbackStartFrameOverride;
+        renderEvent.playbackEndFrameExclusiveOverride = event.playbackEndFrameExclusiveOverride;
+        renderEvent.loopOverrideEnabled = event.loopOverrideEnabled;
+        renderEvent.loopStartFrameOverride = event.loopStartFrameOverride;
+        renderEvent.loopEndFrameExclusiveOverride = event.loopEndFrameExclusiveOverride;
+        destination.push(renderEvent);
     }
 }
 

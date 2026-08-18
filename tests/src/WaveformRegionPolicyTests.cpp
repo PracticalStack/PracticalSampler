@@ -106,6 +106,50 @@ int main()
         require(regions.playback.contains(regions.loop),
                 "Every accepted boundary drag must preserve loop containment.");
 
+        const auto movedRight = movePlaybackRegion(
+            { { 10, 50 }, { 20, 30 }, true }, 80, 100);
+        require(movedRight.playback.startFrame == 60
+                    && movedRight.playback.endFrameExclusive == 100
+                    && movedRight.loop.startFrame == 70
+                    && movedRight.loop.endFrameExclusive == 80,
+                "Moving a playback region must preserve its length and contained loop offset at source edges.");
+        const auto movedLeft = movePlaybackRegion(movedRight, -100, 100);
+        require(movedLeft.playback.startFrame == 0
+                    && movedLeft.loop.startFrame == 10,
+                "Playback-region moves must clamp without separating the contained loop.");
+
+        const auto snapped = chooseWaveformSnapCandidate(
+            52, { 60, 50, 54 }, { 10, 90 }, 4);
+        require(snapped.applied && snapped.resolvedFrame == 50,
+                "Snapping must choose the nearest legal candidate and prefer the earlier frame on ties.");
+        const auto bypassed = chooseWaveformSnapCandidate(
+            52, { 50 }, { 10, 90 }, 4, true);
+        require(!bypassed.applied && bypassed.resolvedFrame == 52,
+                "The explicit bypass must retain direct unsnapped frame editing.");
+        const auto outOfRangeSnap = chooseWaveformSnapCandidate(
+            5, { 0, 20 }, { 10, 90 }, 4);
+        require(!outOfRangeSnap.applied && outOfRangeSnap.resolvedFrame == 10,
+                "Snap candidates outside the legal boundary range must be ignored.");
+
+        const WaveformEditableRegions auditionRegions { { 10, 90 }, { 30, 50 }, true };
+        const auto playbackAudition = resolveWaveformAuditionRegion(
+            WaveformAuditionMode::playbackRegion, auditionRegions, {}, 100);
+        const auto loopAudition = resolveWaveformAuditionRegion(
+            WaveformAuditionMode::loopRegion, auditionRegions, {}, 100);
+        const auto selectionAudition = resolveWaveformAuditionRegion(
+            WaveformAuditionMode::selection, auditionRegions, { 60, 75 }, 100);
+        require(playbackAudition.valid && playbackAudition.playback.startFrame == 10
+                    && playbackAudition.loopActive,
+                "Playback audition must retain the authored region and contained loop.");
+        require(loopAudition.valid && loopAudition.playback.startFrame == 30
+                    && loopAudition.playback.endFrameExclusive == 50
+                    && loopAudition.loopActive,
+                "Loop audition must start at and repeat only the loop region.");
+        require(selectionAudition.valid && selectionAudition.playback.startFrame == 60
+                    && selectionAudition.playback.endFrameExclusive == 75
+                    && !selectionAudition.loopActive,
+                "Selection audition must be a bounded non-looping temporary range.");
+
         const auto idleUpdate = transitionWaveformEditGesture(
             WaveformEditGestureState::idle,
             WaveformEditGestureEvent::update);

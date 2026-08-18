@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace drs::engine
 {
@@ -75,6 +76,45 @@ WaveformEditableRegions normalizeBoundaryDrag(WaveformEditableRegions regions,
                                                WaveformRegionBoundary boundary,
                                                std::uint64_t candidateFrame,
                                                std::uint64_t sourceFrameCount) noexcept;
+
+WaveformEditableRegions movePlaybackRegion(WaveformEditableRegions regions,
+                                           std::int64_t deltaFrames,
+                                           std::uint64_t sourceFrameCount) noexcept;
+
+struct WaveformSnapDecision
+{
+    std::uint64_t requestedFrame = 0;
+    std::uint64_t resolvedFrame = 0;
+    bool applied = false;
+};
+
+WaveformSnapDecision chooseWaveformSnapCandidate(
+    std::uint64_t requestedFrame,
+    const std::vector<std::uint64_t>& candidateFrames,
+    WaveformFrameRange legalBounds,
+    std::uint64_t maximumDistance,
+    bool bypassSnap = false) noexcept;
+
+enum class WaveformAuditionMode : std::uint8_t
+{
+    playbackRegion = 0,
+    loopRegion,
+    selection
+};
+
+struct WaveformAuditionRegion
+{
+    WaveformFrameRange playback;
+    WaveformFrameRange loop;
+    bool loopActive = false;
+    bool valid = false;
+};
+
+WaveformAuditionRegion resolveWaveformAuditionRegion(
+    WaveformAuditionMode mode,
+    WaveformEditableRegions regions,
+    WaveformFrameRange selection,
+    std::uint64_t sourceFrameCount) noexcept;
 
 enum class WaveformEditGestureState : std::uint8_t
 {

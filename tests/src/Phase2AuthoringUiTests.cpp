@@ -536,6 +536,8 @@ drs::app::AuthoringWaveformPreview makePreviewFixture()
     preview.sampleRate = 48000.0;
     preview.frameCount = 116064;
     preview.channelCount = 2;
+    preview.playbackStartFrame = 4000;
+    preview.playbackEndFrameExclusive = 110000;
     preview.loopEnabled = true;
     preview.loopMode = drs::engine::RegionLoopMode::loopContinuous;
     preview.loopStartFrame = 12000;
@@ -1609,6 +1611,16 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformImportLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformValidationLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformValidationButton", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackStart", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackEnd", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackApply", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackReset", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformSetPlaybackSelection", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformSelectPlayback", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformSelectLoop", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackAudition", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformSelectionAudition", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformSnapToggle", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopMode", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopStart", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopEnd", panelBounds);
@@ -1738,6 +1750,24 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireButton(panel, "authoringRedoButton").onClick();
     require(session.getSelectedZone()->loopMode == drs::engine::RegionLoopMode::loopSustain,
             "Redo should restore the typed SFZ loop mode transaction.");
+
+    const auto playbackUndoDepth = session.getDocumentState().undoDepth;
+    requireTextEditor(panel, "authoringWaveformPlaybackStart").setText("6000",
+                                                                         juce::dontSendNotification);
+    requireTextEditor(panel, "authoringWaveformPlaybackEnd").setText("100000",
+                                                                       juce::dontSendNotification);
+    requireButton(panel, "authoringWaveformPlaybackApply").onClick();
+    require(session.getSelectedZone()->sampleStartFrame == 6000
+                && session.getSelectedZone()->sampleEndFrame == 100000
+                && session.getDocumentState().undoDepth == playbackUndoDepth + 1,
+            "Numeric playback offset/end entry should commit one non-destructive zone transaction.");
+    requireButton(panel, "authoringUndoButton").onClick();
+    require(session.getSelectedZone()->sampleStartFrame != 6000,
+            "Playback-region numeric entry must participate in normal undo.");
+    requireButton(panel, "authoringRedoButton").onClick();
+    require(session.getSelectedZone()->sampleStartFrame == 6000
+                && session.getSelectedZone()->sampleEndFrame == 100000,
+            "Playback-region numeric entry must participate in normal redo.");
 
     if (shellName == "compact")
     {
@@ -3697,6 +3727,17 @@ void exerciseWaveformViewportGestures()
         committedLoopStart = start;
         committedLoopEnd = end;
     });
+    int playbackCommitCount = 0;
+    std::uint64_t committedPlaybackStart = 0;
+    std::uint64_t committedPlaybackEnd = 0;
+    waveform.setPlaybackRegionCommitCallback([&](const std::uint64_t start,
+                                                  const std::uint64_t end,
+                                                  const std::string&)
+    {
+        ++playbackCommitCount;
+        committedPlaybackStart = start;
+        committedPlaybackEnd = end;
+    });
 
     require(waveform.getViewportFrames().startFrame == 0
                 && waveform.getViewportFrames().endFrameExclusive == preview.frameCount,
@@ -3732,6 +3773,37 @@ void exerciseWaveformViewportGestures()
             "Waveform Home navigation should restore fit-to-source.");
 
     const auto canvas = waveform.getLocalBounds().toFloat().reduced(12.0f);
+    const auto playbackStartX = canvas.getX() + canvas.getWidth()
+        * static_cast<float>(preview.playbackStartFrame) / static_cast<float>(preview.frameCount);
+    const auto playbackStartPoint = juce::Point<float>(playbackStartX, canvas.getY() + 8.0f);
+    const auto playbackDragTarget = juce::Point<float>(playbackStartX + 28.0f, canvas.getY() + 8.0f);
+    const juce::MouseEvent playbackMouseDown(mouseSource,
+                                             playbackStartPoint,
+                                             juce::ModifierKeys::leftButtonModifier,
+                                             1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                             &waveform, &waveform,
+                                             eventTime, playbackStartPoint, eventTime, 1, false);
+    const juce::MouseEvent playbackMouseDrag(mouseSource,
+                                             playbackDragTarget,
+                                             juce::ModifierKeys::leftButtonModifier,
+                                             1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                             &waveform, &waveform,
+                                             eventTime, playbackStartPoint, eventTime, 1, true);
+    waveform.mouseDown(playbackMouseDown);
+    waveform.mouseDrag(playbackMouseDrag);
+    require(playbackCommitCount == 0,
+            "Playback handle movement must remain transient until pointer release.");
+    waveform.mouseUp(playbackMouseDrag);
+    require(playbackCommitCount == 1
+                && committedPlaybackStart > preview.playbackStartFrame
+                && committedPlaybackEnd == preview.playbackEndFrameExclusive,
+            "One playback-handle drag must publish exactly one normalized transaction.");
+    const auto draggedPlaybackStart = committedPlaybackStart;
+    require(waveform.keyPressed(juce::KeyPress(juce::KeyPress::rightKey))
+                && playbackCommitCount == 2
+                && committedPlaybackStart == draggedPlaybackStart + 1,
+            "A focused playback boundary must support single-frame keyboard parity.");
+
     const auto loopStartX = canvas.getX() + canvas.getWidth()
         * static_cast<float>(preview.loopStartFrame) / static_cast<float>(preview.frameCount);
     const auto dragTarget = juce::Point<float>(loopStartX + 42.0f, canvas.getCentreY());

@@ -859,6 +859,12 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 request.effectiveVelocity = effectiveVelocity;
                 request.routeGainMultiplier = routeGainMultiplier;
                 request.outputSampleRate = sampleRate;
+                request.hasPlaybackRegionOverride = event.hasPlaybackRegionOverride;
+                request.playbackStartFrameOverride = event.playbackStartFrameOverride;
+                request.playbackEndFrameExclusiveOverride = event.playbackEndFrameExclusiveOverride;
+                request.loopOverrideEnabled = event.loopOverrideEnabled;
+                request.loopStartFrameOverride = event.loopStartFrameOverride;
+                request.loopEndFrameExclusiveOverride = event.loopEndFrameExclusiveOverride;
                 if (!slot.voice.start(*renderModel, request))
                 {
                     slot.state = SamplerVoiceSlotState::free;

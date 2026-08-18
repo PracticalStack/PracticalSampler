@@ -350,6 +350,35 @@ void runPlaybackRegionMatrix()
     }
     require(rejectedBeyondPhysicalEnd,
             "An authored playback end beyond the physical source must be rejected before render.");
+
+    const auto auditionModel = buildModel(
+        { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f }, {});
+    auto auditionStart = startRequest();
+    auditionStart.hasPlaybackRegionOverride = true;
+    auditionStart.playbackStartFrameOverride = 2;
+    auditionStart.playbackEndFrameExclusiveOverride = 5;
+    drs::engine::SamplerVoice auditionVoice;
+    require(auditionVoice.start(*auditionModel, auditionStart),
+            "A valid temporary audition range should start without changing the render model.");
+    StereoOutput auditionOutput(5);
+    const auto auditionResult = auditionVoice.render(auditionOutput.view(), 0, 5);
+    require(auditionResult.mixedFrameCount == 3 && auditionResult.voiceFinished,
+            "Temporary selection audition must finish at its exclusive event boundary.");
+    requireVector(auditionOutput.left, { 2.0f, 3.0f, 4.0f, 0.0f, 0.0f },
+                  "Temporary audition range changed");
+
+    auditionStart.playbackStartFrameOverride = 1;
+    auditionStart.playbackEndFrameExclusiveOverride = 5;
+    auditionStart.loopOverrideEnabled = true;
+    auditionStart.loopStartFrameOverride = 2;
+    auditionStart.loopEndFrameExclusiveOverride = 4;
+    drs::engine::SamplerVoice loopAuditionVoice;
+    require(loopAuditionVoice.start(*auditionModel, auditionStart),
+            "A contained temporary loop audition should start.");
+    StereoOutput loopAuditionOutput(7);
+    loopAuditionVoice.render(loopAuditionOutput.view(), 0, 7);
+    requireVector(loopAuditionOutput.left, { 1.0f, 2.0f, 3.0f, 2.0f, 3.0f, 2.0f, 3.0f },
+                  "Temporary loop audition changed");
 }
 
 void runReleaseLawMatrix()

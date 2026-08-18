@@ -38,6 +38,12 @@ struct AuthoringPreviewCommand
     bool emitNote = true;
     std::string selectedZoneId;
     std::string selectedGroupId;
+    bool hasAuditionRegion = false;
+    std::uint64_t auditionStartFrame = 0;
+    std::uint64_t auditionEndFrameExclusive = 0;
+    bool auditionLoopEnabled = false;
+    std::uint64_t auditionLoopStartFrame = 0;
+    std::uint64_t auditionLoopEndFrameExclusive = 0;
 };
 
 struct AuthoringPreviewEventCommand
@@ -46,6 +52,12 @@ struct AuthoringPreviewEventCommand
     int midiNote = 60;
     float velocity = 1.0f;
     std::uint32_t sampleOffset = 0;
+    bool hasAuditionRegion = false;
+    std::uint64_t auditionStartFrame = 0;
+    std::uint64_t auditionEndFrameExclusive = 0;
+    bool auditionLoopEnabled = false;
+    std::uint64_t auditionLoopStartFrame = 0;
+    std::uint64_t auditionLoopEndFrameExclusive = 0;
 };
 
 struct AuthoringPreviewCommandDispatch

@@ -1,4 +1,5 @@
 #include "shared/WaveformPreviewService.h"
+#include "shared/WaveformSnapService.h"
 #include "WavImportTestSupport.h"
 
 #include <algorithm>
@@ -140,6 +141,64 @@ int main()
                         && snapshot->cacheBytes <= options.maximumCacheBytes
                         && snapshot->cacheEvictionCount > 0,
                     "Waveform tile cache must remain bounded and report evictions.");
+        }
+
+        {
+            drs::app::WaveformSnapServiceOptions options;
+            options.readerFactory = [&hooks](const std::string& path)
+            {
+                return hooks.createAudioReader(path);
+            };
+            options.maximumCacheEntries = 4;
+            drs::app::WaveformSnapService service(options);
+            drs::app::WaveformSnapRequest request;
+            request.sourceIdentity = "source-a-fingerprint";
+            request.sourcePath = sourceA;
+            request.candidateFrame = 300;
+            request.searchRadiusFrames = 32;
+            require(service.submit(request).accepted && service.waitForTerminal(5s),
+                    "A bounded zero-crossing request should complete off the caller thread.");
+            auto snapshot = service.getSnapshot();
+            require(snapshot != nullptr
+                        && snapshot->stage == drs::app::WaveformSnapServiceStage::completed
+                        && snapshot->decision.applied
+                        && snapshot->decision.resolvedFrame >= 280
+                        && snapshot->decision.resolvedFrame <= 310,
+                    "Zero-crossing analysis should publish the nearest generation-owned candidate.");
+
+            require(service.submit(request).accepted && service.waitForTerminal(5s),
+                    "An identical zero-crossing request should complete from cache.");
+            snapshot = service.getSnapshot();
+            require(snapshot != nullptr && snapshot->cacheHit
+                        && snapshot->cacheEntryCount == 1,
+                    "Zero-crossing cache identity must include source identity, frame, and radius.");
+        }
+
+        {
+            hooks.readGate().arm();
+            drs::app::WaveformSnapServiceOptions options;
+            options.readerFactory = [&hooks](const std::string& path)
+            {
+                return hooks.createAudioReader(path);
+            };
+            drs::app::WaveformSnapService service(options);
+            drs::app::WaveformSnapRequest request;
+            request.sourceIdentity = "cancel-source";
+            request.sourcePath = sourceA;
+            request.candidateFrame = 100;
+            request.searchRadiusFrames = 32;
+            require(service.submit(request).accepted
+                        && hooks.readGate().waitUntilBlocked(5s),
+                    "Cancellation coverage requires zero-crossing analysis to reach its bounded read.");
+            require(service.cancel("User bypassed snapping"),
+                    "An active zero-crossing request must be cancellable.");
+            hooks.readGate().release();
+            require(service.waitForTerminal(5s),
+                    "Canceled zero-crossing analysis should publish a terminal snapshot.");
+            const auto snapshot = service.getSnapshot();
+            require(snapshot != nullptr
+                        && snapshot->stage == drs::app::WaveformSnapServiceStage::canceled,
+                    "A canceled snap generation must never publish a candidate.");
         }
 
         std::cout << "Waveform preview service tests passed." << std::endl;

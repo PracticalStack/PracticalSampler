@@ -343,6 +343,12 @@ private:
         int midiNoteNumber = 0;
         float velocity = 0.0f;
         std::uint32_t sampleOffset = 0;
+        bool hasPlaybackRegionOverride = false;
+        std::uint64_t playbackStartFrameOverride = 0;
+        std::uint64_t playbackEndFrameExclusiveOverride = 0;
+        bool loopOverrideEnabled = false;
+        std::uint64_t loopStartFrameOverride = 0;
+        std::uint64_t loopEndFrameExclusiveOverride = 0;
     };
 
     class RealtimeNoteEventQueue

@@ -33,6 +33,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/StatusPanel.h
     src/shared/WaveformPreviewService.cpp
     src/shared/WaveformPreviewService.h
+    src/shared/WaveformSnapService.cpp
+    src/shared/WaveformSnapService.h
     src/shared/WavImportService.cpp
     src/shared/WavImportService.h
     src/shared/WavImportWorkflow.cpp

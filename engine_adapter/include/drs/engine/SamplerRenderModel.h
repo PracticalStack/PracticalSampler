@@ -55,6 +55,12 @@ struct SamplerRenderEvent
     std::uint8_t controllerNumber = 0;
     std::uint8_t controllerValue = 0;
     RoundRobinResetEvent roundRobinResetEvent = RoundRobinResetEvent::articulationChange;
+    bool hasPlaybackRegionOverride = false;
+    std::uint64_t playbackStartFrameOverride = 0;
+    std::uint64_t playbackEndFrameExclusiveOverride = 0;
+    bool loopOverrideEnabled = false;
+    std::uint64_t loopStartFrameOverride = 0;
+    std::uint64_t loopEndFrameExclusiveOverride = 0;
 };
 
 // Non-owning callback views. Their backing storage is owned and bounded by the playback context.

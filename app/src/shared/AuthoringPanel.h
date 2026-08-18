@@ -136,8 +136,17 @@ private:
                                   std::uint64_t endFrameExclusive,
                                   const std::string& label);
     void commitWaveformLoopControls(const std::string& label);
+    void commitWaveformPlaybackRegion(std::uint64_t startFrame,
+                                      std::uint64_t endFrameExclusive,
+                                      const std::string& label);
+    void commitWaveformPlaybackControls(const std::string& label);
+    void resetWaveformPlaybackRegion();
+    void setWaveformPlaybackToSelection();
     void setWaveformLoopToSelection();
+    void selectWaveformPlaybackRegion();
+    void selectWaveformLoopRegion();
     void auditionWaveformLoop();
+    void auditionWaveformRegion(drs::engine::WaveformAuditionMode mode);
     std::optional<std::uint64_t> parseWaveformFrameText(const juce::String& text,
                                                         double sampleRate) const;
     void refreshDraftPlaybackBanner();
@@ -247,6 +256,7 @@ private:
     CrossfadeAuditionSequence crossfadeAuditionSequence;
     bool waveformAuditionCueActive = false;
     double waveformAuditionCueStartedMillis = 0.0;
+    drs::engine::WaveformAuditionRegion waveformAuditionRegion;
     bool isRefreshing = false;
     bool hasObservedSessionRevisions = false;
     std::size_t observedDocumentRevision = 0;
@@ -287,6 +297,16 @@ private:
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
     juce::ComboBox waveformLoopModeSelector;
+    juce::TextEditor waveformPlaybackStartEditor;
+    juce::TextEditor waveformPlaybackEndEditor;
+    juce::TextButton waveformPlaybackApplyButton;
+    juce::TextButton waveformPlaybackResetButton;
+    juce::TextButton waveformSetPlaybackSelectionButton;
+    juce::TextButton waveformSelectPlaybackButton;
+    juce::TextButton waveformSelectLoopButton;
+    juce::TextButton waveformPlaybackAuditionButton;
+    juce::TextButton waveformSelectionAuditionButton;
+    juce::ToggleButton waveformSnapToggle;
     juce::TextEditor waveformLoopStartEditor;
     juce::TextEditor waveformLoopEndEditor;
     juce::TextButton waveformLoopApplyButton;

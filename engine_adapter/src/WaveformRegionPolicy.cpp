@@ -221,6 +221,125 @@ WaveformEditableRegions normalizeBoundaryDrag(WaveformEditableRegions regions,
     return regions;
 }
 
+WaveformEditableRegions movePlaybackRegion(WaveformEditableRegions regions,
+                                           const std::int64_t deltaFrames,
+                                           const std::uint64_t sourceFrameCount) noexcept
+{
+    regions.playback = normalizePlaybackRegion(regions.playback, sourceFrameCount);
+    regions.loop = normalizeLoopRegion(regions.loop, regions.playback);
+    if (regions.playback.empty() || deltaFrames == 0)
+        return regions;
+
+    const auto oldStart = regions.playback.startFrame;
+    const auto length = regions.playback.length();
+    const auto maximumStart = sourceFrameCount - length;
+    std::uint64_t newStart = oldStart;
+    if (deltaFrames < 0)
+    {
+        const auto magnitude = static_cast<std::uint64_t>(-(deltaFrames + 1)) + 1;
+        newStart = magnitude >= oldStart ? 0 : oldStart - magnitude;
+    }
+    else
+    {
+        const auto magnitude = static_cast<std::uint64_t>(deltaFrames);
+        newStart = magnitude >= maximumStart - std::min(oldStart, maximumStart)
+            ? maximumStart : oldStart + magnitude;
+    }
+
+    const auto actualDelta = newStart >= oldStart
+        ? static_cast<std::int64_t>(newStart - oldStart)
+        : -static_cast<std::int64_t>(oldStart - newStart);
+    regions.playback = { newStart, newStart + length };
+    if (regions.loopActive && !regions.loop.empty())
+    {
+        if (actualDelta >= 0)
+        {
+            const auto shift = static_cast<std::uint64_t>(actualDelta);
+            regions.loop.startFrame += shift;
+            regions.loop.endFrameExclusive += shift;
+        }
+        else
+        {
+            const auto shift = static_cast<std::uint64_t>(-actualDelta);
+            regions.loop.startFrame -= shift;
+            regions.loop.endFrameExclusive -= shift;
+        }
+    }
+    return regions;
+}
+
+WaveformSnapDecision chooseWaveformSnapCandidate(
+    const std::uint64_t requestedFrame,
+    const std::vector<std::uint64_t>& candidateFrames,
+    WaveformFrameRange legalBounds,
+    const std::uint64_t maximumDistance,
+    const bool bypassSnap) noexcept
+{
+    if (!legalBounds.ordered())
+        std::swap(legalBounds.startFrame, legalBounds.endFrameExclusive);
+    const auto clamped = clampFrame(requestedFrame,
+                                    legalBounds.startFrame,
+                                    legalBounds.endFrameExclusive);
+    WaveformSnapDecision decision { requestedFrame, clamped, false };
+    if (bypassSnap || candidateFrames.empty())
+        return decision;
+
+    auto bestDistance = maximumDistance;
+    auto found = false;
+    for (const auto candidate : candidateFrames)
+    {
+        if (candidate < legalBounds.startFrame || candidate > legalBounds.endFrameExclusive)
+            continue;
+        const auto distance = candidate >= clamped ? candidate - clamped : clamped - candidate;
+        if (distance > maximumDistance
+            || (found && (distance > bestDistance
+                || (distance == bestDistance && candidate >= decision.resolvedFrame))))
+            continue;
+        decision.resolvedFrame = candidate;
+        bestDistance = distance;
+        found = true;
+    }
+    decision.applied = found && decision.resolvedFrame != clamped;
+    return decision;
+}
+
+WaveformAuditionRegion resolveWaveformAuditionRegion(
+    const WaveformAuditionMode mode,
+    WaveformEditableRegions regions,
+    WaveformFrameRange selection,
+    const std::uint64_t sourceFrameCount) noexcept
+{
+    WaveformAuditionRegion result;
+    if (sourceFrameCount == 0)
+        return result;
+    regions.playback = normalizePlaybackRegion(regions.playback, sourceFrameCount);
+    regions.loop = normalizeLoopRegion(regions.loop, regions.playback);
+    selection = normalizeSelectionRegion(selection, sourceFrameCount);
+
+    switch (mode)
+    {
+        case WaveformAuditionMode::playbackRegion:
+            result.playback = regions.playback;
+            result.loop = regions.loop;
+            result.loopActive = regions.loopActive && !regions.loop.empty();
+            break;
+        case WaveformAuditionMode::loopRegion:
+            if (!regions.loopActive || regions.loop.empty())
+                return result;
+            result.playback = regions.loop;
+            result.loop = regions.loop;
+            result.loopActive = true;
+            break;
+        case WaveformAuditionMode::selection:
+            if (selection.empty())
+                return result;
+            result.playback = selection;
+            break;
+    }
+    result.valid = !result.playback.empty();
+    return result;
+}
+
 WaveformEditGestureTransition transitionWaveformEditGesture(
     const WaveformEditGestureState state,
     const WaveformEditGestureEvent event) noexcept

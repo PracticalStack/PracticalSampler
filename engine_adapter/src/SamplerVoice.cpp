@@ -59,9 +59,13 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     const auto& selectedSample = model.getSamples()[selectedRoute.preparedSampleIndex];
     const auto resolvedPlaybackEnd = resolveSampleEndFrame(selectedRoute.sampleEndFrame,
                                                             selectedSample.frameCount);
+    const auto playbackStart = request.hasPlaybackRegionOverride
+        ? request.playbackStartFrameOverride : selectedRoute.sampleStartFrame;
+    const auto playbackEnd = request.hasPlaybackRegionOverride
+        ? request.playbackEndFrameExclusiveOverride : resolvedPlaybackEnd;
     if (selectedSample.dataSource == nullptr
         || selectedSample.frameCount == 0
-        || selectedRoute.sampleStartFrame >= resolvedPlaybackEnd
+        || playbackStart >= playbackEnd || playbackEnd > selectedSample.frameCount
         || !std::isfinite(selectedSample.sampleRate) || selectedSample.sampleRate <= 0.0)
     {
         return false;
@@ -93,19 +97,24 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     renderModel = &model;
     route = &selectedRoute;
     sample = &selectedSample;
-    positionFrames = static_cast<double>(selectedRoute.sampleStartFrame);
-    playbackEndFrame = resolvedPlaybackEnd;
-    nextLookAheadPublicationFrame = selectedRoute.sampleStartFrame;
+    positionFrames = static_cast<double>(playbackStart);
+    playbackEndFrame = playbackEnd;
+    nextLookAheadPublicationFrame = playbackStart;
     incrementFrames = increment;
     outputSampleRate = request.outputSampleRate;
     baseGain = static_cast<float>(gain);
     panGains = computeSamplerPanGains(selectedRoute.pan);
     const auto effectiveLoopMode = effectiveRegionLoopMode(selectedRoute.loopMode,
                                                             selectedRoute.loopEnabled);
-    loopActive = regionLoopModeLoops(effectiveLoopMode)
-        && selectedRoute.loopStartFrame < selectedRoute.loopEndFrame
-        && selectedRoute.loopStartFrame >= selectedRoute.sampleStartFrame
-        && selectedRoute.loopEndFrame <= playbackEndFrame;
+    loopStartFrame = request.hasPlaybackRegionOverride
+        ? request.loopStartFrameOverride : selectedRoute.loopStartFrame;
+    loopEndFrame = request.hasPlaybackRegionOverride
+        ? request.loopEndFrameExclusiveOverride : selectedRoute.loopEndFrame;
+    loopActive = (request.hasPlaybackRegionOverride
+            ? request.loopOverrideEnabled : regionLoopModeLoops(effectiveLoopMode))
+        && loopStartFrame < loopEndFrame
+        && loopStartFrame >= playbackStart
+        && loopEndFrame <= playbackEndFrame;
     return true;
 }
 
@@ -249,10 +258,10 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
         auto nextFrameIndex = std::min(frameIndex + 1,
                                        static_cast<std::size_t>(playbackEndFrame - 1));
         if (loopActive
-            && frameIndex < route->loopEndFrame
-            && nextFrameIndex >= route->loopEndFrame)
+            && frameIndex < loopEndFrame
+            && nextFrameIndex >= loopEndFrame)
         {
-            nextFrameIndex = static_cast<std::size_t>(route->loopStartFrame);
+            nextFrameIndex = static_cast<std::size_t>(loopStartFrame);
         }
         const auto fraction = static_cast<float>(positionFrames - static_cast<double>(frameIndex));
         const auto currentView = sample->dataSource->acquireFrameView(frameIndex, 1);
@@ -271,10 +280,10 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
                 sample->dataSource->publishPageIntent(
                     nextFrameIndex, SamplePageRequestPriority::lookAhead, voiceId);
             positionFrames += incrementFrames;
-            if (loopActive && positionFrames >= static_cast<double>(route->loopEndFrame))
+            if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
             {
-                const auto loopStart = static_cast<double>(route->loopStartFrame);
-                const auto loopLength = static_cast<double>(route->loopEndFrame - route->loopStartFrame);
+                const auto loopStart = static_cast<double>(loopStartFrame);
+                const auto loopLength = static_cast<double>(loopEndFrame - loopStartFrame);
                 positionFrames = loopStart + std::fmod(positionFrames - loopStart, loopLength);
             }
             if (isReleasing() && releaseSamplesRemaining > 0)
@@ -326,10 +335,10 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             output.channels[1][outputStartFrame + outputFrame] += rightSample;
 
         positionFrames += incrementFrames;
-        if (loopActive && positionFrames >= static_cast<double>(route->loopEndFrame))
+        if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
         {
-            const auto loopStart = static_cast<double>(route->loopStartFrame);
-            const auto loopLength = static_cast<double>(route->loopEndFrame - route->loopStartFrame);
+            const auto loopStart = static_cast<double>(loopStartFrame);
+            const auto loopLength = static_cast<double>(loopEndFrame - loopStartFrame);
             positionFrames = loopStart + std::fmod(positionFrames - loopStart, loopLength);
         }
         ++result.mixedFrameCount;
@@ -369,6 +378,8 @@ void SamplerVoice::reset() noexcept
     sample = nullptr;
     positionFrames = 0.0;
     playbackEndFrame = 0;
+    loopStartFrame = 0;
+    loopEndFrame = 0;
     incrementFrames = 1.0;
     outputSampleRate = 48000.0;
     baseGain = 0.0f;

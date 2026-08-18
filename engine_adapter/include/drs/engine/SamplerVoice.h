@@ -26,6 +26,12 @@ struct SamplerVoiceStartRequest
     double routeGainMultiplier = 1.0;
     double outputSampleRate = 48000.0;
     std::uint64_t activationGeneration = 1;
+    bool hasPlaybackRegionOverride = false;
+    std::uint64_t playbackStartFrameOverride = 0;
+    std::uint64_t playbackEndFrameExclusiveOverride = 0;
+    bool loopOverrideEnabled = false;
+    std::uint64_t loopStartFrameOverride = 0;
+    std::uint64_t loopEndFrameExclusiveOverride = 0;
 };
 
 struct SamplerVoiceRenderResult
@@ -134,6 +140,8 @@ private:
     const SamplerRenderSample* sample = nullptr;
     double positionFrames = 0.0;
     std::uint64_t playbackEndFrame = 0;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
     double incrementFrames = 1.0;
     double outputSampleRate = 48000.0;
     float baseGain = 0.0f;

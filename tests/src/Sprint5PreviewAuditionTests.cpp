@@ -116,6 +116,31 @@ void runCommandOwnershipContract()
                 && !currentDispatch.hasEvent,
             "Current-draft audition must request preparation without inventing a note event.");
 
+    auto ranged = makeCommand(AuthoringPreviewCommandType::auditionSelectedZone,
+                              AuthoringPreviewAuditionSource::inspector);
+    ranged.selectedZoneId = "pad-a3-high";
+    ranged.hasAuditionRegion = true;
+    ranged.auditionStartFrame = 120;
+    ranged.auditionEndFrameExclusive = 240;
+    ranged.auditionLoopEnabled = true;
+    ranged.auditionLoopStartFrame = 160;
+    ranged.auditionLoopEndFrameExclusive = 200;
+    const auto rangedDispatch = adapter.dispatch(ranged);
+    require(rangedDispatch.accepted && rangedDispatch.hasEvent
+                && rangedDispatch.event.hasAuditionRegion
+                && rangedDispatch.event.auditionStartFrame == 120
+                && rangedDispatch.event.auditionEndFrameExclusive == 240
+                && rangedDispatch.event.auditionLoopEnabled,
+            "A temporary audition range must survive Preview command adaptation without changing project state.");
+    auto invalidRange = ranged;
+    invalidRange.auditionLoopEndFrameExclusive = 300;
+    require(!adapter.dispatch(invalidRange).accepted,
+            "Preview adaptation must reject a temporary loop outside its audition range.");
+    require(adapter.dispatch(makeCommand(AuthoringPreviewCommandType::noteOff,
+                                         AuthoringPreviewAuditionSource::inspector,
+                                         ranged.midiNote)).accepted,
+            "Temporary ranged audition coverage must release its owned Preview note.");
+
     constexpr std::array sources {
         AuthoringPreviewAuditionSource::summaryPreview,
         AuthoringPreviewAuditionSource::authoringKeyboard,
@@ -183,6 +208,24 @@ void runProcessorTimingAndIsolation(const drs::engine::RuntimeProjectModel& proj
 
     juce::AudioBuffer<float> buffer(2, 256);
     juce::MidiBuffer midi;
+    auto boundedAudition = makeCommand(AuthoringPreviewCommandType::noteOn,
+                                       AuthoringPreviewAuditionSource::inspector,
+                                       57, 0.8f);
+    boundedAudition.hasAuditionRegion = true;
+    boundedAudition.auditionStartFrame = 0;
+    boundedAudition.auditionEndFrameExclusive = 4;
+    require(processor.submitAuthoringPreviewCommand(boundedAudition),
+            "A bounded selection audition should enter the Preview event queue.");
+    crossBlock(processor, buffer, midi);
+    require(processor.getRealtimeSafetySnapshot().authoringPreviewActiveVoiceCount == 0
+                && processor.getAuthoringPreviewCommandSnapshot().ownedNoteCount == 1,
+            "A four-frame Preview override must cross the realtime queue and finish inside one audio block.");
+    require(processor.submitAuthoringPreviewCommand(
+                makeCommand(AuthoringPreviewCommandType::noteOff,
+                            AuthoringPreviewAuditionSource::inspector, 57)),
+            "A naturally finished selection audition must still release command ownership.");
+    crossBlock(processor, buffer, midi);
+
     auto exact = makeCommand(AuthoringPreviewCommandType::noteOn,
                              AuthoringPreviewAuditionSource::authoringKeyboard,
                              57, 0.8f, 73);
