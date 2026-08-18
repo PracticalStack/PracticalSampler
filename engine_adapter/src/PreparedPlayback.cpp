@@ -13,6 +13,7 @@
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <tuple>
 #include <unordered_map>
@@ -694,6 +695,47 @@ const RuntimeStreamSampleDefinition* findStreamSampleById(const RuntimeStreamCon
     return iterator != container.samples.end() ? &(*iterator) : nullptr;
 }
 } // namespace
+
+PreparedPlaybackPrewarmResult publishPreparedPlaybackRegionPrewarmIntents(
+    const ImmutablePreparedPlayback& prepared)
+{
+    PreparedPlaybackPrewarmResult result;
+    std::set<std::pair<std::size_t, std::uint64_t>> publishedFrames;
+    for (const auto& zone : prepared.zones)
+    {
+        if (zone.preparedSampleIndex >= prepared.samples.size())
+            continue;
+        const auto& sample = prepared.samples[zone.preparedSampleIndex];
+        if (sample.dataSource == nullptr
+            || sample.dataSource->descriptor().kind == SampleDataSourceKind::resident)
+            continue;
+
+        const auto& descriptor = sample.dataSource->descriptor();
+        const auto residentHeadFrames = descriptor.bytesPerFrame == 0
+            ? 0 : descriptor.headSizeBytes / descriptor.bytesPerFrame;
+        const auto plan = buildPlaybackRegionPrewarmPlan(
+            zone.sampleStartFrame,
+            zone.loopEnabled,
+            zone.loopStartFrame,
+            zone.loopEndFrame,
+            zone.loopCrossfadeFrames);
+        for (std::size_t planIndex = 0; planIndex < plan.count; ++planIndex)
+        {
+            const auto frame = plan.frames[planIndex];
+            if (frame < residentHeadFrames
+                || !publishedFrames.emplace(zone.preparedSampleIndex, frame).second)
+                continue;
+            const auto priority = planIndex == 0
+                ? SamplePageRequestPriority::imminent
+                : SamplePageRequestPriority::lookAhead;
+            if (sample.dataSource->publishPageIntent(frame, priority, 0))
+                ++result.publishedIntentCount;
+            else
+                ++result.rejectedIntentCount;
+        }
+    }
+    return result;
+}
 
 ResidentPreparationAdmissionResult assessResidentPreparationAdmission(
     const std::vector<ResidentPreparationSampleMetadata>& samples,
@@ -1610,6 +1652,13 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         result.prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
         result.prepared.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
     }
+
+    // Preparation already owns source I/O and page-service registration. Prime
+    // only the authored start/wrap pages here so a deep playback offset or loop
+    // does not depend on an audio-callback miss to discover its first pages.
+    const auto prewarm = publishPreparedPlaybackRegionPrewarmIntents(result.prepared);
+    result.metrics.prewarmIntentCount = prewarm.publishedIntentCount;
+    result.metrics.rejectedPrewarmIntentCount = prewarm.rejectedIntentCount;
 
     std::unordered_set<std::string> preparedZoneIds;
     preparedZoneIds.reserve(result.prepared.zones.size());

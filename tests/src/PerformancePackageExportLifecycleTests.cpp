@@ -45,6 +45,54 @@ bool containsIssue(const std::vector<std::string>& issues, const std::string_vie
     });
 }
 
+struct SourceFileIdentity
+{
+    fs::path path;
+    std::uint64_t size = 0;
+    fs::file_time_type modificationTime;
+    std::string fingerprint;
+};
+
+std::vector<SourceFileIdentity> captureSourceFileIdentities(
+    const drs::engine::RuntimeProjectModel& project)
+{
+    std::vector<SourceFileIdentity> identities;
+    const auto contentRoot = fs::path(project.contentRootPath);
+    for (const auto& source : project.sampleSources)
+    {
+        SourceFileIdentity identity;
+        identity.path = contentRoot / source.path;
+        require(fs::is_regular_file(identity.path),
+                "Source-identity audit requires every authored sample file.");
+        identity.size = fs::file_size(identity.path);
+        identity.modificationTime = fs::last_write_time(identity.path);
+        const auto fingerprint = drs::engine::fingerprintSampleSourceFile(
+            identity.path.generic_string());
+        require(fingerprint.fingerprinted,
+                "Source-identity audit could not fingerprint an authored sample.");
+        identity.fingerprint = fingerprint.fingerprintHex;
+        identities.push_back(std::move(identity));
+    }
+    return identities;
+}
+
+void requireSourceFileIdentitiesUnchanged(
+    const std::vector<SourceFileIdentity>& before)
+{
+    for (const auto& identity : before)
+    {
+        require(fs::is_regular_file(identity.path)
+                    && fs::file_size(identity.path) == identity.size
+                    && fs::last_write_time(identity.path) == identity.modificationTime,
+                "Non-destructive region workflows must preserve source size and modification time.");
+        const auto fingerprint = drs::engine::fingerprintSampleSourceFile(
+            identity.path.generic_string());
+        require(fingerprint.fingerprinted
+                    && fingerprint.fingerprintHex == identity.fingerprint,
+                "Non-destructive region workflows must preserve every source byte.");
+    }
+}
+
 std::vector<std::uint8_t> buildExportLicenseFixture()
 {
     auto bytes = drs::tests::performance_package::buildLicenseTextFixture();
@@ -368,7 +416,10 @@ int main()
 
         PerformancePackageExportService completionService;
         auto completionClient = completionService.openClient();
-        const auto completedAccepted = completionClient.submit(makeRequest(tempRoot / "completed.drpkg"));
+        const auto completedRequest = makeRequest(tempRoot / "completed.drpkg");
+        const auto sourceIdentitiesBeforeExport = captureSourceFileIdentities(
+            completedRequest.project);
+        const auto completedAccepted = completionClient.submit(completedRequest);
         require(completedAccepted.disposition == PerformancePackageExportSubmitDisposition::accepted,
                 "The completion export request must be accepted.");
         require(completionClient.waitForTerminal(60s),
@@ -704,6 +755,7 @@ int main()
                     && packageLoopVoice.getPositionFrames()
                         < static_cast<double>(renderRoute->loopEndFrame),
                 "The reopened playable package must audibly wrap inside the imported loop region.");
+        requireSourceFileIdentitiesUnchanged(sourceIdentitiesBeforeExport);
         drs::engine::EngineFacade facade;
         const auto activated = facade.activatePreparedPerformancePackageSession(
             std::move(preparedActivation));

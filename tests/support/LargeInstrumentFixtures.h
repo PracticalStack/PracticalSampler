@@ -19,6 +19,59 @@ struct LargeInstrumentScaleFixture
     std::uint64_t sparsePackageOffset = 0;
 };
 
+struct WaveformRegionLargeSourceFixture
+{
+    engine::SampleDataSourceDescriptor singleLongSource;
+    std::vector<engine::SampleDataSourceDescriptor> multiSourceInstrument;
+    std::uint64_t multiSourceAudioBytes = 0;
+    std::uint64_t playbackStartFrame = 0;
+    std::uint64_t playbackEndFrame = 0;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
+};
+
+inline WaveformRegionLargeSourceFixture makeWaveformRegionLargeSourceFixture(
+    const std::size_t sourceCount = 64)
+{
+    constexpr std::uint64_t targetAudioBytes = 500ull * 1024ull * 1024ull;
+    constexpr std::uint64_t bytesPerFrame = 6;
+    WaveformRegionLargeSourceFixture fixture;
+    const auto framesPerSource = (targetAudioBytes / sourceCount) / bytesPerFrame;
+    fixture.multiSourceInstrument.reserve(sourceCount);
+    for (std::size_t index = 0; index < sourceCount; ++index)
+    {
+        engine::SampleDataSourceDescriptor descriptor;
+        descriptor.kind = engine::SampleDataSourceKind::deterministicFake;
+        descriptor.sourceId = "waveform-500mb-source-" + std::to_string(index);
+        descriptor.canonicalSourceIdentity = "fixture://" + descriptor.sourceId;
+        descriptor.provenanceIdentity = "waveform-phase7-generation-1";
+        descriptor.formatName = "pcm24";
+        descriptor.channelLayout = "stereo";
+        descriptor.checksumHex = "fixture";
+        descriptor.sampleRate = 48000.0;
+        descriptor.frameCount = framesPerSource;
+        descriptor.channelCount = 2;
+        descriptor.bytesPerFrame = bytesPerFrame;
+        descriptor.dataOffsetBytes = 44;
+        descriptor.dataSizeBytes = descriptor.frameCount * bytesPerFrame;
+        fixture.multiSourceAudioBytes += descriptor.dataSizeBytes;
+        fixture.multiSourceInstrument.push_back(std::move(descriptor));
+    }
+
+    fixture.singleLongSource = fixture.multiSourceInstrument.front();
+    fixture.singleLongSource.sourceId = "waveform-single-500mb-source";
+    fixture.singleLongSource.canonicalSourceIdentity
+        = "fixture://waveform-single-500mb-source";
+    fixture.singleLongSource.frameCount = targetAudioBytes / bytesPerFrame;
+    fixture.singleLongSource.dataSizeBytes
+        = fixture.singleLongSource.frameCount * bytesPerFrame;
+    fixture.playbackStartFrame = fixture.singleLongSource.frameCount - 2'000'000ull;
+    fixture.playbackEndFrame = fixture.singleLongSource.frameCount - 100'000ull;
+    fixture.loopStartFrame = fixture.singleLongSource.frameCount - 1'500'000ull;
+    fixture.loopEndFrame = fixture.singleLongSource.frameCount - 250'000ull;
+    return fixture;
+}
+
 inline LargeInstrumentScaleFixture makeLargeInstrumentScaleFixture(
     const std::size_t sourceCount = 641,
     const std::size_t routeCount = 1704)

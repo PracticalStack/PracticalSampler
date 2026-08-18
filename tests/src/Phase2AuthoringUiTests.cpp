@@ -1,6 +1,7 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/CuratedDspCatalog.h"
 #include "drs/engine/RuntimeLoader.h"
+#include "drs/engine/SampleImport.h"
 #include "shared/AuthoringPanel.h"
 #include "shared/AuthoringPreviewModel.h"
 #include "shared/authoring/AuthoringSummaryStrip.h"
@@ -23,6 +24,56 @@
 namespace
 {
 namespace fs = std::filesystem;
+
+void require(bool condition, const std::string& message);
+
+struct SourceFileIdentity
+{
+    fs::path path;
+    std::uint64_t size = 0;
+    fs::file_time_type modificationTime;
+    std::string fingerprint;
+};
+
+std::vector<SourceFileIdentity> captureSourceFileIdentities(
+    const drs::engine::RuntimeProjectModel& project,
+    const fs::path& manifestPath)
+{
+    std::vector<SourceFileIdentity> identities;
+    for (const auto& source : project.sampleSources)
+    {
+        auto path = fs::path(source.path);
+        if (path.is_relative())
+            path = manifestPath.parent_path() / path;
+        path = fs::weakly_canonical(path);
+        require(fs::is_regular_file(path),
+                "Authoring immutability audit requires every reference sample.");
+        const auto fingerprint = drs::engine::fingerprintSampleSourceFile(
+            path.generic_string());
+        require(fingerprint.fingerprinted,
+                "Authoring immutability audit could not fingerprint a reference sample.");
+        identities.push_back({ path, fs::file_size(path), fs::last_write_time(path),
+                               fingerprint.fingerprintHex });
+    }
+    return identities;
+}
+
+void requireSourceFileIdentitiesUnchanged(
+    const std::vector<SourceFileIdentity>& identities)
+{
+    for (const auto& identity : identities)
+    {
+        require(fs::is_regular_file(identity.path)
+                    && fs::file_size(identity.path) == identity.size
+                    && fs::last_write_time(identity.path) == identity.modificationTime,
+                "Edit, undo, redo, save, and UI lifecycle work must preserve source metadata.");
+        const auto fingerprint = drs::engine::fingerprintSampleSourceFile(
+            identity.path.generic_string());
+        require(fingerprint.fingerprinted
+                    && fingerprint.fingerprintHex == identity.fingerprint,
+                "Edit, undo, redo, save, and UI lifecycle work must preserve source bytes.");
+    }
+}
 
 class DesktopHostedComponent final : public juce::Component
 {
@@ -3991,6 +4042,9 @@ int main()
 
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "Phase 2 reference project must load for authoring UI characterization.");
+        const auto sourceIdentitiesBeforeAuthoring = captureSourceFileIdentities(
+            projectLoad.project,
+            fs::path(drs::engine::getPhase2ReferenceProjectManifestPath()));
 
         const auto outputDirectory = fs::temp_directory_path() / "drs-phase2-authoring-ui-tests";
         fs::create_directories(outputDirectory);
@@ -4231,6 +4285,7 @@ int main()
             inventory << "- " << finding << "\n";
         require(baselineFindings.empty(),
                 "Authoring UI baseline findings must be empty after Sprint 1 layout hardening.");
+        requireSourceFileIdentitiesUnchanged(sourceIdentitiesBeforeAuthoring);
 
         std::cout << "Phase 2 authoring UI characterization tests passed. Output: "
                   << outputDirectory.string() << std::endl;

@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -140,7 +141,8 @@ int main()
         const auto project = loadPhase2ReferenceProjectManifest();
         require(project.loaded, "Sprint 6.5 requires the authored reference project.");
 
-        drs::plugin::Processor processor;
+        auto processorOwner = std::make_unique<drs::plugin::Processor>();
+        auto& processor = *processorOwner;
         processor.prepareToPlay(48000.0, 256);
         processor.replaceAuthoringProject(project.project);
         require(waitForBootstrapLastKnownGood(processor),
@@ -198,8 +200,10 @@ int main()
         const auto activeModel = buildSamplerRenderModel(activePayload);
         require(activeModel.built && activeModel.model != nullptr,
                 "Offline last-known-good coverage requires the active immutable render model.");
-        SamplerPlaybackContext reference(PlaybackActivationLane::performance);
-        SamplerPlaybackContext rejected(PlaybackActivationLane::performance);
+        auto referenceOwner = std::make_unique<SamplerPlaybackContext>(PlaybackActivationLane::performance);
+        auto rejectedOwner = std::make_unique<SamplerPlaybackContext>(PlaybackActivationLane::performance);
+        auto& reference = *referenceOwner;
+        auto& rejected = *rejectedOwner;
         require(reference.prepare(48000.0) && rejected.prepare(48000.0)
                     && reference.stageActivation(activeModel.model)
                     && rejected.stageActivation(activeModel.model)

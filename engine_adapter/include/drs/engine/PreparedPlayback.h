@@ -199,6 +199,8 @@ struct PreparedPlaybackMetrics
     std::uint64_t preparedPerformanceProgramBytes = 0;
     std::size_t cacheHitCount = 0;
     std::size_t cacheMissCount = 0;
+    std::size_t prewarmIntentCount = 0;
+    std::size_t rejectedPrewarmIntentCount = 0;
     std::size_t failureCount = 0;
     std::size_t cancellationCount = 0;
     std::size_t pendingWorkCount = 0;
@@ -206,6 +208,15 @@ struct PreparedPlaybackMetrics
     std::size_t retiredOwnershipRecordCount = 0;
     std::uint64_t retiredBytesAwaitingCleanup = 0;
 };
+
+struct PreparedPlaybackPrewarmResult
+{
+    std::size_t publishedIntentCount = 0;
+    std::size_t rejectedIntentCount = 0;
+};
+
+PreparedPlaybackPrewarmResult publishPreparedPlaybackRegionPrewarmIntents(
+    const ImmutablePreparedPlayback& prepared);
 
 struct PreparedPlaybackSampleResolution
 {

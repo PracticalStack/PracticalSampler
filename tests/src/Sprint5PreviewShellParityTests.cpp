@@ -11,6 +11,7 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -252,13 +253,13 @@ int main()
         require(loaded.loaded, "Mini Sprint 5.7 requires the authored reference project.");
         runDeterministicMetricsContract();
 
-        drs::standalone::MainComponent standalone(false);
-        standalone.setSize(900, 680);
-        const auto standaloneStatus = prepareShell(standalone.getProcessor(), loaded.project,
+        auto standalone = std::make_unique<drs::standalone::MainComponent>(false);
+        standalone->setSize(900, 680);
+        const auto standaloneStatus = prepareShell(standalone->getProcessor(), loaded.project,
                                                    "Standalone shell");
 
-        drs::plugin::Processor pluginProcessor;
-        const auto pluginStatus = prepareShell(pluginProcessor, loaded.project,
+        auto pluginProcessor = std::make_unique<drs::plugin::Processor>();
+        const auto pluginStatus = prepareShell(*pluginProcessor, loaded.project,
                                                "VST3 editor shell");
         require(standaloneStatus.presentationState == pluginStatus.presentationState
                     && standaloneStatus.stateLabel == pluginStatus.stateLabel
@@ -267,23 +268,23 @@ int main()
                     && standaloneStatus.activePreparedDigest == pluginStatus.activePreparedDigest,
                 "Standalone and VST3 editor shells must publish equivalent Preview status identity.");
 
-        requireShellControls(standalone, standalone.getProcessor(), standaloneStatus,
+        requireShellControls(*standalone, standalone->getProcessor(), standaloneStatus,
                              "Standalone shell");
         {
-            drs::plugin::Editor editor(pluginProcessor);
+            drs::plugin::Editor editor(*pluginProcessor);
             editor.setSize(900, 680);
-            requireShellControls(editor, pluginProcessor, pluginStatus, "VST3 editor shell");
-            runConcurrentPublicationRead(pluginProcessor);
+            requireShellControls(editor, *pluginProcessor, pluginStatus, "VST3 editor shell");
+            runConcurrentPublicationRead(*pluginProcessor);
 
-            const auto standaloneFailed = failWithMissingSource(standalone.getProcessor(),
+            const auto standaloneFailed = failWithMissingSource(standalone->getProcessor(),
                                                                  "Standalone shell");
-            const auto pluginFailed = failWithMissingSource(pluginProcessor, "VST3 editor shell");
+            const auto pluginFailed = failWithMissingSource(*pluginProcessor, "VST3 editor shell");
             require(standaloneFailed.presentationState == pluginFailed.presentationState
                         && standaloneFailed.stateLabel == pluginFailed.stateLabel
                         && standaloneFailed.failureFamily == pluginFailed.failureFamily
                         && standaloneFailed.blockingPrerequisite == pluginFailed.blockingPrerequisite,
                     "Standalone and VST3 shells must present equivalent failure guidance.");
-            auto& standalonePanel = requireAuthoringPanel(standalone);
+            auto& standalonePanel = requireAuthoringPanel(*standalone);
             auto& pluginPanel = requireAuthoringPanel(editor);
             standalonePanel.refreshNow();
             pluginPanel.refreshNow();
@@ -296,7 +297,7 @@ int main()
                         && pluginLabel->getText().contains("Failed"),
                     "Both shell status surfaces must expose the failed current request.");
         }
-        const auto editorClosed = pluginProcessor.getAuthoringPreviewStatusSnapshot();
+        const auto editorClosed = pluginProcessor->getAuthoringPreviewStatusSnapshot();
         require(editorClosed.activePreparedBuildId == pluginStatus.activePreparedBuildId
                     && editorClosed.activePreparedDigest == pluginStatus.activePreparedDigest
                     && editorClosed.presentationState

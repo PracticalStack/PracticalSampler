@@ -3,6 +3,7 @@
 #include "drs/engine/SampleDataSource.h"
 
 #include <algorithm>
+#include <array>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -16,6 +17,92 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
+}
+
+class PrewarmRecordingSource final : public ISampleDataSource
+{
+public:
+    PrewarmRecordingSource()
+    {
+        sourceDescriptor.kind = SampleDataSourceKind::deterministicFake;
+        sourceDescriptor.sourceId = "phase7-deep-source";
+        sourceDescriptor.canonicalSourceIdentity = "fixture://phase7-deep-source";
+        sourceDescriptor.provenanceIdentity = "phase7-generation-1";
+        sourceDescriptor.formatName = "pcm24";
+        sourceDescriptor.channelLayout = "stereo";
+        sourceDescriptor.checksumHex = "fixture";
+        sourceDescriptor.sampleRate = 48000.0;
+        sourceDescriptor.frameCount = 100'000'000;
+        sourceDescriptor.channelCount = 2;
+        sourceDescriptor.bytesPerFrame = 6;
+        sourceDescriptor.dataSizeBytes = sourceDescriptor.frameCount * 6;
+    }
+
+    const SampleDataSourceDescriptor& descriptor() const noexcept override
+    {
+        return sourceDescriptor;
+    }
+
+    SampleFrameView acquireFrameView(std::uint64_t, std::uint32_t) const noexcept override
+    {
+        return {};
+    }
+
+    bool publishPageIntent(const std::uint64_t frame,
+                           const SamplePageRequestPriority priority,
+                           std::uint64_t) const noexcept override
+    {
+        if (intentCount >= intents.size())
+            return false;
+        intents[intentCount++] = { frame, priority };
+        return true;
+    }
+
+    struct Intent
+    {
+        std::uint64_t frame = 0;
+        SamplePageRequestPriority priority = SamplePageRequestPriority::lookAhead;
+    };
+
+    SampleDataSourceDescriptor sourceDescriptor;
+    mutable std::array<Intent, 4> intents {};
+    mutable std::size_t intentCount = 0;
+};
+
+void runDeepRegionPrewarmContract()
+{
+    auto source = std::make_shared<PrewarmRecordingSource>();
+    ImmutablePreparedPlayback prepared;
+    PreparedPlaybackSampleHandle sample;
+    sample.sampleSourceId = source->descriptor().sourceId;
+    sample.frameCount = source->descriptor().frameCount;
+    sample.channelCount = source->descriptor().channelCount;
+    sample.dataSource = source;
+    prepared.samples.push_back(std::move(sample));
+
+    PreparedPlaybackZoneHandle zone;
+    zone.zoneId = "deep-loop-zone";
+    zone.sampleSourceId = source->descriptor().sourceId;
+    zone.preparedSampleIndex = 0;
+    zone.sampleStartFrame = 90'000'000;
+    zone.loopEnabled = true;
+    zone.loopStartFrame = 92'000'000;
+    zone.loopEndFrame = 98'000'000;
+    zone.loopCrossfadeFrames = 2048;
+    prepared.zones.push_back(zone);
+    prepared.zones.push_back(zone);
+    prepared.zones.back().zoneId = "deep-loop-zone-shared-source";
+
+    const auto result = publishPreparedPlaybackRegionPrewarmIntents(prepared);
+    require(result.publishedIntentCount == 4 && result.rejectedIntentCount == 0
+                && source->intentCount == 4,
+            "Deep playback/loop prewarm must publish four deduplicated worker intents.");
+    require(source->intents[0].frame == 90'000'000
+                && source->intents[0].priority == SamplePageRequestPriority::imminent
+                && source->intents[1].frame == 92'000'000
+                && source->intents[2].frame == 97'997'952
+                && source->intents[3].frame == 97'999'999,
+            "Deep playback prewarm must target start, loop head, crossfade tail, and final wrap frame.");
 }
 
 struct Fixture
@@ -234,6 +321,7 @@ int main()
 {
     try
     {
+        runDeepRegionPrewarmContract();
         const auto fixture = makeFixture();
         const auto valid = validatePerformancePublishPreparation(
             fixture.identity, fixture.snapshot, fixture.prepared);

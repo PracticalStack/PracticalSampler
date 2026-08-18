@@ -4,10 +4,12 @@
 
 #include <algorithm>
 #include <chrono>
+#include <atomic>
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace
@@ -49,6 +51,13 @@ int main()
         hooks.addReaderFixture({ sourceB, "WAV file", 48000.0, 4096, 1, 32, true, {}, false });
         hooks.setFingerprintBytes(sourceA, std::string(16384, 'a'));
         hooks.setFingerprintBytes(sourceB, std::string(8192, 'b'));
+
+        const auto longSource = std::string("synthetic-preview-500mb.wav");
+        constexpr std::uint64_t fiveHundredMiB = 500ull * 1024ull * 1024ull;
+        constexpr std::int64_t longFrameCount = static_cast<std::int64_t>(fiveHundredMiB / 6ull);
+        hooks.addReaderFixture({ longSource, "WAV file", 48000.0, longFrameCount,
+                                 2, 24, false, {}, false });
+        hooks.setFingerprintBytes(longSource, std::string(32768, 'l'));
 
         {
             drs::app::WaveformPreviewServiceOptions options;
@@ -199,6 +208,111 @@ int main()
             require(snapshot != nullptr
                         && snapshot->stage == drs::app::WaveformSnapServiceStage::canceled,
                     "A canceled snap generation must never publish a candidate.");
+        }
+
+        {
+            drs::app::WaveformPreviewServiceOptions options;
+            options.sampleImportHooks = &hooks;
+            options.maximumCacheEntries = 4;
+            options.maximumCacheBytes = 24u * 1024u;
+            drs::app::WaveformPreviewService service(options);
+
+            auto deep = makeRequest("large-project-a", "long-source-0", longSource,
+                                    "large-churn-0");
+            deep.sourceFileSizeBytes = fiveHundredMiB;
+            deep.sourceModificationTicks = 1000;
+            deep.displayPointCount = 512;
+            deep.chunkFrameCount = 1024;
+            deep.rangeStartFrame = static_cast<std::uint64_t>(longFrameCount) - 2'000'000ull;
+            deep.rangeFrameCount = 262'144;
+
+            hooks.readGate().arm();
+            require(service.submit(deep).accepted
+                        && hooks.readGate().waitUntilBlocked(5s),
+                    "Large-source zoom churn requires the first deep tile to block in worker IO.");
+            std::uint64_t maximumSubmitMicros = 0;
+            std::string newestStamp;
+            for (int index = 1; index <= 96; ++index)
+            {
+                auto churn = deep;
+                churn.projectId = index < 80 ? "large-project-a" : "large-project-replaced";
+                churn.sampleSourceId = "long-source-" + std::to_string(index % 7);
+                churn.rangeStartFrame += static_cast<std::uint64_t>(index) * 4096ull;
+                churn.rangeFrameCount = 32'768ull << (index % 4);
+                newestStamp = "large-churn-" + std::to_string(index);
+                churn.requestStamp = newestStamp;
+                const auto started = std::chrono::steady_clock::now();
+                require(service.submit(std::move(churn)).accepted,
+                        "Every rapid large-source selection/zoom request should be accepted.");
+                const auto elapsed = static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now() - started).count());
+                maximumSubmitMicros = std::max(maximumSubmitMicros, elapsed);
+            }
+            hooks.readGate().release();
+            require(service.waitForTerminal(10s),
+                    "Large-source selection/zoom churn should settle on its newest request.");
+            auto snapshot = service.getSnapshot();
+            require(snapshot != nullptr
+                        && snapshot->stage == drs::app::WaveformPreviewServiceStage::completed
+                        && snapshot->identity.projectId == "large-project-replaced"
+                        && snapshot->identity.requestStamp == newestStamp,
+                    "Only the newest eligible tile may publish after project, source, and zoom churn.");
+            require(maximumSubmitMicros < 16'667,
+                    "Large-source preview submission exceeded one 60 Hz frame.");
+
+            for (int index = 0; index < 12; ++index)
+            {
+                auto tile = deep;
+                tile.requestStamp = "large-cache-" + std::to_string(index);
+                tile.rangeStartFrame += static_cast<std::uint64_t>(index) * 131'072ull;
+                require(service.submit(std::move(tile)).accepted && service.waitForTerminal(10s),
+                        "Deep large-source cache-pressure tile should complete.");
+            }
+            snapshot = service.getSnapshot();
+            require(snapshot != nullptr
+                        && snapshot->cacheEntryCount <= options.maximumCacheEntries
+                        && snapshot->cacheBytes <= options.maximumCacheBytes
+                        && snapshot->cacheEvictionCount > 0,
+                    "Large-source tile memory must remain bounded under continuous zoom pressure.");
+
+            auto replaced = deep;
+            replaced.requestStamp = "large-source-invalidated";
+            replaced.sourceFileSizeBytes += 6;
+            replaced.sourceModificationTicks += 1;
+            require(service.submit(replaced).accepted && service.waitForTerminal(10s),
+                    "Same-path large-source replacement should rebuild its tile.");
+            snapshot = service.getSnapshot();
+            require(snapshot != nullptr && !snapshot->cacheHit
+                        && snapshot->identity.sourceFileSizeBytes == replaced.sourceFileSizeBytes
+                        && snapshot->identity.sourceModificationTicks
+                            == replaced.sourceModificationTicks,
+                    "Source size/mtime changes must invalidate a same-path waveform tile.");
+        }
+
+        {
+            drs::app::WaveformPreviewServiceOptions options;
+            options.sampleImportHooks = &hooks;
+            drs::app::WaveformPreviewService service(options);
+            auto closing = makeRequest("closing-project", "closing-source", longSource,
+                                       "editor-close-active-worker");
+            closing.rangeStartFrame = static_cast<std::uint64_t>(longFrameCount) - 500'000ull;
+            closing.rangeFrameCount = 262'144;
+            hooks.readGate().arm();
+            require(service.submit(closing).accepted
+                        && hooks.readGate().waitUntilBlocked(5s),
+                    "Editor-close qualification requires an active deep tile read.");
+            std::atomic<bool> shutdownReturned {false};
+            std::thread shutdownThread([&]
+            {
+                service.shutdown();
+                shutdownReturned.store(true, std::memory_order_release);
+            });
+            std::this_thread::sleep_for(5ms);
+            hooks.readGate().release();
+            shutdownThread.join();
+            require(shutdownReturned.load(std::memory_order_acquire),
+                    "Closing the editor must cancel and join active waveform work.");
         }
 
         std::cout << "Waveform preview service tests passed." << std::endl;

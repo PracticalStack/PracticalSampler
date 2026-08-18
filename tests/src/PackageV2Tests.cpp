@@ -47,6 +47,24 @@ void runLargeScaleFixtureMatrix()
               << " decodedFloatBytes=" << fixture.decodedFloatBytes
               << " sparseOffset=" << fixture.sparsePackageOffset
               << " pressureTouches=" << fixture.cachePressurePages.size() << std::endl;
+
+    const auto waveformFixture = drs::test::makeWaveformRegionLargeSourceFixture();
+    require(waveformFixture.multiSourceInstrument.size() == 64
+                && waveformFixture.multiSourceAudioBytes >= 499ull * 1024ull * 1024ull
+                && waveformFixture.multiSourceAudioBytes <= 500ull * 1024ull * 1024ull,
+            "Waveform qualification must model a multi-source instrument totaling approximately 500 MiB.");
+    require(drs::engine::validateSampleDataSourceDescriptor(
+                waveformFixture.singleLongSource).valid,
+            "The single approximately-500-MiB long source must pass the production descriptor contract.");
+    for (const auto& descriptor : waveformFixture.multiSourceInstrument)
+        require(drs::engine::validateSampleDataSourceDescriptor(descriptor).valid,
+                "Every approximately-500-MiB instrument source must pass the production descriptor contract.");
+    require(waveformFixture.playbackStartFrame < waveformFixture.loopStartFrame
+                && waveformFixture.loopStartFrame < waveformFixture.loopEndFrame
+                && waveformFixture.loopEndFrame < waveformFixture.playbackEndFrame
+                && waveformFixture.playbackEndFrame
+                    <= waveformFixture.singleLongSource.frameCount,
+            "Large-source playback and loop boundaries must remain ordered deep into the file.");
 }
 
 #pragma pack(push, 1)

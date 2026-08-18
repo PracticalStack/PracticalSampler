@@ -1,4 +1,5 @@
 #include "drs/engine/WaveformRegionPolicy.h"
+#include "drs/engine/PlaybackRegionContract.h"
 
 #include <cmath>
 #include <cstdint>
@@ -65,6 +66,26 @@ int main()
                 "Frame-to-pixel conversion must not overflow near the 64-bit frame limit.");
         require(waveformPixelToFrame(750.0, largeViewport) == maximum - 250,
                 "Pixel-to-frame conversion must preserve deep 64-bit source positions.");
+
+        const auto startOnlyPrewarm = buildPlaybackRegionPrewarmPlan(
+            maximum - 1000, false, 0, 0, 0);
+        require(startOnlyPrewarm.count == 1
+                    && startOnlyPrewarm.frames[0] == maximum - 1000,
+                "A non-looping deep playback region should prewarm only its authored start.");
+        const auto loopPrewarm = buildPlaybackRegionPrewarmPlan(
+            maximum - 1000, true, maximum - 800, maximum - 200, 64);
+        require(loopPrewarm.count == 4
+                    && loopPrewarm.frames[0] == maximum - 1000
+                    && loopPrewarm.frames[1] == maximum - 800
+                    && loopPrewarm.frames[2] == maximum - 264
+                    && loopPrewarm.frames[3] == maximum - 201,
+                "Deep loop prewarm must cover playback start, loop head, crossfade tail, and final loop frame without overflow.");
+        const auto deduplicatedPrewarm = buildPlaybackRegionPrewarmPlan(
+            100, true, 100, 200, 0);
+        require(deduplicatedPrewarm.count == 2
+                    && deduplicatedPrewarm.frames[0] == 100
+                    && deduplicatedPrewarm.frames[1] == 199,
+                "Prewarm planning must deduplicate a playback start that is also the loop head.");
 
         const auto zoomed = zoomWaveformViewport({ 0, 1000 }, 250, 0.5, 1000, 32);
         require(zoomed.startFrame == 125 && zoomed.endFrameExclusive == 625,
