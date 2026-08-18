@@ -1,6 +1,6 @@
 # Practical Sampler
 
-Practical Sampler is an open-source sampler and instrument-building environment for musicians,
+Practical Sampler is a sampler and instrument-building environment in development for musicians,
 sound designers, and instrument developers.
 
 The goal is to build a **first-class open-source sampler and instrument builder** with comprehensive
