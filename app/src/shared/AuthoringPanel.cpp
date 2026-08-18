@@ -11,6 +11,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <initializer_list>
 #include <limits>
 #include <unordered_map>
 #include <unordered_set>
@@ -1235,6 +1236,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureFieldLabel(articulationNameLabel, "Name");
     configureFieldLabel(articulationSwitchNoteLabel, "Key Switch");
     configureFieldLabel(articulationDeleteReassignLabel, "Reassign zones to");
+    configureFieldLabel(waveformPlaybackStartLabel, "REGION START");
+    configureFieldLabel(waveformPlaybackEndLabel, "END");
+    configureFieldLabel(waveformLoopStartLabel, "LOOP START");
+    configureFieldLabel(waveformLoopEndLabel, "END");
+    configureFieldLabel(waveformLoopCrossfadeLabel, "XFADE");
 
     configureEditorSlider(macroDefaultSlider, 0.0, 1.0, 0.01);
     configureEditorSlider(macroMinSlider, 0.0, 1.0, 0.01);
@@ -1305,8 +1311,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             commitWaveformPlaybackRegion(startFrame, endFrameExclusive, label);
         });
     waveformPlaybackStartEditor.setComponentID("authoringWaveformPlaybackStart");
+    waveformPlaybackStartLabel.setComponentID("authoringWaveformPlaybackStartLabel");
     waveformPlaybackStartEditor.setTextToShowWhenEmpty("offset frame or seconds", authoringPanelMuted);
     waveformPlaybackEndEditor.setComponentID("authoringWaveformPlaybackEnd");
+    waveformPlaybackEndLabel.setComponentID("authoringWaveformPlaybackEndLabel");
     waveformPlaybackEndEditor.setTextToShowWhenEmpty("end frame or seconds", authoringPanelMuted);
     waveformPlaybackApplyButton.setComponentID("authoringWaveformPlaybackApply");
     waveformPlaybackApplyButton.setButtonText("Apply Region");
@@ -1330,10 +1338,13 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     waveformLoopModeSelector.addItem("loop_continuous", 3);
     waveformLoopModeSelector.addItem("loop_sustain", 4);
     waveformLoopStartEditor.setComponentID("authoringWaveformLoopStart");
+    waveformLoopStartLabel.setComponentID("authoringWaveformLoopStartLabel");
     waveformLoopStartEditor.setTextToShowWhenEmpty("start frame or seconds", authoringPanelMuted);
     waveformLoopEndEditor.setComponentID("authoringWaveformLoopEnd");
+    waveformLoopEndLabel.setComponentID("authoringWaveformLoopEndLabel");
     waveformLoopEndEditor.setTextToShowWhenEmpty("end frame or seconds", authoringPanelMuted);
     waveformLoopCrossfadeEditor.setComponentID("authoringWaveformLoopCrossfade");
+    waveformLoopCrossfadeLabel.setComponentID("authoringWaveformLoopCrossfadeLabel");
     waveformLoopCrossfadeEditor.setTextToShowWhenEmpty("crossfade frames", authoringPanelMuted);
     waveformLoopApplyButton.setComponentID("authoringWaveformLoopApply");
     waveformLoopApplyButton.setButtonText("Apply");
@@ -2230,6 +2241,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&waveformInfoLabel),
              static_cast<juce::Component*>(&loopInfoLabel),
              static_cast<juce::Component*>(&importMetricsLabel),
+             static_cast<juce::Component*>(&waveformPlaybackStartLabel),
+             static_cast<juce::Component*>(&waveformPlaybackEndLabel),
+             static_cast<juce::Component*>(&waveformLoopStartLabel),
+             static_cast<juce::Component*>(&waveformLoopEndLabel),
+             static_cast<juce::Component*>(&waveformLoopCrossfadeLabel),
              static_cast<juce::Component*>(&waveformPlaybackStartEditor),
              static_cast<juce::Component*>(&waveformPlaybackEndEditor),
              static_cast<juce::Component*>(&waveformPlaybackApplyButton),
@@ -2733,21 +2749,24 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Validate project sources",
                                 "Starts or cancels project source validation in the background.",
                                 "Press to validate the current project sources or cancel an active validation.");
-    sourceValidationButton.setExplicitFocusOrder(66);
-    waveformLoopModeSelector.setExplicitFocusOrder(67);
-    waveformPlaybackStartEditor.setExplicitFocusOrder(68);
-    waveformPlaybackEndEditor.setExplicitFocusOrder(69);
-    waveformPlaybackApplyButton.setExplicitFocusOrder(70);
-    waveformPlaybackResetButton.setExplicitFocusOrder(71);
-    waveformSetPlaybackSelectionButton.setExplicitFocusOrder(72);
-    waveformSelectPlaybackButton.setExplicitFocusOrder(73);
-    waveformSelectLoopButton.setExplicitFocusOrder(74);
-    waveformPlaybackAuditionButton.setExplicitFocusOrder(75);
-    waveformSelectionAuditionButton.setExplicitFocusOrder(76);
-    waveformSnapToggle.setExplicitFocusOrder(77);
-    waveformLoopStartEditor.setExplicitFocusOrder(78);
-    waveformLoopEndEditor.setExplicitFocusOrder(79);
-    waveformLoopCrossfadeEditor.setExplicitFocusOrder(80);
+    waveformPlaybackStartEditor.setExplicitFocusOrder(67);
+    waveformPlaybackEndEditor.setExplicitFocusOrder(68);
+    waveformPlaybackApplyButton.setExplicitFocusOrder(69);
+    waveformPlaybackResetButton.setExplicitFocusOrder(70);
+    waveformSetPlaybackSelectionButton.setExplicitFocusOrder(71);
+    waveformSelectPlaybackButton.setExplicitFocusOrder(72);
+    waveformSelectLoopButton.setExplicitFocusOrder(73);
+    waveformPlaybackAuditionButton.setExplicitFocusOrder(74);
+    waveformLoopModeSelector.setExplicitFocusOrder(75);
+    waveformLoopStartEditor.setExplicitFocusOrder(76);
+    waveformLoopEndEditor.setExplicitFocusOrder(77);
+    waveformLoopCrossfadeEditor.setExplicitFocusOrder(78);
+    waveformLoopApplyButton.setExplicitFocusOrder(79);
+    waveformSetLoopSelectionButton.setExplicitFocusOrder(80);
+    waveformLoopAuditionButton.setExplicitFocusOrder(81);
+    waveformSelectionAuditionButton.setExplicitFocusOrder(82);
+    waveformSnapToggle.setExplicitFocusOrder(83);
+    sourceValidationButton.setExplicitFocusOrder(84);
 
     configureAccessibleMetadata(macroList,
                                 "Macro list",
@@ -3226,8 +3245,21 @@ void AuthoringPanel::resized()
     tabArea.removeFromLeft(tabGap);
     workbenchArticulationsTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
-    auto workbenchEditorArea = workbenchContentHost.getBounds().reduced(12, inspectorWorkbenchInShortLayout ? 6 : 10);
-    if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
+    const auto waveformWorkbenchInShortLayout = shortHeightLayout
+        && workbenchState.activeTab == authoring::WorkbenchTab::waveform;
+    auto workbenchEditorArea = workbenchContentHost.getBounds().reduced(
+        12, (inspectorWorkbenchInShortLayout || waveformWorkbenchInShortLayout) ? 6 : 10);
+    if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
+    {
+        auto headingRow = workbenchEditorArea.removeFromTop(22);
+        waveformLabel.setBounds(headingRow.removeFromLeft(std::min(148, headingRow.getWidth())));
+        headingRow.removeFromLeft(std::min(8, headingRow.getWidth()));
+        waveformScopeLabel.setBounds(headingRow.removeFromLeft(std::min(196, headingRow.getWidth() / 2)));
+        headingRow.removeFromLeft(std::min(8, headingRow.getWidth()));
+        workbenchBreadcrumbLabel.setBounds(headingRow);
+        workbenchEditorArea.removeFromTop(std::min(4, workbenchEditorArea.getHeight()));
+    }
+    else if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
     {
         auto headingRow = workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 20 : 22);
         waveformLabel.setBounds(headingRow.removeFromLeft(std::min(160, headingRow.getWidth())));
@@ -3248,111 +3280,118 @@ void AuthoringPanel::resized()
 
     if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
     {
-        auto regionControls = workbenchEditorArea.removeFromTop(
-            std::min(112, std::max(0, workbenchEditorArea.getHeight() / 2)));
-        workbenchEditorArea.removeFromTop(std::min(4, workbenchEditorArea.getHeight()));
-        const auto controlRowHeight = std::max(1,
-            std::min(25, std::max(0, regionControls.getHeight() - 9) / 4));
-        const auto gap = [](juce::Rectangle<int>& row)
-        {
-            row.removeFromLeft(std::min(4, row.getWidth()));
-        };
-        auto playbackRow = regionControls.removeFromTop(
-            std::min(controlRowHeight, regionControls.getHeight()));
-        waveformPlaybackStartEditor.setBounds(playbackRow.removeFromLeft(
-            std::min(126, playbackRow.getWidth() / 4)));
-        gap(playbackRow);
-        waveformPlaybackEndEditor.setBounds(playbackRow.removeFromLeft(
-            std::min(126, playbackRow.getWidth() / 3)));
-        gap(playbackRow);
-        waveformPlaybackApplyButton.setBounds(playbackRow.removeFromLeft(
-            std::min(94, playbackRow.getWidth() / 2)));
-        gap(playbackRow);
-        waveformPlaybackResetButton.setBounds(playbackRow.removeFromLeft(
-            std::min(98, playbackRow.getWidth())));
+        constexpr auto paneGap = 10;
+        constexpr auto rowGap = 3;
+        constexpr auto footerHeight = 34;
 
-        regionControls.removeFromTop(std::min(3, regionControls.getHeight()));
-        auto selectionRow = regionControls.removeFromTop(
-            std::min(controlRowHeight, regionControls.getHeight()));
-        waveformSetPlaybackSelectionButton.setBounds(selectionRow.removeFromLeft(
-            std::min(156, selectionRow.getWidth() / 3)));
-        gap(selectionRow);
-        waveformSelectPlaybackButton.setBounds(selectionRow.removeFromLeft(
-            std::min(118, selectionRow.getWidth() / 2)));
-        gap(selectionRow);
-        waveformSelectLoopButton.setBounds(selectionRow.removeFromLeft(
-            std::min(96, selectionRow.getWidth())));
-
-        regionControls.removeFromTop(std::min(3, regionControls.getHeight()));
-        auto loopRow = regionControls.removeFromTop(
-            std::min(controlRowHeight, regionControls.getHeight()));
-        waveformLoopModeSelector.setBounds(loopRow.removeFromLeft(
-            std::min(138, loopRow.getWidth() / 5)));
-        gap(loopRow);
-        waveformLoopStartEditor.setBounds(loopRow.removeFromLeft(
-            std::min(104, loopRow.getWidth() / 4)));
-        gap(loopRow);
-        waveformLoopEndEditor.setBounds(loopRow.removeFromLeft(
-            std::min(104, loopRow.getWidth() / 3)));
-        gap(loopRow);
-        waveformLoopCrossfadeEditor.setBounds(loopRow.removeFromLeft(
-            std::min(112, loopRow.getWidth() / 3)));
-        gap(loopRow);
-        waveformLoopApplyButton.setBounds(loopRow.removeFromLeft(
-            std::min(62, loopRow.getWidth() / 2)));
-        gap(loopRow);
-        waveformSetLoopSelectionButton.setBounds(loopRow.removeFromLeft(
-            std::min(150, loopRow.getWidth())));
-
-        regionControls.removeFromTop(std::min(3, regionControls.getHeight()));
-        auto auditionRow = regionControls;
-        waveformPlaybackAuditionButton.setBounds(auditionRow.removeFromLeft(
-            std::min(112, auditionRow.getWidth() / 5)));
-        gap(auditionRow);
-        waveformLoopAuditionButton.setBounds(auditionRow.removeFromLeft(
-            std::min(104, auditionRow.getWidth() / 4)));
-        gap(auditionRow);
-        waveformSelectionAuditionButton.setBounds(auditionRow.removeFromLeft(
-            std::min(130, auditionRow.getWidth() / 3)));
-        gap(auditionRow);
-        waveformSnapToggle.setBounds(auditionRow.removeFromLeft(
-            std::min(94, auditionRow.getWidth() / 2)));
-        gap(auditionRow);
-        waveformLoopGuidanceLabel.setBounds(auditionRow);
-
-        const auto footerHeight = workbenchEditorArea.getWidth() >= 620 ? 52 : 82;
         auto footer = workbenchEditorArea.removeFromBottom(
-            std::min(footerHeight, std::max(0, workbenchEditorArea.getHeight() / 2)));
-        workbenchEditorArea.removeFromBottom(std::min(6, workbenchEditorArea.getHeight()));
-        waveformPreview.setBounds(workbenchEditorArea);
+            std::min(footerHeight, workbenchEditorArea.getHeight()));
+        workbenchEditorArea.removeFromBottom(std::min(4, workbenchEditorArea.getHeight()));
+        auto body = workbenchEditorArea;
 
-        if (footer.getWidth() >= 620)
+        const auto minimumWaveformWidth = body.getWidth() >= 650 ? 200 : 140;
+        const auto controlPaneWidth = std::min(
+            body.getWidth(),
+            std::min(560, std::max(360, body.getWidth() - minimumWaveformWidth - paneGap)));
+        auto controlPane = body.removeFromRight(controlPaneWidth);
+        body.removeFromRight(std::min(paneGap, body.getWidth()));
+        waveformPreview.setBounds(body);
+
+        auto layoutWeightedRow = [](juce::Rectangle<int> row,
+                                    const std::initializer_list<std::pair<juce::Component*, int>> items)
         {
-            auto firstRow = footer.removeFromTop(22);
-            waveformStatusLabel.setBounds(firstRow.removeFromLeft(std::min(210, firstRow.getWidth() / 3)));
-            firstRow.removeFromLeft(std::min(8, firstRow.getWidth()));
-            waveformInfoLabel.setBounds(firstRow);
-            auto secondRow = footer.removeFromTop(24);
-            sourceValidationButton.setBounds(secondRow.removeFromRight(std::min(122, secondRow.getWidth())));
-            secondRow.removeFromRight(std::min(8, secondRow.getWidth()));
-            sourceValidationLabel.setBounds(secondRow.removeFromRight(std::min(250, secondRow.getWidth() / 2)));
-            secondRow.removeFromRight(std::min(8, secondRow.getWidth()));
-            loopInfoLabel.setBounds(secondRow.removeFromLeft(std::min(300, secondRow.getWidth() * 2 / 3)));
-            secondRow.removeFromLeft(std::min(8, secondRow.getWidth()));
-            importMetricsLabel.setBounds(secondRow);
-        }
-        else
+            constexpr auto itemGap = 4;
+            const auto gapPixels = itemGap * std::max(0, static_cast<int>(items.size()) - 1);
+            const auto availableWidth = std::max(0, row.getWidth() - gapPixels);
+            auto totalWeight = 0;
+            for (const auto& item : items)
+                totalWeight += item.second;
+
+            auto remainingWeight = totalWeight;
+            auto remainingWidth = availableWidth;
+            auto index = 0;
+            for (const auto& item : items)
+            {
+                const auto isLast = index == static_cast<int>(items.size()) - 1;
+                const auto width = isLast || remainingWeight <= 0
+                    ? remainingWidth
+                    : std::max(0, remainingWidth * item.second / remainingWeight);
+                item.first->setBounds(row.removeFromLeft(width));
+                remainingWidth -= width;
+                remainingWeight -= item.second;
+                if (!isLast)
+                    row.removeFromLeft(std::min(itemGap, row.getWidth()));
+                ++index;
+            }
+        };
+
+        auto guidanceRow = controlPane.removeFromBottom(std::min(13, controlPane.getHeight()));
+        controlPane.removeFromBottom(std::min(3, controlPane.getHeight()));
+        waveformLoopGuidanceLabel.setBounds(guidanceRow);
+        const auto controlRowHeight = std::max(
+            1, (controlPane.getHeight() - (rowGap * 3)) / 4);
+        auto takeControlRow = [&](const bool addGap)
         {
-            waveformStatusLabel.setBounds(footer.removeFromTop(16));
-            waveformInfoLabel.setBounds(footer.removeFromTop(16));
-            loopInfoLabel.setBounds(footer.removeFromTop(16));
-            importMetricsLabel.setBounds(footer.removeFromTop(16));
-            auto validationRow = footer;
-            sourceValidationButton.setBounds(validationRow.removeFromRight(
-                std::min(112, validationRow.getWidth())));
-            validationRow.removeFromRight(std::min(6, validationRow.getWidth()));
-            sourceValidationLabel.setBounds(validationRow);
-        }
+            auto row = controlPane.removeFromTop(
+                std::min(controlRowHeight, controlPane.getHeight()));
+            if (addGap)
+                controlPane.removeFromTop(std::min(rowGap, controlPane.getHeight()));
+            return row;
+        };
+
+        layoutWeightedRow(takeControlRow(true),
+        {
+            { &waveformPlaybackStartLabel, 70 },
+            { &waveformPlaybackStartEditor, 76 },
+            { &waveformPlaybackEndLabel, 28 },
+            { &waveformPlaybackEndEditor, 76 },
+            { &waveformPlaybackApplyButton, 96 },
+            { &waveformPlaybackResetButton, 96 }
+        });
+        layoutWeightedRow(takeControlRow(true),
+        {
+            { &waveformSetPlaybackSelectionButton, 156 },
+            { &waveformSelectPlaybackButton, 118 },
+            { &waveformSelectLoopButton, 96 },
+            { &waveformPlaybackAuditionButton, 120 }
+        });
+        layoutWeightedRow(takeControlRow(true),
+        {
+            { &waveformLoopModeSelector, 112 },
+            { &waveformLoopStartLabel, 64 },
+            { &waveformLoopStartEditor, 64 },
+            { &waveformLoopEndLabel, 28 },
+            { &waveformLoopEndEditor, 64 },
+            { &waveformLoopCrossfadeLabel, 42 },
+            { &waveformLoopCrossfadeEditor, 64 },
+            { &waveformLoopApplyButton, 58 }
+        });
+        layoutWeightedRow(takeControlRow(false),
+        {
+            { &waveformSetLoopSelectionButton, 156 },
+            { &waveformLoopAuditionButton, 112 },
+            { &waveformSelectionAuditionButton, 136 },
+            { &waveformSnapToggle, 96 }
+        });
+
+        auto footerControls = footer.removeFromRight(controlPaneWidth);
+        footer.removeFromRight(std::min(paneGap, footer.getWidth()));
+        auto waveformFooter = footer;
+        waveformStatusLabel.setBounds(waveformFooter.removeFromTop(
+            std::min(17, waveformFooter.getHeight())));
+        waveformInfoLabel.setBounds(waveformFooter);
+
+        auto contextRow = footerControls.removeFromTop(
+            std::min(17, footerControls.getHeight()));
+        loopInfoLabel.setBounds(contextRow.removeFromLeft(
+            std::min(contextRow.getWidth() * 3 / 5, contextRow.getWidth())));
+        contextRow.removeFromLeft(std::min(6, contextRow.getWidth()));
+        importMetricsLabel.setBounds(contextRow);
+        auto validationRow = footerControls;
+        sourceValidationButton.setBounds(validationRow.removeFromRight(
+            std::min(122, validationRow.getWidth())));
+        validationRow.removeFromRight(std::min(6, validationRow.getWidth()));
+        sourceValidationLabel.setBounds(validationRow);
     }
 
     if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
@@ -4632,6 +4671,11 @@ void AuthoringPanel::refreshWorkbenchVisibility()
     setVisibleAndAccessible(waveformInfoLabel, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(loopInfoLabel, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(importMetricsLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackStartLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformPlaybackEndLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformLoopStartLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformLoopEndLabel, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformLoopCrossfadeLabel, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformPlaybackStartEditor, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformPlaybackEndEditor, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformPlaybackApplyButton, workbenchContentVisible && waveformTab);

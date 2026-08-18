@@ -1626,6 +1626,7 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
 void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
                             drs::engine::AuthoringSession& session,
                             const std::string& shellName,
+                            const fs::path& outputDirectory,
                             std::vector<std::string>& baselineFindings,
                             drs::app::AuthoringSourceValidationSnapshot& validationSnapshot,
                             int& validationRequestCount,
@@ -1679,6 +1680,83 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformLoopApply", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformSetLoopSelection", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopAudition", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackStartLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackEndLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopStartLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopEndLabel", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopCrossfadeLabel", panelBounds);
+
+    auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
+    require(workbenchContent != nullptr,
+            "Waveform layout coverage requires the workbench content host.");
+    const auto workbenchContentBounds = workbenchContent->getBounds();
+    const std::vector<juce::String> waveformInteractiveIds {
+        "authoringWaveformPlaybackStart",
+        "authoringWaveformPlaybackEnd",
+        "authoringWaveformPlaybackApply",
+        "authoringWaveformPlaybackReset",
+        "authoringWaveformSetPlaybackSelection",
+        "authoringWaveformSelectPlayback",
+        "authoringWaveformSelectLoop",
+        "authoringWaveformPlaybackAudition",
+        "authoringWaveformLoopMode",
+        "authoringWaveformLoopStart",
+        "authoringWaveformLoopEnd",
+        "authoringWaveformLoopCrossfade",
+        "authoringWaveformLoopApply",
+        "authoringWaveformSetLoopSelection",
+        "authoringWaveformLoopAudition",
+        "authoringWaveformSelectionAudition",
+        "authoringWaveformSnapToggle"
+    };
+    std::vector<juce::Rectangle<int>> waveformInteractiveBounds;
+    waveformInteractiveBounds.reserve(waveformInteractiveIds.size());
+    for (const auto& componentId : waveformInteractiveIds)
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr && component->isVisible(),
+                "Waveform control must be visible: " + componentId.toStdString());
+        require(workbenchContentBounds.contains(component->getBounds()),
+                "Waveform control must remain inside the workbench panel: " + componentId.toStdString());
+        require(component->getWidth() >= 46 && component->getHeight() >= 20,
+                "Waveform control must retain a usable hit target: " + componentId.toStdString());
+        waveformInteractiveBounds.push_back(component->getBounds());
+    }
+    for (std::size_t left = 0; left < waveformInteractiveBounds.size(); ++left)
+        for (std::size_t right = left + 1; right < waveformInteractiveBounds.size(); ++right)
+            require(!waveformInteractiveBounds[left].intersects(waveformInteractiveBounds[right]),
+                    "Waveform controls must not overlap at the " + shellName + " shell size.");
+
+    requireIncreasingFocusOrder(panel,
+    {
+        "authoringWaveformPlaybackStart",
+        "authoringWaveformPlaybackEnd",
+        "authoringWaveformPlaybackApply",
+        "authoringWaveformPlaybackReset",
+        "authoringWaveformSetPlaybackSelection",
+        "authoringWaveformSelectPlayback",
+        "authoringWaveformSelectLoop",
+        "authoringWaveformPlaybackAudition",
+        "authoringWaveformLoopMode",
+        "authoringWaveformLoopStart",
+        "authoringWaveformLoopEnd",
+        "authoringWaveformLoopCrossfade",
+        "authoringWaveformLoopApply",
+        "authoringWaveformSetLoopSelection",
+        "authoringWaveformLoopAudition",
+        "authoringWaveformSelectionAudition",
+        "authoringWaveformSnapToggle",
+        "authoringWaveformValidationButton"
+    });
+
+    auto* waveformComponent = findDescendantById(panel, "authoringWaveformPreview");
+    require(waveformComponent != nullptr
+                && workbenchContentBounds.contains(waveformComponent->getBounds())
+                && waveformComponent->getWidth() >= 180
+                && waveformComponent->getHeight() >= 80,
+            "Waveform canvas must remain visible and usable beside the controls at the "
+                + shellName + " shell size.");
+    saveComponentPng(panel, outputDirectory / (shellName + "-waveform.png"));
 
     const auto initialZoneId = zoneSelector->getSelectedId();
     const auto alternateZoneId = initialZoneId == 2 ? 1 : 2;
@@ -2467,6 +2545,50 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
     }
 
     saveComponentPng(panel, outputDirectory / "short-host-groups.png");
+}
+
+void exerciseShortHeightWaveformLayout(drs::app::AuthoringPanel& panel,
+                                       const fs::path& outputDirectory)
+{
+    requireButton(panel, "authoringWorkbenchWaveformTab").onClick();
+    auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
+    require(workbenchContent != nullptr,
+            "Short-height waveform coverage requires the workbench content host.");
+    const auto workbenchContentBounds = workbenchContent->getBounds();
+    for (const auto& componentId : {
+             juce::String("authoringWaveformPlaybackStart"),
+             juce::String("authoringWaveformPlaybackEnd"),
+             juce::String("authoringWaveformPlaybackApply"),
+             juce::String("authoringWaveformPlaybackReset"),
+             juce::String("authoringWaveformSetPlaybackSelection"),
+             juce::String("authoringWaveformSelectPlayback"),
+             juce::String("authoringWaveformSelectLoop"),
+             juce::String("authoringWaveformPlaybackAudition"),
+             juce::String("authoringWaveformLoopMode"),
+             juce::String("authoringWaveformLoopStart"),
+             juce::String("authoringWaveformLoopEnd"),
+             juce::String("authoringWaveformLoopCrossfade"),
+             juce::String("authoringWaveformLoopApply"),
+             juce::String("authoringWaveformSetLoopSelection"),
+             juce::String("authoringWaveformLoopAudition"),
+             juce::String("authoringWaveformSelectionAudition"),
+             juce::String("authoringWaveformSnapToggle")
+         })
+    {
+        auto* component = findDescendantById(panel, componentId);
+        require(component != nullptr && component->isVisible()
+                    && workbenchContentBounds.contains(component->getBounds())
+                    && component->getWidth() >= 46 && component->getHeight() >= 20,
+                "Short-height waveform control must remain fully usable: "
+                    + componentId.toStdString());
+    }
+
+    auto* waveform = findDescendantById(panel, "authoringWaveformPreview");
+    require(waveform != nullptr && waveform->isVisible()
+                && workbenchContentBounds.contains(waveform->getBounds())
+                && waveform->getWidth() >= 180 && waveform->getHeight() >= 80,
+            "Short-height waveform canvas must remain visible beside its controls.");
+    saveComponentPng(panel, outputDirectory / "short-host-waveform.png");
 }
 
 void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
@@ -4165,6 +4287,7 @@ int main()
                 exerciseShortHeightGroupLayout(panel, outputDirectory);
                 exerciseRoutingViewportReachability(panel, true);
                 exerciseMacroWorkbenchLayout(panel, true);
+                exerciseShortHeightWaveformLayout(panel, outputDirectory);
                 return;
             }
 
@@ -4183,6 +4306,7 @@ int main()
             exerciseWorkbenchBehavior(panel,
                                    session,
                                    shellName,
+                                   outputDirectory,
                                    baselineFindings,
                                    validationSnapshot,
                                    validationRequestCount,

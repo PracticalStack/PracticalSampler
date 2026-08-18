@@ -296,6 +296,11 @@ private:
     juce::Label waveformInfoLabel;
     juce::Label loopInfoLabel;
     juce::Label importMetricsLabel;
+    juce::Label waveformPlaybackStartLabel;
+    juce::Label waveformPlaybackEndLabel;
+    juce::Label waveformLoopStartLabel;
+    juce::Label waveformLoopEndLabel;
+    juce::Label waveformLoopCrossfadeLabel;
     juce::ComboBox waveformLoopModeSelector;
     juce::TextEditor waveformPlaybackStartEditor;
     juce::TextEditor waveformPlaybackEndEditor;
