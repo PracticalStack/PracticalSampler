@@ -1606,6 +1606,7 @@ drs::app::AuthoringWaveformPreview Processor::getAuthoringWaveformPreview()
             selectedZone->sampleEndFrame, preview.frameCount);
         preview.loopStartFrame = selectedZone->loopStartFrame;
         preview.loopEndFrame = selectedZone->loopEndFrame;
+        preview.loopCrossfadeFrames = selectedZone->loopCrossfadeFrames;
         preview.releaseSeconds = selectedZone->releaseSeconds;
         return preview;
     };

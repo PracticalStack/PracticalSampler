@@ -115,6 +115,9 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         && loopStartFrame < loopEndFrame
         && loopStartFrame >= playbackStart
         && loopEndFrame <= playbackEndFrame;
+    const auto loopLength = loopActive ? loopEndFrame - loopStartFrame : 0;
+    loopCrossfadeFrames = loopActive
+        ? std::min(selectedRoute.loopCrossfadeFrames, loopLength / 2) : 0;
     return true;
 }
 
@@ -266,8 +269,30 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
         const auto fraction = static_cast<float>(positionFrames - static_cast<double>(frameIndex));
         const auto currentView = sample->dataSource->acquireFrameView(frameIndex, 1);
         const auto nextView = sample->dataSource->acquireFrameView(nextFrameIndex, 1);
+        const auto crossfadeStartFrame = loopEndFrame - loopCrossfadeFrames;
+        const auto crossfading = loopActive && loopCrossfadeFrames != 0
+            && positionFrames >= static_cast<double>(crossfadeStartFrame)
+            && positionFrames < static_cast<double>(loopEndFrame);
+        auto crossfadePosition = static_cast<double>(loopStartFrame);
+        std::size_t crossfadeFrameIndex = 0;
+        std::size_t crossfadeNextFrameIndex = 0;
+        SampleFrameView crossfadeCurrentView;
+        SampleFrameView crossfadeNextView;
+        if (crossfading)
+        {
+            crossfadePosition += positionFrames - static_cast<double>(crossfadeStartFrame);
+            crossfadeFrameIndex = static_cast<std::size_t>(crossfadePosition);
+            crossfadeNextFrameIndex = crossfadeFrameIndex + 1;
+            if (crossfadeNextFrameIndex >= loopEndFrame)
+                crossfadeNextFrameIndex = static_cast<std::size_t>(loopStartFrame);
+            crossfadeCurrentView = sample->dataSource->acquireFrameView(crossfadeFrameIndex, 1);
+            crossfadeNextView = sample->dataSource->acquireFrameView(crossfadeNextFrameIndex, 1);
+        }
         if (currentView.status != SampleFrameViewStatus::ready
-            || nextView.status != SampleFrameViewStatus::ready)
+            || nextView.status != SampleFrameViewStatus::ready
+            || (crossfading
+                && (crossfadeCurrentView.status != SampleFrameViewStatus::ready
+                    || crossfadeNextView.status != SampleFrameViewStatus::ready)))
         {
             // The paged policy is bounded silence: advance musical time without waiting.
             ++result.pageMissCount;
@@ -279,6 +304,12 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             if (nextView.status == SampleFrameViewStatus::pageMissing)
                 sample->dataSource->publishPageIntent(
                     nextFrameIndex, SamplePageRequestPriority::lookAhead, voiceId);
+            if (crossfading && crossfadeCurrentView.status == SampleFrameViewStatus::pageMissing)
+                sample->dataSource->publishPageIntent(
+                    crossfadeFrameIndex, SamplePageRequestPriority::imminent, voiceId);
+            if (crossfading && crossfadeNextView.status == SampleFrameViewStatus::pageMissing)
+                sample->dataSource->publishPageIntent(
+                    crossfadeNextFrameIndex, SamplePageRequestPriority::lookAhead, voiceId);
             positionFrames += incrementFrames;
             if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
             {
@@ -325,10 +356,36 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             const auto next = nextView.channels[resolvedChannel][0];
             return current + (next - current) * fraction;
         };
+        const auto readCrossfadeInterpolated = [&](std::size_t channelIndex) noexcept
+        {
+            const auto resolvedChannel = std::min(channelIndex, sourceChannelCount - 1);
+            const auto crossfadeFraction = static_cast<float>(
+                crossfadePosition - static_cast<double>(crossfadeFrameIndex));
+            const auto current = crossfadeCurrentView.channels[resolvedChannel][0];
+            const auto next = crossfadeNextView.channels[resolvedChannel][0];
+            return current + (next - current) * crossfadeFraction;
+        };
+        const auto applyLoopCrossfade = [&](const float tail, const std::size_t channelIndex) noexcept
+        {
+            if (!crossfading)
+                return tail;
+            const auto progress = std::clamp(
+                (positionFrames - static_cast<double>(crossfadeStartFrame)
+                    + (loopCrossfadeFrames == 1 ? 1.0 : 0.0))
+                    / static_cast<double>(loopCrossfadeFrames > 1
+                        ? loopCrossfadeFrames - 1 : 1),
+                0.0, 1.0);
+            const auto angle = progress * 0.5 * 3.14159265358979323846;
+            const auto tailGain = static_cast<float>(std::cos(angle));
+            const auto headGain = static_cast<float>(std::sin(angle));
+            return tail * tailGain + readCrossfadeInterpolated(channelIndex) * headGain;
+        };
 
         const auto envelope = isReleasing() ? getReleaseEnvelopeLevel() : 1.0f;
-        const auto leftSample = readInterpolated(0) * baseGain * panGains.left * envelope;
-        const auto rightSource = sourceChannelCount > 1 ? readInterpolated(1) : readInterpolated(0);
+        const auto leftSample = applyLoopCrossfade(readInterpolated(0), 0)
+            * baseGain * panGains.left * envelope;
+        const auto rightChannel = sourceChannelCount > 1 ? std::size_t { 1 } : std::size_t { 0 };
+        const auto rightSource = applyLoopCrossfade(readInterpolated(rightChannel), rightChannel);
         const auto rightSample = rightSource * baseGain * panGains.right * envelope;
         output.channels[0][outputStartFrame + outputFrame] += leftSample;
         if (output.channelCount > 1)
@@ -380,6 +437,7 @@ void SamplerVoice::reset() noexcept
     playbackEndFrame = 0;
     loopStartFrame = 0;
     loopEndFrame = 0;
+    loopCrossfadeFrames = 0;
     incrementFrames = 1.0;
     outputSampleRate = 48000.0;
     baseGain = 0.0f;

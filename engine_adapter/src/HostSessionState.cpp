@@ -951,6 +951,15 @@ std::string computeHostProjectManifestDigest(const RuntimeProjectModel& project,
     // DAW binding keeps the same digest. Authored playback ends and non-default
     // damper metadata remain part of project identity.
     auto canonicalProject = project;
+    if (canonicalProject.schemaVersion == loopCrossfadeProjectSchemaVersion
+        && canonicalProject.authoring.schemaVersion == loopCrossfadeAuthoringSchemaVersion
+        && std::all_of(canonicalProject.authoring.zones.begin(),
+                       canonicalProject.authoring.zones.end(),
+                       [](const auto& zone) { return zone.loopCrossfadeFrames == 0; }))
+    {
+        canonicalProject.schemaVersion = playbackRegionProjectSchemaVersion;
+        canonicalProject.authoring.schemaVersion = playbackRegionAuthoringSchemaVersion;
+    }
     if (canonicalProject.schemaVersion == playbackRegionProjectSchemaVersion
         && canonicalProject.authoring.schemaVersion == playbackRegionAuthoringSchemaVersion
         && std::all_of(canonicalProject.authoring.zones.begin(),

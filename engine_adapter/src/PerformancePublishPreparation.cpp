@@ -44,6 +44,7 @@ bool zonesMatch(const PlaybackSnapshotZone& authored, const PreparedPlaybackZone
         && authored.loopEndFrame == prepared.loopEndFrame
         && authored.loopMode == prepared.loopMode
         && authored.sampleEndFrame == prepared.sampleEndFrame
+        && authored.loopCrossfadeFrames == prepared.loopCrossfadeFrames
         && authored.releaseSeconds == prepared.releaseSeconds
         && authored.releaseShape == prepared.releaseShape
         && authored.damper == prepared.damper
@@ -411,6 +412,12 @@ PerformancePublishPreparationResult validatePerformancePublishPreparationImpl(
                                      || zone.loopEndFrame > playbackEndFrame)))
             addError(result, "publish-prepared-zone-range-invalid", path,
                      "Prepared playback and loop ranges must fit the decoded source.");
+        const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+            ? zone.loopEndFrame - zone.loopStartFrame : 0;
+        if (zone.loopCrossfadeFrames > loopLength / 2
+            || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+            addError(result, "publish-prepared-loop-crossfade-invalid", path,
+                     "Prepared native loop crossfade frames must fit within half of an enabled loop.");
     }
     for (std::size_t index = 0; index < snapshot.zones.size(); ++index)
     {

@@ -51,7 +51,13 @@ struct ModelOptions
     double amplitudeVelocityTracking = 100.0;
     std::uint64_t sampleStartFrame = 0;
     std::uint64_t sampleEndFrame = 0;
+    bool loopEnabled = false;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
 };
+
+drs::engine::SampleDataSourceDescriptor makePagedDescriptor(std::uint64_t frameCount);
 
 drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> channels,
                                               const ModelOptions& options = {},
@@ -78,6 +84,13 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     snapshotZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
     snapshotZone.sampleEndFrame = options.sampleEndFrame;
+    snapshotZone.loopEnabled = options.loopEnabled;
+    snapshotZone.loopMode = options.loopEnabled
+        ? drs::engine::RegionLoopMode::loopContinuous
+        : drs::engine::RegionLoopMode::noLoop;
+    snapshotZone.loopStartFrame = options.loopStartFrame;
+    snapshotZone.loopEndFrame = options.loopEndFrame;
+    snapshotZone.loopCrossfadeFrames = options.loopCrossfadeFrames;
     snapshot.zones.push_back(std::move(snapshotZone));
     drs::engine::PlaybackSnapshotGroupRoute snapshotGroup;
     snapshotGroup.groupId = "voice-group";
@@ -118,6 +131,13 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     preparedZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
     preparedZone.sampleEndFrame = options.sampleEndFrame;
+    preparedZone.loopEnabled = options.loopEnabled;
+    preparedZone.loopMode = options.loopEnabled
+        ? drs::engine::RegionLoopMode::loopContinuous
+        : drs::engine::RegionLoopMode::noLoop;
+    preparedZone.loopStartFrame = options.loopStartFrame;
+    preparedZone.loopEndFrame = options.loopEndFrame;
+    preparedZone.loopCrossfadeFrames = options.loopCrossfadeFrames;
     prepared.zones.push_back(std::move(preparedZone));
     drs::engine::PreparedPlaybackGroupRoute preparedGroup;
     preparedGroup.groupId = "voice-group";
@@ -478,6 +498,92 @@ void runPartitionInvarianceMatrix()
             "Equivalent block partition changed lifecycle state.");
 }
 
+void runNativeLoopCrossfadeMatrix()
+{
+    const std::vector<float> discontinuousLoop { 0.0f, 0.0f, 0.0f, 0.0f,
+                                                  1.0f, 1.0f, 1.0f, 1.0f };
+    ModelOptions options;
+    options.loopEnabled = true;
+    options.loopStartFrame = 0;
+    options.loopEndFrame = discontinuousLoop.size();
+    options.loopCrossfadeFrames = 2;
+    const auto model = buildModel({ discontinuousLoop }, options);
+
+    drs::engine::SamplerVoice voice;
+    require(voice.start(*model, makeStart()), "Native loop-crossfade voice should start.");
+    StereoOutput output(10);
+    const auto rendered = voice.render(output.view(), 0, 10);
+    require(rendered.accepted && rendered.mixedFrameCount == 10 && !rendered.voiceFinished,
+            "Native loop crossfade must keep the looping voice active.");
+    requireVector(output.left,
+                  { 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f },
+                  "Equal-power loop-crossfade vector changed");
+
+    ModelOptions shortOptions;
+    shortOptions.loopEnabled = true;
+    shortOptions.loopStartFrame = 0;
+    shortOptions.loopEndFrame = 2;
+    shortOptions.loopCrossfadeFrames = 1;
+    const auto shortModel = buildModel({ { 1.0f, 0.0f } }, shortOptions);
+    drs::engine::SamplerVoice shortLoop;
+    require(shortLoop.start(*shortModel, makeStart()),
+            "The minimum two-frame loop should accept a one-frame crossfade.");
+    StereoOutput shortOutput(6);
+    const auto shortRender = shortLoop.render(shortOutput.view(), 0, 6);
+    require(shortRender.accepted && shortRender.mixedFrameCount == 6
+                && std::all_of(shortOutput.left.begin(), shortOutput.left.end(),
+                               [](const float value) { return value == 1.0f; }),
+            "A one-frame crossfade must smooth the minimum valid loop deterministically.");
+
+    drs::engine::SamplerVoice partitioned;
+    require(partitioned.start(*model, makeStart()),
+            "Partitioned native loop-crossfade voice should start.");
+    StereoOutput partitionedOutput(10);
+    partitioned.render(partitionedOutput.view(), 0, 3);
+    partitioned.render(partitionedOutput.view(), 3, 7);
+    requireVector(partitionedOutput.left, output.left,
+                  "Native loop crossfade must remain render-partition invariant");
+
+    auto pagedSource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
+        makePagedDescriptor(discontinuousLoop.size()),
+        std::vector<std::vector<float>> { discontinuousLoop },
+        4, 4, std::vector<bool> { true });
+    const auto pagedModel = buildModel({ discontinuousLoop }, options, pagedSource);
+    drs::engine::SamplerVoice paged;
+    require(paged.start(*pagedModel, makeStart()),
+            "Paged native loop-crossfade voice should start.");
+    StereoOutput pagedOutput(10);
+    const auto pagedRender = paged.render(pagedOutput.view(), 0, 10);
+    require(pagedRender.pageMissCount == 0 && pagedRender.mixedFrameCount == 10,
+            "Dual-read loop crossfade must render when both the loop tail and head are ready.");
+    requireVector(pagedOutput.left, output.left,
+                  "Resident and paged native loop crossfade must remain sample-identical");
+
+    auto missingTailSource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
+        makePagedDescriptor(discontinuousLoop.size()),
+        std::vector<std::vector<float>> { discontinuousLoop },
+        4, 4, std::vector<bool> { false });
+    const auto missingTailModel = buildModel({ discontinuousLoop }, options, missingTailSource);
+    drs::engine::SamplerVoice missingTail;
+    require(missingTail.start(*missingTailModel, makeStart()),
+            "Missing-tail loop-crossfade voice should start from its resident head.");
+    StereoOutput missingTailOutput(8);
+    const auto missingTailRender = missingTail.render(missingTailOutput.view(), 0, 8);
+    require(missingTailRender.pageMissCount > 0
+                && missingTailRender.underrunFrameCount > 0,
+            "Dual-read loop crossfade must use bounded silence and page intent when its tail page is missing.");
+
+    drs::engine::SamplerVoice pitched;
+    require(pitched.start(*model, makeStart(48)),
+            "Pitched native loop-crossfade voice should start.");
+    StereoOutput pitchedOutput(24);
+    const auto pitchedRender = pitched.render(pitchedOutput.view(), 0, 24);
+    require(pitchedRender.accepted && pitchedRender.mixedFrameCount == 24
+                && std::all_of(pitchedOutput.left.begin(), pitchedOutput.left.end(),
+                               [](const float value) { return std::isfinite(value); }),
+            "Pitched native loop crossfade must remain finite and active.");
+}
+
 drs::engine::SampleDataSourceDescriptor makePagedDescriptor(const std::uint64_t frameCount)
 {
     drs::engine::SampleDataSourceDescriptor descriptor;
@@ -598,6 +704,7 @@ int main()
         runGainVelocityAndPanMatrix();
         runOffsetAccumulationAndFinalFrameMatrix();
         runPartitionInvarianceMatrix();
+        runNativeLoopCrossfadeMatrix();
         runPagedBoundaryAndUnderrunMatrix();
         std::cout << "Sprint 4.2 deterministic voice-kernel matrix passed." << std::endl;
         return 0;

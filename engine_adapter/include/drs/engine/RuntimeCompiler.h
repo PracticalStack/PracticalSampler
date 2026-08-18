@@ -47,7 +47,12 @@ struct RuntimeCompileZoneDefinition
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    bool loopEnabled = false;
+    RegionLoopMode loopMode = RegionLoopMode::noLoop;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
     std::uint64_t sampleEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
 };
 
 struct RuntimeCompilePlan

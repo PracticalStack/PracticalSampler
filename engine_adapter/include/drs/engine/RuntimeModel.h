@@ -215,6 +215,9 @@ struct RuntimeProjectZoneDefinition
     ContinuousDamperDefinition damper;
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
     std::uint64_t sampleEndFrame = 0;
+    // Native-only loop smoothing. This is deliberately separate from the
+    // portable SFZ v1 region contract and never implies an SFZ writer.
+    std::uint64_t loopCrossfadeFrames = 0;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The
@@ -454,7 +457,12 @@ struct RuntimeZoneDefinition
     double amplitudeVelocityTracking = 100.0;
     std::vector<RuntimeControllerCondition> controllerConditions;
     ContinuousDamperDefinition damper;
+    bool loopEnabled = false;
+    RegionLoopMode loopMode = RegionLoopMode::noLoop;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrame = 0;
     std::uint64_t sampleEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
 };
 
 struct RuntimeInstrumentModel

@@ -46,6 +46,7 @@ struct AuthoringWaveformPreview
     std::uint64_t playbackEndFrameExclusive = 0;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
     double releaseSeconds = 0.0;
     std::uint64_t viewportStartFrame = 0;
     std::uint64_t viewportEndFrameExclusive = 0;

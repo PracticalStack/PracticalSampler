@@ -1333,6 +1333,8 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     waveformLoopStartEditor.setTextToShowWhenEmpty("start frame or seconds", authoringPanelMuted);
     waveformLoopEndEditor.setComponentID("authoringWaveformLoopEnd");
     waveformLoopEndEditor.setTextToShowWhenEmpty("end frame or seconds", authoringPanelMuted);
+    waveformLoopCrossfadeEditor.setComponentID("authoringWaveformLoopCrossfade");
+    waveformLoopCrossfadeEditor.setTextToShowWhenEmpty("crossfade frames", authoringPanelMuted);
     waveformLoopApplyButton.setComponentID("authoringWaveformLoopApply");
     waveformLoopApplyButton.setButtonText("Apply");
     waveformSetLoopSelectionButton.setComponentID("authoringWaveformSetLoopSelection");
@@ -1464,6 +1466,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     waveformLoopEndEditor.onReturnKey = [this]
     {
         commitWaveformLoopControls("Set SFZ loop region");
+    };
+    waveformLoopCrossfadeEditor.onReturnKey = [this]
+    {
+        commitWaveformLoopControls("Set native loop crossfade");
     };
     waveformPlaybackApplyButton.onClick = [this]
     {
@@ -2237,6 +2243,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&waveformLoopModeSelector),
              static_cast<juce::Component*>(&waveformLoopStartEditor),
              static_cast<juce::Component*>(&waveformLoopEndEditor),
+             static_cast<juce::Component*>(&waveformLoopCrossfadeEditor),
              static_cast<juce::Component*>(&waveformLoopApplyButton),
              static_cast<juce::Component*>(&waveformSetLoopSelectionButton),
              static_cast<juce::Component*>(&waveformLoopAuditionButton),
@@ -2695,6 +2702,9 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(waveformLoopEndEditor,
                                 "Loop end",
                                 "Accepts an exclusive source frame or a time value ending in s.");
+    configureAccessibleMetadata(waveformLoopCrossfadeEditor,
+                                "Loop crossfade",
+                                "Native equal-power loop smoothing in source frames or seconds; zero disables it.");
     configureAccessibleMetadata(waveformLoopApplyButton,
                                 "Apply loop region",
                                 "Commits the loop mode and boundaries as one undoable edit.");
@@ -2737,6 +2747,7 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     waveformSnapToggle.setExplicitFocusOrder(77);
     waveformLoopStartEditor.setExplicitFocusOrder(78);
     waveformLoopEndEditor.setExplicitFocusOrder(79);
+    waveformLoopCrossfadeEditor.setExplicitFocusOrder(80);
 
     configureAccessibleMetadata(macroList,
                                 "Macro list",
@@ -3283,6 +3294,9 @@ void AuthoringPanel::resized()
         gap(loopRow);
         waveformLoopEndEditor.setBounds(loopRow.removeFromLeft(
             std::min(104, loopRow.getWidth() / 3)));
+        gap(loopRow);
+        waveformLoopCrossfadeEditor.setBounds(loopRow.removeFromLeft(
+            std::min(112, loopRow.getWidth() / 3)));
         gap(loopRow);
         waveformLoopApplyButton.setBounds(loopRow.removeFromLeft(
             std::min(62, loopRow.getWidth() / 2)));
@@ -4539,6 +4553,7 @@ void AuthoringPanel::refreshWorkbenchVisibility()
         || isComponentFocusedWithin(focusedComponent, waveformLoopModeSelector)
         || isComponentFocusedWithin(focusedComponent, waveformLoopStartEditor)
         || isComponentFocusedWithin(focusedComponent, waveformLoopEndEditor)
+        || isComponentFocusedWithin(focusedComponent, waveformLoopCrossfadeEditor)
         || isComponentFocusedWithin(focusedComponent, waveformLoopApplyButton)
         || isComponentFocusedWithin(focusedComponent, waveformSetLoopSelectionButton)
         || isComponentFocusedWithin(focusedComponent, waveformLoopAuditionButton)
@@ -4630,6 +4645,7 @@ void AuthoringPanel::refreshWorkbenchVisibility()
     setVisibleAndAccessible(waveformLoopModeSelector, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopStartEditor, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopEndEditor, workbenchContentVisible && waveformTab);
+    setVisibleAndAccessible(waveformLoopCrossfadeEditor, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopApplyButton, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformSetLoopSelectionButton, workbenchContentVisible && waveformTab);
     setVisibleAndAccessible(waveformLoopAuditionButton, workbenchContentVisible && waveformTab);
@@ -5563,10 +5579,13 @@ void AuthoringPanel::refreshWaveformWorkbenchContent()
                                        juce::dontSendNotification);
     waveformLoopStartEditor.setText(juce::String(preview.loopStartFrame), juce::dontSendNotification);
     waveformLoopEndEditor.setText(juce::String(preview.loopEndFrame), juce::dontSendNotification);
+    waveformLoopCrossfadeEditor.setText(juce::String(preview.loopCrossfadeFrames),
+                                        juce::dontSendNotification);
     const auto hasEditableSource = preview.available && preview.frameCount > preview.playbackStartFrame;
     waveformLoopModeSelector.setEnabled(hasEditableSource);
     waveformLoopStartEditor.setEnabled(hasEditableSource);
     waveformLoopEndEditor.setEnabled(hasEditableSource);
+    waveformLoopCrossfadeEditor.setEnabled(hasEditableSource && preview.loopEnabled);
     waveformLoopApplyButton.setEnabled(hasEditableSource);
     waveformSetLoopSelectionButton.setEnabled(hasEditableSource);
     waveformLoopAuditionButton.setEnabled(hasEditableSource && previewStatus.auditionAvailable);
@@ -5778,6 +5797,9 @@ void AuthoringPanel::commitWaveformPlaybackRegion(const std::uint64_t startFrame
             { editedZone.loopStartFrame, editedZone.loopEndFrame }, playback);
         editedZone.loopStartFrame = loop.startFrame;
         editedZone.loopEndFrame = loop.endFrameExclusive;
+        editedZone.loopCrossfadeFrames = std::min(
+            editedZone.loopCrossfadeFrames,
+            (loop.endFrameExclusive - loop.startFrame) / 2);
     }
     if (editedZone.sampleStartFrame == selectedZone->sampleStartFrame
         && editedZone.sampleEndFrame == selectedZone->sampleEndFrame
@@ -5871,6 +5893,9 @@ void AuthoringPanel::commitWaveformLoopRegion(const std::uint64_t startFrame,
     auto editedZone = *selectedZone;
     editedZone.loopStartFrame = loop.startFrame;
     editedZone.loopEndFrame = loop.endFrameExclusive;
+    editedZone.loopCrossfadeFrames = std::min(
+        editedZone.loopCrossfadeFrames,
+        (loop.endFrameExclusive - loop.startFrame) / 2);
     if (!drs::engine::regionLoopModeLoops(editedZone.loopMode))
         editedZone.loopMode = drs::engine::RegionLoopMode::loopContinuous;
     editedZone.loopEnabled = true;
@@ -5916,7 +5941,9 @@ void AuthoringPanel::commitWaveformLoopControls(const std::string& label)
 
     const auto start = parseWaveformFrameText(waveformLoopStartEditor.getText(), preview.sampleRate);
     const auto end = parseWaveformFrameText(waveformLoopEndEditor.getText(), preview.sampleRate);
-    if (!start.has_value() || !end.has_value())
+    const auto crossfade = parseWaveformFrameText(waveformLoopCrossfadeEditor.getText(),
+                                                   preview.sampleRate);
+    if (!start.has_value() || !end.has_value() || !crossfade.has_value())
         return;
     const auto loop = drs::engine::normalizeLoopRegion(
         { *start, *end }, { preview.playbackStartFrame, playbackEnd });
@@ -5924,6 +5951,9 @@ void AuthoringPanel::commitWaveformLoopControls(const std::string& label)
     editedZone.loopEndFrame = loop.endFrameExclusive;
     editedZone.loopEnabled = drs::engine::regionLoopModeLoops(editedZone.loopMode)
         && !loop.empty();
+    const auto loopLength = loop.endFrameExclusive - loop.startFrame;
+    editedZone.loopCrossfadeFrames = editedZone.loopEnabled
+        ? std::min(*crossfade, loopLength / 2) : 0;
     if (editedZone.loopMode == drs::engine::RegionLoopMode::oneShot)
         editedZone.triggerMode = drs::engine::ZoneTriggerMode::oneShot;
     else if (previousLoopMode == drs::engine::RegionLoopMode::oneShot
@@ -5934,6 +5964,7 @@ void AuthoringPanel::commitWaveformLoopControls(const std::string& label)
         && editedZone.loopEnabled == selectedZone->loopEnabled
         && editedZone.loopStartFrame == selectedZone->loopStartFrame
         && editedZone.loopEndFrame == selectedZone->loopEndFrame
+        && editedZone.loopCrossfadeFrames == selectedZone->loopCrossfadeFrames
         && editedZone.triggerMode == selectedZone->triggerMode)
         return;
 

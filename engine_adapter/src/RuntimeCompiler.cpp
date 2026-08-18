@@ -438,14 +438,29 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         {
             return zone.sampleEndFrame != 0;
         });
+    const auto requiresSfzRegionInstrumentSchema = std::any_of(
+        plan.zones.begin(), plan.zones.end(), [](const RuntimeCompileZoneDefinition& zone)
+        {
+            return zone.loopMode != RegionLoopMode::noLoop
+                || zone.loopEnabled || zone.loopStartFrame != 0 || zone.loopEndFrame != 0;
+        });
+    const auto requiresLoopCrossfadeInstrumentSchema = std::any_of(
+        plan.zones.begin(), plan.zones.end(), [](const RuntimeCompileZoneDefinition& zone)
+        {
+            return zone.loopCrossfadeFrames != 0;
+        });
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = requiresPlaybackRegionInstrumentSchema
+    result.instrument.schemaVersion = requiresLoopCrossfadeInstrumentSchema
+        ? loopCrossfadeInstrumentSchemaVersion
+        : (requiresSfzRegionInstrumentSchema
+        ? sfzRegionInstrumentSchemaVersion
+        : (requiresPlaybackRegionInstrumentSchema
         ? playbackRegionInstrumentSchemaVersion
         : (requiresContinuousDamperInstrumentSchema
         ? continuousDamperInstrumentSchemaVersion
         : (requiresFxRoutingInstrumentSchema ? runtimeInstrumentFxRoutingSchemaVersion
             : (requiresPerformanceInstrumentSchema ? 3
-                : (requiresExtendedInstrumentSchema ? 2 : 1))));
+                : (requiresExtendedInstrumentSchema ? 2 : 1))))));
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -501,6 +516,25 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
             addIssue(result, "Zone '" + zonePlan.id + "' has an empty or out-of-range playback region.");
         if (zonePlan.sampleEndFrame > sourceFrameCount)
             addIssue(result, "Zone '" + zonePlan.id + "' has sampleEndFrame beyond its source length.");
+        const auto playbackEndFrame = resolveSampleEndFrame(zonePlan.sampleEndFrame,
+                                                             sourceFrameCount);
+        const auto effectiveLoopMode = effectiveRegionLoopMode(zonePlan.loopMode,
+                                                                zonePlan.loopEnabled);
+        if (regionLoopModeLoops(effectiveLoopMode)
+            && (zonePlan.loopStartFrame < zonePlan.sampleStartFrame
+                || zonePlan.loopStartFrame >= zonePlan.loopEndFrame
+                || zonePlan.loopEndFrame > playbackEndFrame))
+        {
+            addIssue(result, "Zone '" + zonePlan.id
+                             + "' has a loop outside its compiled playback region.");
+        }
+        const auto loopLength = zonePlan.loopEndFrame > zonePlan.loopStartFrame
+            ? zonePlan.loopEndFrame - zonePlan.loopStartFrame : 0;
+        if (zonePlan.loopCrossfadeFrames > loopLength / 2
+            || (zonePlan.loopCrossfadeFrames != 0 && !regionLoopModeLoops(effectiveLoopMode)))
+        {
+            addIssue(result, "Zone '" + zonePlan.id + "' has an invalid native loop crossfade.");
+        }
         if (zonePlan.damper.dynamicRelease
             || zonePlan.damper.sustainControllerNumber != legacySustainControllerNumber
             || zonePlan.damper.sustainThreshold != legacySustainThreshold)
@@ -666,6 +700,11 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.amplitudeVelocityTracking = zonePlan.amplitudeVelocityTracking;
         zone.controllerConditions = zonePlan.controllerConditions;
         zone.damper = zonePlan.damper;
+        zone.loopEnabled = zonePlan.loopEnabled;
+        zone.loopMode = zonePlan.loopMode;
+        zone.loopStartFrame = zonePlan.loopStartFrame;
+        zone.loopEndFrame = zonePlan.loopEndFrame;
+        zone.loopCrossfadeFrames = zonePlan.loopCrossfadeFrames;
         result.instrument.zones.push_back(std::move(zone));
     }
 

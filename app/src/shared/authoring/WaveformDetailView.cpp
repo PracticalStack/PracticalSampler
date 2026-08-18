@@ -269,6 +269,29 @@ void WaveformDetailView::paint(juce::Graphics& g)
             g.fillRect(juce::Rectangle<float>(visibleLeft, inner.getY(),
                                               visibleRight - visibleLeft, inner.getHeight()));
         }
+        if (preview.loopCrossfadeFrames != 0
+            && preview.loopEndFrame > preview.loopStartFrame)
+        {
+            const auto crossfadeFrames = std::min(
+                preview.loopCrossfadeFrames,
+                (preview.loopEndFrame - preview.loopStartFrame) / 2);
+            const auto tailX = inner.getX() + static_cast<float>(
+                drs::engine::waveformFrameToPixel(
+                    preview.loopEndFrame - crossfadeFrames, viewport));
+            const auto headX = inner.getX() + static_cast<float>(
+                drs::engine::waveformFrameToPixel(
+                    preview.loopStartFrame + crossfadeFrames, viewport));
+            g.setColour(waveformSelected.withAlpha(0.18f));
+            g.fillRect(juce::Rectangle<float>(tailX, inner.getY(),
+                                               std::max(0.0f, endX - tailX), inner.getHeight()));
+            g.fillRect(juce::Rectangle<float>(startX, inner.getY(),
+                                               std::max(0.0f, headX - startX), inner.getHeight()));
+            g.setFont(juce::FontOptions(9.0f, juce::Font::bold));
+            g.drawFittedText("XFADE", juce::Rectangle<int>(static_cast<int>(tailX + 3.0f),
+                                                            static_cast<int>(inner.getCentreY() - 7.0f),
+                                                            44, 14),
+                             juce::Justification::centredLeft, 1);
+        }
         g.setColour(waveformAccent);
         g.drawVerticalLine(static_cast<int>(startX), inner.getY(), inner.getBottom());
         g.drawVerticalLine(static_cast<int>(endX), inner.getY(), inner.getBottom());

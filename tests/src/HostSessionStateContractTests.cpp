@@ -19,7 +19,9 @@ void require(const bool condition, const std::string& message)
 
 std::string readTextFile(const fs::path& path)
 {
-    std::ifstream input(path, std::ios::binary);
+    // Golden JSON is canonicalized with LF by the codec. Text mode keeps this
+    // byte-for-byte assertion independent of the checkout's Windows EOL policy.
+    std::ifstream input(path);
     if (!input)
         return {};
 
@@ -341,7 +343,7 @@ int main()
             firstProject.project, firstLocation);
         const auto secondDigest = drs::engine::computeHostProjectManifestDigest(
             secondProject.project, secondLocation);
-        require(firstDigest == "fnv1a64:a9774c2eb31512be"
+        require(firstDigest == "fnv1a64:9e6eebf6797fab37"
                     && secondDigest == firstDigest,
                 "Equivalent relocated project models must produce the checked-in canonical digest; first="
                     + firstDigest + ", second=" + secondDigest + ".");
@@ -373,10 +375,46 @@ int main()
                 "A zero playback-end sentinel must not invalidate an existing DAW binding.");
 
         auto authoredPlaybackRegion = schemaEight.project;
+        authoredPlaybackRegion.schemaVersion = drs::engine::loopCrossfadeProjectSchemaVersion;
+        authoredPlaybackRegion.authoring.schemaVersion
+            = drs::engine::loopCrossfadeAuthoringSchemaVersion;
+        authoredPlaybackRegion.authoring.zones.front().sampleStartFrame = 8;
         authoredPlaybackRegion.authoring.zones.front().sampleEndFrame = 100;
+        authoredPlaybackRegion.authoring.zones.front().loopEnabled = true;
+        authoredPlaybackRegion.authoring.zones.front().loopMode
+            = drs::engine::RegionLoopMode::loopSustain;
+        authoredPlaybackRegion.authoring.zones.front().loopStartFrame = 24;
+        authoredPlaybackRegion.authoring.zones.front().loopEndFrame = 80;
+        authoredPlaybackRegion.authoring.zones.front().loopCrossfadeFrames = 12;
         require(drs::engine::computeHostProjectManifestDigest(
                     authoredPlaybackRegion, firstLocation) != afterPlaybackRegionMigration,
                 "An authored playback end must participate in host binding identity.");
+
+        auto regionHostState = *dirty.hostState;
+        regionHostState.projectBinding.projectId = authoredPlaybackRegion.projectId;
+        regionHostState.projectBinding.manifestPath = firstLocation;
+        regionHostState.projectBinding.manifestFileName
+            = fs::path(firstLocation).filename().generic_string();
+        regionHostState.projectBinding.manifestDigest
+            = drs::engine::computeHostProjectManifestDigest(authoredPlaybackRegion, firstLocation);
+        regionHostState.authoringState.projectSnapshot = authoredPlaybackRegion;
+        const auto regionHostSerialized = drs::engine::serializeHostSessionState(regionHostState);
+        require(regionHostSerialized.serialized,
+                "An authored SFZ playback region must survive host-state serialization.");
+        const auto regionHostRestored = drs::engine::parseHostSessionState(regionHostSerialized.text);
+        require(regionHostRestored.isValidHostState()
+                    && regionHostRestored.hostState->authoringState.projectSnapshot.has_value(),
+                "An authored SFZ playback region must survive host-state restoration.");
+        const auto& restoredRegion = regionHostRestored.hostState->authoringState
+            .projectSnapshot->authoring.zones.front();
+        require(restoredRegion.sampleStartFrame == 8
+                    && restoredRegion.sampleEndFrame == 100
+                    && restoredRegion.loopEnabled
+                    && restoredRegion.loopMode == drs::engine::RegionLoopMode::loopSustain
+                    && restoredRegion.loopStartFrame == 24
+                    && restoredRegion.loopEndFrame == 80
+                    && restoredRegion.loopCrossfadeFrames == 12,
+                "Host state must preserve the complete typed SFZ region contract.");
 
         auto authoredDamper = schemaSeven.project;
         authoredDamper.authoring.zones.front().damper.sustainControllerNumber = 90;

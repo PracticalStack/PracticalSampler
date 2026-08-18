@@ -173,6 +173,7 @@ struct PlaybackSnapshotZone
     ContinuousDamperDefinition damper;
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
     std::uint64_t sampleEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
 };
 
 // S3.7-T5 deferral note: this remains a public aggregate for current builder, facade, and

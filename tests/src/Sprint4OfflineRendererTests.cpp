@@ -57,6 +57,7 @@ struct ModelSpec
     bool loopEnabled = false;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
 };
 
 drs::engine::SamplerRenderModelPtr makeGroupedModel(const std::string& id,
@@ -132,6 +133,7 @@ drs::engine::SamplerRenderModelPtr makeGroupedModel(const std::string& id,
         snapshotZone.loopEnabled = spec.loopEnabled;
         snapshotZone.loopStartFrame = spec.loopStartFrame;
         snapshotZone.loopEndFrame = spec.loopEndFrame;
+        snapshotZone.loopCrossfadeFrames = spec.loopCrossfadeFrames;
         snapshot.zones.push_back(std::move(snapshotZone));
 
         auto decoded = std::make_shared<drs::engine::PreparedPlaybackDecodedSampleData>();
@@ -163,6 +165,7 @@ drs::engine::SamplerRenderModelPtr makeGroupedModel(const std::string& id,
         preparedZone.loopEnabled = spec.loopEnabled;
         preparedZone.loopStartFrame = spec.loopStartFrame;
         preparedZone.loopEndFrame = spec.loopEndFrame;
+        preparedZone.loopCrossfadeFrames = spec.loopCrossfadeFrames;
         prepared.zones.push_back(std::move(preparedZone));
     }
 
@@ -360,6 +363,21 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
         requireFrame(loopBoundary, 0, frame, loopExpected[frame], "Forward loop boundary");
     artifacts.push_back(std::move(loopBoundary));
 
+    ModelSpec crossfadedLoop { { { 0.0f, 0.0f, 0.0f, 0.0f,
+                                      1.0f, 1.0f, 1.0f, 1.0f } } };
+    crossfadedLoop.loopEnabled = true;
+    crossfadedLoop.loopStartFrame = 0;
+    crossfadedLoop.loopEndFrame = 8;
+    crossfadedLoop.loopCrossfadeFrames = 2;
+    auto crossfade = render("native-loop-crossfade", crossfadedLoop, 10, { noteOn(0) });
+    const std::array<double, 10> crossfadeExpected {
+        0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0
+    };
+    for (std::size_t frame = 0; frame < crossfadeExpected.size(); ++frame)
+        requireFrame(crossfade, 0, frame, crossfadeExpected[frame],
+                     "Native loop crossfade offline parity");
+    artifacts.push_back(std::move(crossfade));
+
     auto multipleWraps = render("multiple-loop-wraps", loop, 8, { noteOn(0, 72) });
     const std::array<double, 8> wrapExpected { 0.0, 0.4, 0.2, 0.6, 0.4, 0.2, 0.6, 0.4 };
     for (std::size_t frame = 0; frame < wrapExpected.size(); ++frame)
@@ -376,7 +394,9 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
     std::vector<drs::tests::OfflineTimelineEvent> stealEvents;
     for (std::size_t index = 0; index <= drs::engine::SamplerVoicePool::capacity; ++index)
         stealEvents.push_back(noteOn(0, 48 + static_cast<int>(index)));
-    auto stealing = render("voice-stealing", loopConstant, 4, std::move(stealEvents));
+    auto stealingLoop = loopConstant;
+    stealingLoop.loopCrossfadeFrames = 4;
+    auto stealing = render("voice-stealing", stealingLoop, 40, std::move(stealEvents));
     requireFrame(stealing, 0, 0,
                  static_cast<double>(drs::engine::SamplerVoicePool::capacity),
                  "Fixed-pool post-steal mix");
@@ -425,6 +445,7 @@ drs::tests::OfflineRenderArtifact runPartitionInvarianceMatrix()
     spec.loopEnabled = true;
     spec.loopStartFrame = 2;
     spec.loopEndFrame = 18;
+    spec.loopCrossfadeFrames = 4;
     const std::vector<drs::tests::OfflineTimelineEvent> events {
         noteOn(5, 60), noteOn(37, 64), noteOn(91, 60), noteOff(333, 60),
         noteOn(511, 67, 96), command(1025, drs::engine::SamplerRenderEventType::allNotesOff),

@@ -2,12 +2,14 @@
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReaderDispatch.h"
+#include "drs/engine/SamplerVoice.h"
 #include "shared/PerformancePackageExportService.h"
 #include "shared/PerformancePackageProjection.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -119,6 +121,15 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     semanticRoute.amplitudeVelocityTracking = 37.0;
     semanticRoute.releaseSeconds = 1.25;
     semanticRoute.releaseShape = -6.0;
+    semanticRoute.sampleStartFrame = 8;
+    semanticRoute.sampleEndFrame = 256;
+    semanticRoute.loopEnabled = true;
+    semanticRoute.loopMode = drs::engine::RegionLoopMode::loopSustain;
+    semanticRoute.loopStartFrame = 32;
+    semanticRoute.loopEndFrame = 192;
+    semanticRoute.loopCrossfadeFrames = 16;
+    request.project.schemaVersion = drs::engine::loopCrossfadeProjectSchemaVersion;
+    request.project.authoring.schemaVersion = drs::engine::loopCrossfadeAuthoringSchemaVersion;
     semanticRoute.controllerConditions = { { 23, 0, 63 } };
     semanticRoute.performance.event = drs::engine::PerformanceEventKind::release;
     request.sessionState.loadProfileId = "balanced";
@@ -278,15 +289,14 @@ int main()
         unsupportedProject.authoring.performanceBanks.push_back(
             { "unsupported-bank", "Unsupported Bank", {}, {}, {} });
         unsupportedProject.authoring.groups.front().pan = 0.25;
-        unsupportedProject.authoring.zones.front().loopEnabled = true;
         const auto compatibilityProjection = projectPerformancePackage(
             unsupportedProject, {}, PerformancePackageProjectionContext { "unsupported" });
         require(!compatibilityProjection.projected
                     && !containsIssue(compatibilityProjection.issues, "target mappings")
                     && containsIssue(compatibilityProjection.issues, "performance banks")
                     && containsIssue(compatibilityProjection.issues, "non-default pan")
-                    && containsIssue(compatibilityProjection.issues, "loop settings"),
-                "FX/routing support must not loosen unrelated export compatibility blockers.");
+                    && !containsIssue(compatibilityProjection.issues, "loop settings"),
+                "Playable-package projection must preserve loop settings while retaining unrelated blockers.");
 
         const auto tempRoot = fs::temp_directory_path() / "drs-performance-package-export-lifecycle";
         fs::remove_all(tempRoot);
@@ -388,8 +398,8 @@ int main()
                     && packageV2.metadata.manifest.minimumReaderSchemaVersion
                         == drs::engine::performancePackageLegacySchemaVersion
                     && packageV2.metadata.instrument.instrument.schemaVersion
-                        < drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
-                "Graph-free export must retain legacy package and runtime instrument versions.");
+                        == drs::engine::loopCrossfadeInstrumentSchemaVersion,
+                "Graph-free region export must retain the legacy package envelope and use the typed SFZ-region instrument schema.");
 
         const auto legacyIdentityPackagePath = tempRoot / "legacy-identity-note.drpkg";
         auto legacyIdentityInjected = false;
@@ -636,6 +646,13 @@ int main()
                     && preparedRoute->amplitudeVelocityTracking == 37.0
                     && preparedRoute->releaseSeconds == 1.25
                     && preparedRoute->releaseShape == -6.0
+                    && preparedRoute->sampleStartFrame == 8
+                    && preparedRoute->sampleEndFrame == 256
+                    && preparedRoute->loopEnabled
+                    && preparedRoute->loopMode == drs::engine::RegionLoopMode::loopSustain
+                    && preparedRoute->loopStartFrame == 32
+                    && preparedRoute->loopEndFrame == 192
+                    && preparedRoute->loopCrossfadeFrames == 16
                     && preparedRoute->controllerConditions
                         == std::vector<drs::engine::RuntimeControllerCondition> { { 23, 0, 63 } },
                 "Package-v2 reconstruction must retain tuning, velocity tracking, release time, and controller conditions.");
@@ -648,9 +665,45 @@ int main()
         require(renderRoute != renderRoutes.end()
                     && renderRoute->releaseSeconds == 1.25
                     && renderRoute->releaseShape == -6.0
+                    && renderRoute->sampleStartFrame == 8
+                    && renderRoute->sampleEndFrame == 256
+                    && renderRoute->loopEnabled
+                    && renderRoute->loopMode == drs::engine::RegionLoopMode::loopSustain
+                    && renderRoute->loopStartFrame == 32
+                    && renderRoute->loopEndFrame == 192
+                    && renderRoute->loopCrossfadeFrames == 16
                     && renderRoute->performanceEvent
                         == drs::engine::PerformanceEventKind::release,
                 "Package-v2 reconstruction must rebuild release envelopes and non-note-on performance events.");
+        const auto renderRouteIndex = static_cast<std::size_t>(
+            std::distance(renderRoutes.begin(), renderRoute));
+        drs::engine::SamplerVoice packageLoopVoice;
+        drs::engine::SamplerVoiceStartRequest packageLoopStart;
+        packageLoopStart.voiceId = 1;
+        packageLoopStart.triggerId = 1;
+        packageLoopStart.routeIndex = renderRouteIndex;
+        packageLoopStart.sourceMidiNote = renderRoute->rootKey;
+        packageLoopStart.effectiveMidiNote = renderRoute->rootKey;
+        packageLoopStart.effectiveVelocity = 127;
+        packageLoopStart.outputSampleRate = 48000.0;
+        packageLoopStart.activationGeneration = 1;
+        require(packageLoopVoice.start(*preparedActivation.renderModel, packageLoopStart),
+                "The reopened package region must start in the production voice kernel.");
+        std::vector<float> packageLoopLeft(512, 0.0f);
+        std::vector<float> packageLoopRight(512, 0.0f);
+        std::array<float*, 2> packageLoopChannels {
+            packageLoopLeft.data(), packageLoopRight.data()
+        };
+        const auto packageLoopRender = packageLoopVoice.render(
+            { packageLoopChannels.data(), 2, 512 }, 0, 512);
+        require(packageLoopRender.accepted
+                    && packageLoopRender.mixedFrameCount == 512
+                    && !packageLoopRender.voiceFinished
+                    && packageLoopVoice.getPositionFrames()
+                        >= static_cast<double>(renderRoute->loopStartFrame)
+                    && packageLoopVoice.getPositionFrames()
+                        < static_cast<double>(renderRoute->loopEndFrame),
+                "The reopened playable package must audibly wrap inside the imported loop region.");
         drs::engine::EngineFacade facade;
         const auto activated = facade.activatePreparedPerformancePackageSession(
             std::move(preparedActivation));
@@ -679,7 +732,7 @@ int main()
                     && targetOnlyPackage.metadata.manifest.schemaVersion
                         == drs::engine::performancePackageFxRoutingSchemaVersion
                     && targetOnlyPackage.metadata.instrument.instrument.schemaVersion
-                        == drs::engine::runtimeInstrumentFxRoutingSchemaVersion
+                        == drs::engine::loopCrossfadeInstrumentSchemaVersion
                     && targetOnlyPackage.metadata.instrument.instrument.fxSlots.empty()
                     && targetOnlyPackage.metadata.instrument.instrument.macros.size() == 1
                     && targetOnlyPackage.metadata.instrument.instrument.macros.front().targets.size() == 1
@@ -729,8 +782,8 @@ int main()
                     && graphPackage.metadata.manifest.minimumReaderSchemaVersion
                         == drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion
                     && graphPackage.metadata.instrument.instrument.schemaVersion
-                        == drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
-                "Graph-bearing export must select package schema 2, minimum reader 2, and runtime instrument v4.");
+                        == drs::engine::loopCrossfadeInstrumentSchemaVersion,
+                "Graph-bearing region export must select package schema 2, minimum reader 2, and the newest required instrument schema.");
         const auto& graphInstrument = graphPackage.metadata.instrument.instrument;
         require(graphInstrument.fxSlots.size() == 1
                     && graphInstrument.fxSlots.front().id == "drive"

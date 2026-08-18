@@ -1630,6 +1630,37 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateSelectedZone(const Ru
                                   "No zone is currently selected for editing.");
 
     auto project = getProject();
+    if (zone.loopCrossfadeFrames != 0
+        && project.schemaVersion < loopCrossfadeProjectSchemaVersion)
+    {
+        while (project.schemaVersion < loopCrossfadeProjectSchemaVersion)
+        {
+            RuntimeProjectMigrationResult migration;
+            switch (project.schemaVersion)
+            {
+                case 1: migration = migrateRuntimeProjectToPhase2Authoring(project); break;
+                case 2: migration = migrateRuntimeProjectToPhase3RoundRobinSchema(project); break;
+                case 3: migration = migrateRuntimeProjectToZoneGroupsSchema(project); break;
+                case 4: migration = migrateRuntimeProjectToCuratedDspSchema(project); break;
+                case 5: migration = migrateRuntimeProjectToPerformanceArticulationSchema(project); break;
+                case 6: migration = migrateRuntimeProjectToContinuousDamperSchema(project); break;
+                case 7: migration = migrateRuntimeProjectToPlaybackRegionSchema(project); break;
+                case 8: migration = migrateRuntimeProjectToLoopCrossfadeSchema(project); break;
+                default:
+                    return makeRejectedResult(getDocumentState(),
+                                              "Zone edit rejected",
+                                              "The current project cannot migrate to native loop crossfade metadata.");
+            }
+            if (!migration.valid)
+            {
+                return makeRejectedResult(getDocumentState(),
+                                          "Zone edit rejected",
+                                          migration.issues.empty()
+                                              ? migration.state : migration.issues.front());
+            }
+            project = std::move(migration.project);
+        }
+    }
     const auto previousGroupId = project.authoring.zones[*selectedZoneIndex].groupId;
     const auto previousGroupStatus = assessGroupRoundRobin(project, previousGroupId);
     const auto destinationGroupStatus = zone.groupId == previousGroupId

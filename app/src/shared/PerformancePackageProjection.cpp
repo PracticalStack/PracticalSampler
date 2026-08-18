@@ -60,11 +60,6 @@ void collectCompatibilityIssues(const drs::engine::RuntimeProjectModel& project,
                              + "' uses non-default pan, which playable package export does not yet preserve.");
         }
 
-        if (zone.loopEnabled || zone.loopStartFrame != 0 || zone.loopEndFrame != 0)
-        {
-            issues.push_back("Zone '" + zone.id
-                             + "' uses loop settings, which playable package export does not yet preserve.");
-        }
     }
 }
 } // namespace
@@ -255,6 +250,7 @@ PerformancePackageProjectionResult projectPerformancePackage(
         zone.gainDb = projectZone.gainDb;
         zone.sampleStartFrame = projectZone.sampleStartFrame;
         zone.sampleEndFrame = projectZone.sampleEndFrame;
+        zone.loopCrossfadeFrames = projectZone.loopCrossfadeFrames;
         zone.releaseSeconds = projectZone.releaseSeconds;
         zone.releaseShape = projectZone.releaseShape;
         zone.roundRobin = projectZone.roundRobin;
@@ -270,6 +266,10 @@ PerformancePackageProjectionResult projectPerformancePackage(
         zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
         zone.controllerConditions = projectZone.controllerConditions;
         zone.damper = projectZone.damper;
+        zone.loopEnabled = projectZone.loopEnabled;
+        zone.loopMode = projectZone.loopMode;
+        zone.loopStartFrame = projectZone.loopStartFrame;
+        zone.loopEndFrame = projectZone.loopEndFrame;
         plan.zones.push_back(std::move(zone));
     }
 

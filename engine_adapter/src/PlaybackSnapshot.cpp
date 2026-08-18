@@ -607,6 +607,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["loopMode"] = regionLoopModeName(zone.loopMode);
         zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
+        zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
         ordered_json damperCurve = ordered_json::array();
@@ -1232,6 +1233,13 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         if (zone.loopEnabled && zone.loopEndFrame < zone.loopStartFrame)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-loop-range", path,
                        "Loop-enabled zones must not declare loopEndFrame before loopStartFrame.");
+        const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+            ? zone.loopEndFrame - zone.loopStartFrame : 0;
+        if (zone.loopCrossfadeFrames > loopLength / 2
+            || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+            addFinding(result, PlaybackSnapshotFindingSeverity::error,
+                       "invalid-zone-loop-crossfade", path,
+                       "Native loop crossfade frames must fit within half of an enabled loop.");
         if (zone.releaseSeconds < 0.0)
             addFinding(result, PlaybackSnapshotFindingSeverity::error, "invalid-zone-release", path,
                        "Zone releaseSeconds must not be negative.");
@@ -1311,6 +1319,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         });
         result.snapshot.zones.back().loopMode = zone.loopMode;
         result.snapshot.zones.back().sampleEndFrame = zone.sampleEndFrame;
+        result.snapshot.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
 
         if (!zone.articulationId.empty())
         {

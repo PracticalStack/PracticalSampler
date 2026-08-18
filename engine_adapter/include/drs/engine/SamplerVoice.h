@@ -142,6 +142,7 @@ private:
     std::uint64_t playbackEndFrame = 0;
     std::uint64_t loopStartFrame = 0;
     std::uint64_t loopEndFrame = 0;
+    std::uint64_t loopCrossfadeFrames = 0;
     double incrementFrames = 1.0;
     double outputSampleRate = 48000.0;
     float baseGain = 0.0f;

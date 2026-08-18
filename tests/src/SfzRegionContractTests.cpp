@@ -2,6 +2,7 @@
 #include "drs/engine/SfzImportProjection.h"
 #include "drs/engine/SfzRegionContract.h"
 #include "drs/engine/PlaybackRegionContract.h"
+#include "drs/engine/RuntimeLoader.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -312,6 +313,86 @@ int main()
                     && projectionSession.getProject().authoring.schemaVersion == playbackRegionAuthoringSchemaVersion
                     && sfzRegionPlaybackContractSchemaVersion == 2,
                 "Applying a projection must promote old inputs to the named playback-region schema contract.");
+
+        const auto savedProjectPath = projectionRoot / "region-contract.drsproj";
+        {
+            std::ofstream savedProject(savedProjectPath, std::ios::binary | std::ios::trunc);
+            savedProject << serializeRuntimeProjectManifest(
+                projectionSession.getProject(), savedProjectPath.generic_string());
+        }
+        std::ifstream savedProjectInput(savedProjectPath, std::ios::binary);
+        const std::string savedProjectText((std::istreambuf_iterator<char>(savedProjectInput)),
+                                           std::istreambuf_iterator<char>());
+        const auto reopenedProject = parseRuntimeProjectManifest(
+            savedProjectText, savedProjectPath.generic_string(), false);
+        require(reopenedProject.loaded && reopenedProject.project.authoring.zones.size() == 3,
+                "The imported SFZ region project must save and reopen"
+                    + (reopenedProject.issues.empty()
+                           ? std::string(".")
+                           : std::string(": ") + reopenedProject.issues.front()));
+        const auto& reopenedRegion = reopenedProject.project.authoring.zones.front();
+        require(reopenedRegion.sampleStartFrame == 1
+                    && reopenedRegion.sampleEndFrame == 0
+                    && reopenedRegion.loopMode == RegionLoopMode::loopContinuous
+                    && reopenedRegion.loopEnabled
+                    && reopenedRegion.loopStartFrame == 2
+                    && reopenedRegion.loopEndFrame == 6,
+                "Project save/reopen must preserve the complete imported SFZ region contract.");
+
+        const auto crossfadeMigration = migrateRuntimeProjectToLoopCrossfadeSchema(
+            reopenedProject.project);
+        require(crossfadeMigration.valid && crossfadeMigration.migrated,
+                "The optional native loop crossfade must use its own project-schema increment.");
+        auto crossfadeProject = crossfadeMigration.project;
+        crossfadeProject.authoring.zones.front().loopCrossfadeFrames = 2;
+        const auto crossfadeText = serializeRuntimeProjectManifest(
+            crossfadeProject, savedProjectPath.generic_string());
+        const auto crossfadeReopened = parseRuntimeProjectManifest(
+            crossfadeText, savedProjectPath.generic_string(), false);
+        require(crossfadeReopened.loaded
+                    && crossfadeReopened.project.schemaVersion
+                        == loopCrossfadeProjectSchemaVersion
+                    && crossfadeReopened.project.authoring.schemaVersion
+                        == loopCrossfadeAuthoringSchemaVersion
+                    && crossfadeReopened.project.authoring.zones.front().loopCrossfadeFrames == 2,
+                "Native loop crossfade metadata must survive project persistence independently of SFZ semantics.");
+
+        const auto metadataSfz = projectionRoot / "metadata-fallback.sfz";
+        {
+            std::ofstream sfz(metadataSfz, std::ios::binary | std::ios::trunc);
+            sfz << "<region> sample=fixture.wav key=60\n"
+                   "<region> sample=fixture.wav key=61 loop_mode=loop_sustain "
+                   "loop_start=80 loop_end=159\n"
+                   "<region> sample=fixture.wav key=62 loop_mode=ping_pong\n";
+        }
+        SfzImportExecutionContext metadataContext;
+        metadataContext.sourceRegionMetadataResolver = [](const std::string&)
+            -> std::optional<SfzImportSourceRegionMetadata>
+        {
+            return SfzImportSourceRegionMetadata {
+                std::uint64_t { 480 }, true, 64, 192
+            };
+        };
+        const auto metadataProjection = projectSfzImportDocument(
+            makeProjectionProject(projectionRoot), metadataSfz.generic_string(), metadataContext);
+        require(metadataProjection.projected && metadataProjection.zones.size() == 3,
+                "Production projection must accept source-metadata region fallback.");
+        require(metadataProjection.zones[0].sampleEndFrame == 0
+                    && metadataProjection.zones[0].loopMode == RegionLoopMode::loopContinuous
+                    && metadataProjection.zones[0].loopStartFrame == 64
+                    && metadataProjection.zones[0].loopEndFrame == 193,
+                "Omitted SFZ region values must use WAV frame and inclusive-loop metadata fallback.");
+        require(metadataProjection.zones[1].loopMode == RegionLoopMode::loopSustain
+                    && metadataProjection.zones[1].loopStartFrame == 80
+                    && metadataProjection.zones[1].loopEndFrame == 160,
+                "Explicit SFZ loop values must take precedence over embedded WAV loop metadata.");
+        require(std::any_of(metadataProjection.authoringNotes.begin(),
+                            metadataProjection.authoringNotes.end(), [](const auto& note)
+                            {
+                                return note.find("sfz.region.loop_mode.unsupported")
+                                    != std::string::npos;
+                            }),
+                "Unsupported region semantics must survive projection as an explicit conversion finding.");
 
         std::ifstream fixtureManifest(fixturePath("baseline-fixtures.csv"));
         require(fixtureManifest.good(),

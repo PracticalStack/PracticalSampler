@@ -901,7 +901,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
                                    bool useExplicitRoundRobin,
                                    bool usePerformanceRules,
                                    bool useContinuousDamper,
-                                   bool usePlaybackRegion)
+                                   bool usePlaybackRegion,
+                                   bool useLoopCrossfade)
 {
     ordered_json array = ordered_json::array();
 
@@ -925,6 +926,8 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
         if (usePlaybackRegion)
             zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
+        if (useLoopCrossfade)
+            zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["loopEnabled"] = zone.loopEnabled;
         zoneObject["loopStartFrame"] = zone.loopStartFrame;
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
@@ -1312,7 +1315,7 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
     if (project.schemaVersion >= 2
-        && project.schemaVersion <= playbackRegionProjectSchemaVersion)
+        && project.schemaVersion <= loopCrossfadeProjectSchemaVersion)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1440,6 +1443,12 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         if (const auto sampleEndFrame = readRequired<RuntimeProjectLoadResult, std::uint64_t>(
                                 zoneObject, result, "sampleEndFrame", context.c_str()))
                             zone.sampleEndFrame = *sampleEndFrame;
+                    }
+                    if (project.schemaVersion >= loopCrossfadeProjectSchemaVersion)
+                    {
+                        if (const auto loopCrossfadeFrames = readRequired<RuntimeProjectLoadResult, std::uint64_t>(
+                                zoneObject, result, "loopCrossfadeFrames", context.c_str()))
+                            zone.loopCrossfadeFrames = *loopCrossfadeFrames;
                     }
                     if (const auto loopEnabled = readRequired<RuntimeProjectLoadResult, bool>(zoneObject, result, "loopEnabled", context.c_str()))
                         zone.loopEnabled = *loopEnabled;
@@ -2056,6 +2065,27 @@ RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
                 addFinding("runtime-zone-playback-region-invalid",
                            "zones[" + std::to_string(index) + "].sampleEndFrame",
                            "Runtime zones must keep sampleStartFrame before an authored sampleEndFrame.");
+            const auto effectiveLoopMode = effectiveRegionLoopMode(zone.loopMode,
+                                                                    zone.loopEnabled);
+            if (instrument.schemaVersion >= sfzRegionInstrumentSchemaVersion
+                && regionLoopModeLoops(effectiveLoopMode)
+                && (zone.loopStartFrame < zone.sampleStartFrame
+                    || zone.loopStartFrame >= zone.loopEndFrame
+                    || (zone.sampleEndFrame != 0 && zone.loopEndFrame > zone.sampleEndFrame)))
+            {
+                addFinding("runtime-zone-loop-region-invalid",
+                           "zones[" + std::to_string(index) + "].loopStartFrame",
+                           "Runtime loops must use an ordered half-open range inside the playback region.");
+            }
+            const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+                ? zone.loopEndFrame - zone.loopStartFrame : 0;
+            if (zone.loopCrossfadeFrames > loopLength / 2
+                || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+            {
+                addFinding("runtime-zone-loop-crossfade-invalid",
+                           "zones[" + std::to_string(index) + "].loopCrossfadeFrames",
+                           "Native loop crossfade frames must fit an enabled loop.");
+            }
             std::string findingCode;
             std::string detail;
             if (!validateContinuousDamperDefinition(zone.damper,
@@ -2363,9 +2393,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
     if (project.schemaVersion != 1 && project.schemaVersion != 2 && project.schemaVersion != 3
         && project.schemaVersion != 4 && project.schemaVersion != 5 && project.schemaVersion != 6
         && project.schemaVersion != continuousDamperProjectSchemaVersion
-        && project.schemaVersion != playbackRegionProjectSchemaVersion)
+        && project.schemaVersion != playbackRegionProjectSchemaVersion
+        && project.schemaVersion != loopCrossfadeProjectSchemaVersion)
     {
-        addIssue(result, "Project schemaVersion must be between 1 and 8.");
+        addIssue(result, "Project schemaVersion must be between 1 and 9.");
     }
 
     if (project.projectId.empty())
@@ -2400,7 +2431,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= playbackRegionProjectSchemaVersion)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= loopCrossfadeProjectSchemaVersion)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -2427,6 +2458,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         if (project.schemaVersion == playbackRegionProjectSchemaVersion
             && authoring.schemaVersion != playbackRegionAuthoringSchemaVersion)
             addIssue(result, "Project authoring schemaVersion must be 7 for schemaVersion 8 projects.");
+        if (project.schemaVersion == loopCrossfadeProjectSchemaVersion
+            && authoring.schemaVersion != loopCrossfadeAuthoringSchemaVersion)
+            addIssue(result, "Project authoring schemaVersion must be 8 for schemaVersion 9 projects.");
 
         if (!std::isfinite(authoring.masterGainDb))
             addIssue(result, "Project authoring masterGainDb must be finite.");
@@ -2552,6 +2586,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                 && (zone.loopStartFrame < zone.sampleStartFrame
                     || zone.loopEndFrame > zone.sampleEndFrame))
                 addIssue(result, "Project zone '" + zone.id + "' must keep its enabled loop inside the playback region.");
+            const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+                ? zone.loopEndFrame - zone.loopStartFrame : 0;
+            if (zone.loopCrossfadeFrames > loopLength / 2
+                || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+                addIssue(result, "Project zone '" + zone.id + "' has an invalid native loop crossfade.");
+            if (zone.loopCrossfadeFrames != 0
+                && project.schemaVersion < loopCrossfadeProjectSchemaVersion)
+                addIssue(result, "Project zone '" + zone.id + "' requires the loop-crossfade project schema.");
 
             if (zone.releaseSeconds < 0.0)
                 addIssue(result, "Project zone '" + zone.id + "' must not have a negative releaseSeconds.");
@@ -3234,6 +3276,43 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToPlaybackRegionSchema(
     return result;
 }
 
+RuntimeProjectMigrationResult migrateRuntimeProjectToLoopCrossfadeSchema(
+    const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project loop-crossfade migration failed";
+    if (project.schemaVersion == loopCrossfadeProjectSchemaVersion
+        && project.authoring.schemaVersion == loopCrossfadeAuthoringSchemaVersion)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid ? "Project already uses the loop-crossfade schema"
+                                        : validation.state;
+        return result;
+    }
+    if (project.schemaVersion != playbackRegionProjectSchemaVersion
+        || project.authoring.schemaVersion != playbackRegionAuthoringSchemaVersion)
+    {
+        addIssue(result, "Only Project schemaVersion 8 with authoring schemaVersion 7 can migrate to the loop-crossfade schema.");
+        return result;
+    }
+
+    result.project = project;
+    result.project.schemaVersion = loopCrossfadeProjectSchemaVersion;
+    result.project.authoring.schemaVersion = loopCrossfadeAuthoringSchemaVersion;
+    for (auto& zone : result.project.authoring.zones)
+        zone.loopCrossfadeFrames = 0;
+    const auto validation = validateRuntimeProjectModel(result.project);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to the loop-crossfade schema"
+                                    : validation.state;
+    return result;
+}
+
 RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawText,
                                                          const std::string& manifestPath,
                                                          const bool validateReferencedPaths)
@@ -3593,6 +3672,33 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                         zoneObject, result, "sampleEndFrame", context.c_str()))
                     zone.sampleEndFrame = *sampleEndFrame;
             }
+            if (instrument.schemaVersion >= sfzRegionInstrumentSchemaVersion)
+            {
+                if (const auto loopEnabled = readRequired<RuntimeManifestLoadResult, bool>(
+                        zoneObject, result, "loopEnabled", context.c_str()))
+                    zone.loopEnabled = *loopEnabled;
+                if (const auto loopStartFrame = readRequired<RuntimeManifestLoadResult, std::uint64_t>(
+                        zoneObject, result, "loopStartFrame", context.c_str()))
+                    zone.loopStartFrame = *loopStartFrame;
+                if (const auto loopEndFrame = readRequired<RuntimeManifestLoadResult, std::uint64_t>(
+                        zoneObject, result, "loopEndFrame", context.c_str()))
+                    zone.loopEndFrame = *loopEndFrame;
+                if (const auto loopMode = readRequired<RuntimeManifestLoadResult, std::string>(
+                        zoneObject, result, "loopMode", context.c_str()))
+                {
+                    if (*loopMode == "no_loop") zone.loopMode = RegionLoopMode::noLoop;
+                    else if (*loopMode == "one_shot") zone.loopMode = RegionLoopMode::oneShot;
+                    else if (*loopMode == "loop_continuous") zone.loopMode = RegionLoopMode::loopContinuous;
+                    else if (*loopMode == "loop_sustain") zone.loopMode = RegionLoopMode::loopSustain;
+                    else addIssue(result, context + " field 'loopMode' is unsupported.");
+                }
+            }
+            if (instrument.schemaVersion >= loopCrossfadeInstrumentSchemaVersion)
+            {
+                if (const auto loopCrossfadeFrames = readRequired<RuntimeManifestLoadResult, std::uint64_t>(
+                        zoneObject, result, "loopCrossfadeFrames", context.c_str()))
+                    zone.loopCrossfadeFrames = *loopCrossfadeFrames;
+            }
 
             if (const auto streamOffsetBytes = readRequired<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "streamOffsetBytes", context.c_str()))
                 zone.streamOffsetBytes = *streamOffsetBytes;
@@ -3712,6 +3818,20 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                 addIssue(result, context + " must not have a negative releaseSeconds.");
             if (zone.sampleEndFrame != 0 && zone.sampleStartFrame >= zone.sampleEndFrame)
                 addIssue(result, context + " must keep sampleStartFrame before sampleEndFrame.");
+            const auto effectiveLoopMode = effectiveRegionLoopMode(zone.loopMode, zone.loopEnabled);
+            if (instrument.schemaVersion >= sfzRegionInstrumentSchemaVersion
+                && regionLoopModeLoops(effectiveLoopMode)
+                && (zone.loopStartFrame < zone.sampleStartFrame
+                    || zone.loopStartFrame >= zone.loopEndFrame
+                    || (zone.sampleEndFrame != 0 && zone.loopEndFrame > zone.sampleEndFrame)))
+            {
+                addIssue(result, context + " must keep its enabled loop inside the playback region.");
+            }
+            const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+                ? zone.loopEndFrame - zone.loopStartFrame : 0;
+            if (zone.loopCrossfadeFrames > loopLength / 2
+                || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+                addIssue(result, context + " has an invalid native loop crossfade.");
             if (!std::isfinite(zone.releaseShape))
                 addIssue(result, context + " field 'releaseShape' must be finite.");
             if (instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion)
@@ -3934,8 +4054,10 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
     if (instrument.schemaVersion != 1 && instrument.schemaVersion != 2
         && instrument.schemaVersion != 3 && instrument.schemaVersion != 4
         && instrument.schemaVersion != continuousDamperInstrumentSchemaVersion
-        && instrument.schemaVersion != playbackRegionInstrumentSchemaVersion)
-        addIssue(result, "Manifest schemaVersion must be between 1 and 6.");
+        && instrument.schemaVersion != playbackRegionInstrumentSchemaVersion
+        && instrument.schemaVersion != sfzRegionInstrumentSchemaVersion
+        && instrument.schemaVersion != loopCrossfadeInstrumentSchemaVersion)
+        addIssue(result, "Manifest schemaVersion must be between 1 and 8.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -4042,7 +4164,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         authoring["zones"] = serializeProjectZones(project.authoring.zones, project.schemaVersion >= 3,
                                                      project.schemaVersion >= 6,
                                                      project.schemaVersion >= continuousDamperProjectSchemaVersion,
-                                                     project.schemaVersion >= playbackRegionProjectSchemaVersion);
+                                                     project.schemaVersion >= playbackRegionProjectSchemaVersion,
+                                                     project.schemaVersion >= loopCrossfadeProjectSchemaVersion);
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
@@ -4143,6 +4266,15 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
         if (instrument.schemaVersion >= playbackRegionInstrumentSchemaVersion)
             zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
+        if (instrument.schemaVersion >= sfzRegionInstrumentSchemaVersion)
+        {
+            zoneObject["loopEnabled"] = zone.loopEnabled;
+            zoneObject["loopMode"] = regionLoopModeName(zone.loopMode);
+            zoneObject["loopStartFrame"] = zone.loopStartFrame;
+            zoneObject["loopEndFrame"] = zone.loopEndFrame;
+        }
+        if (instrument.schemaVersion >= loopCrossfadeInstrumentSchemaVersion)
+            zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["streamOffsetBytes"] = zone.streamOffsetBytes;
         zoneObject["prefetchBytes"] = zone.prefetchBytes;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;

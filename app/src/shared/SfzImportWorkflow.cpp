@@ -1,5 +1,7 @@
 #include "shared/SfzImportWorkflow.h"
 
+#include "drs/engine/SampleImport.h"
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -132,7 +134,22 @@ SfzImportReviewPreparationResult prepareSfzImportReview(
     SfzImportReviewPreparationResult result;
     result.analysis = drs::engine::analyzeSfzImportDocument(sfzPath, context);
     result.reportModel = makeSfzImportReportModel(result.analysis);
-    result.projection = drs::engine::projectSfzImportAnalysis(baseProject, result.analysis, context);
+    auto projectionContext = context;
+    projectionContext.sourceRegionMetadataResolver = [](const std::string& samplePath)
+        -> std::optional<drs::engine::SfzImportSourceRegionMetadata>
+    {
+        const auto inspection = drs::engine::inspectSampleFileMetadataOnly(samplePath);
+        if (!inspection.inspected)
+            return std::nullopt;
+        drs::engine::SfzImportSourceRegionMetadata metadata;
+        metadata.frameCount = inspection.metadata.frameCount;
+        metadata.loopRangePresent = inspection.metadata.loopRangePresent;
+        metadata.loopStartFrame = inspection.metadata.loopStartFrame;
+        metadata.loopEndFrameInclusive = inspection.metadata.loopEndFrame;
+        return metadata;
+    };
+    result.projection = drs::engine::projectSfzImportAnalysis(
+        baseProject, result.analysis, projectionContext);
     result.commitAllowed = result.reportModel.commitAllowed && result.projection.projected;
     result.blocking = result.analysis.report.blocking || result.projection.blocking;
     result.state = result.projection.state.empty() ? result.analysis.report.state : result.projection.state;

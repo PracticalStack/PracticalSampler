@@ -258,9 +258,15 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
 {
     drs::engine::RuntimeInstrumentModel instrument;
     instrument.schemaName = "drs.instrument";
+    const auto usesLoopCrossfade = std::any_of(
+        project.authoring.zones.begin(), project.authoring.zones.end(), [](const auto& zone)
+        {
+            return zone.loopCrossfadeFrames != 0;
+        });
     instrument.schemaVersion = project.schemaVersion >= drs::engine::playbackRegionProjectSchemaVersion
             && project.authoring.schemaVersion >= drs::engine::playbackRegionAuthoringSchemaVersion
-        ? drs::engine::playbackRegionInstrumentSchemaVersion
+        ? (usesLoopCrossfade ? drs::engine::loopCrossfadeInstrumentSchemaVersion
+                             : drs::engine::sfzRegionInstrumentSchemaVersion)
         : (project.schemaVersion >= drs::engine::continuousDamperProjectSchemaVersion
             && project.authoring.schemaVersion >= drs::engine::continuousDamperAuthoringSchemaVersion
         ? drs::engine::continuousDamperInstrumentSchemaVersion
@@ -369,6 +375,7 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.velocityCrossfade = projectZone.velocityCrossfade;
         zone.sampleStartFrame = projectZone.sampleStartFrame;
         zone.sampleEndFrame = projectZone.sampleEndFrame;
+        zone.loopCrossfadeFrames = projectZone.loopCrossfadeFrames;
         zone.streamOffsetBytes = 0;
         zone.prefetchBytes = 16384;
         zone.releaseSeconds = projectZone.releaseSeconds;
@@ -393,6 +400,10 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         zone.amplitudeVelocityTracking = projectZone.amplitudeVelocityTracking;
         zone.controllerConditions = projectZone.controllerConditions;
         zone.damper = projectZone.damper;
+        zone.loopEnabled = projectZone.loopEnabled;
+        zone.loopMode = projectZone.loopMode;
+        zone.loopStartFrame = projectZone.loopStartFrame;
+        zone.loopEndFrame = projectZone.loopEndFrame;
         instrument.zones.push_back(std::move(zone));
     }
 

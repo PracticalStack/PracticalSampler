@@ -309,6 +309,7 @@ private:
     juce::ToggleButton waveformSnapToggle;
     juce::TextEditor waveformLoopStartEditor;
     juce::TextEditor waveformLoopEndEditor;
+    juce::TextEditor waveformLoopCrossfadeEditor;
     juce::TextButton waveformLoopApplyButton;
     juce::TextButton waveformSetLoopSelectionButton;
     juce::TextButton waveformLoopAuditionButton;

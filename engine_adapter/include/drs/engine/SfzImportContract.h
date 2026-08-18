@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -116,12 +117,26 @@ using SfzImportCancellationReasonProbe = std::function<SfzImportCancellationReas
 using SfzImportProgressSink = std::function<void(SfzImportStage, float)>;
 using SfzImportProgressEventSink = std::function<void(const SfzImportProgress&)>;
 
+struct SfzImportSourceRegionMetadata
+{
+    std::optional<std::uint64_t> frameCount;
+    bool loopRangePresent = false;
+    std::uint64_t loopStartFrame = 0;
+    std::uint64_t loopEndFrameInclusive = 0;
+};
+
+using SfzImportSourceRegionMetadataResolver
+    = std::function<std::optional<SfzImportSourceRegionMetadata>(const std::string&)>;
+
 struct SfzImportExecutionContext
 {
     SfzImportCancellationProbe cancellationProbe;
     SfzImportProgressSink progressSink;
     SfzImportCancellationReasonProbe cancellationReasonProbe;
     SfzImportProgressEventSink progressEventSink;
+    // The application supplies this on its existing import worker. Keeping the
+    // resolver optional preserves the engine parser's JUCE-free contract.
+    SfzImportSourceRegionMetadataResolver sourceRegionMetadataResolver;
     SfzImportBudgetLimits budgets;
 
     // Polling is intentionally noexcept. A throwing callback is unsafe on a

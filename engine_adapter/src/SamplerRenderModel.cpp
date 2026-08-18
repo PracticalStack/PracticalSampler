@@ -162,6 +162,7 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.loopEndFrame == preparedZone.loopEndFrame
         && snapshotZone.loopMode == preparedZone.loopMode
         && snapshotZone.sampleEndFrame == preparedZone.sampleEndFrame
+        && snapshotZone.loopCrossfadeFrames == preparedZone.loopCrossfadeFrames
         && snapshotZone.releaseSeconds == preparedZone.releaseSeconds
         && snapshotZone.releaseShape == preparedZone.releaseShape
         && snapshotZone.roundRobin == preparedZone.roundRobin
@@ -427,6 +428,12 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                 || zone.loopEndFrame > playbackEndFrame))
             addError(result, "render-model-loop-range-invalid", path + ".loopStartFrame",
                      "Enabled loops require an ordered half-open range inside the playback region.");
+        const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+            ? zone.loopEndFrame - zone.loopStartFrame : 0;
+        if (zone.loopCrossfadeFrames > loopLength / 2
+            || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+            addError(result, "render-model-loop-crossfade-invalid", path + ".loopCrossfadeFrames",
+                     "Native loop crossfades must fit within half of an enabled loop.");
 
         const auto snapshotZoneEntry = snapshotZonesById.find(zone.zoneId);
         const auto* snapshotZone = snapshotZoneEntry == snapshotZonesById.end()
@@ -674,6 +681,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                                   zone.damper });
         model->routes.back().loopMode = zone.loopMode;
         model->routes.back().sampleEndFrame = zone.sampleEndFrame;
+        model->routes.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
     }
     for (const auto& route : model->routes)
     {

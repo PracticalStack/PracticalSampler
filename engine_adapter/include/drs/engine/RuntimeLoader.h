@@ -40,6 +40,8 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToContinuousDamperSchema(
     const RuntimeProjectModel& project);
 RuntimeProjectMigrationResult migrateRuntimeProjectToPlaybackRegionSchema(
     const RuntimeProjectModel& project);
+RuntimeProjectMigrationResult migrateRuntimeProjectToLoopCrossfadeSchema(
+    const RuntimeProjectModel& project);
 
 std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, const std::string& manifestPath);
 std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& instrument, const std::string& manifestPath);

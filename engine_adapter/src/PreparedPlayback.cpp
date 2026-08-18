@@ -325,6 +325,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopEndFrame"] = zone.loopEndFrame;
         zoneObject["loopMode"] = regionLoopModeName(zone.loopMode);
         zoneObject["sampleEndFrame"] = zone.sampleEndFrame;
+        zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
         ordered_json damperCurve = ordered_json::array();
@@ -1562,6 +1563,18 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
                        "Prepared playback requires a non-empty playback region with any enabled loop fully contained inside it.");
             continue;
         }
+        const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
+            ? zone.loopEndFrame - zone.loopStartFrame : 0;
+        if (zone.loopCrossfadeFrames > loopLength / 2
+            || (zone.loopCrossfadeFrames != 0 && !zone.loopEnabled))
+        {
+            addFinding(result,
+                       PlaybackSnapshotFindingSeverity::error,
+                       "invalid-prepared-loop-crossfade",
+                       "zones[" + std::to_string(index) + "].loopCrossfadeFrames",
+                       "Native loop crossfade frames must fit within half of an enabled loop.");
+            continue;
+        }
 
         result.prepared.zones.push_back({
             zone.id,
@@ -1595,6 +1608,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         });
         result.prepared.zones.back().loopMode = zone.loopMode;
         result.prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
+        result.prepared.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
     }
 
     std::unordered_set<std::string> preparedZoneIds;
@@ -2514,6 +2528,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEndFrame"] = zone.loopEndFrame;
         value["loopMode"] = regionLoopModeName(zone.loopMode);
         value["sampleEndFrame"] = zone.sampleEndFrame;
+        value["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         value["releaseSeconds"] = zone.releaseSeconds;
         value["releaseShape"] = zone.releaseShape;
         if (zone.roundRobin.has_value())
@@ -2561,6 +2576,7 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
         value["loopEndFrame"] = handle.loopEndFrame;
         value["loopMode"] = regionLoopModeName(handle.loopMode);
         value["sampleEndFrame"] = handle.sampleEndFrame;
+        value["loopCrossfadeFrames"] = handle.loopCrossfadeFrames;
         value["releaseSeconds"] = handle.releaseSeconds;
         value["releaseShape"] = handle.releaseShape;
         if (handle.roundRobin.has_value())
@@ -2820,6 +2836,7 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.loopEndFrame == right.loopEndFrame
         && left.loopMode == right.loopMode
         && left.sampleEndFrame == right.sampleEndFrame
+        && left.loopCrossfadeFrames == right.loopCrossfadeFrames
         && left.releaseSeconds == right.releaseSeconds
         && left.releaseShape == right.releaseShape
         && left.roundRobin == right.roundRobin

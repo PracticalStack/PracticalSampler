@@ -1264,6 +1264,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     std::map<std::string, std::string> roundRobinPoolIdsBySignature;
     std::map<std::string, std::string> projectedGroupIdsByCandidate;
     std::map<std::string, ProjectedGroupState> projectedGroupStates;
+    std::map<std::string, std::optional<SfzImportSourceRegionMetadata>> sourceMetadataByPath;
     ScopedGainState scopedGainState;
 
     std::map<int, int> importedControllerDefaults;
@@ -1354,7 +1355,59 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         if (unsafeRegionDocumentOrders.count(section.documentOrder) > 0)
             continue;
 
-        const auto regionResolution = resolveSfzRegionContract(section);
+        const auto* sampleOpcode = findEffectiveOpcode(section, "sample");
+        if (sampleOpcode == nullptr || sampleOpcode->value.empty())
+        {
+            result.issues.push_back("Region at document order " + std::to_string(section.documentOrder)
+                                    + " did not resolve a sample opcode.");
+            continue;
+        }
+
+        const auto samplePath = resolveSamplePath(section, *sampleOpcode);
+        const auto canonicalSamplePath = samplePath.generic_string();
+        auto sourceMetadata = sourceMetadataByPath.find(canonicalSamplePath);
+        if (sourceMetadata == sourceMetadataByPath.end())
+        {
+            std::optional<SfzImportSourceRegionMetadata> resolvedMetadata;
+            if (context.sourceRegionMetadataResolver)
+            {
+                try
+                {
+                    resolvedMetadata = context.sourceRegionMetadataResolver(canonicalSamplePath);
+                }
+                catch (...)
+                {
+                    result.authoringNotes.push_back(
+                        "SFZ region metadata fallback could not inspect '" + canonicalSamplePath + "'.");
+                }
+            }
+            sourceMetadata = sourceMetadataByPath.emplace(
+                canonicalSamplePath, std::move(resolvedMetadata)).first;
+        }
+
+        SfzRegionSourceMetadata regionSourceMetadata;
+        if (sourceMetadata->second.has_value())
+        {
+            const auto& metadata = *sourceMetadata->second;
+            regionSourceMetadata.frameCount = metadata.frameCount;
+            if (metadata.loopRangePresent)
+            {
+                regionSourceMetadata.firstLoop = SfzWaveLoopMetadata {
+                    metadata.loopStartFrame,
+                    metadata.loopEndFrameInclusive
+                };
+            }
+        }
+
+        const auto regionResolution = resolveSfzRegionContract(section, regionSourceMetadata);
+        for (const auto& finding : regionResolution.findings)
+        {
+            std::ostringstream note;
+            note << "SFZ region conversion finding [" << finding.code
+                 << "] at document order " << section.documentOrder
+                 << ": " << finding.detail;
+            result.authoringNotes.push_back(note.str());
+        }
         if (!regionResolution.valid)
         {
             result.blocking = true;
@@ -1374,16 +1427,6 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             continue;
 
         const auto scopedGainContribution = buildScopedGainContribution(section, scopedGainState);
-        const auto* sampleOpcode = findEffectiveOpcode(section, "sample");
-        if (sampleOpcode == nullptr || sampleOpcode->value.empty())
-        {
-            result.issues.push_back("Region at document order " + std::to_string(section.documentOrder)
-                                    + " did not resolve a sample opcode.");
-            continue;
-        }
-
-        const auto samplePath = resolveSamplePath(section, *sampleOpcode);
-        const auto canonicalSamplePath = samplePath.generic_string();
         const auto preserveVelocityCrossfade =
             !sectionUsesUnsupportedVelocityCrossfade(section, unsupportedCrossfadeOpcodes);
 

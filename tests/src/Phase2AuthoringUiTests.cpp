@@ -1624,6 +1624,7 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformLoopMode", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopStart", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopEnd", panelBounds);
+    requireComponentVisibleWithin(panel, "authoringWaveformLoopCrossfade", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopApply", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformSetLoopSelection", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopAudition", panelBounds);
@@ -1750,6 +1751,23 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireButton(panel, "authoringRedoButton").onClick();
     require(session.getSelectedZone()->loopMode == drs::engine::RegionLoopMode::loopSustain,
             "Redo should restore the typed SFZ loop mode transaction.");
+
+    const auto loopCrossfadeUndoDepth = session.getDocumentState().undoDepth;
+    requireTextEditor(panel, "authoringWaveformLoopCrossfade").setText(
+        "128", juce::dontSendNotification);
+    requireButton(panel, "authoringWaveformLoopApply").onClick();
+    require(session.getSelectedZone()->loopCrossfadeFrames == 128
+                && session.getProject().schemaVersion
+                    == drs::engine::loopCrossfadeProjectSchemaVersion
+                && session.getProject().authoring.schemaVersion
+                    == drs::engine::loopCrossfadeAuthoringSchemaVersion
+                && session.getDocumentState().undoDepth == loopCrossfadeUndoDepth + 1,
+            "Native loop crossfade entry should promote its schema and commit one undoable zone transaction"
+                " (frames=" + std::to_string(session.getSelectedZone()->loopCrossfadeFrames)
+                + ", project=" + std::to_string(session.getProject().schemaVersion)
+                + ", authoring=" + std::to_string(session.getProject().authoring.schemaVersion)
+                + ", undo=" + std::to_string(session.getDocumentState().undoDepth)
+                + ", expectedUndo=" + std::to_string(loopCrossfadeUndoDepth + 1) + ").");
 
     const auto playbackUndoDepth = session.getDocumentState().undoDepth;
     requireTextEditor(panel, "authoringWaveformPlaybackStart").setText("6000",
