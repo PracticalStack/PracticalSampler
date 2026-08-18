@@ -16,8 +16,8 @@ implemented and covered by an extensive automated test suite, including validati
 
 Recent work has focused on scalable authoring and playback for large instruments, interactive SFZ
 region and loop editing, bounded waveform rendering, reliable DAW state recall, and a consistent
-desktop authoring experience. File formats, compatibility guarantees, and the final source license
-may still change before the first public release.
+desktop authoring experience. File formats and compatibility guarantees may still change before the
+first public release.
 
 ## Key features
 
@@ -75,5 +75,9 @@ tester-installer instructions.
 - [SFZ region and waveform authoring](docs/waveform-region-authoring-guide.md)
 - [Large-instrument streaming](docs/large-instrument-streaming-support.md)
 
-Practical Sampler is being developed in the open, but contributor guidance and the final
-open-source license have not yet been published.
+## License
+
+Project-owned software is licensed under the
+[GNU Affero General Public License v3.0 only](LICENSE). Third-party code and separately licensed
+content retain their own terms. See the [V1 licensing statement](docs/licensing.md) for scope,
+dependency compatibility, content licensing, and distribution notes.
