@@ -1,6 +1,6 @@
 # Windows Build
 
-This repository is Windows-first for Phase 0.
+This repository is Windows-first for the native runtime and shell.
 
 ## Supported baseline
 
@@ -18,6 +18,7 @@ The current bootstrap builds:
 - a JUCE standalone shell target
 - a JUCE VST3 shell target
 - a `drs_phase0_smoke_tests` executable for startup and runtime initialization validation
+- a `drs_native_content_contract_tests` executable for native content-root and fixture validation
 
 The product-owned `engine_adapter` is present and compiled as the native runtime seam. Product source
 samples are rooted at `content/samples/`, and runtime fixtures are rooted at `content/runtime/`.
@@ -79,7 +80,7 @@ cmake --preset vs2022-debug
 Build:
 
 ```powershell
-cmake --build --preset build-debug --target drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin drs_phase0_smoke_tests
+cmake --build --preset build-debug --target DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin drs_phase0_smoke_tests drs_native_content_contract_tests
 ```
 
 Run tests:

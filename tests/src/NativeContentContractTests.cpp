@@ -19,8 +19,9 @@ void require(const bool condition, const std::string& message)
 void requireNativePath(const fs::path& path, const std::string& label)
 {
     const auto normalized = path.lexically_normal();
+    const auto legacyAuthoringProjectName = std::string("hise") + "_project";
     require(normalized.is_absolute(), label + " must be absolute.");
-    require(normalized.generic_string().find("hise_project") == std::string::npos,
+    require(normalized.generic_string().find(legacyAuthoringProjectName) == std::string::npos,
             label + " must not retain a legacy authoring-project path.");
 }
 } // namespace

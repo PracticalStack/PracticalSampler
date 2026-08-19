@@ -25,7 +25,7 @@ This is intentional. It lets the team review the contract in source control and 
 
 - every file declares `schemaName`
 - every file declares `schemaVersion`
-- identifiers are product-owned strings, not HISE object names
+- identifiers are stable product-owned strings, not third-party object names
 - relative asset paths are resolved from the containing manifest file
 - unknown future fields should be ignored unless they alter safety-critical load behavior
 
@@ -95,7 +95,8 @@ The adapter-side runtime model now has explicit product-owned structs for:
 - manifest load results
 - stream-container load and read-resolution results
 
-That model is intentionally defined in `engine_adapter/include/drs/engine/RuntimeModel.h` so the shell can consume runtime status without reaching into HISE types.
+That model is intentionally defined in `engine_adapter/include/drs/engine/RuntimeModel.h` so the
+shell can consume runtime status without reaching into third-party types.
 
 ## Loader contract
 

@@ -11,12 +11,12 @@ plug-in codes and CIDs, native file extensions, schemas, and package signatures 
 
 ## Updated source surfaces
 
-- Root and product READMEs, including the application, engine adapter, and HISE content guidance.
+- Root and product READMEs, including the application, engine adapter, and native content guidance.
 - Active architecture, operator, host-validation, package, and contributor documentation.
 - Current engineering and UI plans that describe ongoing or future work.
 - Product-page titles, metadata, visible copy, image alt text, and accessibility labels.
 - The maintained DRSWeb title, description, overview heading, and overview copy.
-- The human-readable vendor-provenance headings for the JUCE and HISE dependencies.
+- The human-readable vendor-provenance headings for the JUCE and nlohmann/json dependencies.
 
 The ledger identified 107 approved source occurrences across 59 files. Those occurrences were
 updated at their source; generated reference copies were not edited independently.

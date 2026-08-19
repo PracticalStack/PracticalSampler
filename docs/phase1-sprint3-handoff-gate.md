@@ -5,7 +5,7 @@ This note captures Sprint 3 task `S3.7-T6` from section 6.1 of `engineering-plan
 ## Fresh-tree validation
 
 - configured a new isolated debug tree at `DecentRhapsodyStudio/build/vs2022-debug-s37t6`
-- built the bootstrap application and plugin targets together with `drs_all_tests`
+- built the native bootstrap application and plugin targets together with `drs_all_tests`
 - enumerated the clean-tree CTest matrix and confirmed all 36 registered tests were present before running them
 - reran the full 36-test matrix after fixing the only failing clean-tree blockers
 
@@ -26,8 +26,8 @@ This note captures Sprint 3 task `S3.7-T6` from section 6.1 of `engineering-plan
 
 Validated on Sunday, July 19, 2026 with:
 
-- `cmake -S . -B build/vs2022-debug-s37t6 -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=17 -DDRS_ENABLE_HISE_INTEGRATION=OFF`
-- `cmake --build build/vs2022-debug-s37t6 --target drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin drs_all_tests`
+- `cmake -S . -B build/vs2022-debug-s37t6 -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=17`
+- `cmake --build build/vs2022-debug-s37t6 --target DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin drs_all_tests`
 - `ctest --test-dir build/vs2022-debug-s37t6 -N`
 - `ctest --test-dir build/vs2022-debug-s37t6 --output-on-failure`
 

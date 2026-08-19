@@ -44,7 +44,7 @@ first public release.
 - `tests/` — unit, integration, performance, lifecycle, and host-validation coverage
 - `tools/` — build, packaging, installation, and validation scripts
 - `docs/` — architecture, authoring, build, and release-evidence documentation
-- `third_party/` — vendored dependencies, currently JUCE
+- `third_party/` — vendored dependencies, currently JUCE and nlohmann/json
 
 ## Building on Windows
 
@@ -78,6 +78,6 @@ tester-installer instructions.
 ## License
 
 Project-owned software is licensed under the
-[GNU Affero General Public License v3.0 only](LICENSE). Third-party code and separately licensed
+[GNU Affero General Public License v3.0 only](docs/licensing.md). Third-party code and separately licensed
 content retain their own terms. See the [V1 licensing statement](docs/licensing.md) for scope,
 dependency compatibility, content licensing, and distribution notes.

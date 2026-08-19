@@ -64,7 +64,7 @@ passed; the new standalone and VST3 remained installed and the legacy bundle was
 | Check | Result |
 |---|---|
 | Clean Debug compile through `drs_all_tests` aggregate | PASS — generated product resources and new-name artifacts rebuilt. |
-| Clean Release application, VST3, HISE probe, and smoke build | PASS. |
+| Clean Release application, VST3, native content contract, and smoke build | PASS. |
 | Phase 0 smoke / VST3 scan | PASS, 6.91 s. |
 | Real VST3 host-state round trip | PASS, 2.41 s. |
 | `drs.package_v2.records` | PASS, 0.27 s. |

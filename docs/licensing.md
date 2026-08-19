@@ -6,8 +6,8 @@ Effective August 18, 2026.
 
 Unless a file or directory states otherwise, original Practical Sampler source code, build scripts,
 tests, documentation, and original user-interface assets are licensed under the **GNU Affero General
-Public License, version 3 only** (`AGPL-3.0-only`). The complete license text is in
-[`LICENSE`](../LICENSE).
+Public License, version 3 only** (`AGPL-3.0-only`). The complete license text must accompany
+source distributions. This document records the repository's scope and dependency policy.
 
 Copyright (C) 2026 Practical Sampler contributors.
 
@@ -21,15 +21,10 @@ The V1 open-source build uses the open-source licensing paths of its principal f
 
 - The vendored JUCE modules are dual-licensed under AGPLv3 or a commercial JUCE license; see
   [`third_party/juce/LICENSE.md`](../third_party/juce/LICENSE.md).
-- The vendored HISE snapshot is offered under GPLv3 or a commercial HISE license; see the
-  [HISE license statement](../third_party/hise/README.md#license).
-- Section 13 of AGPLv3 expressly permits AGPLv3-covered work to be linked or combined with GPLv3
-  work. Each part retains its applicable license, and the AGPLv3 terms continue to apply to the
-  AGPL-covered part.
 
 Accordingly, `AGPL-3.0-only` is the V1 project license selected for Practical Sampler's original
-code. This repository does not grant a commercial JUCE license, a commercial HISE license, or a
-proprietary license to Practical Sampler code.
+code. This repository does not grant a commercial JUCE license or a proprietary license to Practical
+Sampler code.
 
 ## Third-party software
 
@@ -47,7 +42,7 @@ verify its provenance and license first.
 
 Instrument authors remain responsible for ensuring that they have permission to use and distribute
 their samples and other content. A project or `.drpkg` package may include its own `LICENSE.txt`.
-Executable products that incorporate Practical Sampler, JUCE, or HISE code remain subject to the
+Executable products that incorporate Practical Sampler or JUCE code remain subject to the
 applicable software licenses regardless of the content license.
 
 ## Distribution note

@@ -20,7 +20,7 @@ audio-path changes are made. It is the implementation contract for the companion
    and pan are retained at their current points in this path.
 3. Aux sends, bus-to-bus graphs, feedback routes, sidechains, third-party plug-in hosting,
    convolution assets, oversampling, and host latency compensation are out of scope.
-4. The public data and graph contracts are product-owned. JUCE and HISE primitives remain
+4. The public data and graph contracts are product-owned. JUCE primitives remain
    private implementation details and do not appear in persisted models or snapshot APIs.
 
 ## Authored model and compatibility

@@ -6,22 +6,21 @@ Depends on: Phase 1 / Gate G1
 
 ## Outcome
 
-Owned HISE presentation content and newly generated project/package provenance now use
-`Practical Sampler` and `Practical Sampler Project`. Existing native artifacts that contain the
-former product name only in free-text notes remain readable, and those notes are not migrated or
-rewritten.
+Native product content and newly generated project/package provenance now use `Practical Sampler`
+and `Practical Sampler Project`. The former authoring-tool content tree was removed; reusable sample
+assets were migrated into the native content root and runtime fixtures remain under product-owned
+formats.
 
-## Owned HISE content
+## Owned native content
 
 | Surface | New presentation | Preserved technical identity |
 |---|---|---|
-| `content/hise_project/project_info.xml` | Name and description say Practical Sampler. | Bundle identifier `com.decentrhapsody.studio` and plug-in code `Drs0`. |
-| `content/hise_project/user_info.xml` | Company and copyright say Practical Sampler Project. | Company code `Dcrh`; existing placeholder URL remains unchanged. |
-| HISE `Interface.js` | Visible header says Practical Sampler. | Script path, component IDs, and `DRS*` symbols. |
-| Owned desktop XML backup | Header text says Practical Sampler. | `DecentRhapsodyStudioUIData` directory, XML filename, component definitions, and geometry. |
+| `content/samples/DRS_Sine_A3.wav` | Retained as a native source sample fixture. | Stable filename and WAV content. |
+| `content/samples/DRS_TriangleLead_A4.wav` | Retained as a native source sample fixture. | Stable filename and WAV content. |
+| `content/runtime/phase1/` | Product-owned JSON runtime manifests and negative fixtures. | `.drsproj`, `.drinst`, `.drstrm`, and `.drpkg` schemas and IDs. |
 
-Both XML documents and the owned desktop backup parse successfully. The source interface and XML
-backup agree on the visible header.
+The migrated samples and runtime manifests load through the native content contract. No authoring
+tool project metadata, scripts, sample maps, preset backups, or editor scaffolding is retained.
 
 ## Generated prose
 
@@ -30,9 +29,9 @@ Newly saved or exported artifacts now receive these free-text notes:
 - `.drinst`: `Generated from the current Practical Sampler authoring project when the project was saved.`
 - package manifest and packaged `.drinst`: `Exported from the current Practical Sampler authoring project.`
 
-The HISE SDK setup guidance emitted by `EngineFacade` now names Practical Sampler. The separate
-partial phrase “Decent Rhapsody authoring assets” remains unchanged because it is neither the full
-old product name nor a company/vendor field; changing partial product-family copy is outside this
+Runtime setup guidance emitted by `EngineFacade` names Practical Sampler. The separate partial
+phrase “Decent Rhapsody authoring assets” remains unchanged because it is neither the full old
+product name nor a company/vendor field; changing partial product-family copy is outside this
 initiative.
 
 No checked-in deterministic golden artifact contained the changed provenance sentences, so no
@@ -70,18 +69,17 @@ not current presentation copy.
 | `drs.sprint0.import_storage_hardening` | PASS, 9.33 s. |
 | `drs.performance_package.export_lifecycle` | PASS, 2.60 s. |
 | `drs.phase3.crossfade_persistence` | PASS, 0.23 s. |
-| HISE XML/source identity assertions | PASS. |
+| Native content and runtime identity assertions | PASS. |
 | Technical identity baseline verifier | PASS. |
 | Rolling identity audit | PASS — 533 occurrences, zero unclassified. |
 
-The Phase 0 smoke executable was built but not run because its old VST3 artifact path and expected
-scan name are intentionally scheduled for Phase 3. Phase 2 did not alter those test expectations.
+The Phase 0 smoke executable and native content contract test were rerun after the content migration;
+both locate the migrated samples and native runtime fixtures.
 
 ## Scope audit
 
-Phase 2 removed ten active `CHANGE` occurrences and added two intentional compatibility-fixture
-occurrences. Remaining former-name occurrences in nearby paths are either the two fixtures, active
-documentation reserved for Phase 4, or explicitly deferred partial-name copy.
+Phase 2 removed the authoring-tool content tree and migrated only reusable native sample assets.
+Historical identity fixtures remain readable without changing their technical contracts.
 
 No native extension, schema, package signature, bundle ID, plug-in/company code, VST3 CID, host
 parameter ID, compact directory, component ID, CMake target, or CTest name changed.

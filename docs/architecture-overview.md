@@ -63,6 +63,7 @@ This layer validates the product-owned seams without becoming a second applicati
 External source snapshots live here and must be treated as external even when vendored.
 
 - `third_party/juce/`
+- `third_party/nlohmann/json/`
 - product-owned runtime code must not depend on an external authoring-tool tree
 
 Local product work should prefer wrappers, generated config, and explicit integration seams over ad hoc edits inside vendored code.

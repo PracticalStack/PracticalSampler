@@ -22,8 +22,6 @@ change is included.
 
 - Added `DRS_PRODUCT_DISPLAY_NAME` and `DRS_COMPANY_DISPLAY_NAME` at the top-level CMake boundary.
 - Applied those values to the JUCE standalone and VST3 `PRODUCT_NAME` / `COMPANY_NAME` metadata.
-- Applied the same configured values to the generated HISE frontend name, description, and
-  manufacturer fields.
 - Applied the values to the generated runtime display-name constants.
 - Routed the standalone title fallback through the generated product display-name constant.
 - Changed the compatibility-copy destination to
@@ -83,11 +81,10 @@ and can be recreated from a pre-rename source revision.
 
 ## Deferred by the delivery plan
 
-`Phase0SmokeTests.cpp` and `Vst3HostStateQualificationTests.cpp` still reference the old artifact
-filename and scanned display name. Updating artifact-path assertions and active host fixtures is
-explicit Phase 3 work. Phase 1 therefore uses the successful VST3 manifest load, direct module
-metadata inspection, Windows resource inspection, runtime launch, and the stable-ID verifier as its
-gate evidence.
+`Phase0SmokeTests.cpp` and `Vst3HostStateQualificationTests.cpp` were subsequently updated with
+the native artifact paths and active host fixtures during Phase 3. The Phase 1 gate evidence remains
+the successful VST3 manifest load, direct module metadata inspection, Windows resource inspection,
+runtime launch, and stable-ID verifier.
 
 ## Gate G1 decision
 

@@ -1,6 +1,8 @@
 # Vendor Manifest
 
-This manifest records the current vendored dependency snapshots imported for Phase 0.
+This manifest records the current vendored dependency snapshots used by the native Practical Sampler
+repository. The supported dependency set is intentionally small and contains no authoring-tool
+runtime or project tree.
 
 ## JUCE
 
