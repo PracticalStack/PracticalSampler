@@ -11,9 +11,12 @@ This document records Phase 0 decisions that are settled enough to guide reposit
 - Visual Studio 2022 Community is the supported IDE for early development.
 - CMake is the build system.
 - Package managers are intentionally avoided in Phase 0.
-- JUCE and HISE will be vendored under `third_party/`.
-- JUCE and HISE must always be treated as external dependencies, not as product-owned code.
-- Product-owned HISE authoring assets live under `content/hise_project/`, not inside `third_party/hise/`.
+- Practical Sampler is moving to a product-owned native runtime with no HISE dependency.
+- The current HISE vendor tree and `content/hise_project/` are temporary migration inputs only; no
+  new product code may depend on them.
+- Native source samples belong under `content/samples/`, and native runtime fixtures belong under
+  `content/runtime/`.
+- `_analysis/Rhapsody/` remains reference material and is explicitly outside the HISE-removal scope.
 - The eventual project license will be GPL-compatible and open source, but the exact license is deferred for now.
 
 ## Working toolchain baseline

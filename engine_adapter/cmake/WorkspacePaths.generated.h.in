@@ -3,6 +3,7 @@
 namespace drs::engine::generated
 {
 inline constexpr char workspaceRepoRoot[] = "@CMAKE_SOURCE_DIR@";
+inline constexpr char workspaceNativeSamplesRoot[] = "@CMAKE_SOURCE_DIR@/content/samples";
 inline constexpr char workspaceHiseProjectRoot[] = "@CMAKE_SOURCE_DIR@/content/hise_project";
 inline constexpr char workspacePhase1RuntimeRoot[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1";
 inline constexpr char workspacePhase1ReferenceCorpusIndex[] = "@CMAKE_SOURCE_DIR@/content/runtime/phase1/reference-corpus/index.json";

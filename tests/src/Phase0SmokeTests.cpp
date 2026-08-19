@@ -1,5 +1,6 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/HiseProjectContent.h"
+#include "drs/engine/NativeContent.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
 #include "shared/PerformancePanel.h"
@@ -273,6 +274,17 @@ int main()
 
         drs::engine::EngineFacade engineFacade;
         const auto statusSnapshot = engineFacade.getStatusSnapshot();
+
+        const auto nativeContentRoots = drs::engine::getNativeContentRoots();
+        require(!nativeContentRoots.repositoryRoot.empty(),
+                "Native content contract must expose the repository root.");
+        require(!nativeContentRoots.samplesRoot.empty()
+                    && nativeContentRoots.samplesRoot.find("hise_project") == std::string::npos,
+                "Native content contract must expose a HISE-independent samples root.");
+        require(juce::File(nativeContentRoots.samplesRoot).isDirectory(),
+                "Native samples root must exist in the repository.");
+        require(!nativeContentRoots.runtimeRoot.empty(),
+                "Native content contract must expose the runtime fixture root.");
 
         require(!statusSnapshot.mode.empty(), "Engine snapshot mode must not be empty.");
         require(!statusSnapshot.integrationState.empty(), "Engine snapshot integration state must not be empty.");

@@ -227,6 +227,7 @@ add_library(drs_engine_adapter STATIC
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    src/NativeContent.cpp
     src/VelocityCrossfadeAuthoring.cpp
     include/drs/engine/AuthoringPreviewCommandAdapter.h
     include/drs/engine/AuthoringPreviewContract.h
@@ -355,6 +356,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     src/RuntimeStreamingService.cpp
     src/RuntimeStream.cpp
     src/RuntimeVoice.cpp
+    src/NativeContent.cpp
     src/SfzImportReport.cpp
     src/SfzImport.cpp
     src/SfzRegionContract.cpp
@@ -399,6 +401,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     include/drs/engine/RuntimeStreamingService.h
     include/drs/engine/RuntimeStream.h
     include/drs/engine/RuntimeVoice.h
+    include/drs/engine/NativeContent.h
     include/drs/engine/SamplerPlaybackContext.h
     include/drs/engine/SampleImport.h
     include/drs/engine/SfzImport.h
