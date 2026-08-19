@@ -2,6 +2,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
+#include "drs/engine/NativeContent.h"
 #include "drs/engine/PlaybackRegionContract.h"
 
 #include <json/json.hpp>
@@ -67,11 +68,10 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
     const auto projectPath = outputDirectory / "tiny-open-instrument.drsproj";
     const auto instrumentPath = outputDirectory / "tiny-open-instrument.drinst";
     const auto streamPath = outputDirectory / "tiny-open-instrument.drstrm";
-    const auto contentRoot = fs::path(drs::engine::getPhase1ReferenceProjectManifestPath()).parent_path()
-        / ".." / ".." / ".." / ".." / "hise_project";
+    const auto contentRoot = fs::path(drs::engine::getNativeContentRoots().samplesRoot);
 
-    const auto sinePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
-    const auto trianglePath = (contentRoot / "Samples" / "DRS_TriangleLead_A4.wav").lexically_normal();
+    const auto sinePath = (contentRoot / "DRS_Sine_A3.wav").lexically_normal();
+    const auto trianglePath = (contentRoot / "DRS_TriangleLead_A4.wav").lexically_normal();
 
     const auto sineImport = drs::engine::inspectSampleFile(sinePath.generic_string());
     require(sineImport.accepted, "Reference sine sample must inspect successfully before compile tests run.");
@@ -95,7 +95,7 @@ drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path& output
         "Sprint 2 finalizes the compiled stream path with a deterministic binary payload writer."
     };
     plan.instrumentValidationNotes = {
-        "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
+        "Uses the native product sample fixtures as stand-in sample sources for Sprint 1.",
         "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
         "Acts as the canonical loader fixture for the deterministic stream index and payload writer."
     };
@@ -483,7 +483,7 @@ int main(const int argc, char** argv)
                            "Compile rejection should explain duplicate source ids.");
 
         auto awkwardNamingPlan = tempCompilePlan;
-        awkwardNamingPlan.sampleSources.front().sourcePath = (fs::path(awkwardNamingPlan.contentRootPath) / "Samples" / "Bad Name!.wav").generic_string();
+        awkwardNamingPlan.sampleSources.front().sourcePath = (fs::path(awkwardNamingPlan.contentRootPath) / "Bad Name!.wav").generic_string();
         awkwardNamingPlan.sampleSources.front().metadata.sourcePath = awkwardNamingPlan.sampleSources.front().sourcePath;
         const auto awkwardNamingCompile = drs::engine::compileRuntimeInstrument(awkwardNamingPlan);
         require(awkwardNamingCompile.compiled,

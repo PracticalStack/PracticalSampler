@@ -9,7 +9,7 @@
     "projectManifestPath": "tiny-open-instrument.drsproj",
     "instrumentManifestPath": "tiny-open-instrument.drinst",
     "streamAssetPath": "tiny-open-instrument.drstrm",
-    "contentRootPath": "../../../../hise_project"
+    "contentRootPath": "../../../../samples"
   },
   "packageFiles": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "sine-a3",
       "role": "core-sustain",
-      "sourcePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "sourcePath": "../../../../samples/DRS_Sine_A3.wav",
       "sourceChecksumHex": "bc13c2d71c12fce6",
       "sampleRate": 44100.0,
       "frameCount": 88200,
@@ -53,7 +53,7 @@
     {
       "id": "triangle-a4",
       "role": "core-lead",
-      "sourcePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "sourcePath": "../../../../samples/DRS_TriangleLead_A4.wav",
       "sourceChecksumHex": "0481fa2ca766debe",
       "sampleRate": 44100.0,
       "frameCount": 44100,

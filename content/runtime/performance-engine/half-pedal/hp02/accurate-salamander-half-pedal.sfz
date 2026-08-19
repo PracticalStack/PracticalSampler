@@ -19,6 +19,6 @@ v127=1.0
 width_oncc1=20
 
 <region>
-sample=../../../../hise_project/Samples/DRS_Sine_A3.wav
+sample=../../../../samples/DRS_Sine_A3.wav
 key=60
 ampeg_release=0.25

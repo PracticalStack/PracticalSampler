@@ -6,6 +6,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SfzImportProjection.h"
+#include "drs/engine/NativeContent.h"
 #include "shared/ProjectStorage.h"
 
 #include <juce_core/juce_core.h>
@@ -112,8 +113,8 @@ void verifyMalformedCurveReferenceIsBlocking(const fs::path& fixture,
     stream << "<global> ampeg_dynamic=1 ampeg_releasecc64=100 "
               "ampeg_release_curvecc64=12\n"
               "<region> sample="
-           << (fixture.parent_path() / ".." / ".." / ".." / ".."
-               / "hise_project" / "Samples" / "DRS_Sine_A3.wav").lexically_normal().generic_string()
+           << (fs::path(getNativeContentRoots().samplesRoot) / "DRS_Sine_A3.wav")
+                  .lexically_normal().generic_string()
            << " key=69\n";
     stream.close();
 

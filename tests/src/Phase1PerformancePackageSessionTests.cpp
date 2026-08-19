@@ -3,6 +3,7 @@
 #include "standalone/MainComponent.h"
 
 #include "drs/engine/PackageReaderDispatch.h"
+#include "drs/engine/NativeContent.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 
@@ -89,8 +90,7 @@ float renderQueuedPerformanceSurfaceMagnitude(drs::plugin::Processor& processor,
 
 fs::path buildReferenceContentRoot()
 {
-    return fs::path(drs::engine::getPhase1ReferenceProjectManifestPath()).parent_path()
-        / ".." / ".." / ".." / ".." / "hise_project";
+    return fs::path(drs::engine::getNativeContentRoots().samplesRoot);
 }
 
 drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
@@ -106,8 +106,8 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     project.defaultInstrumentManifestPath = (buildReferenceContentRoot() / "PackageExportFixture.drinst").generic_string();
     project.notes = { "Sprint 6 playable package export fixture." };
 
-    project.sampleSources.push_back({ "sine-a3", "Samples/DRS_Sine_A3.wav", "core-sustain" });
-    project.sampleSources.push_back({ "triangle-a4", "Samples/DRS_TriangleLead_A4.wav", "core-lead" });
+    project.sampleSources.push_back({ "sine-a3", "DRS_Sine_A3.wav", "core-sustain" });
+    project.sampleSources.push_back({ "triangle-a4", "DRS_TriangleLead_A4.wav", "core-lead" });
 
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 5;

@@ -36,7 +36,7 @@
       "id": "pad-a3",
       "groupId": "pad-core",
       "articulationId": "sustain",
-      "samplePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+    "samplePath": "../../../../samples/DRS_Sine_A3.wav",
       "streamAssetPath": "missing-default-articulation.drstrm",
       "rootKey": 57,
       "keyLow": 36,

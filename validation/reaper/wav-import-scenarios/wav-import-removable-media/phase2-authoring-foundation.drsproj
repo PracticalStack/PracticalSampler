@@ -3,8 +3,8 @@
   "schemaVersion": 4,
   "projectId": "drs.phase2.authoring-foundation",
   "displayName": "DRS Phase 2 Authoring Foundation (wav-import-removable-media)",
-  "contentRoot": "../../../../hise_project",
-  "defaultInstrumentManifest": "../../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+  "contentRoot": "../../../../content/samples",
+  "defaultInstrumentManifest": "../../../../content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "sampleSources": [
     {
       "id": "sine-a3",

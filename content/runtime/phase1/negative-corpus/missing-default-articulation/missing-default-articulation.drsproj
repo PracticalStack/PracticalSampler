@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "projectId": "drs.phase1.invalid-missing-default",
   "displayName": "Invalid Missing Default Articulation",
-  "contentRoot": "../../../../hise_project",
+  "contentRoot": "../../../../samples",
   "defaultInstrumentManifest": "missing-default-articulation.drinst",
   "sampleSources": [
     {
       "id": "sine-a3",
-      "path": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "path": "../../../../samples/DRS_Sine_A3.wav",
       "role": "core-sustain"
     }
   ],

@@ -3,17 +3,17 @@
   "schemaVersion": 4,
   "projectId": "drs.phase2.authoring-foundation",
   "displayName": "DRS Phase 2 Authoring Foundation (wav-import-missing-local)",
-  "contentRoot": "../../../../hise_project",
-  "defaultInstrumentManifest": "../../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
+  "contentRoot": "../../../../content/samples",
+  "defaultInstrumentManifest": "../../../../content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "sampleSources": [
     {
       "id": "sine-a3",
-      "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\content\\runtime\\phase2\\authoring-foundation\\reference-project\\Samples\\missing-local-a3.wav",
+      "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\PracticalSampler\\content\\samples\\missing-local-a3.wav",
       "role": "core-sustain"
     },
     {
       "id": "triangle-a4",
-      "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\DecentRhapsodyStudio\\content\\runtime\\phase2\\authoring-foundation\\reference-project\\Samples\\missing-local-a4.wav",
+      "path": "E:\\Dev\\Cpp\\VST\\DecentRhapsody\\PracticalSampler\\content\\samples\\missing-local-a4.wav",
       "role": "core-lead"
     }
   ],

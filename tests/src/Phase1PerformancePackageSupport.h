@@ -4,6 +4,7 @@
 #include "drs/engine/RuntimeCompiler.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
+#include "drs/engine/NativeContent.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -157,8 +158,7 @@ inline std::vector<std::uint8_t> buildLicenseTextFixture()
 
 inline fs::path getReferenceContentRoot()
 {
-    return fs::path(drs::engine::getPhase1ReferenceProjectManifestPath()).parent_path()
-        / ".." / ".." / ".." / ".." / "hise_project";
+    return fs::path(drs::engine::getNativeContentRoots().samplesRoot);
 }
 
 inline CheckedInCorpusPaths getCheckedInCorpusPaths()
@@ -185,8 +185,8 @@ inline drs::engine::RuntimeCompilePlan buildReferenceCompilePlan(const fs::path&
     const auto streamPath = outputDirectory / "tiny-open-instrument.drstrm";
     const auto contentRoot = getReferenceContentRoot().lexically_normal();
 
-    const auto sinePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
-    const auto trianglePath = (contentRoot / "Samples" / "DRS_TriangleLead_A4.wav").lexically_normal();
+    const auto sinePath = (contentRoot / "DRS_Sine_A3.wav").lexically_normal();
+    const auto trianglePath = (contentRoot / "DRS_TriangleLead_A4.wav").lexically_normal();
 
     const auto sineImport = drs::engine::inspectSampleFile(sinePath.generic_string());
     if (!sineImport.accepted)
@@ -377,8 +377,8 @@ inline drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
         = (getReferenceContentRoot() / "PackageExportFixture.drinst").generic_string();
     project.notes = { "Sprint 6 playable package export fixture." };
 
-    project.sampleSources.push_back({ "sine-a3", "Samples/DRS_Sine_A3.wav", "core-sustain" });
-    project.sampleSources.push_back({ "triangle-a4", "Samples/DRS_TriangleLead_A4.wav", "core-lead" });
+    project.sampleSources.push_back({ "sine-a3", "DRS_Sine_A3.wav", "core-sustain" });
+    project.sampleSources.push_back({ "triangle-a4", "DRS_TriangleLead_A4.wav", "core-lead" });
 
     project.authoring.schemaName = "drs.authoring";
     project.authoring.schemaVersion = 5;

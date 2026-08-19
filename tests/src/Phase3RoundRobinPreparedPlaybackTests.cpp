@@ -5,6 +5,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/SamplerRenderModel.h"
+#include "drs/engine/NativeContent.h"
 
 #include <filesystem>
 #include <iostream>
@@ -89,9 +90,7 @@ void requireRoundRobinEquals(const std::optional<drs::engine::RoundRobinDescript
 
 fs::path getReferenceSamplePath()
 {
-    const auto referenceProjectPath = fs::path(drs::engine::getPhase1ReferenceProjectManifestPath());
-    return (referenceProjectPath.parent_path()
-            / ".." / ".." / ".." / ".." / "hise_project" / "Samples" / "DRS_Sine_A3.wav")
+    return (fs::path(drs::engine::getNativeContentRoots().samplesRoot) / "DRS_Sine_A3.wav")
         .lexically_normal();
 }
 

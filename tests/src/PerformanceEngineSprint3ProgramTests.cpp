@@ -5,6 +5,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/SamplerRenderModel.h"
+#include "drs/engine/NativeContent.h"
 
 #include <filesystem>
 #include <fstream>
@@ -175,9 +176,8 @@ void verifyInstrumentV3AndCompatibility()
 
 void verifyCompilerSchemaThree()
 {
-    const auto contentRoot = fs::path(getPhase1ReferenceProjectManifestPath()).parent_path()
-        / ".." / ".." / ".." / ".." / "hise_project";
-    const auto samplePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
+    const auto contentRoot = fs::path(getNativeContentRoots().samplesRoot);
+    const auto samplePath = (contentRoot / "DRS_Sine_A3.wav").lexically_normal();
     const auto inspected = inspectSampleFile(samplePath.generic_string());
     require(inspected.accepted, "Compiler v3 coverage needs the checked-in reference sample.");
     RuntimeCompilePlan plan;

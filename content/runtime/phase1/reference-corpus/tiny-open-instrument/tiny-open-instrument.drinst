@@ -57,7 +57,7 @@
       "id": "pad-a3",
       "groupId": "pad-core",
       "articulationId": "sustain",
-      "samplePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "samplePath": "../../../../samples/DRS_Sine_A3.wav",
       "streamAssetPath": "tiny-open-instrument.drstrm",
       "rootKey": 57,
       "keyLow": 36,
@@ -76,7 +76,7 @@
       "id": "pad-a3-accent",
       "groupId": "pad-core",
       "articulationId": "sustain",
-      "samplePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "samplePath": "../../../../samples/DRS_Sine_A3.wav",
       "streamAssetPath": "tiny-open-instrument.drstrm",
       "rootKey": 57,
       "keyLow": 36,
@@ -95,7 +95,7 @@
       "id": "lead-a4",
       "groupId": "lead-core",
       "articulationId": "lead",
-      "samplePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "samplePath": "../../../../samples/DRS_TriangleLead_A4.wav",
       "streamAssetPath": "tiny-open-instrument.drstrm",
       "rootKey": 69,
       "keyLow": 60,
@@ -114,7 +114,7 @@
       "id": "lead-a4-accent",
       "groupId": "lead-core",
       "articulationId": "lead",
-      "samplePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "samplePath": "../../../../samples/DRS_TriangleLead_A4.wav",
       "streamAssetPath": "tiny-open-instrument.drstrm",
       "rootKey": 69,
       "keyLow": 60,
@@ -131,7 +131,7 @@
     }
   ],
   "validationNotes": [
-    "Uses the existing open HISE sample assets as stand-in sample sources for Sprint 1.",
+    "Uses the native product sample fixtures as stand-in sample sources for Sprint 1.",
     "Exercises two articulations, two groups, velocity-layer routing, and explicit prefetch metadata.",
     "Acts as the canonical loader fixture for the deterministic stream index and payload writer."
   ]

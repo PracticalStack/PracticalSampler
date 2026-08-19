@@ -5,7 +5,7 @@
   "referenceManifestPath": "content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "timingUnits": "microseconds",
   "staticExpectations": {
-    "manifestBytes": 3595,
+    "manifestBytes": 3541,
     "sourceProjectResolved": true,
     "compiledStreamAssetResolved": true,
     "macroCount": 2,

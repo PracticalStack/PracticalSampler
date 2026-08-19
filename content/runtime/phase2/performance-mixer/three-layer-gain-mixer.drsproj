@@ -3,12 +3,12 @@
   "schemaVersion": 5,
   "projectId": "drs.performance-mixer.three-layer-gain",
   "displayName": "Performance Mixer Three-Layer Gain Fixture",
-  "contentRoot": "../../../hise_project",
+  "contentRoot": "../../../samples",
   "defaultInstrumentManifest": "../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "sampleSources": [
-    { "id": "bell-source", "path": "../../../hise_project/Samples/DRS_Sine_A3.wav", "role": "bell" },
-    { "id": "epiano-source", "path": "../../../hise_project/Samples/DRS_TriangleLead_A4.wav", "role": "epiano" },
-    { "id": "plucks-source", "path": "../../../hise_project/Samples/DRS_Sine_A3.wav", "role": "plucks" }
+    { "id": "bell-source", "path": "../../../samples/DRS_Sine_A3.wav", "role": "bell" },
+    { "id": "epiano-source", "path": "../../../samples/DRS_TriangleLead_A4.wav", "role": "epiano" },
+    { "id": "plucks-source", "path": "../../../samples/DRS_Sine_A3.wav", "role": "plucks" }
   ],
   "authoring": {
     "schemaName": "drs.authoring",

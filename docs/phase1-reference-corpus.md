@@ -20,7 +20,8 @@ Current implementation:
 - `content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst`
 - `content/runtime/phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drstrm`
 
-This fixture reuses the existing open HISE sample assets as its source audio while the native content pipeline continues to land in slices.
+This fixture uses the reusable native product sample fixtures in `content/samples/`, keeping the
+reference corpus independent of any authoring-tool project layout.
 
 Sprint 2 now also checks in a compiler-emitted prototype `.drstrm` descriptor for this fixture so the reference corpus captures deterministic payload offsets and page-table placeholders instead of only a placeholder container stub.
 

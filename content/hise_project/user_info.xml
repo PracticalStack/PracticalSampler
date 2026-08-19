@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<UserSettings>
-  <Company value="Practical Sampler Project" type="TEXT" description="Company Name"/>
-  <CompanyCode value="Dcrh" type="TEXT" description="Company Code (4 characters, first must be uppercase)"/>
-  <CompanyURL value="https://example.invalid/decentrhapsody" type="TEXT" description="Company Website"/>
-  <CompanyCopyright value="&#169;2026 Practical Sampler Project" type="TEXT" description="Company Copyright"/>
-  <TeamDevelopmentID value=""/>
-</UserSettings>

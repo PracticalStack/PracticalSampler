@@ -5,6 +5,18 @@ $sourceProjectPath = Join-Path $repositoryRoot 'content\runtime\phase2\authoring
 $scenarioRoot = Join-Path $validationRoot 'wav-import-scenarios'
 [IO.Directory]::CreateDirectory($scenarioRoot) | Out-Null
 
+function Set-NativeProjectPaths {
+    param(
+        [object] $Project,
+        [string] $ScenarioDirectory
+    )
+
+    $nativeSamplesRoot = Join-Path $repositoryRoot 'content\samples'
+    $nativeInstrumentManifest = Join-Path $repositoryRoot 'content\runtime\phase1\reference-corpus\tiny-open-instrument\tiny-open-instrument.drinst'
+    $Project.contentRoot = ([IO.Path]::GetRelativePath($ScenarioDirectory, $nativeSamplesRoot)).Replace('\', '/')
+    $Project.defaultInstrumentManifest = ([IO.Path]::GetRelativePath($ScenarioDirectory, $nativeInstrumentManifest)).Replace('\', '/')
+}
+
 function Write-WavImportScenario {
     param(
         [string] $Name,
@@ -20,6 +32,7 @@ function Write-WavImportScenario {
     }
 
     $project.displayName = "$($project.displayName) ($Name)"
+    Set-NativeProjectPaths -Project $project -ScenarioDirectory $scenarioDirectory
     for ($index = 0; $index -lt $SamplePaths.Count; ++$index) {
         $project.sampleSources[$index].path = $SamplePaths[$index]
     }
@@ -48,8 +61,8 @@ function Write-WavImportScenario {
 }
 
 Write-WavImportScenario -Name 'wav-import-missing-local' -SamplePaths @(
-    'E:\Dev\Cpp\VST\DecentRhapsody\DecentRhapsodyStudio\content\runtime\phase2\authoring-foundation\reference-project\Samples\missing-local-a3.wav',
-    'E:\Dev\Cpp\VST\DecentRhapsody\DecentRhapsodyStudio\content\runtime\phase2\authoring-foundation\reference-project\Samples\missing-local-a4.wav'
+    'E:\Dev\Cpp\VST\DecentRhapsody\PracticalSampler\content\samples\missing-local-a3.wav',
+    'E:\Dev\Cpp\VST\DecentRhapsody\PracticalSampler\content\samples\missing-local-a4.wav'
 )
 
 Write-WavImportScenario -Name 'wav-import-removable-media' -SamplePaths @(

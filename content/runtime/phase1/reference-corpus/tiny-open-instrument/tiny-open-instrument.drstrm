@@ -12,7 +12,7 @@
   "samples": [
     {
       "sampleId": "sine-a3",
-      "sourcePath": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "sourcePath": "../../../../samples/DRS_Sine_A3.wav",
       "sourceChecksumHex": "bc13c2d71c12fce6",
       "payloadChecksumHex": "986d785edc3e631e",
       "formatName": "WAV file",
@@ -59,7 +59,7 @@
     },
     {
       "sampleId": "triangle-a4",
-      "sourcePath": "../../../../hise_project/Samples/DRS_TriangleLead_A4.wav",
+      "sourcePath": "../../../../samples/DRS_TriangleLead_A4.wav",
       "sourceChecksumHex": "0481fa2ca766debe",
       "payloadChecksumHex": "a0dce2a9b4ee5ea5",
       "formatName": "WAV file",

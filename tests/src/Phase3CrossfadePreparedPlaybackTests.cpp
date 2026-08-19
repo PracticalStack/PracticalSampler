@@ -4,6 +4,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/RuntimeStream.h"
 #include "drs/engine/SampleImport.h"
+#include "drs/engine/NativeContent.h"
 
 #include <filesystem>
 #include <fstream>
@@ -166,10 +167,8 @@ drs::engine::RuntimeProjectModel buildCrossfadeReadyProject()
 
 drs::engine::RuntimeCompilePlan buildCrossfadeCompilePlan(const fs::path& outputDirectory)
 {
-    const auto referenceProjectPath = fs::path(drs::engine::getPhase1ReferenceProjectManifestPath());
-    const auto contentRoot = referenceProjectPath.parent_path()
-        / ".." / ".." / ".." / ".." / "hise_project";
-    const auto samplePath = (contentRoot / "Samples" / "DRS_Sine_A3.wav").lexically_normal();
+    const auto samplePath = fs::path(drs::engine::getNativeContentRoots().samplesRoot)
+        / "DRS_Sine_A3.wav";
 
     const auto sampleImport = drs::engine::importSampleFile(samplePath.generic_string());
     require(sampleImport.imported,
@@ -181,7 +180,8 @@ drs::engine::RuntimeCompilePlan buildCrossfadeCompilePlan(const fs::path& output
     plan.outputStreamPath = (outputDirectory / "crossfade-compile.drstrm").generic_string();
     plan.projectId = "drs.phase3.crossfade-prepared-playback";
     plan.projectDisplayName = "DRS Phase 3 Crossfade Prepared Playback";
-    plan.contentRootPath = contentRoot.lexically_normal().generic_string();
+    plan.contentRootPath = fs::path(drs::engine::getNativeContentRoots().samplesRoot)
+        .lexically_normal().generic_string();
     plan.instrumentId = "drs.phase3.crossfade-compile";
     plan.instrumentDisplayName = "DRS Phase 3 Crossfade Compile";
     plan.defaultLoadProfile = "balanced";

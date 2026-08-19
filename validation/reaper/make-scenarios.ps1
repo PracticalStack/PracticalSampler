@@ -5,6 +5,21 @@ $sourceProjectPath = Join-Path $repositoryRoot 'content\runtime\phase2\authoring
 $scenarioRoot = Join-Path $validationRoot 'scenarios'
 [IO.Directory]::CreateDirectory($scenarioRoot) | Out-Null
 
+function Set-NativeProjectPaths {
+    param(
+        [object] $Project,
+        [string] $ScenarioDirectory
+    )
+
+    $nativeSamplesRoot = Join-Path $repositoryRoot 'content\samples'
+    $nativeInstrumentManifest = Join-Path $repositoryRoot 'content\runtime\phase1\reference-corpus\tiny-open-instrument\tiny-open-instrument.drinst'
+    $Project.contentRoot = ([IO.Path]::GetRelativePath($ScenarioDirectory, $nativeSamplesRoot)).Replace('\', '/')
+    $Project.defaultInstrumentManifest = ([IO.Path]::GetRelativePath($ScenarioDirectory, $nativeInstrumentManifest)).Replace('\', '/')
+    foreach ($sample in $Project.sampleSources) {
+        $sample.path = ([IO.Path]::GetRelativePath($ScenarioDirectory, (Join-Path $nativeSamplesRoot ([IO.Path]::GetFileName($sample.path))))).Replace('\', '/')
+    }
+}
+
 function Write-StateScenario {
     param(
         [string] $Name,
@@ -44,6 +59,7 @@ $changedDirectory = Join-Path $scenarioRoot 'changed'
 $changedPath = Join-Path $changedDirectory 'phase2-authoring-foundation.drsproj'
 $changed = Get-Content -LiteralPath $sourceProjectPath -Raw | ConvertFrom-Json
 $changed.displayName = "$($changed.displayName) changed after DAW save"
+Set-NativeProjectPaths -Project $changed -ScenarioDirectory $changedDirectory
 [IO.File]::WriteAllText(
     $changedPath,
     ($changed | ConvertTo-Json -Depth 100) + "`n",
@@ -53,5 +69,10 @@ Write-StateScenario -Name 'changed-manifest' -ManifestPath $changedPath -Content
 $missingDirectory = Join-Path $scenarioRoot 'missing-samples'
 [IO.Directory]::CreateDirectory($missingDirectory) | Out-Null
 $missingPath = Join-Path $missingDirectory 'phase2-authoring-foundation.drsproj'
-Copy-Item -LiteralPath $sourceProjectPath -Destination $missingPath -Force
+$missing = Get-Content -LiteralPath $sourceProjectPath -Raw | ConvertFrom-Json
+Set-NativeProjectPaths -Project $missing -ScenarioDirectory $missingDirectory
+[IO.File]::WriteAllText(
+    $missingPath,
+    ($missing | ConvertTo-Json -Depth 100) + "`n",
+    [Text.UTF8Encoding]::new($false))
 Write-StateScenario -Name 'missing-sample' -ManifestPath $missingPath -ContentRootHint $missingDirectory

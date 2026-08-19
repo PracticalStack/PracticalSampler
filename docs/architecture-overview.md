@@ -1,6 +1,7 @@
 # Architecture Overview
 
-This note captures the intended Phase 0 boundary lines for Practical Sampler so future work grows around stable seams instead of drifting into an accidental HISE fork.
+This note captures the intended native-runtime boundary lines for Practical Sampler so future work
+grows around stable seams instead of retaining an authoring-tool dependency.
 
 ## Layer map
 
@@ -13,17 +14,16 @@ Product-owned JUCE shell code lives here.
 - `drs_standalone_shell` owns the standalone-facing root component and window content.
 - `drs_plugin_shell` owns the minimal plugin processor and editor shell.
 
-This layer may depend on public headers from `engine_adapter/`, but it should not include HISE headers directly.
+This layer may depend on public headers from `engine_adapter/`, but it should not include external authoring-tool headers directly.
 
 ### `engine_adapter/`
 
-This is the only product-owned layer allowed to mediate between the shell and HISE-facing concerns.
+This is the product-owned layer that mediates between the shell and native runtime concerns.
 
 Current Phase 0 responsibilities:
 
-- compile exact metadata about the vendored HISE snapshot into generated headers
-- expose frontend-profile metadata through a lightweight linked bridge
-- resolve the product-owned HISE content root under `content/hise_project/`
+- expose native runtime metadata through stable product-owned interfaces
+- resolve product-owned content roots under `content/`
 - present a stable `EngineFacade` surface to the shell
 
 Early Phase 1 responsibilities now started in the same seam:
@@ -37,22 +37,22 @@ validation, sample interpolation, pitch/gain/pan math, fixed voice/event storage
 lifecycle, and one mutable `SamplerPlaybackContext` per lane. Preview and Performance share this
 code but no voices, event scratch, activation slots, retirement queues, or counters.
 
-Future HISE-backed runtime objects, preset loading orchestration, and processor-construction boundaries should be introduced here first.
+Future native runtime objects, preset loading orchestration, and processor-construction boundaries should be introduced here first.
 
 ### `content/`
 
 This is product-owned authoring and runtime-facing data.
 
-- HISE project assets live under `content/hise_project/`
-- authored scripts, presets, sample maps, images, and XML backups belong here
-- this tree is the product-owned source of truth for early authoring assets, not the vendored HISE tree
+- native source samples live under `content/samples/`
+- runtime fixtures and manifests live under `content/runtime/`
+- product-owned authoring and validation assets must use native formats and paths
 
 ### `tests/`
 
 This layer validates the product-owned seams without becoming a second application surface.
 
 - `drs_phase0_smoke_tests` exercises `EngineFacade`
-- the smoke harness validates that the authored HISE content root is present and populated
+- the smoke harness validates that the native content roots are present and populated
 - the same executable instantiates the standalone and plugin shell components to catch immediate bootstrap failures
 - Sprint 4 focused tests validate render-model rejection, voice vectors, scheduling, lifecycle,
   playback-context isolation, shell cutover, reviewed offline baselines, callback guards, and
@@ -63,7 +63,7 @@ This layer validates the product-owned seams without becoming a second applicati
 External source snapshots live here and must be treated as external even when vendored.
 
 - `third_party/juce/`
-- `third_party/hise/`
+- product-owned runtime code must not depend on an external authoring-tool tree
 
 Local product work should prefer wrappers, generated config, and explicit integration seams over ad hoc edits inside vendored code.
 
@@ -71,7 +71,7 @@ Local product work should prefer wrappers, generated config, and explicit integr
 
 The intended dependency flow is:
 
-`app/` -> `engine_adapter/` -> vendored HISE metadata and content conventions
+`app/` -> `engine_adapter/` -> native runtime services and content contracts
 
 `tests/` -> `app/` and `engine_adapter/`
 
@@ -79,16 +79,16 @@ The intended dependency flow is:
 
 ## Guardrails
 
-- Product-owned code outside `engine_adapter/` should not include HISE headers.
-- Product-owned authoring assets should not be stored under `third_party/hise/`.
+- Product-owned code outside `engine_adapter/` should not include external authoring-tool headers.
+- Product-owned authoring assets should remain under `content/` and use native formats.
 - Changes to vendored dependencies should be rare, explicit, and documented as external updates.
 - New runtime integration work should first expose a stable adapter API before spreading through shell code.
 
 ## Current Phase 0 proof points
 
-- Windows bootstrap builds the standalone shell, VST3 shell, HISE frontend compile probe, and smoke harness.
+- Windows bootstrap builds the standalone shell, VST3 shell, and smoke harness.
 - The smoke harness runs through CTest and is wired into GitHub Actions.
-- The shell can already surface adapter-driven status information without a full HISE runtime handshake.
+- The shell can already surface adapter-driven status information without an external authoring-tool handshake.
 
 ## Sprint 4 renderer boundary
 

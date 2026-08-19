@@ -3,12 +3,12 @@
   "schemaVersion": 4,
   "projectId": "drs.host-state.default-articulation",
   "displayName": "Host State Default Articulation Fixture",
-  "contentRoot": "../../../../hise_project",
+  "contentRoot": "../../../../samples",
   "defaultInstrumentManifest": "../../../phase1/reference-corpus/tiny-open-instrument/tiny-open-instrument.drinst",
   "sampleSources": [
     {
       "id": "sine-a3",
-      "path": "../../../../hise_project/Samples/DRS_Sine_A3.wav",
+      "path": "../../../../samples/DRS_Sine_A3.wav",
       "role": "host-recall-fixture"
     }
   ],
