@@ -1,1 +1,0 @@
-Compares a version string (in `major.minor.patch` format) against the current project version and returns true if the given version is older. Typically used inside a pre-callback to detect presets saved with an older plugin version and apply migration logic before loading.

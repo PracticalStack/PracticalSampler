@@ -1,1 +1,0 @@
-Restores the processor state from a base64-encoded string previously obtained via `exportState`. The string is validated before applying - if it is not a valid base64-encoded state, a script error is reported.

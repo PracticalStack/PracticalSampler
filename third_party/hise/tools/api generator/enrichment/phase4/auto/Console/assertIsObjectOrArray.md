@@ -1,1 +1,0 @@
-Throws a script error if `value` is not a JSON object or array. The error message includes the actual type. Useful for validating module references before calling methods on them, or for type-guarding function parameters that expect structured data.

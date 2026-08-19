@@ -1,3 +1,0 @@
-Creates or returns the global script look-and-feel object. The first call creates the LAF; subsequent calls from any script processor return the same singleton instance. Use `laf.registerFunction()` to register custom drawing callbacks for buttons, sliders, combo boxes, the preset browser, and other UI elements.
-
-> [!Warning:Last registration wins per function] Registering a drawing function in one processor overwrites any previous registration for the same function name made by another processor. The last registration wins with no warning.

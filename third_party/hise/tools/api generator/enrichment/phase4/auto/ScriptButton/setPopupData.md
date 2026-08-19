@@ -1,3 +1,0 @@
-Attaches a FloatingTile popup to this button. When clicked, the button toggles the popup on and off. The `jsonData` parameter configures the FloatingTile content type (e.g. `{"Type": "Keyboard"}`), and the `position` parameter specifies `[x, y, width, height]` relative to the button.
-
-> [!Warning:Position array needs exactly 4 elements] The position array must have exactly 4 elements `[x, y, w, h]`. Incomplete arrays throw a script error.

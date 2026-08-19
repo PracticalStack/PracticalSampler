@@ -1,1 +1,0 @@
-Creates a MIDI automation handler for managing the mapping between MIDI CC messages and plugin parameters. The handler allows programmatically configuring, querying, and modifying MIDI learn assignments.

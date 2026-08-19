@@ -1,5 +1,5 @@
 # Engine Adapter
 
-This directory is reserved for the product-owned integration boundary between Practical Sampler and HISE.
+This directory contains the product-owned native runtime adapter for Practical Sampler.
 
-Only code in this layer should directly mediate access to HISE-backed runtime services. Product domain models and higher-level app features should depend on stable adapter interfaces rather than on HISE internals.
+Product domain models and higher-level app features should depend on stable adapter interfaces and native content contracts rather than on third-party implementation details.

@@ -1,1 +1,0 @@
-Returns 1 if the DAW is currently bouncing/exporting audio offline, 0 for realtime playback. Useful in transport change callbacks to adjust processing for offline rendering (disable UI updates, use higher quality algorithms).

@@ -1,1 +1,0 @@
-Adds a four-sided polygon defined by four corner points, each as an `[x, y]` array. The points are connected in order and closed automatically. Unlike `addRectangle`, this allows non-rectangular shapes such as trapezoids and parallelograms.

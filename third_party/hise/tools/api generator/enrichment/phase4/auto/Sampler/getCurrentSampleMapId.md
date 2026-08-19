@@ -1,1 +1,0 @@
-Returns the ID string of the currently loaded sample map. Returns an empty string if no map is loaded. Maps loaded via `loadSampleMapFromJSON()` get the ID `"CustomJSON"`, which you can use to distinguish user-imported maps from factory maps.

@@ -1,1 +1,0 @@
-Triggers a visual refresh of all dynamic child components in this container. Unlike the standard repaint on other components, this propagates through the dynamic component tree rather than just repainting the container itself.

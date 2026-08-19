@@ -1,1 +1,0 @@
-Returns the note number associated with a polyphonic aftertouch event. Only meaningful when the event type is Aftertouch and carries per-key pressure data.

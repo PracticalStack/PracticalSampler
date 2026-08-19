@@ -1,1 +1,0 @@
-Returns the engine uptime in seconds. When called from a MIDI callback (`onNoteOn`, `onNoteOff`, `onController`, `onTimer`), the returned value includes the current event's sub-buffer timestamp offset for sample-accurate timing within the audio buffer.

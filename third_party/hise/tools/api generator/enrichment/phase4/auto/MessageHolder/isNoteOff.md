@@ -1,1 +1,0 @@
-Returns true if this event has the NoteOff type. Use this to filter event lists or check the type of a stored event before processing.

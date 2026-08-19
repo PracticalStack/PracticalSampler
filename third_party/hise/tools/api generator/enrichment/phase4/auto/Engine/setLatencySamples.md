@@ -1,1 +1,0 @@
-Sets the plugin's reported latency in samples. The host DAW uses this value for delay compensation.

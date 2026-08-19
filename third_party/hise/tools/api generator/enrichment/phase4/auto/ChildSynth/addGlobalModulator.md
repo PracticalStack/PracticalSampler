@@ -1,3 +1,0 @@
-Adds a per-voice global modulator receiver to the specified modulator chain. The `globalMod` parameter must be a reference to a modulator inside a GlobalModulatorContainer, obtained via `Synth.getModulator()`. Each voice receives its own modulation value from the global source. Returns the new modulator as a Modulator handle (use it to set intensity), or undefined if creation fails.
-
-> [!Warning:Prefer static variant for efficiency] Per-voice global modulation computes a separate value for every active voice. For targets that do not need voice independence (effect parameters, synth-level controls), use `addStaticGlobalModulator` instead - it uses one value per audio block and is significantly cheaper on CPU.

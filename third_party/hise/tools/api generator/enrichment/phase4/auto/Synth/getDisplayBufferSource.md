@@ -1,1 +1,0 @@
-Returns a `DisplayBufferSource` handle to the processor with the given name that holds display buffer data. Processors that expose display buffers include oscillators, analysers, and scriptnode containers with display buffer nodes.

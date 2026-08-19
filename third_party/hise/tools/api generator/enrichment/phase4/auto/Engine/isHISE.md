@@ -1,1 +1,0 @@
-Returns `true` if running inside the HISE IDE, `false` in exported plugins. Useful for conditionally enabling debug features or test code during development.

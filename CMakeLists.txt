@@ -13,7 +13,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(DRS_ENABLE_HISE_INTEGRATION "Enable experimental HISE-backed integration work" OFF)
 option(DRS_ENABLE_THREAD_SANITIZER "Instrument supported builds with ThreadSanitizer" OFF)
 
 if(DRS_ENABLE_THREAD_SANITIZER)
@@ -35,12 +34,7 @@ add_subdirectory(third_party/juce EXCLUDE_FROM_ALL)
 
 message(STATUS "${DRS_PRODUCT_DISPLAY_NAME} Phase 0 configuration")
 message(STATUS "  JUCE source: ${CMAKE_CURRENT_SOURCE_DIR}/third_party/juce")
-message(STATUS "  HISE source: ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hise")
-message(STATUS "  HISE CMake integration enabled: ${DRS_ENABLE_HISE_INTEGRATION}")
-
-if(NOT DRS_ENABLE_HISE_INTEGRATION)
-    message(STATUS "  Note: HISE is vendored but not yet integrated into the CMake build.")
-endif()
+message(STATUS "  Runtime content root: ${CMAKE_CURRENT_SOURCE_DIR}/content/runtime")
 
 add_subdirectory(engine_adapter)
 add_subdirectory(app)

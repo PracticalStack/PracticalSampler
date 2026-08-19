@@ -1,1 +1,0 @@
-Converts a MIDI note number to its name string. Middle C (note 60) returns `"C3"`. Uses sharps for accidentals (e.g., `"F#4"`, not `"Gb4"`).

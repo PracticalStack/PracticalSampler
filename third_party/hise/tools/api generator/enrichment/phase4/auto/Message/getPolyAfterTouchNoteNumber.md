@@ -1,1 +1,0 @@
-Returns the note number associated with a polyphonic aftertouch event. Only valid on aftertouch events inside `onController`. Use `Message.isPolyAftertouch()` to check the event type before calling this method.

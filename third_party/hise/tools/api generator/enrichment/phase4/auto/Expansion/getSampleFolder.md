@@ -1,1 +1,0 @@
-Returns a `File` object pointing to this expansion's Samples directory. If a link file redirects the sample folder to a different location (via `setSampleFolder()`), this returns the resolved target path rather than the default subfolder.

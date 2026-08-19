@@ -1,1 +1,0 @@
-Returns the value of a property from the Data tree. If the property has not been explicitly set, returns the default value for that property. This differs from dot-read syntax (`cc.text`), which returns the raw property and may be undefined when unset.

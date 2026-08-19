@@ -1,1 +1,0 @@
-Returns a JSON object containing the current global matrix properties, including the selectable sources flag, default init values, and range properties. Use this as a starting point when calling `setMatrixModulationProperties` - fetch the current state, modify the values you need, then pass the object back.

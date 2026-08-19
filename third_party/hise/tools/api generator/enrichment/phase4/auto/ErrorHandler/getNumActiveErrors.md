@@ -1,1 +1,0 @@
-Returns the number of currently active error states. Returns 0 when no errors are active. Use this after calling `clearErrorLevel()` to detect the all-clear transition, since the error callback does not fire when the last error is cleared.

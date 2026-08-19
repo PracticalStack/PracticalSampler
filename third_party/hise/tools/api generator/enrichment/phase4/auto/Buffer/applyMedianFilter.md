@@ -1,1 +1,0 @@
-Applies a median filter and returns the filtered signal as a new Buffer. The source buffer is unchanged, so use this when you want denoising or impulse suppression without overwriting the original data.

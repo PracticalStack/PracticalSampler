@@ -1,1 +1,0 @@
-Returns the target [Parameter]($API.Parameter$) object that this connection feeds into. Returns undefined if the target node has been deleted.

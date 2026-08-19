@@ -1,3 +1,0 @@
-Registers a module's full state for inclusion in user presets. Pass the processor ID as a string, or pass a JSON object with an `ID` property plus optional `RemovedProperties` and `RemovedChildElements` arrays to exclude specific data (routing matrix, bypass state, etc.) from the saved state. Passing an empty string clears all registered modules.
-
-> [!Warning:Preset load overwrites module state] When loading a preset, the saved module state is reattached, overwriting the module's current state. Clone any data you need to preserve before the preset load occurs.

@@ -1,3 +1,0 @@
-Cancels the download, deletes the target file from disk, and fires a final callback. Returns `true` if the download was running at the time of the call, `false` if it was already stopped or finished. After aborting, `getStatusText()` returns `"Aborted"` and the download cannot be resumed - start a new download with `Server.downloadFile()` instead.
-
-> [!Warning:Abort is asynchronous] The abort is asynchronous. When `abort()` returns, the file has not yet been deleted and `getStatusText()` may still return `"Downloading"` until the background thread processes the request.

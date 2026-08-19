@@ -1,1 +1,0 @@
-Prints a value to the HISE console. The value is converted to its string representation and displayed in the console window, and also shown as an inline debug value at the calling line in the code editor. For arrays and objects, wrap the value in `trace()` to see the full structure instead of `[object Array]`.

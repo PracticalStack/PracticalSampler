@@ -1,1 +1,0 @@
-Returns the current value of the button: 0 for off, 1 for on.

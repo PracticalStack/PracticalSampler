@@ -1,1 +1,0 @@
-Purges the specified `Sample` objects and unpurges all others. Pass an array of `Sample` objects obtained from `createSelection()` or similar methods. All samples not in the array are automatically unpurged.

@@ -1,1 +1,0 @@
-Returns the current parameter value. If the parameter is actively connected (either externally or via a modulation source), this returns the last value applied to the node. Otherwise it returns the stored persistent value.

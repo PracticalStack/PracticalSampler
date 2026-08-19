@@ -1,1 +1,0 @@
-Returns the screen bounds as an `[x, y, width, height]` array. Pass `true` for the total display area (including taskbar/dock) or `false` for the user-available area only. This is typically used to calculate the maximum safe zoom level that fits the screen, combined with `Settings.setZoomLevel()`.

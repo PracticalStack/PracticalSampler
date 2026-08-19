@@ -1,3 +1,0 @@
-Reads the audio file and returns its sample data as Buffer objects. Supports WAV, AIFF, FLAC, OGG, and HLAC formats. The return type depends on the channel count: mono files return a single Buffer, while multi-channel files return an Array of Buffers (one per channel). Load the metadata separately via `loadAudioMetadata()` to get the file's native sample rate for correct playback.
-
-> [!Warning:Return type varies by channel count] The return type varies by channel count. Code that always indexes the result as an array (e.g. `result[0]`) will fail on mono files. Normalise to array format with `if (!Array.isArray(audio)) audio = [audio];` for consistent handling.

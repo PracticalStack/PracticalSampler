@@ -1,1 +1,0 @@
-Returns the current value of the component. In List mode, returns the selected row index. In Table mode with `MultiColumnMode`, returns a `[column, row]` array after `setValue([c, r])` has been called. In Viewport mode, returns whatever was last set via `setValue()`.

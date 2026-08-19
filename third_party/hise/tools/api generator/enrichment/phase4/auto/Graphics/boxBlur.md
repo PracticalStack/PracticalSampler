@@ -1,1 +1,0 @@
-Applies a box blur to the current layer. Box blur is computationally cheaper than `gaussianBlur` but produces a less natural-looking result with visible block artifacts at large radii. The blur amount is clamped to the range 0-100.

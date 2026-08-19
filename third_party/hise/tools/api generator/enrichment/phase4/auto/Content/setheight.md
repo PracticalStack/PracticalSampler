@@ -1,3 +1,0 @@
-Sets the interface height in pixels. Can be called after onInit to dynamically resize the interface. Use `Broadcaster.attachToInterfaceSize()` to respond to size changes in other parts of the code. For setting both dimensions at once during initialisation, prefer `Content.makeFrontInterface()`.
-
-> [!Warning:Set width before height] If `setHeight` is called before `setWidth` has been set (width is still 0), no size change is broadcast. Set the width first, or use `Content.makeFrontInterface()` for initial setup.

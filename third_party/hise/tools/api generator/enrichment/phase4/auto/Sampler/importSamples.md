@@ -1,1 +1,0 @@
-Imports audio files into the sampler and returns an array of `Sample` objects for the newly imported samples. Pass `true` for skipExistingSamples to avoid re-importing files already in the map. Only available in the HISE IDE - returns an empty array in exported plugins.

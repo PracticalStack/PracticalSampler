@@ -1,1 +1,0 @@
-Returns the pressure value (0-127) of a polyphonic aftertouch event. Only valid on aftertouch events inside `onController`. Pair with `Message.getPolyAfterTouchNoteNumber()` to identify which note the pressure applies to.

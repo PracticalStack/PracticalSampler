@@ -1,1 +1,0 @@
-Sets the interface dimensions to the device simulator's display resolution and registers this script as the front interface. Use this instead of `Content.makeFrontInterface()` when building a full-screen interface that should fill the entire display.

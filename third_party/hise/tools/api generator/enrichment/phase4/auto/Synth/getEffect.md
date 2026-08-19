@@ -1,1 +1,0 @@
-Returns a `ScriptEffect` handle to the effect processor with the given name within the parent synth's subtree, including effects in child synths. Store the reference in a `const var` at the top level of your script for reuse across callbacks.

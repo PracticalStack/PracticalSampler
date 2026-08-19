@@ -1,3 +1,0 @@
-Sets the start offset in samples for this event (0-65535). Unlike the timestamp, which positions the event within the audio buffer, the start offset tells the sound generator to skip the given number of samples when the voice starts - useful for sample-accurate voice positioning within a longer sample.
-
-> [!Warning:No corresponding getter available] There is no corresponding `getStartOffset()` method. Once set, the value cannot be read back through the scripting API.

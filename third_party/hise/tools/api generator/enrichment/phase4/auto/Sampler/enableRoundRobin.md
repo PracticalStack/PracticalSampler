@@ -1,1 +1,0 @@
-Enables or disables automatic round-robin group cycling. Disable this before using any manual group selection method (`setActiveGroup`, `setMultiGroupIndex`, `getRRGroupsForMessage`, and their per-event variants).

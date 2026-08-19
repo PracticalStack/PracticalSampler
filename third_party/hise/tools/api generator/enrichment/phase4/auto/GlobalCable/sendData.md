@@ -1,3 +1,0 @@
-Serialises any HISEScript value (JSON objects, strings, arrays, buffers) to a binary stream and sends it to all cable targets with registered data callbacks. The data channel is independent of the value channel. A recursion guard prevents this reference's own data callbacks from firing when it sends data.
-
-> [!Warning:Not audio-thread safe, allocates heap] Performs a heap allocation internally. Do NOT call from the audio thread or a synchronous cable callback. Use a Timer or async context if needed.

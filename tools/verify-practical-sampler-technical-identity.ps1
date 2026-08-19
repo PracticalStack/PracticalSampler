@@ -39,9 +39,6 @@ Require-Text 'app\CMakeLists.txt' ("BUNDLE_ID `"{0}`"" -f $baseline.applicationI
 Require-Text 'app\CMakeLists.txt' ("BUNDLE_ID `"{0}`"" -f $baseline.pluginIdentity.bundleId) 'plug-in bundle ID'
 Require-Text 'app\CMakeLists.txt' ("PLUGIN_MANUFACTURER_CODE {0}" -f $baseline.pluginIdentity.manufacturerCodeFourCc) 'plug-in manufacturer code'
 Require-Text 'app\CMakeLists.txt' ("PLUGIN_CODE {0}" -f $baseline.pluginIdentity.pluginCodeFourCc) 'plug-in code'
-Require-Text 'engine_adapter\cmake\HisePluginFrontendAppConfig.h.in' ("JucePlugin_ManufacturerCode {0}" -f $baseline.pluginIdentity.frontendTemplateManufacturerCodeHex) 'frontend template manufacturer code'
-Require-Text 'engine_adapter\cmake\HisePluginFrontendAppConfig.h.in' ("JucePlugin_PluginCode {0}" -f $baseline.pluginIdentity.frontendTemplatePluginCodeHex) 'frontend template plug-in code'
-
 foreach ($format in $baseline.nativeFormats) {
     $found = & rg --fixed-strings --quiet --glob '!build/**' --glob '!third_party/**' -- $format $repositoryRoot
     if ($LASTEXITCODE -ne 0) {

@@ -1,1 +1,0 @@
-Loads an image from the project's Images pool and stores it under the given pretty name alias. Use the `{PROJECT_FOLDER}` prefix for project images or `{EXP::ExpansionName}` for expansion pack images. Reference the pretty name later in paint routines or with `setImage()`.

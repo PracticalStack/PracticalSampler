@@ -1,1 +1,0 @@
-Returns the thread constant identifying which thread is currently executing. Both the real-time audio thread and the offline audio export thread return `Threads.Audio` - use `Threads.isCurrentlyExporting()` to distinguish between the two.

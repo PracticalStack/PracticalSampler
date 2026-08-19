@@ -1,1 +1,0 @@
-Returns the number of seconds elapsed since the last user preset began loading. Use this as a debounce guard to suppress operations that would conflict with an in-progress or recently completed preset restore - for example, skipping cleanup logic that fires within 500ms of a preset load.

@@ -1,1 +1,0 @@
-Sends a note-off for the specified event ID with a sample-accurate delay. The `timestamp` parameter is a sample offset added to the current event's timestamp. Use this to schedule note-offs in the future, for example to create fixed-duration one-shot notes.

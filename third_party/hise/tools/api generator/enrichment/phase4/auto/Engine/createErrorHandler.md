@@ -1,1 +1,0 @@
-Creates an error handler that can intercept initialisation errors and compilation failures, providing a scripting interface for customising error reporting behaviour.

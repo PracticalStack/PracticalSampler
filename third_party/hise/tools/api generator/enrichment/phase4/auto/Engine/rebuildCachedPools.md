@@ -1,1 +1,0 @@
-Clears and reloads the MIDI file and sample map pools from the project folder. Useful when files have been added, removed, or modified externally while HISE is running.

@@ -1,1 +1,0 @@
-Returns the Unicode code point (integer) of the character at the given zero-based position. Returns 0 if the position is out of bounds. Use `String.charAt()` if you need the character as a string instead of a number.

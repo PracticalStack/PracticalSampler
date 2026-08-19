@@ -1,1 +1,0 @@
-Loads image files into the image pool for use by UI components. Supports wildcard patterns using `*` to load multiple files at once (e.g., `"{PROJECT_FOLDER}icons*"` loads all files containing "icons" in the path).

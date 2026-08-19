@@ -1,1 +1,0 @@
-Attaches a scripted look and feel object to this component and all its children. Pass `false` to clear it. ScriptImage has no dedicated LAF drawing functions, but CSS rendering via a `StyleSheetLookAndFeel` can intercept image drawing.

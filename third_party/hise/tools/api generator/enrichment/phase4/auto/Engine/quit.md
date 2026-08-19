@@ -1,1 +1,0 @@
-Signals that the standalone application should terminate gracefully. This method does nothing in plugin builds (VST/AU/AAX).

@@ -1,3 +1,0 @@
-Re-queues the most recent GET or POST request, including its original URL, parameters, and callback. Returns `true` if the call was successfully re-queued, or `false` if there was no previous call to resend or the system is offline. Typically wired to a "Retry" button in an error panel after a connectivity failure.
-
-> [!Warning:Only tracks most recent request] Only the single most recent call is tracked. If your workflow makes multiple sequential requests, only the last one can be retried with this method. For multi-step flows, store the step state and re-invoke the appropriate function directly.

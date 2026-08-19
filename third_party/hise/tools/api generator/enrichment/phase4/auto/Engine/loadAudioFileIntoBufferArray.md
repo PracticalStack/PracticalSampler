@@ -1,3 +1,0 @@
-Loads an audio file and returns its content as an array of Buffer objects, one per channel. Supports `{PROJECT_FOLDER}` and expansion wildcard references. The file is cached in the pool, so subsequent calls with the same reference return cached data.
-
-> [!Warning:Buffer references pool memory directly] The returned Buffer objects reference the pool's internal memory directly. Modifying the buffer data modifies the cached pool entry, affecting all subsequent accesses to the same file.

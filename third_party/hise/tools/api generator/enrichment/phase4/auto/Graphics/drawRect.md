@@ -1,1 +1,0 @@
-Draws a rectangle outline within the specified area using the current colour. The `borderSize` parameter controls the stroke width. The border is drawn inward from the rectangle edges. To draw a filled rectangle, use `fillRect` instead.

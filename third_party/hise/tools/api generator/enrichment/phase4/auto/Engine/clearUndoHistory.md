@@ -1,1 +1,0 @@
-Removes all stored undo/redo actions from the undo manager. Use this to reset the undo stack after a major state change where previous actions would no longer be meaningful.

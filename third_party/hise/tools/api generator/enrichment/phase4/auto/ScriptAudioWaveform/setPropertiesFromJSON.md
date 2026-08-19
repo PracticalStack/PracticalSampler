@@ -1,1 +1,0 @@
-Restores all properties from a JSON object. Use `Content.setPropertiesFromJSON()` for the equivalent call on the Content level.

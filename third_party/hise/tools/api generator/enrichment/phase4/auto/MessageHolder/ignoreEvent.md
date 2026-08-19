@@ -1,3 +1,0 @@
-Sets or clears the ignored flag on the stored event. When an event is marked as ignored, it remains in the MIDI buffer but is skipped during processing. This is useful when preparing events for re-injection that should arrive pre-flagged.
-
-> [!Warning:Only modifies stored copy, not live event] This modifies only the stored copy's flag, not the live event in the audio buffer. To suppress the original event during a MIDI callback, call `Message.ignoreEvent(true)` on the `Message` object, not on the MessageHolder.

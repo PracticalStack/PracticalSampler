@@ -1,1 +1,0 @@
-Returns the total memory usage of all loaded samples in megabytes, including samples from the main pool and all expansion pools.

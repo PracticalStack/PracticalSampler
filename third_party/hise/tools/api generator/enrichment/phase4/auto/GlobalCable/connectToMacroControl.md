@@ -1,3 +1,0 @@
-Connects the cable to a macro control so that cable values are forwarded to the macro. The cable's normalised 0..1 value is scaled to 0..127 for the macro system. Pass `macroIndex` as -1 to remove all existing macro connections from this cable.
-
-> [!Warning:Always pass macroIsTarget as true] Passing `macroIsTarget=false` triggers a debug assertion and does nothing. Always pass `true`. The reverse direction (macro drives cable) is not yet implemented.

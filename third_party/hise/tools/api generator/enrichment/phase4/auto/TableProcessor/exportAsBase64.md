@@ -1,3 +1,0 @@
-Serialises the table's graph points to a base64-encoded string that captures all point positions and curve values. Pass the result to `restoreFromBase64()` to restore the exact curve later.
-
-> [!Warning:Empty string means default table state] Returns an empty string when the table is in its default state (a diagonal line from (0,0) to (1,1)). This is intentional - `restoreFromBase64()` treats an empty string as a reset, so the roundtrip is consistent.

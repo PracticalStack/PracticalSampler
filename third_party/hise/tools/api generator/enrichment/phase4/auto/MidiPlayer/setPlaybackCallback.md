@@ -1,3 +1,0 @@
-Registers a callback that fires whenever the transport state changes (play, stop, record). The callback receives two arguments: the timestamp and the new play state (0 = stopped, 1 = playing, 2 = recording). The `synchronous` parameter controls threading: pass 0 for async delivery on the message thread, or non-zero for synchronous delivery on the audio thread.
-
-> [!Warning:Sync mode requires inline function] When using synchronous mode, the callback runs on the audio thread and must be an inline function to guarantee realtime safety. Use async mode (0) for any callback that updates UI components.

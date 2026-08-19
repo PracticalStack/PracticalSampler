@@ -1,3 +1,0 @@
-Modifies the position and curve of an existing graph point. All coordinate and curve values are clamped to 0.0-1.0 internally. The `curve` parameter controls interpolation between this point and the next: `0.5` is linear, values below `0.5` produce a concave shape, and values above `0.5` produce a convex shape.
-
-> [!Warning:Edge points ignore x parameter] Edge points (index 0 and the last point) silently ignore the `x` parameter - only `y` and `curve` are updated. No error is produced when setting `x` on an edge point.

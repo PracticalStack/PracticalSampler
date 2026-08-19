@@ -1,1 +1,0 @@
-Starts recording incoming MIDI events into the current sequence using overdub mode. Pass 0 for immediate start. Returns true if recording started, false if deferred (when synced to master clock and stopped, recording will begin on the next clock start).

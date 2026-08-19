@@ -1,3 +1,0 @@
-Binds a HiseScript function to a JavaScript callback identifier. The JavaScript side calls the identifier as a function and receives a Promise that resolves with the HiseScript function's return value - use `callbackId(args).then(result => { ... })` in the webview. The HiseScript function receives a single argument containing an array of all values passed from JavaScript.
-
-> [!Warning:Runs synchronously on webview thread] The bound callback executes synchronously on the webview's callback thread. Avoid long-running operations inside the callback - defer heavy work to a timer or background task.

@@ -1,1 +1,0 @@
-Sets a parameter value by index. Use the dynamic constants (e.g. `mp.Intensity`) rather than raw numbers - they are self-documenting and immune to index changes. Bracket assignment syntax (`mp["Intensity"] = 0.5`) also delegates to this method for writes.

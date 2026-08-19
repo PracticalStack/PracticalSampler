@@ -1,1 +1,0 @@
-Returns the coarse detune amount in semitones stored on the current event. The default is 0 for unmodified events. Sound generators combine this with fine detune and transpose to calculate the final playback pitch.

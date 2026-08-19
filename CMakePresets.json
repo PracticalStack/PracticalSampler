@@ -12,8 +12,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_CXX_STANDARD": "17",
-        "DRS_ENABLE_HISE_INTEGRATION": "OFF"
+        "CMAKE_CXX_STANDARD": "17"
       }
     },
     {

@@ -1,3 +1,0 @@
-Returns whether the effect is currently suspended due to silence detection. An effect must both opt into silence suspension internally (a property of the effect type, not configurable from script) and have received approximately 86 consecutive silent audio callbacks before this returns `true`. Use this in timer callbacks to zero out meter displays when no audio is flowing, avoiding frozen stale values.
-
-> [!Warning:Not all effects support suspension] Always returns `false` for effect types that have not opted into silence suspension, regardless of whether audio is actually flowing. Not all effects support this feature.

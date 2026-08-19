@@ -1,1 +1,0 @@
-Reads the current value from the connected processor (set via the `processorId` and `parameterId` properties) and updates this component accordingly. Does nothing if no processor connection is established.

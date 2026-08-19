@@ -1,1 +1,0 @@
-Checks whether a component with the given name has been created on the interface. Returns `true` if a component with that name exists, `false` otherwise. Unlike the `addXXX()` methods, this is not restricted to `onInit` and can be called at any time. Useful for conditional logic in scripts that handle interfaces with optional components.

@@ -1,5 +1,0 @@
-Loads all audio files into the audio sample buffer pool and returns a list of all pool reference strings. Call this during `onInit` to ensure audio files are available at runtime. The pool contents are used by Convolution Reverb, scriptnode filter and convolution nodes, and the Audio Loop Player.
-
-> [!Warning:Required for Convolution Reverb IR embedding] This is the most common support issue for Convolution Reverb users: if you do not call `Engine.loadAudioFilesIntoPool()` in `onInit`, impulse responses will not be embedded when exporting the plugin. The exported plugin will silently fail to load IRs. Always call this in `onInit` even if the files appear to work in the HISE IDE.
-
-The returned array contains pool reference strings for all loaded audio files. Use this list to populate IR selection UI elements (e.g., a ComboBox for choosing between impulse responses).

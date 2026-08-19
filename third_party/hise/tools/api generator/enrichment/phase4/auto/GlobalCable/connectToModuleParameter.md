@@ -1,3 +1,0 @@
-Connects the cable to a specific parameter of a HISE module. The cable's normalised 0..1 value is converted through the target range defined in `targetObject` before being applied to the module parameter. The target range JSON supports optional value smoothing via a `SmoothingTime` property.
-
-The parameter can be specified by index (integer) or by name (string). Passing `parameterIndexOrId` as -1 with a valid `processorId` removes all connections for that processor. Passing an empty `processorId` with -1 removes all module parameter connections from the cable.

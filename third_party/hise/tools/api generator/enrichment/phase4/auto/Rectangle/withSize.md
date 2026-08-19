@@ -1,1 +1,0 @@
-Returns a new Rectangle with the same top-left position but different width and height. To resize while keeping the centre fixed instead of the top-left corner, use `withSizeKeepingCentre()`.

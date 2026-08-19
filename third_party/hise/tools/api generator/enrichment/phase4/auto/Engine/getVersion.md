@@ -1,1 +1,0 @@
-Returns the product version string from the project settings (e.g., `"1.0.0"`). This is the plugin's own version, not the HISE engine version - use `Engine.getProjectInfo().HISEBuild` for the HISE build version.

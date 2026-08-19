@@ -1,3 +1,0 @@
-Returns a live Buffer view of the underlying float array without copying. Pass `true` to get all 128 backing slots (including unused ones) or `false` to get only the occupied elements. The `true` variant provides a stable fixed-size buffer suitable for shader uniforms; the `false` variant dynamically resizes as elements are inserted or removed.
-
-> [!Warning:Live view modifies stack directly] The returned Buffer is a live view, not a copy. Writing to the buffer modifies the stack's backing array directly. This can be used intentionally (e.g. decaying float values in a timer callback) but is a subtle side effect if unintended.

@@ -1,1 +1,0 @@
-Returns the current download speed in bytes per second, measured using a sliding one-second window. Returns 0 when the download is not actively running.

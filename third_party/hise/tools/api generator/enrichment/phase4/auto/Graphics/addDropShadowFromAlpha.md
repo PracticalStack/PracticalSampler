@@ -1,3 +1,0 @@
-Adds a drop shadow behind the current rendering based on the alpha channel of previously drawn content. Unlike `drawDropShadow` which creates a shadow around a rectangular area, this method reads the actual shape of whatever has already been drawn and generates a shadow that follows its outline. This makes it ideal for creating glow effects around irregular shapes like arcs and paths.
-
-> [!Warning:Draw content before shadow call] This method must be placed in the draw sequence after the shapes whose alpha channel should generate the shadow. Drawing it before any content produces no visible shadow because the pixel buffer is empty at that point.

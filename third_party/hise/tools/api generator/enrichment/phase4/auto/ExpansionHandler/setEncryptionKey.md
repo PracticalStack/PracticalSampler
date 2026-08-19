@@ -1,1 +1,0 @@
-Deprecated. Always throws a script error: "This function is deprecated. Use the project settings to setup the project's blowfish key". Configure the BlowFish encryption key in the HISE Project Settings instead.

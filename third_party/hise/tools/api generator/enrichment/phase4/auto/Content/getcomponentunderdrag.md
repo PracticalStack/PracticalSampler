@@ -1,1 +1,0 @@
-Returns the component ID of the component currently being dragged. Returns an empty string if no drag operation is active.

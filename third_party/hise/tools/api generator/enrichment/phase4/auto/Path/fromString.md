@@ -1,1 +1,0 @@
-Restores path geometry from a human-readable string previously created by `toString()`. The existing path contents are replaced entirely. For compact binary serialisation, use `loadFromData` with a base64 string instead.

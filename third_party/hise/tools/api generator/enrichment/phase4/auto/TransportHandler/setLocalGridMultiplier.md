@@ -1,1 +1,0 @@
-Sets a per-instance multiplier that slows down the grid callbacks for this TransportHandler. Only every Nth grid tick is passed through, where N is the factor. The grid index in the callback is adjusted (divided by the factor). The factor must be 1 or a power of two (2, 4, 8, 16, 32, 64) - other values trigger a script error.

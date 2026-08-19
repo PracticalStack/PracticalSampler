@@ -1,1 +1,0 @@
-Returns the current interface dimensions as a `[width, height]` array.

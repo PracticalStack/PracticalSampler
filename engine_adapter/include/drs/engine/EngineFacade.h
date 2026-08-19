@@ -27,26 +27,6 @@
 
 namespace drs::engine
 {
-enum class HiseFrontendTargetKind
-{
-    plugin,
-    standalone
-};
-
-struct HiseFrontendExportProfile
-{
-    std::string name;
-    HiseFrontendTargetKind targetKind;
-    bool useFrontend = false;
-    bool isStandaloneApp = false;
-    bool frontendIsPlugin = false;
-    bool isStandaloneFrontend = false;
-    bool requiresAsioSdk = false;
-    bool requiresVst3Sdk = false;
-    std::string sourceTemplate;
-    std::string summary;
-};
-
 struct EngineMacroDescriptor
 {
     std::string id;
@@ -382,7 +362,6 @@ class EngineFacade
 public:
     EngineFacade();
 
-    std::vector<HiseFrontendExportProfile> getFrontendExportProfiles() const;
     bool serviceBackgroundWork();
     std::uint64_t getStateRevision() const { return stateRevision; }
     std::uint64_t getPerformancePublishLifecycleRevision() const noexcept

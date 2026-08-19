@@ -40,11 +40,11 @@ first public release.
 
 - `app/` — standalone, VST3, and shared user-interface code
 - `engine_adapter/` — sampler core, import, playback, streaming, and engine-facing boundaries
-- `content/` — product-owned instruments, runtime fixtures, and HISE project content
+- `content/` — product-owned instruments, native samples, and runtime fixtures
 - `tests/` — unit, integration, performance, lifecycle, and host-validation coverage
 - `tools/` — build, packaging, installation, and validation scripts
 - `docs/` — architecture, authoring, build, and release-evidence documentation
-- `third_party/` — vendored dependencies, including JUCE and HISE snapshots
+- `third_party/` — vendored dependencies, currently JUCE
 
 ## Building on Windows
 

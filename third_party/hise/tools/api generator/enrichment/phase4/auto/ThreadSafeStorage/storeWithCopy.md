@@ -1,1 +1,0 @@
-Stores a deep copy of the value, breaking reference sharing with the original. The caller can safely modify the source array or object after this call without affecting the stored data. For primitive types (numbers, booleans, strings), this behaves identically to `store()` since they are already value types.

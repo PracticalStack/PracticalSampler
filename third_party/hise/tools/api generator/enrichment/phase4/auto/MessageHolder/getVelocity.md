@@ -1,1 +1,0 @@
-Returns the velocity value (0-127 for standard MIDI) stored on this event.

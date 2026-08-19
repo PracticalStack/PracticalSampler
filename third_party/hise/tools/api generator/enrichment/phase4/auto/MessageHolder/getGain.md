@@ -1,1 +1,0 @@
-Returns the per-event gain in decibels. A value of 0 means unity gain. This gain is applied as a per-voice factor during rendering, separate from velocity-based volume.

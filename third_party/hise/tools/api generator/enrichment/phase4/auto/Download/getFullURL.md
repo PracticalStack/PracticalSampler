@@ -1,1 +1,0 @@
-Returns the full URL string of this download as originally passed to `Server.downloadFile()`.

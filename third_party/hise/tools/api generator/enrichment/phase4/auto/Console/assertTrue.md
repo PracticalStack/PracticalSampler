@@ -1,1 +1,0 @@
-Throws a script error if `condition` evaluates to false. Any falsy value (0, `false`, empty string, undefined) triggers the assertion. Commonly used as a guard clause in utility functions or as an "unreachable code" marker by calling `Console.assertTrue(false)` at code paths that should never execute.

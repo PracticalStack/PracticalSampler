@@ -1,1 +1,0 @@
-Returns the fine detune amount in cents stored on the current event. The default is 0 for unmodified events. Sound generators combine this with coarse detune and transpose to calculate the final playback pitch.

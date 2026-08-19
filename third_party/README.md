@@ -7,7 +7,7 @@ These trees are intentionally kept separate from product-owned code. Vendored do
 Current planned dependencies:
 
 - `juce/`
-- `hise/`
+- `nlohmann/json/`
 
 Every vendored dependency should include or be paired with provenance information recording its upstream origin and any local modifications.
 

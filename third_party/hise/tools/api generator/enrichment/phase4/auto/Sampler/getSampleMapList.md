@@ -1,1 +1,0 @@
-Returns a sorted array of reference strings for all available sample maps in the pool. The strings can include folder separators (e.g. `"Pads/Warm"`) which you can parse to build a category-based browser.

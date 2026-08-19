@@ -1,1 +1,0 @@
-Creates a Beatport manager object for integration with the Beatport streaming platform.

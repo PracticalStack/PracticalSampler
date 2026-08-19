@@ -1,1 +1,0 @@
-Shows a modal yes/no dialog with a markdown-formatted message body. The callback receives `true` if the user clicked Yes, `false` for No. The dialog and callback both run asynchronously on the UI thread.

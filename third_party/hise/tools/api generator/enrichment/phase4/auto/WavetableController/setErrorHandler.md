@@ -1,1 +1,0 @@
-Sets a callback function that receives error messages during resynthesis. The callback is called with a single string argument describing the error. Use this to surface resynthesis failures (FFT issues, Loris errors) to the user or to your debug console.

@@ -1,3 +1,0 @@
-Tests whether this rectangle fully contains another rectangle, or whether a point lies within its bounds. For rectangle containment, pass a Rectangle object, a `[x, y, w, h]` array, or four numbers. For point containment, pass a `[x, y]` array or two numbers. This is the standard approach for hit testing stored regions inside mouse callbacks.
-
-> [!Warning:Two numbers always interpreted as point] When called with two numbers (e.g. `contains(50, 100)`), the arguments are always interpreted as a point, not as the first two components of a rectangle.

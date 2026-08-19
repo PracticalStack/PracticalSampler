@@ -1,1 +1,0 @@
-Converts a duration in quarter beats to samples using an explicit BPM value instead of the current host tempo.

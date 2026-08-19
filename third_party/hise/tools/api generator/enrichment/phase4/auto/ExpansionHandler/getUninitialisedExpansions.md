@@ -1,1 +1,0 @@
-This method is declared in the C++ source but is not registered in the scripting API, so it cannot be called from HiseScript. Use `getExpansionList()` to retrieve initialised expansions and `setAllowedExpansionTypes()` to control which types are loaded.

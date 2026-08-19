@@ -1,3 +1,0 @@
-Controls whether listeners are initialised with current values when any of the broadcaster's arguments are still `undefined`. By default, when a new listener is added, the broadcaster initialises it with the current values - but this initialisation is skipped if any value is `undefined`. Setting this to `true` forces the initialisation to proceed regardless.
-
-> [!Warning:Only affects listener initialization, not sends] This only affects the automatic initialisation of newly added listeners. Calling `sendSyncMessage` or `sendAsyncMessage` with `undefined` arguments is always silently suppressed regardless of this setting.

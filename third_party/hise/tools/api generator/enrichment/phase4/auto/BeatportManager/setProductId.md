@@ -1,1 +1,0 @@
-Sets the Beatport product identifier for this manager instance. In production mode, this passes the ID to the Beatport SDK. In simulation mode, it logs the product ID to the HISE console. Call this before `isBeatportAccess()` or `validate()`.

@@ -1,1 +1,0 @@
-Shows this panel as a popup overlay on top of the interface. Set the `isPopupPanel` property to `true` so the panel stays hidden until explicitly shown. If `closeOtherPopups` is `1`, all other currently visible popup panels are closed first.

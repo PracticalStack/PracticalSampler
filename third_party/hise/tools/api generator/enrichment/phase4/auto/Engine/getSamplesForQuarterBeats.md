@@ -1,1 +1,0 @@
-Converts a duration in quarter beats to the equivalent number of audio samples using the current host BPM. The result depends on both the sample rate and BPM. This is the inverse of `Engine.getQuarterBeatsForSamples()`.

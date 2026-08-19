@@ -1,1 +1,0 @@
-Returns the controller value for this event. For PitchBend events, this returns the full 14-bit pitch wheel value (0-16383). For all other event types, it returns the value byte (0-127 for standard CC).

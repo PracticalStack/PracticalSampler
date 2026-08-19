@@ -1,1 +1,0 @@
-Returns `true` if the download is actively transferring data, `false` otherwise. A download in `"Waiting"` or `"Paused"` state returns `false`.

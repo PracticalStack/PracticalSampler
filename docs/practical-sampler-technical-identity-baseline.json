@@ -28,9 +28,7 @@
     "pluginCodeHex": "0x44727330",
     "componentCid": "ABCDEF019182FAEB4463726844727330",
     "controllerCid": "ABCDEF011234ABCD4463726844727330",
-    "reaperTypeId": 741815803,
-    "frontendTemplateManufacturerCodeHex": "0x44726870",
-    "frontendTemplatePluginCodeHex": "0x44727330"
+    "reaperTypeId": 741815803
   },
   "nativeFormats": [
     ".drsproj",

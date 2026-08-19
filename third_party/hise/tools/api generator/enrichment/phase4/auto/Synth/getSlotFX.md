@@ -1,1 +1,0 @@
-Returns a `ScriptSlotFX` handle to the slot effect processor with the given name. The method finds both traditional SlotFX modules and scriptnode DspNetwork holders. The returned handle provides methods for swapping effect algorithms at runtime.

@@ -1,1 +1,0 @@
-Returns the start position of the currently selected sample range in samples. If no audio data is loaded, returns `0`. Use this together with `getRangeEnd()` to determine the selected region.

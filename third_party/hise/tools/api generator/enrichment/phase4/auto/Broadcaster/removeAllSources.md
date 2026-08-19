@@ -1,1 +1,0 @@
-Removes all attached event sources from the broadcaster. Each source's upstream registration is automatically cleaned up. Registered listener targets are not affected - they remain registered and fire if messages are sent manually. Use `removeAllListeners` to also remove targets.

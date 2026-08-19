@@ -1,1 +1,0 @@
-Returns the number of samples in the active range, not the total file length. After calling `setRange()`, this reflects the sub-range size. Use `getTotalLengthInSamples()` for the original file length, or divide by `getSampleRate()` to get the duration in seconds.

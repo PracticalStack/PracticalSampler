@@ -1,1 +1,0 @@
-Sets the active group filter for a layer. On the next noteOn, only samples matching this group value in the given layer will be considered for voice start. The group index is zero-based.

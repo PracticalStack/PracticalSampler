@@ -1,1 +1,0 @@
-Returns a `Sampler` handle to the sampler with the given name within the parent synth's subtree. The returned handle provides methods for sample map loading, sample editing, round-robin configuration, and AHDSR envelope access.

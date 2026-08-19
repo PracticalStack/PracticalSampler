@@ -1,1 +1,0 @@
-Inserts one or more values at the specified index. Existing elements at and after the index shift right. Supports variadic arguments - each additional argument is inserted at consecutive positions starting from the given index.

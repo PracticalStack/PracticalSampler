@@ -1,1 +1,0 @@
-Static utility that returns `true` if the argument is an array. Called on the Array prototype (`Array.isArray(x)`), not on an instance. Equivalent to JavaScript's `Array.isArray()`.

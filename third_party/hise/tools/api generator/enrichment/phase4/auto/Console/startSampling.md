@@ -1,1 +1,0 @@
-Starts a data sampling session with the given identifier. Once active, subsequent calls to `sample()` record labeled data snapshots that can be inspected in the code editor. Requires the profiling toolkit to be enabled.

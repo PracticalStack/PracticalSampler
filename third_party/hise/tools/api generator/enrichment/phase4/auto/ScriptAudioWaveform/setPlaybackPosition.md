@@ -1,3 +1,0 @@
-Moves the playback cursor on the waveform display to the given normalised position (0.0 to 1.0). This is display-only - it does not affect actual audio playback. Use it from a timer callback to visually track a player's position.
-
-> [!Warning:Reset cursor after changing processorId] After changing the `processorId` property at runtime, always call `setPlaybackPosition(0)` to reset the cursor. The display does not auto-reset when the data source changes.

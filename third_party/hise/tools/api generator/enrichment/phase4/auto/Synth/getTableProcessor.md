@@ -1,1 +1,0 @@
-Returns a `ScriptTableProcessor` handle to the processor with the given name that holds table data. Processors that expose table data include Table envelopes, Velocity modulators (in table mode), and scriptnode containers with table nodes.

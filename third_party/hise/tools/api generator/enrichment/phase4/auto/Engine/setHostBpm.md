@@ -1,1 +1,0 @@
-Overrides the host BPM with a fixed value. All tempo-based calculations will use this value instead of the host-reported tempo. Pass -1 to re-enable sync to the host DAW's tempo.

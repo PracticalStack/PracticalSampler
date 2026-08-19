@@ -1,3 +1,0 @@
-Returns an array of component references whose names match the given pattern. Pass `".*"` to get all components (this uses an optimised fast path). Use this to batch-apply a shared look-and-feel, reset values, or iterate over a group of related controls that share a naming convention.
-
-> [!Warning:Uses wildcard matching, not regex] The pattern uses wildcard matching, not full regular expressions. Simple prefix matching like `"Knob.*"` works reliably, but complex regex features may not behave as expected.

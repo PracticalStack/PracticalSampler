@@ -1,1 +1,0 @@
-Returns the current peak volume of the voice matching the specified layer, group, and event ID. Gain tracking must be enabled first with `setEnableGainTracking()` for the same layer/group pair.

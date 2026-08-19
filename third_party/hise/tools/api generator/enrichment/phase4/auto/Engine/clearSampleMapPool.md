@@ -1,1 +1,0 @@
-Removes all cached sample maps from the pool, forcing them to be re-read from disk on next access. Prints the number of removed entries to the console.

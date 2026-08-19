@@ -1,1 +1,0 @@
-Returns the value stored under the given key in the thread-safe property store, or undefined if the key has not been set. Safe to poll from the UI thread while the background thread writes via `setProperty()`.

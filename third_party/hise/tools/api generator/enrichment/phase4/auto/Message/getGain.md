@@ -1,1 +1,0 @@
-Returns the per-event gain in decibels (-100 to 36). Unlike `Message.getVelocity()`, which only works on note events, `getGain()` works on any event type, making it useful alongside `Message.setGain()` as a more flexible alternative to velocity for per-event volume control.

@@ -1,1 +1,0 @@
-Reverses the order of elements in-place. Returns `undefined` (not the array), so it cannot be chained like `sort()` or `sortNatural()`.

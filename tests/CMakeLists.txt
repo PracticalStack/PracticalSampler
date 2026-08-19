@@ -94,11 +94,6 @@ target_link_libraries(drs_phase1_runtime_contract_tests
 
 target_compile_features(drs_phase1_runtime_contract_tests PRIVATE cxx_std_17)
 
-target_include_directories(drs_phase1_runtime_contract_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
-
 add_test(
     NAME drs.phase1.runtime_contract
     COMMAND drs_phase1_runtime_contract_tests
@@ -1054,11 +1049,6 @@ target_compile_features(drs_curated_dsp_contract_tests PRIVATE cxx_std_17)
 target_compile_definitions(drs_curated_dsp_contract_tests
     PRIVATE
         DRS_CURATED_DSP_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/curated-dsp"
-)
-
-target_include_directories(drs_curated_dsp_contract_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -2906,11 +2896,6 @@ target_link_libraries(drs_phase1_preset_state_tests
 
 target_compile_features(drs_phase1_preset_state_tests PRIVATE cxx_std_17)
 
-target_include_directories(drs_phase1_preset_state_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
-
 add_test(
     NAME drs.phase1.preset_state
     COMMAND drs_phase1_preset_state_tests
@@ -3981,7 +3966,6 @@ target_compile_features(drs_phase1_compile_path_tests PRIVATE cxx_std_17)
 target_include_directories(drs_phase1_compile_path_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4020,7 +4004,6 @@ target_compile_features(drs_phase1_performance_package_tests PRIVATE cxx_std_17)
 target_include_directories(drs_phase1_performance_package_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4042,11 +4025,6 @@ target_compile_features(drs_packaged_instrument_fx_routing_contract_tests PRIVAT
 target_compile_definitions(drs_packaged_instrument_fx_routing_contract_tests
     PRIVATE
         DRS_PACKAGED_INSTRUMENT_FX_ROUTING_FIXTURE_ROOT="${CMAKE_SOURCE_DIR}/content/runtime/phase2/packaged-instrument-fx-routing"
-)
-
-target_include_directories(drs_packaged_instrument_fx_routing_contract_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4089,7 +4067,6 @@ target_compile_definitions(drs_packaged_instrument_fx_routing_activation_tests
 target_include_directories(drs_packaged_instrument_fx_routing_activation_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4127,7 +4104,6 @@ target_compile_features(drs_phase1_performance_package_loader_tests PRIVATE cxx_
 target_include_directories(drs_phase1_performance_package_loader_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4167,7 +4143,6 @@ endif()
 target_include_directories(drs_phase1_performance_package_session_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4201,7 +4176,6 @@ target_compile_features(drs_performance_package_export_lifecycle_tests PRIVATE c
 
 target_include_directories(drs_performance_package_export_lifecycle_tests
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
 )
 
@@ -4238,7 +4212,6 @@ target_compile_features(drs_phase1_performance_package_host_validation_tests PRI
 target_include_directories(drs_phase1_performance_package_host_validation_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4393,7 +4366,6 @@ target_include_directories(drs_phase1_performance_package_release_gate
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/support
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4430,7 +4402,6 @@ target_compile_features(drs_phase1_pipeline_report PRIVATE cxx_std_17)
 target_include_directories(drs_phase1_pipeline_report
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4463,7 +4434,6 @@ target_compile_features(drs_phase1_benchmark_scene PRIVATE cxx_std_17)
 target_include_directories(drs_phase1_benchmark_scene
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(
@@ -4493,11 +4463,6 @@ target_link_libraries(drs_phase1_stream_reader_tests
 
 target_compile_features(drs_phase1_stream_reader_tests PRIVATE cxx_std_17)
 
-target_include_directories(drs_phase1_stream_reader_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
-
 add_test(
     NAME drs.phase1.stream_reader
     COMMAND drs_phase1_stream_reader_tests
@@ -4522,11 +4487,6 @@ target_link_libraries(drs_phase1_streaming_service_tests
 )
 
 target_compile_features(drs_phase1_streaming_service_tests PRIVATE cxx_std_17)
-
-target_include_directories(drs_phase1_streaming_service_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
 
 add_test(
     NAME drs.phase1.streaming_service
@@ -4553,11 +4513,6 @@ target_link_libraries(drs_phase1_voice_runtime_tests
 
 target_compile_features(drs_phase1_voice_runtime_tests PRIVATE cxx_std_17)
 
-target_include_directories(drs_phase1_voice_runtime_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
-
 add_test(
     NAME drs.phase1.voice_runtime
     COMMAND drs_phase1_voice_runtime_tests
@@ -4582,11 +4537,6 @@ target_link_libraries(drs_phase1_note_routing_tests
 )
 
 target_compile_features(drs_phase1_note_routing_tests PRIVATE cxx_std_17)
-
-target_include_directories(drs_phase1_note_routing_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
 
 add_test(
     NAME drs.phase1.note_routing
@@ -4613,11 +4563,6 @@ target_link_libraries(drs_phase1_load_profile_tests
 
 target_compile_features(drs_phase1_load_profile_tests PRIVATE cxx_std_17)
 
-target_include_directories(drs_phase1_load_profile_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
-
 add_test(
     NAME drs.phase1.load_profile
     COMMAND drs_phase1_load_profile_tests
@@ -4643,11 +4588,6 @@ target_link_libraries(drs_phase1_runtime_counters_tests
 
 target_compile_features(drs_phase1_runtime_counters_tests PRIVATE cxx_std_17)
 
-target_include_directories(drs_phase1_runtime_counters_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
-
 add_test(
     NAME drs.phase1.runtime_counters
     COMMAND drs_phase1_runtime_counters_tests
@@ -4672,11 +4612,6 @@ target_link_libraries(drs_phase1_runtime_baseline_guard
 )
 
 target_compile_features(drs_phase1_runtime_baseline_guard PRIVATE cxx_std_17)
-
-target_include_directories(drs_phase1_runtime_baseline_guard
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
-)
 
 add_test(
     NAME drs.phase1.runtime_baseline_guard
@@ -4712,7 +4647,6 @@ target_compile_features(drs_phase1_runtime_fixture_tool PRIVATE cxx_std_17)
 target_include_directories(drs_phase1_runtime_fixture_tool
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
-        ${CMAKE_SOURCE_DIR}/third_party/hise/hi_tools/hi_neural/RTNeural/modules
 )
 
 add_test(

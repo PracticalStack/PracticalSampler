@@ -1,3 +1,0 @@
-Sets the default root directory for the file browser that opens when the user clicks the waveform to load an audio file. The argument must be a File object obtained from `FileSystem.getFolder()` or a similar File API call. This only affects AudioFile mode - in Sampler mode, the file browser is not used.
-
-> [!Warning:Pass File object, not string path] Passing a string path instead of a File object causes a script error. Always use `FileSystem.getFolder()` to obtain the folder reference.

@@ -1,1 +1,0 @@
-Converts a duration in quarter beats to milliseconds using the current host BPM. At 120 BPM, one quarter beat equals 500 ms. Use `Engine.getMilliSecondsForQuarterBeatsWithTempo()` to specify an explicit BPM.

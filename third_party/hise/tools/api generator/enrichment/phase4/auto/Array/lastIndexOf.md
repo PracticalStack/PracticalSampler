@@ -1,1 +1,0 @@
-Returns the index of the last occurrence of the specified value, or `-1` if not found. Searches backward from the end of the array. Always uses loose comparison - unlike `indexOf()`, there is no `typeStrictness` parameter.

@@ -1,3 +1,0 @@
-Renders a list of MIDI events to audio buffers on a background thread. Pass an array of MessageHolder objects created via `Engine.createMessageHolder()`. The callback receives a status object with `channels` (array of Buffer objects), `finished` (boolean), and `progress` (0.0 to 1.0).
-
-> [!Warning:New render replaces active render] Calling `renderAudio` while a render is in progress replaces the current render. The previous render's callback will not receive a final completion notification.

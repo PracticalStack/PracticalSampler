@@ -1,1 +1,0 @@
-Forces a full asynchronous reload of all samples across every sampler in the module tree. Kills all active voices before reloading.

@@ -1,1 +1,0 @@
-Returns the raw normalised cable value between 0.0 and 1.0, bypassing the local input range. This reads the cable's internal storage directly.

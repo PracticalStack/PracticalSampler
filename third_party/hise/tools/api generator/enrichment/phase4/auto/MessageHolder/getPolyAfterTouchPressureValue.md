@@ -1,1 +1,0 @@
-Returns the pressure value from a polyphonic aftertouch event (0-255). Only meaningful when the event type is Aftertouch and carries per-key pressure data.

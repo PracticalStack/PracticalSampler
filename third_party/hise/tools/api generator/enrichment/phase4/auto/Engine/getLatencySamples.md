@@ -1,1 +1,0 @@
-Returns the plugin's reported latency in samples as used by the host for delay compensation. The default is 0.

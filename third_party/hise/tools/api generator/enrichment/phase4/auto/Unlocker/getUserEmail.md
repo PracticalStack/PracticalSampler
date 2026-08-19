@@ -1,1 +1,0 @@
-Returns the email address associated with the loaded licence key. The email is extracted from the RSA-validated key file data. Returns an empty string if no valid key file has been loaded.

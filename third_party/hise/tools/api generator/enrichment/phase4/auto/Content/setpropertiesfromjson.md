@@ -1,3 +1,0 @@
-Sets multiple properties on a component identified by name using a JSON object. Each key in the JSON must match a valid component property name (e.g. `text`, `width`, `height`, `x`, `y`, `visible`, `enabled`). This is the Content-level variant that takes a component name string as the first argument - for the version called directly on a component reference, see `ScriptComponent.setPropertiesFromJSON()`. Throws a script error if the named component does not exist.
-
-> [!Warning:Invalid property keys silently ignored] Property keys that do not match any valid property on the target component are silently ignored - no error is reported for typos.

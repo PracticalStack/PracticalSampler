@@ -1,1 +1,0 @@
-Writes the given array of MessageHolder objects into the sequence at the specified one-based index, replacing the existing MIDI data on the current track. This operation is undoable if the undo manager has been enabled.

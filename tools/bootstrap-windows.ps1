@@ -28,7 +28,7 @@ Write-Host "Developer shell: $vsDevCmd"
 Push-Location $root
 try {
     $configureCommand = "cmake --preset $configurePreset"
-    $bootstrapTargets = "drs_hise_frontend_plugin_probe DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin"
+    $bootstrapTargets = "DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin"
     $smokeBuildCommand = "cmake --build --preset $buildPreset --target $bootstrapTargets drs_phase0_smoke_tests"
     $fullTestBuildCommand = "cmake --build --preset $buildPreset --target $bootstrapTargets drs_all_tests"
     $testCommand = "ctest --preset $testPreset"

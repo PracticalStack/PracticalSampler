@@ -1,1 +1,0 @@
-Returns `true` if the stack has no used elements.

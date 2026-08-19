@@ -1,1 +1,0 @@
-Returns the screen resolution as a four-element array `[x, y, width, height]` representing the primary display dimensions in pixels.

@@ -1,1 +1,0 @@
-Resets the internal millisecond counter to zero. Subsequent calls to `getMilliSecondsSinceCounterReset()` measure elapsed time from this point. Note that `startTimer()` also resets the counter automatically.

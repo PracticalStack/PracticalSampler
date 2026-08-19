@@ -1,1 +1,0 @@
-Configures this panel as a popup by setting its FloatingTile JSON configuration and bounds. The `position` array specifies `[x, y, width, height]` for the popup. Call `showAsPopup()` to display the configured popup.

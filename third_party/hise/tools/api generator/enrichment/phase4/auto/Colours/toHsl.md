@@ -1,3 +1,0 @@
-Decomposes a colour into a four-element float array `[hue, saturation, lightness, alpha]` where all values are in the 0.0-1.0 range. Hue is normalised so that 0.0 is red, 0.333 is green, and 0.667 is blue. Useful for shifting hue or lightness relative to the current value before converting back with `Colours.fromHsl()`.
-
-> [!Warning:Alpha format differs between toHsl and fromHsl] The output alpha is a 0.0-1.0 float, but `Colours.fromHsl()` expects alpha as a 0-255 integer. For a correct roundtrip, multiply `hsl[3]` by 255 before passing the array back. Passing the float directly truncates alpha to 0 (fully transparent).

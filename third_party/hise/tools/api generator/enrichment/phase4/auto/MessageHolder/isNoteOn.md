@@ -1,1 +1,0 @@
-Returns true if this event has the NoteOn type. A NoteOn with velocity 0 still returns true - HISE does not automatically convert zero-velocity NoteOn events to NoteOff.

@@ -1,3 +1,0 @@
-Removes the element at the given index. The last used element is moved into the vacated slot and the used count is decremented. Returns `true` on success, `false` if the index is out of range.
-
-> [!Warning:Decrement loop counter after removal] When removing elements in a forward loop, decrement the loop counter after each removal (`i--`). The swap-and-pop moves the last element into slot `i`, so without the decrement the swapped element is never checked.

@@ -1,1 +1,0 @@
-Returns the duration of one grid tick in samples, accounting for the current BPM, global grid tempo setting, local grid multiplier, and sample rate. If the local multiplier is 4, the returned length is 4x the base grid length. Useful for calculating buffer sizes or scheduling positions relative to the grid.

@@ -1,5 +1,4 @@
 #include "drs/engine/EngineFacade.h"
-#include "drs/engine/HiseProjectContent.h"
 #include "drs/engine/NativeContent.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "plugin/PluginProcessor.h"
@@ -11,7 +10,6 @@
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
-#include <algorithm>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -24,20 +22,6 @@ void require(bool condition, const std::string& message)
 {
     if (!condition)
         throw std::runtime_error(message);
-}
-
-bool hasPresentDirectory(const drs::engine::HiseProjectContentSnapshot& snapshot,
-                         const std::string& directoryName,
-                         std::size_t minimumMatchingFiles)
-{
-    return std::any_of(snapshot.repoDirectories.begin(),
-                       snapshot.repoDirectories.end(),
-                       [&](const auto& directory)
-                       {
-                           return directory.name == directoryName
-                               && directory.exists
-                               && directory.matchingFileCount >= minimumMatchingFiles;
-                       });
 }
 
 juce::File getBuiltPluginBundle()
@@ -279,8 +263,8 @@ int main()
         require(!nativeContentRoots.repositoryRoot.empty(),
                 "Native content contract must expose the repository root.");
         require(!nativeContentRoots.samplesRoot.empty()
-                    && nativeContentRoots.samplesRoot.find("hise_project") == std::string::npos,
-                "Native content contract must expose a HISE-independent samples root.");
+                    && nativeContentRoots.samplesRoot.find("content/samples") != std::string::npos,
+                "Native content contract must expose the product-owned samples root.");
         require(juce::File(nativeContentRoots.samplesRoot).isDirectory(),
                 "Native samples root must exist in the repository.");
         require(!nativeContentRoots.runtimeRoot.empty(),
@@ -293,8 +277,8 @@ int main()
                 "Engine snapshot diagnostics should expose streamed page misses.");
         require(statusSnapshot.diagnostics.dormantPurgeCount >= 1,
                 "Engine snapshot diagnostics should expose dormant purge activity.");
-        require(statusSnapshot.detail.find("Repo HISE content root:") != std::string::npos,
-                "Engine snapshot detail must describe the product-owned HISE content seam.");
+        require(statusSnapshot.detail.find("Native content roots:") != std::string::npos,
+                "Engine snapshot detail must describe the native content contract.");
         require(statusSnapshot.detail.find("Phase 1 runtime bootstrap:") != std::string::npos,
                 "Engine snapshot detail must describe the Phase 1 runtime bootstrap seam.");
         require(statusSnapshot.detail.find("Runtime diagnostics:") != std::string::npos,
@@ -346,15 +330,6 @@ int main()
         const auto referenceCorpusIndex = juce::File(drs::engine::getPhase1ReferenceCorpusIndexPath());
         require(referenceCorpusIndex.existsAsFile(),
                 "Phase 1 reference corpus index must exist next to the runtime fixtures.");
-
-        const auto contentSnapshot = drs::engine::getHiseProjectContentSnapshot();
-
-        require(contentSnapshot.repoContentRootExists, "Product-owned HISE content root must exist.");
-        require(contentSnapshot.presetFileCount >= 2, "Expected at least two authored factory preset files.");
-        require(contentSnapshot.sampleMapFileCount >= 2, "Expected at least two authored sample map files.");
-        require(hasPresentDirectory(contentSnapshot, "Scripts", 3), "Expected authored script assets under Scripts/.");
-        require(hasPresentDirectory(contentSnapshot, "XmlPresetBackups", 2),
-                "Expected authored HISE XML backup assets under XmlPresetBackups/.");
 
         drs::standalone::MainComponent mainComponent(false);
         mainComponent.addToDesktop(0);

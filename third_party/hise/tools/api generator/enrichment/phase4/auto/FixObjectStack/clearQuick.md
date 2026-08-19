@@ -1,3 +1,0 @@
-Resets the used count to zero without modifying element data. Previous values remain in memory but become inaccessible through `size()`, `indexOf()`, and `contains()`. Subsequent inserts overwrite the stale slots.
-
-> [!Warning:Stale data persists in serialization] `toBase64()` serialises the full memory block including slots cleared by `clearQuick()`. Call `clear()` before serialising if stale data must not leak into the output.
