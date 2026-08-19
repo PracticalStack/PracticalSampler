@@ -58,6 +58,25 @@ std::string summarizeIssues(const std::vector<std::string>& issues)
     return summary;
 }
 
+bool hasEmptyProjectBindingAndPackageBinding(const std::string& serializedState)
+{
+    const auto parsed = drs::engine::parseHostSessionState(serializedState);
+    if (!parsed.isValidHostState()
+        || !parsed.hostState.has_value()
+        || !parsed.hostState->performancePackageBinding.has_value())
+    {
+        return false;
+    }
+
+    const auto& binding = parsed.hostState->projectBinding;
+    return binding.projectId.empty()
+        && binding.manifestPath.empty()
+        && binding.manifestFileName.empty()
+        && binding.manifestDigest.empty()
+        && binding.contentRootHint.empty()
+        && binding.portableRelativePath.empty();
+}
+
 void writeTextFile(const fs::path& path, const std::string& text)
 {
     fs::create_directories(path.parent_path());
@@ -723,7 +742,8 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
     const auto standaloneRealtime = standalone.getProcessor().getRealtimeSafetySnapshot();
     auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(standalone, "workspaceTabs"));
     const bool standaloneProjectBindingSuppressed
-        = standalone.exportStateJson().find("\"projectBinding\"") == std::string::npos;
+        = standalone.getProcessor().waitForHostStatePublication()
+        && hasEmptyProjectBindingAndPackageBinding(standalone.exportStateJson());
 
     drs::plugin::Processor processor;
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
@@ -759,7 +779,8 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
             "Release-gate package state did not reach background host-state publication.");
     processor.getStateInformation(pluginState);
     const std::string serializedPluginState(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
-    const bool pluginProjectBindingSuppressed = serializedPluginState.find("\"projectBinding\"") == std::string::npos;
+    const bool pluginProjectBindingSuppressed
+        = hasEmptyProjectBindingAndPackageBinding(serializedPluginState);
 
     ordered_json section;
     section["exportedPackagePath"] = exportedPackagePath.generic_string();

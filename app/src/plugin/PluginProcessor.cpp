@@ -2145,6 +2145,7 @@ PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePack
         packageManifest,
         resolvedPackageFile,
         drs::engine::PackageSessionReadiness::playable);
+    refreshSerializedHostStatePublication(true);
     result.timings.workspaceTransitionMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now() - workspaceTransitionStarted).count());
@@ -2198,6 +2199,7 @@ PerformancePackageWorkspaceLoadResult Processor::activateOpenedPerformancePackag
         packageManifest,
         resolvedPackageFile,
         drs::engine::PackageSessionReadiness::playable);
+    refreshSerializedHostStatePublication(true);
     result.loaded = true;
     result.failureCategory = drs::engine::PerformancePackageFailureCategory::none;
     result.state = activation.state.empty() ? std::string("Performance package opened") : activation.state;

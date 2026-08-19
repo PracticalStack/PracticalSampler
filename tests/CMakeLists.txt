@@ -39,6 +39,31 @@ add_test(
     COMMAND drs_phase0_smoke_tests
 )
 
+juce_add_console_app(drs_native_content_contract_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Native Content Contract Tests"
+)
+
+target_sources(drs_native_content_contract_tests
+    PRIVATE
+        src/NativeContentContractTests.cpp
+)
+
+target_link_libraries(drs_native_content_contract_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_native_content_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.native_content.contract
+    COMMAND drs_native_content_contract_tests
+)
+
 juce_add_console_app(drs_vst3_host_state_qualification_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} VST3 Host State Qualification Tests"
 )
@@ -4751,6 +4776,7 @@ add_dependencies(drs_all_tests
     drs_sprint6_publish_shell_parity_tests
     drs_sprint6_integration_hardening_tests
     drs_phase0_smoke_tests
+    drs_native_content_contract_tests
     drs_phase1_runtime_contract_tests
     drs_phase1_draft_playback_contract_tests
     drs_phase1_draft_playback_facade_tests

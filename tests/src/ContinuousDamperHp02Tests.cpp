@@ -171,9 +171,9 @@ void verifyInstrumentAndPackageRoundTrip(const RuntimeProjectModel& project,
     const auto projectPath = tempRoot / "hp02.drsproj";
     const auto instrument = drs::app::buildInstrumentManifestForProject(
         project, juce::File(projectPath.generic_string()));
-    require(instrument.schemaVersion == playbackRegionInstrumentSchemaVersion
+    require(instrument.schemaVersion == sfzRegionInstrumentSchemaVersion
                 && !instrument.zones.empty() && instrument.zones.front().damper.dynamicRelease,
-            "Current playback-region projects must emit runtime instrument schema 6 with damper metadata");
+            "Current playback-region projects must emit runtime instrument schema 7 with damper metadata");
 
     const auto instrumentPath = tempRoot / "hp02.drinst";
     const auto serialized = serializeRuntimeInstrumentManifest(instrument,

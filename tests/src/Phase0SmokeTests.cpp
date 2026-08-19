@@ -269,6 +269,11 @@ int main()
                 "Native samples root must exist in the repository.");
         require(!nativeContentRoots.runtimeRoot.empty(),
                 "Native content contract must expose the runtime fixture root.");
+        require(juce::File(nativeContentRoots.runtimeRoot).isDirectory(),
+                "Native runtime root must exist in the repository.");
+        for (const auto* sampleName : { "DRS_Sine_A3.wav", "DRS_TriangleLead_A4.wav" })
+            require(juce::File(nativeContentRoots.samplesRoot).getChildFile(sampleName).existsAsFile(),
+                    "Native smoke coverage must find the required sample fixtures.");
 
         require(!statusSnapshot.mode.empty(), "Engine snapshot mode must not be empty.");
         require(!statusSnapshot.integrationState.empty(), "Engine snapshot integration state must not be empty.");

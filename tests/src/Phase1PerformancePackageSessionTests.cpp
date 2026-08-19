@@ -93,6 +93,25 @@ fs::path buildReferenceContentRoot()
     return fs::path(drs::engine::getNativeContentRoots().samplesRoot);
 }
 
+bool hasEmptyProjectBindingAndPackageBinding(const std::string& serializedState)
+{
+    const auto parsed = drs::engine::parseHostSessionState(serializedState);
+    if (!parsed.isValidHostState()
+        || !parsed.hostState.has_value()
+        || !parsed.hostState->performancePackageBinding.has_value())
+    {
+        return false;
+    }
+
+    const auto& binding = parsed.hostState->projectBinding;
+    return binding.projectId.empty()
+        && binding.manifestPath.empty()
+        && binding.manifestFileName.empty()
+        && binding.manifestDigest.empty()
+        && binding.contentRootHint.empty()
+        && binding.portableRelativePath.empty();
+}
+
 drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
 {
     const auto contentRoot = buildReferenceContentRoot().lexically_normal().generic_string();
@@ -274,8 +293,10 @@ int main()
                 "Standalone package sessions should expose only the Perform tab.");
         require(findDescendantById(standalone, "authoringZoneSelector") == nullptr,
                 "Standalone package sessions should not expose authoring descendants.");
-        require(standalone.exportStateJson().find("\"projectBinding\"") == std::string::npos,
-                "Standalone package sessions should export preset-only host state without project bindings.");
+        require(standalone.getProcessor().waitForHostStatePublication(),
+                "Standalone package session state did not reach background host-state publication.");
+        require(hasEmptyProjectBindingAndPackageBinding(standalone.exportStateJson()),
+                "Standalone package sessions should export package-bound host state without a project binding.");
         const auto& standaloneSessionState = standalone.getProcessor().getEngineFacade().getCurrentSessionState();
         require(!findMacroValue(standaloneSessionState, "motion").has_value(),
                 "Standalone package sessions should not reintroduce Motion when the exported package omitted macros.");
@@ -350,8 +371,8 @@ int main()
                 "Package session state did not reach background host-state publication.");
         processor.getStateInformation(pluginState);
         const std::string serializedState(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
-        require(serializedState.find("\"projectBinding\"") == std::string::npos,
-                "Plugin package sessions should export preset-only host state without project bindings.");
+        require(hasEmptyProjectBindingAndPackageBinding(serializedState),
+                "Plugin package sessions should export package-bound host state without a project binding.");
         const auto& pluginSessionState = processor.getEngineFacade().getCurrentSessionState();
         require(!findMacroValue(pluginSessionState, "motion").has_value(),
                 "Plugin package sessions should not reintroduce Motion when the exported package omitted macros.");
