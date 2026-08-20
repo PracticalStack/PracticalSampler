@@ -428,6 +428,39 @@ int main()
                                84,
                                "The second projected SFZ layer crossfade metadata");
 
+        const auto softStringSpursPath = resolveFixturePath(
+            "DemoSFVInstruments/SoftStringSpurs/Soft String Spurs/Soft String Spurs.sfz");
+        const auto softStringSpursAnalysis = analyzeSfzImportDocument(
+            softStringSpursPath.generic_string());
+        const auto softStringSpursProjection = projectSfzImportAnalysis(
+            makeBlankPhase6Project(softStringSpursPath), softStringSpursAnalysis);
+        require(softStringSpursAnalysis.analyzed
+                    && softStringSpursProjection.projected
+                    && softStringSpursProjection.playable
+                    && !softStringSpursProjection.blocking,
+                "Soft String Spurs must project as playable content without blocking loop-range issues. Issues: "
+                    + joinIssues(softStringSpursProjection.issues));
+        const auto softStringPreStartCount = static_cast<std::size_t>(std::count_if(
+            softStringSpursProjection.zones.begin(),
+            softStringSpursProjection.zones.end(),
+            [](const RuntimeProjectZoneDefinition& zone)
+            {
+                return zone.loopEnabled
+                    && zone.loopStartFrame < zone.sampleStartFrame
+                    && zone.sampleStartFrame < zone.loopEndFrame;
+            }));
+        require(softStringPreStartCount >= 6,
+                "Soft String Spurs must retain the six known earlier-loop-start regions as playable zones.");
+        require(std::all_of(softStringSpursProjection.zones.begin(),
+                            softStringSpursProjection.zones.end(),
+                            [](const RuntimeProjectZoneDefinition& zone)
+                            {
+                                return !zone.loopEnabled
+                                    || (zone.loopStartFrame < zone.loopEndFrame
+                                        && zone.loopEndFrame > zone.sampleStartFrame);
+                            }),
+                "Soft String Spurs projected loops must remain ordered and enterable from playback start.");
+
         const auto firstSamplePath = resolveFirstSamplePath(fixturePath);
         const auto scopedVolumeTempDirectory = fs::temp_directory_path() / "drs-sprint31-sfz-stage1";
         const auto scopedVolumeFixturePath = scopedVolumeTempDirectory / "scoped-volume-stage1.sfz";

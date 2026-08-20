@@ -169,7 +169,7 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     semanticRoute.amplitudeVelocityTracking = 37.0;
     semanticRoute.releaseSeconds = 1.25;
     semanticRoute.releaseShape = -6.0;
-    semanticRoute.sampleStartFrame = 8;
+    semanticRoute.sampleStartFrame = 64;
     semanticRoute.sampleEndFrame = 256;
     semanticRoute.loopEnabled = true;
     semanticRoute.loopMode = drs::engine::RegionLoopMode::loopSustain;
@@ -697,7 +697,7 @@ int main()
                     && preparedRoute->amplitudeVelocityTracking == 37.0
                     && preparedRoute->releaseSeconds == 1.25
                     && preparedRoute->releaseShape == -6.0
-                    && preparedRoute->sampleStartFrame == 8
+                    && preparedRoute->sampleStartFrame == 64
                     && preparedRoute->sampleEndFrame == 256
                     && preparedRoute->loopEnabled
                     && preparedRoute->loopMode == drs::engine::RegionLoopMode::loopSustain
@@ -716,7 +716,7 @@ int main()
         require(renderRoute != renderRoutes.end()
                     && renderRoute->releaseSeconds == 1.25
                     && renderRoute->releaseShape == -6.0
-                    && renderRoute->sampleStartFrame == 8
+                    && renderRoute->sampleStartFrame == 64
                     && renderRoute->sampleEndFrame == 256
                     && renderRoute->loopEnabled
                     && renderRoute->loopMode == drs::engine::RegionLoopMode::loopSustain

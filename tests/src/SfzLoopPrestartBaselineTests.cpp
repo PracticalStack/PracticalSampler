@@ -145,6 +145,31 @@ int main()
                     && hasFindingCode(loopEndsBeforePlayback, "sfz.region.loop_range.outside_playback"),
                 "A loop that ends before playback starts must remain a blocking non-enterable range.");
 
+        const auto exactStartAndEnd = resolveSfzRegionContract(
+            makeRegion({ { "offset", "100" },
+                         { "end", "199" },
+                         { "loop_mode", "loop_continuous" },
+                         { "loop_start", "100" },
+                         { "loop_end", "199" } }),
+            { std::uint64_t { 200 }, std::nullopt });
+        require(exactStartAndEnd.valid
+                    && exactStartAndEnd.region.loopStart.frame
+                        == exactStartAndEnd.region.playbackStart.frame
+                    && exactStartAndEnd.region.loopEndExclusive.frame
+                        == exactStartAndEnd.region.playbackEndExclusive.frame,
+                "Loop start equal to playback start and loop end equal to playback end must remain valid.");
+
+        const auto loopEndsBeyondPlayback = resolveSfzRegionContract(
+            makeRegion({ { "offset", "100" },
+                         { "end", "199" },
+                         { "loop_mode", "loop_continuous" },
+                         { "loop_start", "80" },
+                         { "loop_end", "200" } }),
+            { std::uint64_t { 201 }, std::nullopt });
+        require(!loopEndsBeyondPlayback.valid
+                    && hasFindingCode(loopEndsBeyondPlayback, "sfz.region.loop_range.outside_playback"),
+                "A loop extending beyond playback end must remain a blocking out-of-range contract.");
+
         std::cout << "SFZ loop pre-start baseline characterization passed." << std::endl;
         return 0;
     }

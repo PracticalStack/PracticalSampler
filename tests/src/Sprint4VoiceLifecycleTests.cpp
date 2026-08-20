@@ -446,6 +446,7 @@ void runReleaseLawMatrix()
 void runTypedLoopModeMatrix()
 {
     ModelOptions continuous;
+    continuous.sampleStartFrame = 3;
     continuous.loopEnabled = true;
     continuous.loopMode = drs::engine::RegionLoopMode::loopContinuous;
     continuous.loopStartFrame = 2;

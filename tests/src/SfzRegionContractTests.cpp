@@ -305,6 +305,26 @@ int main()
                 "SFZ end=0 must convert from an inclusive endpoint to exclusive frame one.");
         require(projection.zones[2].sampleEndFrame == 6,
                 "SFZ end must convert from inclusive to exclusive exactly once.");
+
+        const auto preStartProjectionSfz = projectionRoot / "pre-start-projection.sfz";
+        {
+            std::ofstream sfz(preStartProjectionSfz, std::ios::binary | std::ios::trunc);
+            sfz << "<region> sample=fixture.wav offset=10 end=29 loop_mode=loop_continuous "
+                   "loop_start=4 loop_end=19\n";
+        }
+        const auto preStartProjection = projectSfzImportDocument(
+            makeProjectionProject(projectionRoot), preStartProjectionSfz.generic_string());
+        require(preStartProjection.projected && preStartProjection.playable
+                    && !preStartProjection.blocking
+                    && preStartProjection.zones.size() == 1,
+                "SFZ projection must accept an earlier loop head in a playable zone.");
+        require(preStartProjection.zones.front().sampleStartFrame == 10
+                    && preStartProjection.zones.front().sampleEndFrame == 30
+                    && preStartProjection.zones.front().loopEnabled
+                    && preStartProjection.zones.front().loopMode == RegionLoopMode::loopContinuous
+                    && preStartProjection.zones.front().loopStartFrame == 4
+                    && preStartProjection.zones.front().loopEndFrame == 20,
+                "SFZ projection must preserve playback start, earlier loop start, exclusive loop end, and mode.");
         AuthoringSession projectionSession(makeProjectionProject(projectionRoot));
         const auto applyResult = applySfzImportProjection(
             projectionSession, projection, "Import playback-region contract fixture");

@@ -384,6 +384,22 @@ std::vector<drs::tests::OfflineRenderArtifact> runGoldenBehaviorMatrix()
         requireFrame(multipleWraps, 0, frame, wrapExpected[frame], "Multiple loop wraps");
     artifacts.push_back(std::move(multipleWraps));
 
+    ModelSpec preStartLoop { { { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f,
+                                  6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f } } };
+    preStartLoop.sampleStartFrame = 9;
+    preStartLoop.loopEnabled = true;
+    preStartLoop.loopStartFrame = 4;
+    preStartLoop.loopEndFrame = 11;
+    const auto preStartLoopRender = render("pre-start-loop-first-wrap", preStartLoop, 6,
+                                           { noteOn(0) });
+    const std::array<double, 6> preStartLoopExpected { 9.0, 10.0, 4.0, 5.0, 6.0, 7.0 };
+    for (std::size_t frame = 0; frame < preStartLoopExpected.size(); ++frame)
+        requireFrame(preStartLoopRender, 0, frame, preStartLoopExpected[frame],
+                     "Earlier loop head offline first wrap");
+    require(preStartLoopRender.summary.firstNonZeroFrame == 0
+                && preStartLoopRender.summary.lastNonZeroFrame == 5,
+            "Earlier loop head offline render must remain audible across the first backward wrap.");
+
     auto polyphony = render("polyphony", loopConstant, 8,
                             { noteOn(0, 60), noteOn(0, 61), noteOn(0, 62) });
     requireFrame(polyphony, 0, 0, 3.0, "Three-voice polyphony");

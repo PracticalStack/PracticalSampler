@@ -296,17 +296,18 @@
       </section>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">3</span><h2>Rewrite and strengthen tests</h2><span class="sprint-focus">Protect the boundary</span></div>
+        <div class="sprint-head"><span class="sprint-number">3</span><h2>Rewrite and strengthen tests</h2><span class="sprint-focus">Targeted gate passed · August 20, 2026</span></div>
         <p class="sprint-intent">Prove the new behavior at contract, import, persistence, runtime, voice, and package levels while preserving rejection of genuinely invalid data.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LS-3.1</span> Add contract tests for earlier loop start, exact loop-start equality, loop-end equality with playback end, and loop end at or before playback start.</li>
-            <li><span class="task-id">LS-3.2</span> Add SFZ projection tests proving the resolved zone preserves <code>sampleStartFrame</code>, <code>loopStartFrame</code>, <code>loopEndFrame</code>, and <code>loopMode</code>.</li>
-            <li><span class="task-id">LS-3.3</span> Add project, manifest, prepared-playback, host-state, and package round-trip coverage for the relaxed range.</li>
-            <li><span class="task-id">LS-3.4</span> Add voice lifecycle tests proving continuous loops wrap after note-on and continue through release; prove sustain loops stop wrapping on note-off.</li>
-            <li><span class="task-id">LS-3.5</span> Add offline render assertions that locate the first post-<code>loop_end</code> sample at the earlier loop head.</li>
+            <li class="complete"><span class="task-id">LS-3.1</span> Add contract tests for earlier loop start, exact loop-start equality, loop-end equality with playback end, and loop end at or before playback start.</li>
+            <li class="complete"><span class="task-id">LS-3.2</span> Add SFZ projection tests proving the resolved zone preserves <code>sampleStartFrame</code>, <code>loopStartFrame</code>, <code>loopEndFrame</code>, and <code>loopMode</code>.</li>
+            <li class="complete"><span class="task-id">LS-3.3</span> Add project, manifest, prepared-playback, host-state, and package round-trip coverage for the relaxed range.</li>
+            <li class="complete"><span class="task-id">LS-3.4</span> Add voice lifecycle tests proving continuous loops wrap after note-on and continue through release; prove sustain loops stop wrapping on note-off.</li>
+            <li class="complete"><span class="task-id">LS-3.5</span> Add offline render assertions that locate the first post-<code>loop_end</code> sample at the earlier loop head.</li>
             <li><span class="task-id">LS-3.6</span> Run the full Practical Sampler test matrix and the targeted Soft String Spurs import validation.</li>
           </ul>
+          <div class="callout warning"><h3>Aggregate matrix follow-up</h3><p>The Sprint 3 feature matrix and targeted Soft String Spurs qualification pass. The registered 202-test aggregate was stopped at test #3, <code>drs.host_state.vst3_qualification</code>, after several minutes without output; that external host qualification remains an environment follow-up before LS-3.6 can be checked off.</p></div>
           <p class="files">Primary homes: <code>tests/src/SfzRegionContractTests.cpp</code>, <code>Sprint31SfzProjectionTests.cpp</code>, <code>Sprint4VoiceLifecycleTests.cpp</code>, package tests, and prepared-playback tests.</p>
         </div>
       </section>
