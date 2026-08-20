@@ -1528,6 +1528,30 @@ add_test(
     COMMAND drs_sfz_region_contract_tests
 )
 
+# Sprint 0 baseline for allowing loop_start before a zone's playback start.
+# This characterization intentionally records the current import rejection;
+# Sprint 1 will update the expectation as the contract is relaxed.
+add_executable(drs_sfz_loop_prestart_baseline_tests
+    src/SfzLoopPrestartBaselineTests.cpp
+)
+
+target_link_libraries(drs_sfz_loop_prestart_baseline_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_sfz_loop_prestart_baseline_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_sfz_loop_prestart_baseline_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.sfz_loop_prestart.baseline
+    COMMAND drs_sfz_loop_prestart_baseline_tests
+)
+
 add_executable(drs_waveform_region_policy_tests
     src/WaveformRegionPolicyTests.cpp
 )

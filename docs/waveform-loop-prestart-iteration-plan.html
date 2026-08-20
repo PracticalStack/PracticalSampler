@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - Pre-Start Loop Range Iteration Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+    a { color: var(--blue); }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.025em; }
+    h1 { max-width: 1100px; margin-bottom: 18px; font-size: clamp(2.35rem, 5vw, 4.65rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code { padding: 0.12em 0.35em; border-radius: 5px; color: #26343c; background: #e9edeb; font: 0.9em "Cascadia Code", Consolas, monospace; }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero { position: relative; overflow: hidden; padding: 48px; border-radius: 27px; color: #fffaf3; background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2)); box-shadow: var(--shadow); }
+    .hero::after { content: "LOOP RANGE"; position: absolute; right: 14px; bottom: -32px; color: rgba(255,255,255,0.045); font: 700 7rem/1 Georgia, serif; pointer-events: none; }
+    .eyebrow, .section-label { display: inline-block; margin-bottom: 10px; color: #efc39f; font-size: 0.75rem; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 1020px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+    .summary-grid, .grid-2, .grid-3, .grid-4 { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .toc, .section, .sprint, .callout { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .sprint { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.violet { border-top: 4px solid var(--violet); }
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 920px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242,238,230,0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: var(--red-soft); }
+    .status.should { color: var(--amber); background: var(--amber-soft); }
+    .status.later { color: var(--violet); background: var(--violet-soft); }
+    .sprint { overflow: hidden; padding: 0; }
+    .sprint-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .sprint-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .sprint-head h2 { margin: 0; font-size: 1.65rem; }
+    .sprint-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .sprint-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .sprint-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-list li.complete::before { content: "[x]"; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+    .contract { margin: 16px 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: #26343c; color: #f3f6f2; font: 0.95rem/1.7 "Cascadia Code", Consolas, monospace; overflow-x: auto; }
+    .contract .changed { color: #f5d69c; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 145px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+    @media (max-width: 1160px) { .summary-grid, .grid-3 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .flow { grid-template-columns: repeat(3, 1fr); } .flow-step:nth-child(3)::after { display: none; } .toc ol { columns: 2; } }
+    @media (max-width: 700px) { .page { width: calc(100% - 22px); padding-top: 18px; } .hero, .section { padding: 25px 22px; } .summary-grid, .grid-3, .flow { grid-template-columns: 1fr; } .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; } .toc ol { columns: 1; } .sprint-head { grid-template-columns: auto 1fr; } .sprint-focus { grid-column: 2; text-align: left; } .sprint-body { padding: 20px; } .hero::after { display: none; } }
+    @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .toc, .section, .sprint { box-shadow: none; } .sprint, .card, .callout, table { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Next Iteration | August 20, 2026</span>
+      <h1>Allow <code>loop_start</code> Before the Zone Playback Start</h1>
+      <p class="lede">Relax Practical Sampler's loop-range contract so an imported zone can begin note-on playback at its authored <code>offset</code>, reach <code>loop_end</code>, and then wrap back to an earlier <code>loop_start</code>. This iteration targets the Soft String Spurs failure while preserving existing loop timing, native project data, and runtime behavior.</p>
+      <div class="meta">
+        <span class="chip">Scope: PracticalSampler only</span>
+        <span class="chip">SFZ import + native runtime</span>
+        <span class="chip">Non-destructive source audio</span>
+        <span class="chip">Continuous and sustain loops</span>
+        <span class="chip">_analysis/Rhapsody excluded</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>6 / 10</strong><span>Estimated complexity</span></div>
+        <div class="summary-card"><strong>7 / 10</strong><span>Estimated implementation risk</span></div>
+        <div class="summary-card"><strong>4</strong><span>Runtime contract layers to update</span></div>
+        <div class="summary-card"><strong>1</strong><span>Primary customer-visible behavior change</span></div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#goal">Goal and Scope</a></li>
+        <li><a href="#problem">Current Failure</a></li>
+        <li><a href="#semantics">Locked Semantics</a></li>
+        <li><a href="#contract">Contract Changes</a></li>
+        <li><a href="#tasks">Development Tasklist</a></li>
+        <li><a href="#validation">Validation Matrix</a></li>
+        <li><a href="#risks">Risks and Guardrails</a></li>
+        <li><a href="#release">Release Gate</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="goal">
+      <span class="section-label">01 | Product frame</span>
+      <div class="heading"><h2>Goal and scope</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Creator outcome</h3>
+          <p>An SFZ zone with a loop point before its authored playback start imports successfully and plays the intended attack, then loops without changing the source sample.</p>
+        </article>
+        <article class="card good">
+          <h3>Engineering outcome</h3>
+          <p>The importer, project model, compiler, prepared playback, render model, voice, persistence, and package paths agree on the relaxed loop invariant.</p>
+        </article>
+        <article class="card warn">
+          <h3>Explicit non-goal</h3>
+          <p>This iteration does not reinterpret <code>offset</code>, move playback start automatically to <code>loop_start</code>, add new SFZ loop modes, or edit source audio.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Scope boundary</h3>
+        <p>All implementation, tests, fixtures, and this plan belong to <code>PracticalSampler/</code>. The sibling <code>_analysis/Rhapsody/</code> tree is excluded.</p>
+      </div>
+    </section>
+
+    <section class="section" id="problem">
+      <span class="section-label">02 | Ground truth</span>
+      <div class="heading"><h2>Current failure and cause</h2></div>
+      <p>Practical Sampler currently treats the loop as required to be fully contained by the zone's playback range. The SFZ contract rejects a resolved loop when <code>loop_start &lt; playbackStart</code> or <code>loop_end &gt; playbackEnd</code>.</p>
+      <div class="contract"><span class="changed">Current required invariant:</span><br />playbackStart &lt;= loopStart &lt; loopEnd &lt;= playbackEnd</div>
+      <p>Soft String Spurs contains valid-looking authored cases where <code>offset</code> is later than <code>loop_start</code>. For example, a Swells region uses <code>offset=30767</code> and <code>loop_start=30549</code>. The importer therefore reports <em>The resolved loop must be fully contained by the resolved playback range</em> before a playable project is created.</p>
+      <div class="grid-2">
+        <article class="card problem">
+          <h3>Not the problem</h3>
+          <ul>
+            <li><code>loop_mode=loop_continuous</code> is already parsed and mapped.</li>
+            <li>Loop start/end are already represented as zone fields.</li>
+            <li>Normal loops whose start is at or after playback start must continue to work unchanged.</li>
+          </ul>
+        </article>
+        <article class="card good">
+          <h3>The actual gap</h3>
+          <ul>
+            <li>Import validation rejects the earlier loop start.</li>
+            <li>Several downstream validators repeat the same restriction.</li>
+            <li><code>SamplerVoice</code> also requires the loop start to be at or after playback start.</li>
+          </ul>
+        </article>
+      </div>
+      <p class="files">Reference seams: <a href="../engine_adapter/src/SfzRegionContract.cpp">SFZ contract validation</a>, <a href="../engine_adapter/src/RuntimeCompiler.cpp">runtime compiler validation</a>, and <a href="../engine_adapter/src/SamplerVoice.cpp">voice loop activation</a>.</p>
+    </section>
+
+    <section class="section" id="semantics">
+      <span class="section-label">03 | Locked behavior</span>
+      <div class="heading"><h2>Playback semantics for this iteration</h2></div>
+      <div class="flow">
+        <div class="flow-step"><strong>Note-on</strong><span>Voice position begins at the authored zone <code>playbackStart</code> / SFZ <code>offset</code>.</span></div>
+        <div class="flow-step"><strong>Initial pass</strong><span>Audio advances normally, even if <code>loop_start</code> is earlier than the initial position.</span></div>
+        <div class="flow-step"><strong>Loop end</strong><span>When playback reaches <code>loop_end</code>, the loop becomes active.</span></div>
+        <div class="flow-step"><strong>Backward wrap</strong><span>Position jumps to the authored earlier <code>loop_start</code>.</span></div>
+        <div class="flow-step"><strong>Steady state</strong><span><code>loop_continuous</code> keeps wrapping; <code>loop_sustain</code> stops wrapping on note-off.</span></div>
+      </div>
+      <div class="contract"><span class="changed">New active-loop invariant:</span><br />loopStart &lt; loopEnd<br />loopStart &lt;= playbackStart &lt; loopEnd<br />loopEnd &lt;= playbackEnd</div>
+      <div class="grid-3">
+        <article class="card accent"><h3>Preserve offset</h3><p>Do not move <code>playbackStart</code> backward to <code>loop_start</code>. The attack and timing encoded by the SFZ remain authoritative.</p></article>
+        <article class="card good"><h3>Keep half-open frames</h3><p>Continue using native <code>[start, end)</code> ranges. Only the containment relationship changes; inclusive SFZ endpoint conversion does not.</p></article>
+        <article class="card violet"><h3>Keep mode behavior</h3><p><code>loop_continuous</code> wraps through release. <code>loop_sustain</code> stops wrapping at note-off and plays the tail.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="contract">
+      <span class="section-label">04 | Architecture</span>
+      <div class="heading"><h2>Contract and propagation changes</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Current rule</th><th>Required change</th><th>Guard that remains</th></tr></thead>
+          <tbody>
+            <tr><td class="id">SFZ resolution</td><td>Loop start must not precede playback start.</td><td>Accept an earlier loop start when the loop is ordered and its end is after playback start.</td><td>Reject missing, collapsed, or non-enterable loop ranges.</td></tr>
+            <tr><td class="id">Runtime compiler</td><td>Rejects <code>loopStartFrame &lt; sampleStartFrame</code>.</td><td>Remove only that lower-bound rejection.</td><td>Retain ordered-range and loop-end-within-playback-end checks.</td></tr>
+            <tr><td class="id">Load / package validators</td><td>Repeat the full-containment requirement.</td><td>Apply the same relaxed invariant to project, manifest, prepared, and package data.</td><td>Reject invalid persisted data consistently across every loader.</td></tr>
+            <tr><td class="id">Render model</td><td>Only activates a loop whose start is inside playback.</td><td>Allow loop activation when playback begins between loop start and loop end.</td><td>Prevent activation when playback begins at or after loop end.</td></tr>
+            <tr><td class="id">Sampler voice</td><td><code>loopActive</code> requires <code>loopStartFrame &gt;= playbackStart</code>.</td><td>Remove that condition and preserve the existing wrap and crossfade calculations.</td><td>Require <code>loopStart &lt;= playbackStart &lt; loopEnd</code> before activation.</td></tr>
+            <tr><td class="id">Streaming / prewarm</td><td>Playback start and loop head are treated as separate bounded regions.</td><td>Ensure a loop head before playback start is retained in preparation and can be requested after the first wrap.</td><td>No audio-thread file I/O or unbounded prewarm work.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="tasks">
+      <span class="section-label">05 | Development plan</span>
+      <div class="heading"><h2>Tasklist and implementation sequence</h2></div>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">0</span><h2>Baseline and fixture contract</h2><span class="sprint-focus">Complete · August 20, 2026</span></div>
+        <p class="sprint-intent">Create a focused fixture and red/characterization coverage before changing the invariant.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">LS-0.1</span> Add a minimal SFZ fixture with <code>loop_mode=loop_continuous</code>, <code>offset</code> after <code>loop_start</code>, and a valid <code>loop_end</code>.</li>
+            <li class="complete"><span class="task-id">LS-0.2</span> Add a Soft String Spurs-derived import fixture or validation-only representation covering the failing relationship without requiring unrelated corpus edits.</li>
+            <li class="complete"><span class="task-id">LS-0.3</span> Record the current importer failure and identify every validator that rejects <code>loopStartFrame &lt; sampleStartFrame</code>.</li>
+            <li class="complete"><span class="task-id">LS-0.4</span> Confirm normal in-range loops, missing boundaries, collapsed loops, and loops ending before playback start remain distinct cases.</li>
+          </ul>
+          <div class="exit"><h3>Sprint 0 gate passed</h3><p><code>drs.sfz_loop_prestart.baseline</code> and <code>drs.sfz_region.contract</code> both pass. The baseline intentionally records the current earlier-loop-start rejection; Sprint 1 can now change that expectation.</p></div>
+          <p class="files">Primary homes: <code>tests/src/SfzLoopPrestartBaselineTests.cpp</code>, <code>tests/src/SfzRegionContractTests.cpp</code>, and <code>tests/fixtures/sfz-region-contract/loop-prestart-baseline.sfz</code>.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">1</span><h2>Relax the import and native contracts</h2><span class="sprint-focus">Make the zone valid</span></div>
+        <p class="sprint-intent">Change the typed SFZ contract and native zone validation without altering endpoint conversion or loop-mode meaning.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LS-1.1</span> Update <code>validateResolvedRanges</code> to allow <code>loop_start &lt; playbackStart</code> while requiring <code>loopStart &lt;= playbackStart &lt; loopEnd</code>.</li>
+            <li><span class="task-id">LS-1.2</span> Preserve inherited <code>loop_mode</code>, explicit loop boundaries, WAV fallback precedence, and inclusive-to-exclusive endpoint conversion.</li>
+            <li><span class="task-id">LS-1.3</span> Update runtime compiler, project loader, manifest loader, prepared playback, render-model, and performance-publish validation rules.</li>
+            <li><span class="task-id">LS-1.4</span> Keep diagnostics actionable: distinguish an invalid loop range from an earlier-but-valid loop start.</li>
+          </ul>
+          <p class="files">Primary homes: <code>engine_adapter/src/SfzRegionContract.cpp</code>, <code>RuntimeCompiler.cpp</code>, <code>RuntimeLoader.cpp</code>, <code>PreparedPlayback.cpp</code>, <code>SamplerRenderModel.cpp</code>, and <code>PerformancePublishPreparation.cpp</code>.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">2</span><h2>Update voice playback and streaming</h2><span class="sprint-focus">Make the wrap audible</span></div>
+        <p class="sprint-intent">Allow a prepared voice to enter the loop from a later playback position and wrap backward safely.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LS-2.1</span> Update <code>SamplerVoice</code> loop activation so a voice beginning between loop start and loop end can wrap on the first crossing.</li>
+            <li><span class="task-id">LS-2.2</span> Verify normal forward wrapping, crossfade indexing, release behavior, and page-miss position advancement when the loop head precedes playback start.</li>
+            <li><span class="task-id">LS-2.3</span> Ensure prepared playback retains and prewarms the earlier loop head; confirm the first wrap publishes bounded page intent when the page is absent.</li>
+            <li><span class="task-id">LS-2.4</span> Confirm the loop head and playback start remain independent in snapshots, routes, prepared handles, and package artifacts.</li>
+          </ul>
+          <p class="files">Primary homes: <code>engine_adapter/src/SamplerVoice.cpp</code>, <code>PreparedPlayback.cpp</code>, <code>SamplerRenderModel.cpp</code>, and streaming/preparation tests.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">3</span><h2>Rewrite and strengthen tests</h2><span class="sprint-focus">Protect the boundary</span></div>
+        <p class="sprint-intent">Prove the new behavior at contract, import, persistence, runtime, voice, and package levels while preserving rejection of genuinely invalid data.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LS-3.1</span> Add contract tests for earlier loop start, exact loop-start equality, loop-end equality with playback end, and loop end at or before playback start.</li>
+            <li><span class="task-id">LS-3.2</span> Add SFZ projection tests proving the resolved zone preserves <code>sampleStartFrame</code>, <code>loopStartFrame</code>, <code>loopEndFrame</code>, and <code>loopMode</code>.</li>
+            <li><span class="task-id">LS-3.3</span> Add project, manifest, prepared-playback, host-state, and package round-trip coverage for the relaxed range.</li>
+            <li><span class="task-id">LS-3.4</span> Add voice lifecycle tests proving continuous loops wrap after note-on and continue through release; prove sustain loops stop wrapping on note-off.</li>
+            <li><span class="task-id">LS-3.5</span> Add offline render assertions that locate the first post-<code>loop_end</code> sample at the earlier loop head.</li>
+            <li><span class="task-id">LS-3.6</span> Run the full Practical Sampler test matrix and the targeted Soft String Spurs import validation.</li>
+          </ul>
+          <p class="files">Primary homes: <code>tests/src/SfzRegionContractTests.cpp</code>, <code>Sprint31SfzProjectionTests.cpp</code>, <code>Sprint4VoiceLifecycleTests.cpp</code>, package tests, and prepared-playback tests.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">4</span><h2>Documentation and release hygiene</h2><span class="sprint-focus">Close the iteration</span></div>
+        <p class="sprint-intent">Make the relaxed contract discoverable and confirm that no validator or release artifact still assumes full loop containment.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LS-4.1</span> Update active Markdown guidance describing loop ranges, including the distinction between playback start and loop start.</li>
+            <li><span class="task-id">LS-4.2</span> Audit active code, tests, fixtures, and policies for stale full-containment wording or duplicated lower-bound checks.</li>
+            <li><span class="task-id">LS-4.3</span> Re-run clean checkout, build, test, package reopen, and release-artifact checks.</li>
+            <li><span class="task-id">LS-4.4</span> Record the final accepted invariant and any remaining unsupported SFZ cases in the next release evidence.</li>
+          </ul>
+          <p class="files">Documentation scope is limited to active Markdown and this new HTML plan; old HTML documentation is not part of the update unless it is used as an active policy source.</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="section" id="validation">
+      <span class="section-label">06 | Evidence</span>
+      <div class="heading"><h2>Validation matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Scenario</th><th>Expected result</th><th>Evidence</th><th>Priority</th></tr></thead>
+          <tbody>
+            <tr><td>Earlier loop start: <code>loopStart &lt; playbackStart &lt; loopEnd</code></td><td>Import, compile, prepare, and play successfully.</td><td>SFZ contract + projection + voice + offline render tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Exact boundary: <code>loopStart == playbackStart</code></td><td>Existing behavior remains unchanged.</td><td>Contract and regression tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Loop end at playback end</td><td>Valid half-open range; loop wraps before natural end.</td><td>Compiler, render-model, and voice tests.</td><td><span class="priority">P1</span></td></tr>
+            <tr><td>Loop end at or before playback start</td><td>Rejected as non-enterable with an actionable diagnostic.</td><td>Negative contract and loader tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Collapsed or reversed loop</td><td>Rejected.</td><td>Existing invalid-range coverage remains green.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td><code>loop_sustain</code> with earlier loop start</td><td>Wraps while held; stops wrapping at note-off and plays the tail.</td><td>Voice lifecycle and offline render evidence.</td><td><span class="priority">P1</span></td></tr>
+            <tr><td>Prepared source page missing at first wrap</td><td>Bounded silence/page intent behavior remains safe; no audio-thread file I/O.</td><td>Streaming/prepared playback tests.</td><td><span class="priority">P1</span></td></tr>
+            <tr><td>Soft String Spurs import</td><td>Previously reported projection issues are absent for the supported regions.</td><td>Targeted validation run and import report.</td><td><span class="priority">P0</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <span class="section-label">07 | Risk control</span>
+      <div class="heading"><h2>Risks and guardrails</h2></div>
+      <div class="grid-2">
+        <article class="card warn"><h3>Risk: invalid content becomes playable</h3><p>Relaxing the lower bound must not accept collapsed ranges, loop ends before note-on position, or loop ends beyond playback end. Keep explicit ordered and enterable-range checks in every layer.</p></article>
+        <article class="card warn"><h3>Risk: attack timing changes</h3><p>Normalizing playback start to loop start would alter the instrument. Preserve the authored playback start and only change the first-wrap destination.</p></article>
+        <article class="card accent"><h3>Risk: one validator is missed</h3><p>Use a repository audit for <code>loopStartFrame &lt; sampleStartFrame</code> and run clean load, prepare, render, package, and host-state paths.</p></article>
+        <article class="card violet"><h3>Risk: page preparation misses the loop head</h3><p>Keep loop-head prewarm independent from playback-start prewarm and exercise the first wrap under a page-miss test.</p></article>
+      </div>
+      <div class="callout warning">
+        <h3>Compatibility guardrail</h3>
+        <p>Existing projects and zones with loops fully inside playback must serialize identically and render identically. The only new accepted relationship is an earlier loop start that still permits the voice to enter the loop before playback reaches its end.</p>
+      </div>
+    </section>
+
+    <section class="section" id="release">
+      <span class="section-label">08 | Completion</span>
+      <div class="heading"><h2>Release gate</h2></div>
+      <div class="exit">
+        <h3>Iteration is complete when</h3>
+        <ul>
+          <li>Soft String Spurs imports without the reported earlier-loop-start projection errors.</li>
+          <li>The native zone preserves the authored playback start and earlier loop start.</li>
+          <li><code>loop_continuous</code> wraps at runtime after the initial playback position reaches <code>loop_end</code>.</li>
+          <li><code>loop_sustain</code> retains its existing note-off behavior.</li>
+          <li>All project, prepared, package, host-state, and render-model paths accept and preserve the range.</li>
+          <li>Invalid and non-enterable ranges remain rejected with stable diagnostics.</li>
+          <li>Targeted and full Practical Sampler tests pass from a clean checkout.</li>
+        </ul>
+      </div>
+      <div class="callout decision">
+        <h3>Definition of done</h3>
+        <p>The feature is not complete when only the importer accepts the SFZ. It is complete when the accepted zone survives native persistence and package projection and produces the intended first backward loop wrap in the actual voice/render path.</p>
+      </div>
+    </section>
+
+    <footer>
+      Practical Sampler internal engineering plan · Next iteration: pre-start loop ranges · Scope locked to <code>PracticalSampler/</code> · Generated August 20, 2026
+    </footer>
+  </main>
+</body>
+</html>

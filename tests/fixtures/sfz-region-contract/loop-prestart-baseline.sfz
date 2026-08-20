@@ -1,0 +1,24 @@
+// Sprint 0 baseline for the next pre-start loop-range iteration.
+// The first region models the Soft String Spurs failure: playback starts
+// after the loop head, then reaches loop_end before wrapping backward.
+<global>
+loop_mode=loop_continuous
+
+<group>
+offset=30767
+
+<region>
+sample=soft-string-spurs-swell.wav
+end=435174
+loop_start=30549
+loop_end=435174
+key=68
+
+// A normal in-range loop remains part of the regression baseline.
+<region>
+sample=ordinary-loop.wav
+offset=120
+end=999
+loop_start=240
+loop_end=799
+key=69
