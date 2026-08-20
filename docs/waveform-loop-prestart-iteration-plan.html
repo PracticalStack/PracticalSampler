@@ -281,15 +281,16 @@
       </section>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">2</span><h2>Update voice playback and streaming</h2><span class="sprint-focus">Make the wrap audible</span></div>
+        <div class="sprint-head"><span class="sprint-number">2</span><h2>Update voice playback and streaming</h2><span class="sprint-focus">Complete · August 20, 2026</span></div>
         <p class="sprint-intent">Allow a prepared voice to enter the loop from a later playback position and wrap backward safely.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LS-2.1</span> Update <code>SamplerVoice</code> loop activation so a voice beginning between loop start and loop end can wrap on the first crossing.</li>
-            <li><span class="task-id">LS-2.2</span> Verify normal forward wrapping, crossfade indexing, release behavior, and page-miss position advancement when the loop head precedes playback start.</li>
-            <li><span class="task-id">LS-2.3</span> Ensure prepared playback retains and prewarms the earlier loop head; confirm the first wrap publishes bounded page intent when the page is absent.</li>
-            <li><span class="task-id">LS-2.4</span> Confirm the loop head and playback start remain independent in snapshots, routes, prepared handles, and package artifacts.</li>
+            <li class="complete"><span class="task-id">LS-2.1</span> Update <code>SamplerVoice</code> loop activation so a voice beginning between loop start and loop end can wrap on the first crossing.</li>
+            <li class="complete"><span class="task-id">LS-2.2</span> Verify normal forward wrapping, crossfade indexing, release behavior, and page-miss position advancement when the loop head precedes playback start.</li>
+            <li class="complete"><span class="task-id">LS-2.3</span> Ensure prepared playback retains and prewarms the earlier loop head; confirm the first wrap publishes bounded page intent when the page is absent.</li>
+            <li class="complete"><span class="task-id">LS-2.4</span> Confirm the loop head and playback start remain independent in snapshots, routes, prepared handles, and package artifacts.</li>
           </ul>
+          <div class="exit"><h3>Sprint 2 gate passed</h3><p><code>SamplerVoice</code> now activates a loop when playback starts inside the loop interval, produces the first backward wrap, and keeps continuous looping active through release. The paged voice test observes a bounded intent for the missing earlier loop head, while prepared-playback prewarm publishes playback start, loop head, and final loop-frame targets independently.</p></div>
           <p class="files">Primary homes: <code>engine_adapter/src/SamplerVoice.cpp</code>, <code>PreparedPlayback.cpp</code>, <code>SamplerRenderModel.cpp</code>, and streaming/preparation tests.</p>
         </div>
       </section>

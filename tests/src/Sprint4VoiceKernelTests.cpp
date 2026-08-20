@@ -691,6 +691,55 @@ void runPagedBoundaryAndUnderrunMatrix()
                 == drs::engine::SamplePageIntentRing::capacity,
             "The drained intent ring must report bounded publication/consumption metrics.");
 }
+
+void runPreStartLoopAndPageIntentMatrix()
+{
+    ModelOptions options;
+    options.sampleStartFrame = 9;
+    options.loopEnabled = true;
+    options.loopStartFrame = 4;
+    options.loopEndFrame = 11;
+    const std::vector<float> source {
+        0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f,
+        6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f
+    };
+
+    const auto residentModel = buildModel({ source }, options);
+    drs::engine::SamplerVoice resident;
+    require(resident.start(*residentModel, makeStart())
+                && resident.isLoopActive(),
+            "A pre-start loop voice must activate when playback begins before loop end.");
+    StereoOutput residentOutput(6);
+    const auto residentResult = resident.render(residentOutput.view(), 0, 6);
+    require(residentResult.mixedFrameCount == 6 && !residentResult.voiceFinished,
+            "A pre-start loop must remain active after its first backward wrap.");
+    requireVector(residentOutput.left, { 9.0f, 10.0f, 4.0f, 5.0f, 6.0f, 7.0f },
+                  "Pre-start loop first-wrap sequence changed");
+
+    drs::engine::SamplerVoice released;
+    require(released.start(*residentModel, makeStart())
+                && released.beginRelease()
+                && released.isLoopActive(),
+            "A pre-start loop_continuous voice must keep wrapping through release.");
+
+    auto pagedSource = std::make_shared<drs::engine::DeterministicFakePagedSampleDataSource>(
+        makePagedDescriptor(source.size()),
+        std::vector<std::vector<float>> { source },
+        4, 4, std::vector<bool> { false, true });
+    auto recordingSource = std::make_shared<IntentRecordingSource>(pagedSource);
+    const auto pagedModel = buildModel({ source }, options, recordingSource);
+    drs::engine::SamplerVoice paged;
+    require(paged.start(*pagedModel, makeStart())
+                && paged.isLoopActive(),
+            "A paged pre-start loop voice must activate from its later playback start.");
+    StereoOutput pagedOutput(4);
+    const auto pagedResult = paged.render(pagedOutput.view(), 0, 4);
+    require(pagedResult.pageMissCount > 0
+                && recordingSource->publicationCount.load(std::memory_order_relaxed) > 0
+                && recordingSource->lastRequestedFrame.load(std::memory_order_relaxed) >= 4
+                && recordingSource->lastRequestedFrame.load(std::memory_order_relaxed) <= 7,
+            "The first wrap to a missing earlier loop head must publish a bounded page intent.");
+}
 } // namespace
 
 int main()
@@ -706,6 +755,7 @@ int main()
         runPartitionInvarianceMatrix();
         runNativeLoopCrossfadeMatrix();
         runPagedBoundaryAndUnderrunMatrix();
+        runPreStartLoopAndPageIntentMatrix();
         std::cout << "Sprint 4.2 deterministic voice-kernel matrix passed." << std::endl;
         return 0;
     }

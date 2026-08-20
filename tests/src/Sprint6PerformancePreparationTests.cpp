@@ -105,6 +105,39 @@ void runDeepRegionPrewarmContract()
             "Deep playback prewarm must target start, loop head, crossfade tail, and final wrap frame.");
 }
 
+void runPreStartLoopPrewarmContract()
+{
+    auto source = std::make_shared<PrewarmRecordingSource>();
+    ImmutablePreparedPlayback prepared;
+    PreparedPlaybackSampleHandle sample;
+    sample.sampleSourceId = source->descriptor().sourceId;
+    sample.frameCount = source->descriptor().frameCount;
+    sample.channelCount = source->descriptor().channelCount;
+    sample.dataSource = source;
+    prepared.samples.push_back(std::move(sample));
+
+    PreparedPlaybackZoneHandle zone;
+    zone.zoneId = "pre-start-loop-zone";
+    zone.sampleSourceId = source->descriptor().sourceId;
+    zone.preparedSampleIndex = 0;
+    zone.sampleStartFrame = 90'000'000;
+    zone.loopEnabled = true;
+    zone.loopStartFrame = 89'000'000;
+    zone.loopEndFrame = 98'000'000;
+    prepared.zones.push_back(zone);
+
+    const auto result = publishPreparedPlaybackRegionPrewarmIntents(prepared);
+    require(result.publishedIntentCount == 3 && result.rejectedIntentCount == 0
+                && source->intentCount == 3,
+            "Pre-start loop prewarm must publish playback start, earlier loop head, and final loop frame.");
+    require(source->intents[0].frame == 90'000'000
+                && source->intents[0].priority == SamplePageRequestPriority::imminent
+                && source->intents[1].frame == 89'000'000
+                && source->intents[1].priority == SamplePageRequestPriority::lookAhead
+                && source->intents[2].frame == 97'999'999,
+            "Pre-start loop prewarm must retain the earlier loop head as a distinct look-ahead target.");
+}
+
 struct Fixture
 {
     PlaybackSnapshotBuildResult snapshot;
@@ -322,6 +355,7 @@ int main()
     try
     {
         runDeepRegionPrewarmContract();
+        runPreStartLoopPrewarmContract();
         const auto fixture = makeFixture();
         const auto valid = validatePerformancePublishPreparation(
             fixture.identity, fixture.snapshot, fixture.prepared);

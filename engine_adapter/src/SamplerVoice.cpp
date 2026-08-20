@@ -113,7 +113,7 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     loopActive = (request.hasPlaybackRegionOverride
             ? request.loopOverrideEnabled : regionLoopModeLoops(effectiveLoopMode))
         && loopStartFrame < loopEndFrame
-        && loopStartFrame >= playbackStart
+        && loopEndFrame > playbackStart
         && loopEndFrame <= playbackEndFrame;
     const auto loopLength = loopActive ? loopEndFrame - loopStartFrame : 0;
     loopCrossfadeFrames = loopActive
