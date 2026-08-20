@@ -1824,6 +1824,58 @@ RuntimeProjectDocumentActionResult AuthoringSession::updateZoneRanges(
     return documentController.commitSnapshot(project, label, changedPaths);
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::updateZoneReleaseSeconds(
+    const std::vector<std::string>& zoneIds,
+    const double releaseSeconds,
+    const std::string& label)
+{
+    if (zoneIds.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone release edit rejected",
+                                  "At least one zone must be provided for a release edit.");
+    if (!std::isfinite(releaseSeconds) || releaseSeconds < 0.0)
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone release edit rejected",
+                                  "Zone releaseSeconds must be finite and non-negative.");
+
+    auto project = getProject();
+    std::unordered_set<std::string> requestedZoneIds;
+    std::vector<std::size_t> zoneIndices;
+    zoneIndices.reserve(zoneIds.size());
+    for (const auto& zoneId : zoneIds)
+    {
+        if (!requestedZoneIds.insert(zoneId).second)
+            return makeRejectedResult(getDocumentState(),
+                                      "Zone release edit rejected",
+                                      "Zone '" + zoneId + "' was provided more than once.");
+
+        const auto zoneIndex = findZoneIndexById(project, zoneId);
+        if (!zoneIndex.has_value())
+            return makeRejectedResult(getDocumentState(),
+                                      "Zone release edit rejected",
+                                      "Zone '" + zoneId + "' does not exist in the current authoring project.");
+        zoneIndices.push_back(*zoneIndex);
+    }
+
+    std::vector<std::string> changedPaths;
+    changedPaths.reserve(zoneIndices.size());
+    for (const auto zoneIndex : zoneIndices)
+    {
+        auto& zone = project.authoring.zones[zoneIndex];
+        if (zone.releaseSeconds == releaseSeconds)
+            continue;
+        zone.releaseSeconds = releaseSeconds;
+        changedPaths.push_back("authoring.zones[" + std::to_string(zoneIndex) + "]");
+    }
+
+    if (changedPaths.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Zone release unchanged",
+                                  "The selected zones already use that release time.");
+
+    return documentController.commitSnapshot(project, label, changedPaths);
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::createVelocityCrossfadePair(
     const VelocityCrossfadePairRequest& request,
     const std::string& label)

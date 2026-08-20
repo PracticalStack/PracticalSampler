@@ -711,6 +711,9 @@ void ZoneMappingEditor::applyValuesToControls(const ZoneFieldValuesViewModel& va
     if (values.releaseSeconds > releaseSlider.getMaximum())
         releaseSlider.setRange(0.0, values.releaseSeconds * 2.0, 0.01);
     releaseSlider.setValue(values.releaseSeconds, juce::dontSendNotification);
+    releaseSlider.setHelpText(values.hasMultipleZoneSelection
+        ? "Sets the amplitude release time after note-off for every selected zone, in seconds."
+        : "Sets the selected zone's amplitude release time after note-off, in seconds.");
     auto& releaseShapeSlider = releaseShapeRow.getSlider();
     if (values.releaseShape < releaseShapeSlider.getMinimum()
         || values.releaseShape > releaseShapeSlider.getMaximum())

@@ -6983,6 +6983,15 @@ void AuthoringPanel::applySelectedZoneEdit(const authoring::ZoneFieldValuesViewM
         return;
     }
 
+    if (zoneMapSelectedZoneIds.size() > 1 && label == "Update zone release")
+    {
+        const auto result = authoringSession.updateZoneReleaseSeconds(
+            zoneMapSelectedZoneIds, values.releaseSeconds, label.toStdString());
+        if (result.applied)
+            refreshFromSession();
+        return;
+    }
+
     auto editedZone = *currentZone;
     editedZone.rootKey = values.rootKey;
     editedZone.keyLow = values.keyLow;

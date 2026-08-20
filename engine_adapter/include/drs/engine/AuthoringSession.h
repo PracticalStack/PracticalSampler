@@ -114,6 +114,10 @@ public:
     RuntimeProjectDocumentActionResult updateZoneRanges(
         const std::vector<AuthoringZoneSummary>& zones,
         const std::string& label);
+    RuntimeProjectDocumentActionResult updateZoneReleaseSeconds(
+        const std::vector<std::string>& zoneIds,
+        double releaseSeconds,
+        const std::string& label);
     RuntimeProjectDocumentActionResult createVelocityCrossfadePair(
         const VelocityCrossfadePairRequest& request,
         const std::string& label);
