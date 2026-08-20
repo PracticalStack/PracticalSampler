@@ -59,8 +59,11 @@ WaveformFrameRange normalizePlaybackRegion(const WaveformFrameRange requested,
 WaveformFrameRange normalizeLoopRegion(const WaveformFrameRange requested,
                                        const WaveformFrameRange playbackRegion) noexcept
 {
+    // The loop head may precede playback start. The playback end remains the
+    // upper bound because the runtime contract still requires an enterable
+    // loop that ends within the playback region.
     return normalizeWaveformFrameRange(requested,
-                                       playbackRegion,
+                                       { 0, playbackRegion.endFrameExclusive },
                                        playbackRegion.empty() ? 0 : 1);
 }
 
@@ -182,7 +185,7 @@ WaveformEditableRegions normalizeBoundaryDrag(WaveformEditableRegions regions,
         {
             auto maximum = regions.playback.endFrameExclusive - 1;
             if (regions.loopActive)
-                maximum = std::min(maximum, regions.loop.startFrame);
+                maximum = std::min(maximum, regions.loop.endFrameExclusive - 1);
             regions.playback.startFrame = clampFrame(candidateFrame, 0, maximum);
             break;
         }
@@ -201,16 +204,15 @@ WaveformEditableRegions normalizeBoundaryDrag(WaveformEditableRegions regions,
             if (!regions.loopActive)
                 break;
             const auto maximum = regions.loop.endFrameExclusive - 1;
-            regions.loop.startFrame = clampFrame(candidateFrame,
-                                                  regions.playback.startFrame,
-                                                  maximum);
+            regions.loop.startFrame = clampFrame(candidateFrame, 0, maximum);
             break;
         }
         case WaveformRegionBoundary::loopEnd:
         {
             if (!regions.loopActive)
                 break;
-            const auto minimum = regions.loop.startFrame + 1;
+            const auto minimum = std::max(regions.loop.startFrame + 1,
+                                          regions.playback.startFrame + 1);
             regions.loop.endFrameExclusive = clampFrame(candidateFrame,
                                                          minimum,
                                                          regions.playback.endFrameExclusive);
@@ -255,15 +257,20 @@ WaveformEditableRegions movePlaybackRegion(WaveformEditableRegions regions,
         if (actualDelta >= 0)
         {
             const auto shift = static_cast<std::uint64_t>(actualDelta);
-            regions.loop.startFrame += shift;
-            regions.loop.endFrameExclusive += shift;
+            regions.loop.startFrame = std::min(
+                regions.loop.startFrame + shift, regions.playback.endFrameExclusive);
+            regions.loop.endFrameExclusive = std::min(
+                regions.loop.endFrameExclusive + shift, regions.playback.endFrameExclusive);
         }
         else
         {
             const auto shift = static_cast<std::uint64_t>(-actualDelta);
-            regions.loop.startFrame -= shift;
-            regions.loop.endFrameExclusive -= shift;
+            regions.loop.startFrame = regions.loop.startFrame > shift
+                ? regions.loop.startFrame - shift : 0;
+            regions.loop.endFrameExclusive = regions.loop.endFrameExclusive > shift
+                ? regions.loop.endFrameExclusive - shift : 0;
         }
+        regions.loop = normalizeLoopRegion(regions.loop, regions.playback);
     }
     return regions;
 }

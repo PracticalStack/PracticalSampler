@@ -313,15 +313,16 @@
       </section>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">4</span><h2>Documentation and release hygiene</h2><span class="sprint-focus">Close the iteration</span></div>
+        <div class="sprint-head"><span class="sprint-number">4</span><h2>Documentation and release hygiene</h2><span class="sprint-focus">Targeted gate passed · August 20, 2026</span></div>
         <p class="sprint-intent">Make the relaxed contract discoverable and confirm that no validator or release artifact still assumes full loop containment.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LS-4.1</span> Update active Markdown guidance describing loop ranges, including the distinction between playback start and loop start.</li>
-            <li><span class="task-id">LS-4.2</span> Audit active code, tests, fixtures, and policies for stale full-containment wording or duplicated lower-bound checks.</li>
+            <li class="complete"><span class="task-id">LS-4.1</span> Update active Markdown guidance describing loop ranges, including the distinction between playback start and loop start.</li>
+            <li class="complete"><span class="task-id">LS-4.2</span> Audit active code, tests, fixtures, and policies for stale full-containment wording or duplicated lower-bound checks.</li>
             <li><span class="task-id">LS-4.3</span> Re-run clean checkout, build, test, package reopen, and release-artifact checks.</li>
-            <li><span class="task-id">LS-4.4</span> Record the final accepted invariant and any remaining unsupported SFZ cases in the next release evidence.</li>
+            <li class="complete"><span class="task-id">LS-4.4</span> Record the final accepted invariant and any remaining unsupported SFZ cases in the next release evidence.</li>
           </ul>
+          <div class="callout warning"><h3>Release-hygiene follow-up</h3><p>Fresh Debug configuration and all feature-specific build/test targets pass. The aggregate <code>drs_all_tests</code> rebuild was stopped during the broad JUCE graph after 265/1,211 actions, and the Debug package host/release-gate run remains blocked by the known reference-sine fixture and external lifecycle hang. LS-4.3 stays open until those environment/release prerequisites are rerun successfully.</p></div>
           <p class="files">Documentation scope is limited to active Markdown and this new HTML plan; old HTML documentation is not part of the update unless it is used as an active policy source.</p>
         </div>
       </section>

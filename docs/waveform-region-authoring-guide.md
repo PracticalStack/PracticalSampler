@@ -17,6 +17,18 @@ This is a one-way SFZ conversion workflow. Practical Sampler projects and playab
 
 Numeric fields accept source frames or seconds using an `s` suffix. End values shown by Practical Sampler are exclusive; they identify the first frame after the playable range.
 
+## Final loop invariant
+
+Enabled forward loops use the native half-open range `[loopStartFrame, loopEndFrame)` and must satisfy:
+
+```text
+loopStartFrame < loopEndFrame
+loopStartFrame <= playbackStartFrame < loopEndFrame
+loopEndFrame <= playbackEndFrame
+```
+
+The loop head may therefore precede playback start. Playback still begins at the authored `offset`/`playbackStartFrame`; it does not jump backward until playback reaches `loopEndFrame`. The waveform editor, Preview, Publish, package loader, prepared playback, render model, and voice kernel preserve this relationship.
+
 ## Keyboard reference
 
 | Input | Action |
@@ -41,7 +53,7 @@ All boundary editors expose accessibility titles, descriptions, focus order, ena
 | `loop_mode=one_shot` | Exact | One-shot trigger behavior with no repeating loop. |
 | `loop_mode=loop_continuous` | Exact | Continuous forward loop. |
 | `loop_mode=loop_sustain` | Exact | Forward loop released by note-off. |
-| `loop_start` | Exact | Becomes the native loop start frame. |
+| `loop_start` | Exact | Becomes the native loop start frame, including when it precedes playback start. |
 | `loop_end` | Normalized | SFZ's inclusive loop end is converted once to the native exclusive loop end. |
 | Embedded WAV `smpl` loop | Fallback | Supplies omitted loop boundaries; explicit SFZ values win. |
 | `<global>` / `<master>` / `<group>` inheritance | Resolved | Effective values are resolved before the region is projected. |
@@ -55,7 +67,7 @@ All boundary editors expose accessibility titles, descriptions, focus order, ena
 - Projects predating playback ends continue to use the physical source end through the historical zero sentinel.
 - Playback-region projects migrate to project/authoring schema 8/7 without changing their host binding when all new fields retain legacy defaults.
 - Authoring a native loop crossfade promotes the project to schema 9/8. Compiled instruments use schema 7 for the complete SFZ region contract and schema 8 when a native crossfade is present.
-- Older readable package and project schemas remain supported. Invalid ranges, loops that end at or before playback start, loop ends beyond playback end, and crossfades larger than half the loop are rejected rather than repaired silently at playback time.
+- Older readable package and project schemas remain supported. Invalid, collapsed, or reversed ranges; loops that end at or before playback start; loop ends beyond playback end; unresolved active-loop boundaries; unsupported loop modes; and crossfades larger than half the loop are rejected or reported as unsupported rather than repaired silently at playback time.
 - Host state, save/reopen, Preview, Publish, and playable-package open all use the same typed region fields.
 
 ## Large sources

@@ -45,8 +45,8 @@ int main()
 
         const WaveformFrameRange playback { 20, 80 };
         const auto containedLoop = normalizeLoopRegion({ 10, 90 }, playback);
-        require(containedLoop.startFrame == 20 && containedLoop.endFrameExclusive == 80,
-                "Loop normalization must keep the loop inside the playback region.");
+        require(containedLoop.startFrame == 10 && containedLoop.endFrameExclusive == 80,
+                "Loop normalization must preserve an earlier loop head while bounding its end to playback.");
 
         const auto emptySelection = normalizeSelectionRegion({ 42, 42 }, 100);
         require(emptySelection.empty() && emptySelection.startFrame == 42,
@@ -101,8 +101,15 @@ int main()
                                         WaveformRegionBoundary::playbackStart,
                                         50,
                                         100);
-        require(regions.playback.startFrame == 30,
-                "Playback start must stop at an active loop start instead of excluding the loop.");
+        require(regions.playback.startFrame == 50,
+                "Playback start may move after an active loop head while the loop remains enterable.");
+
+        regions = normalizeBoundaryDrag(regions,
+                                        WaveformRegionBoundary::playbackStart,
+                                        75,
+                                        100);
+        require(regions.playback.startFrame == 69,
+                "Playback start must stop before loop end instead of making the earlier loop non-enterable.");
 
         regions = normalizeBoundaryDrag(regions,
                                         WaveformRegionBoundary::playbackEnd,
@@ -124,8 +131,9 @@ int main()
                                         100);
         require(regions.loop.endFrameExclusive == 70,
                 "Loop-end handles must preserve a one-frame minimum loop.");
-        require(regions.playback.contains(regions.loop),
-                "Every accepted boundary drag must preserve loop containment.");
+        require(regions.loop.startFrame <= regions.playback.startFrame
+                    && regions.loop.endFrameExclusive <= regions.playback.endFrameExclusive,
+                "Every accepted boundary drag must preserve an enterable loop range.");
 
         const auto movedRight = movePlaybackRegion(
             { { 10, 50 }, { 20, 30 }, true }, 80, 100);
@@ -133,11 +141,19 @@ int main()
                     && movedRight.playback.endFrameExclusive == 100
                     && movedRight.loop.startFrame == 70
                     && movedRight.loop.endFrameExclusive == 80,
-                "Moving a playback region must preserve its length and contained loop offset at source edges.");
+                "Moving a playback region must preserve its length and loop offset at source edges.");
         const auto movedLeft = movePlaybackRegion(movedRight, -100, 100);
         require(movedLeft.playback.startFrame == 0
                     && movedLeft.loop.startFrame == 10,
-                "Playback-region moves must clamp without separating the contained loop.");
+                "Playback-region moves must clamp without separating the loop from playback.");
+
+        const auto movedPreStart = movePlaybackRegion(
+            { { 20, 80 }, { 10, 70 }, true }, -30, 100);
+        require(movedPreStart.playback.startFrame == 0
+                    && movedPreStart.playback.endFrameExclusive == 60
+                    && movedPreStart.loop.startFrame == 0
+                    && movedPreStart.loop.endFrameExclusive == 50,
+                "Moving a playback region must safely retain an earlier loop head at the source boundary.");
 
         const auto snapped = chooseWaveformSnapCandidate(
             52, { 60, 50, 54 }, { 10, 90 }, 4);
@@ -161,7 +177,7 @@ int main()
             WaveformAuditionMode::selection, auditionRegions, { 60, 75 }, 100);
         require(playbackAudition.valid && playbackAudition.playback.startFrame == 10
                     && playbackAudition.loopActive,
-                "Playback audition must retain the authored region and contained loop.");
+                "Playback audition must retain the authored region and enterable loop.");
         require(loopAudition.valid && loopAudition.playback.startFrame == 30
                     && loopAudition.playback.endFrameExclusive == 50
                     && loopAudition.loopActive,
