@@ -266,15 +266,16 @@
       </section>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">1</span><h2>Relax the import and native contracts</h2><span class="sprint-focus">Make the zone valid</span></div>
+        <div class="sprint-head"><span class="sprint-number">1</span><h2>Relax the import and native contracts</h2><span class="sprint-focus">Complete · August 20, 2026</span></div>
         <p class="sprint-intent">Change the typed SFZ contract and native zone validation without altering endpoint conversion or loop-mode meaning.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LS-1.1</span> Update <code>validateResolvedRanges</code> to allow <code>loop_start &lt; playbackStart</code> while requiring <code>loopStart &lt;= playbackStart &lt; loopEnd</code>.</li>
-            <li><span class="task-id">LS-1.2</span> Preserve inherited <code>loop_mode</code>, explicit loop boundaries, WAV fallback precedence, and inclusive-to-exclusive endpoint conversion.</li>
-            <li><span class="task-id">LS-1.3</span> Update runtime compiler, project loader, manifest loader, prepared playback, render-model, and performance-publish validation rules.</li>
-            <li><span class="task-id">LS-1.4</span> Keep diagnostics actionable: distinguish an invalid loop range from an earlier-but-valid loop start.</li>
+            <li class="complete"><span class="task-id">LS-1.1</span> Update <code>validateResolvedRanges</code> to allow <code>loop_start &lt; playbackStart</code> while requiring <code>loopStart &lt;= playbackStart &lt; loopEnd</code>.</li>
+            <li class="complete"><span class="task-id">LS-1.2</span> Preserve inherited <code>loop_mode</code>, explicit loop boundaries, WAV fallback precedence, and inclusive-to-exclusive endpoint conversion.</li>
+            <li class="complete"><span class="task-id">LS-1.3</span> Update runtime compiler, project loader, manifest loader, prepared playback, render-model, and performance-publish validation rules.</li>
+            <li class="complete"><span class="task-id">LS-1.4</span> Keep diagnostics actionable: distinguish an invalid loop range from an earlier-but-valid loop start.</li>
           </ul>
+          <div class="exit"><h3>Phase 1 gate passed</h3><p>The SFZ contract, compiler, instrument loader, render model, prepared/publish validators, and focused regression fixtures now accept an earlier loop head while rejecting non-enterable and out-of-range loops. Audible first-wrap behavior remains Phase 2 work.</p></div>
           <p class="files">Primary homes: <code>engine_adapter/src/SfzRegionContract.cpp</code>, <code>RuntimeCompiler.cpp</code>, <code>RuntimeLoader.cpp</code>, <code>PreparedPlayback.cpp</code>, <code>SamplerRenderModel.cpp</code>, and <code>PerformancePublishPreparation.cpp</code>.</p>
         </div>
       </section>

@@ -8,6 +8,7 @@ Phase 6 is implemented. Practical Sampler now converts the supported SFZ region 
 
 - Effective SFZ inheritance is resolved before projection.
 - `offset`, inclusive `end`, `loop_mode`, `loop_start`, and inclusive `loop_end` are converted to the native half-open playback-region contract.
+- A loop start may precede the authored playback start; the loop must remain ordered, its end must be after playback start, and its end must not exceed playback end.
 - Embedded WAV loop metadata supplies a fallback when SFZ loop boundaries are omitted. Explicit SFZ values take precedence.
 - Sample metadata is inspected once per canonical source path on the existing import worker path; the engine-side projection remains filesystem- and JUCE-independent through an injected resolver.
 - Unsupported, malformed, or only partially representable region semantics are retained as explicit import findings/authoring notes.

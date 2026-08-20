@@ -1594,15 +1594,15 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         if (zone.sampleEndFrame > preparedSample.frameCount
             || zone.sampleStartFrame >= playbackEndFrame
             || (zone.loopEnabled
-                && (zone.loopStartFrame < zone.sampleStartFrame
-                    || zone.loopStartFrame >= zone.loopEndFrame
+                && (zone.loopStartFrame >= zone.loopEndFrame
+                    || zone.loopEndFrame <= zone.sampleStartFrame
                     || zone.loopEndFrame > playbackEndFrame)))
         {
             addFinding(result,
                        PlaybackSnapshotFindingSeverity::error,
                        "invalid-prepared-playback-region",
                        "zones[" + std::to_string(index) + "].sampleEndFrame",
-                       "Prepared playback requires a non-empty playback region with any enabled loop fully contained inside it.");
+                       "Prepared playback requires a non-empty playback region with any enabled loop enterable from playback start and ending within it.");
             continue;
         }
         const auto loopLength = zone.loopEndFrame > zone.loopStartFrame

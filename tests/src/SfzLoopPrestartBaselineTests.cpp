@@ -102,10 +102,10 @@ int main()
         require(earlierLoop.region.loopStart.frame < earlierLoop.region.playbackStart.frame
                     && earlierLoop.region.playbackStart.frame < earlierLoop.region.loopEndExclusive.frame,
                 "The baseline fixture must exercise a loop head before the playback start while remaining enterable.");
-        require(!earlierLoop.valid
-                    && earlierLoop.disposition == SfzRegionMappingDisposition::invalid
-                    && hasFindingCode(earlierLoop, "sfz.region.loop_range.outside_playback"),
-                "Sprint 0 must record the current rejection of a loop head before playback start.");
+        require(earlierLoop.valid
+                    && earlierLoop.disposition == SfzRegionMappingDisposition::normalized
+                    && !hasFindingCode(earlierLoop, "sfz.region.loop_range.outside_playback"),
+                "Phase 1 must accept a loop head before playback start when the loop is enterable.");
 
         const auto ordinaryLoop = resolveSfzRegionContract(
             regionAt(normalized.document, 1),

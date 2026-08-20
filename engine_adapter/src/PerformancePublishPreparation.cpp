@@ -407,8 +407,8 @@ PerformancePublishPreparationResult validatePerformancePublishPreparationImpl(
         const auto playbackEndFrame = resolveSampleEndFrame(zone.sampleEndFrame, sample.frameCount);
         if (zone.sampleEndFrame > sample.frameCount
             || zone.sampleStartFrame >= playbackEndFrame
-            || (zone.loopEnabled && (zone.loopStartFrame < zone.sampleStartFrame
-                                     || zone.loopStartFrame >= zone.loopEndFrame
+            || (zone.loopEnabled && (zone.loopStartFrame >= zone.loopEndFrame
+                                     || zone.loopEndFrame <= zone.sampleStartFrame
                                      || zone.loopEndFrame > playbackEndFrame)))
             addError(result, "publish-prepared-zone-range-invalid", path,
                      "Prepared playback and loop ranges must fit the decoded source.");

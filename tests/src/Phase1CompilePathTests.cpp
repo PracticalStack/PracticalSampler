@@ -370,6 +370,36 @@ int main(const int argc, char** argv)
                     && playbackRegionInstrumentRoundTrip.instrument.zones.front().sampleEndFrame == 100,
                 "Packaged runtime-instrument serialization must round-trip the playback end.");
 
+        auto preStartLoopPlan = tempCompilePlan;
+        preStartLoopPlan.zones.front().sampleStartFrame = 100;
+        preStartLoopPlan.zones.front().sampleEndFrame = 1000;
+        preStartLoopPlan.zones.front().loopEnabled = true;
+        preStartLoopPlan.zones.front().loopMode = drs::engine::RegionLoopMode::loopContinuous;
+        preStartLoopPlan.zones.front().loopStartFrame = 50;
+        preStartLoopPlan.zones.front().loopEndFrame = 900;
+        const auto preStartLoopCompile = drs::engine::compileRuntimeInstrument(preStartLoopPlan);
+        require(preStartLoopCompile.compiled
+                    && preStartLoopCompile.instrument.zones.front().sampleStartFrame == 100
+                    && preStartLoopCompile.instrument.zones.front().loopStartFrame == 50
+                    && preStartLoopCompile.instrument.zones.front().loopEndFrame == 900,
+                "Runtime compilation must accept and preserve a loop head before playback start.");
+        const auto preStartLoopInstrumentJson = drs::engine::serializeRuntimeInstrumentManifest(
+            preStartLoopCompile.instrument, preStartLoopPlan.outputInstrumentPath);
+        const auto preStartLoopInstrumentRoundTrip = drs::engine::parseRuntimeInstrumentManifest(
+            preStartLoopInstrumentJson, preStartLoopPlan.outputInstrumentPath, false);
+        require(preStartLoopInstrumentRoundTrip.loaded
+                    && preStartLoopInstrumentRoundTrip.instrument.zones.front().loopStartFrame == 50
+                    && preStartLoopInstrumentRoundTrip.instrument.zones.front().loopEndFrame == 900,
+                "Runtime instrument loading must preserve a loop head before playback start.");
+        auto nonEnterableLoopPlan = preStartLoopPlan;
+        nonEnterableLoopPlan.zones.front().loopEndFrame = 100;
+        const auto nonEnterableLoopCompile = drs::engine::compileRuntimeInstrument(nonEnterableLoopPlan);
+        require(!nonEnterableLoopCompile.compiled,
+                "Runtime compilation must reject a loop that ends at playback start.");
+        requireAnyContains(nonEnterableLoopCompile.issues,
+                           "loop outside its compiled playback region",
+                           "Non-enterable loops must retain an actionable compiler diagnostic.");
+
         auto maxBoundaryPlan = tempCompilePlan;
         maxBoundaryPlan.zones.front().sampleEndFrame
             = maxBoundaryPlan.sampleSources.front().metadata.frameCount;

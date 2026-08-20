@@ -2069,13 +2069,13 @@ RuntimeInstrumentValidationResult validateRuntimeInstrumentModel(
                                                                     zone.loopEnabled);
             if (instrument.schemaVersion >= sfzRegionInstrumentSchemaVersion
                 && regionLoopModeLoops(effectiveLoopMode)
-                && (zone.loopStartFrame < zone.sampleStartFrame
-                    || zone.loopStartFrame >= zone.loopEndFrame
+                && (zone.loopStartFrame >= zone.loopEndFrame
+                    || zone.loopEndFrame <= zone.sampleStartFrame
                     || (zone.sampleEndFrame != 0 && zone.loopEndFrame > zone.sampleEndFrame)))
             {
                 addFinding("runtime-zone-loop-region-invalid",
                            "zones[" + std::to_string(index) + "].loopStartFrame",
-                           "Runtime loops must use an ordered half-open range inside the playback region.");
+                           "Runtime loops must use an ordered half-open range enterable from playback start and ending within the playback region.");
             }
             const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
                 ? zone.loopEndFrame - zone.loopStartFrame : 0;
@@ -2582,10 +2582,11 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                 addIssue(result, "Project zone '" + zone.id + "' has loopStartFrame greater than loopEndFrame.");
             if (zone.sampleEndFrame != 0 && zone.sampleStartFrame >= zone.sampleEndFrame)
                 addIssue(result, "Project zone '" + zone.id + "' must keep sampleStartFrame before sampleEndFrame.");
+            if (zone.loopEnabled && zone.loopEndFrame <= zone.sampleStartFrame)
+                addIssue(result, "Project zone '" + zone.id + "' must keep its enabled loop enterable from playback start.");
             if (zone.sampleEndFrame != 0 && zone.loopEnabled
-                && (zone.loopStartFrame < zone.sampleStartFrame
-                    || zone.loopEndFrame > zone.sampleEndFrame))
-                addIssue(result, "Project zone '" + zone.id + "' must keep its enabled loop inside the playback region.");
+                && zone.loopEndFrame > zone.sampleEndFrame)
+                addIssue(result, "Project zone '" + zone.id + "' must keep its enabled loop end inside the playback region.");
             const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
                 ? zone.loopEndFrame - zone.loopStartFrame : 0;
             if (zone.loopCrossfadeFrames > loopLength / 2
@@ -3821,11 +3822,11 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             const auto effectiveLoopMode = effectiveRegionLoopMode(zone.loopMode, zone.loopEnabled);
             if (instrument.schemaVersion >= sfzRegionInstrumentSchemaVersion
                 && regionLoopModeLoops(effectiveLoopMode)
-                && (zone.loopStartFrame < zone.sampleStartFrame
-                    || zone.loopStartFrame >= zone.loopEndFrame
+                && (zone.loopStartFrame >= zone.loopEndFrame
+                    || zone.loopEndFrame <= zone.sampleStartFrame
                     || (zone.sampleEndFrame != 0 && zone.loopEndFrame > zone.sampleEndFrame)))
             {
-                addIssue(result, context + " must keep its enabled loop inside the playback region.");
+                addIssue(result, context + " must keep its enabled loop enterable from playback start and ending within the playback region.");
             }
             const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
                 ? zone.loopEndFrame - zone.loopStartFrame : 0;

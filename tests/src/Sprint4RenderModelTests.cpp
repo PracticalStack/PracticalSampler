@@ -200,6 +200,21 @@ void runImmutableModelContract()
     require(weakPayload.expired(),
             "Activation ownership should release after the final non-audio model owner releases it.");
 
+    RenderModelFixture preStartLoopFixture;
+    preStartLoopFixture.snapshot.zones.front().sampleStartFrame = 3;
+    preStartLoopFixture.snapshot.zones.front().loopStartFrame = 1;
+    preStartLoopFixture.snapshot.zones.front().loopEndFrame = 7;
+    preStartLoopFixture.prepared.zones.front().sampleStartFrame = 3;
+    preStartLoopFixture.prepared.zones.front().loopStartFrame = 1;
+    preStartLoopFixture.prepared.zones.front().loopEndFrame = 7;
+    const auto preStartLoop = drs::engine::buildSamplerRenderModel(
+        preStartLoopFixture.makePayload());
+    require(preStartLoop.built && preStartLoop.findings.empty()
+                && preStartLoop.model != nullptr
+                && preStartLoop.model->getRoutes().front().sampleStartFrame == 3
+                && preStartLoop.model->getRoutes().front().loopStartFrame == 1,
+            "Render model must accept a loop head before playback start while preserving both boundaries.");
+
     RenderModelFixture performanceFixture;
     performanceFixture.lane = drs::engine::PlaybackActivationLane::performance;
     performanceFixture.lifecycle = drs::engine::PlaybackSnapshotLifecycleState::active;

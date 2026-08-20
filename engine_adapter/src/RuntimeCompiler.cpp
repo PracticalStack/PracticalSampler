@@ -521,8 +521,8 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         const auto effectiveLoopMode = effectiveRegionLoopMode(zonePlan.loopMode,
                                                                 zonePlan.loopEnabled);
         if (regionLoopModeLoops(effectiveLoopMode)
-            && (zonePlan.loopStartFrame < zonePlan.sampleStartFrame
-                || zonePlan.loopStartFrame >= zonePlan.loopEndFrame
+            && (zonePlan.loopStartFrame >= zonePlan.loopEndFrame
+                || zonePlan.loopEndFrame <= zonePlan.sampleStartFrame
                 || zonePlan.loopEndFrame > playbackEndFrame))
         {
             addIssue(result, "Zone '" + zonePlan.id

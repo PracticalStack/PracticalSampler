@@ -423,11 +423,11 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             addError(result, "render-model-start-frame-invalid", path + ".sampleStartFrame",
                      "Zone start frame must precede the resolved exclusive playback end.");
         if (zone.loopEnabled
-            && (zone.loopStartFrame < zone.sampleStartFrame
-                || zone.loopStartFrame >= zone.loopEndFrame
+            && (zone.loopStartFrame >= zone.loopEndFrame
+                || zone.loopEndFrame <= zone.sampleStartFrame
                 || zone.loopEndFrame > playbackEndFrame))
             addError(result, "render-model-loop-range-invalid", path + ".loopStartFrame",
-                     "Enabled loops require an ordered half-open range inside the playback region.");
+                     "Enabled loops require an ordered half-open range enterable from playback start and ending within the playback region.");
         const auto loopLength = zone.loopEndFrame > zone.loopStartFrame
             ? zone.loopEndFrame - zone.loopStartFrame : 0;
         if (zone.loopCrossfadeFrames > loopLength / 2

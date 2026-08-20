@@ -10,7 +10,7 @@ This is a one-way SFZ conversion workflow. Practical Sampler projects and playab
 
 1. Select a zone and open **Waveform** in the Authoring workspace.
 2. Use the waveform selection for temporary auditioning, or choose **Set Playback Region** to make it the zone's non-destructive playback range.
-3. Choose the loop mode and set the loop start/end. The loop is always contained inside the playback region.
+3. Choose the loop mode and set the loop start/end. Imported zones may have a loop start before playback start; playback begins at the authored playback start, reaches loop end, then wraps to the earlier loop start.
 4. Optionally set a native loop crossfade. This is a Practical Sampler enhancement, not a portable SFZ opcode.
 5. Use **Apply** or press Return from a numeric field. One completed action creates one undo step; transient selections and canceled gestures do not dirty the project.
 6. Preview the selected range, then Publish when the draft is ready. Saving, publishing, and package export preserve the source file unchanged.
@@ -55,7 +55,7 @@ All boundary editors expose accessibility titles, descriptions, focus order, ena
 - Projects predating playback ends continue to use the physical source end through the historical zero sentinel.
 - Playback-region projects migrate to project/authoring schema 8/7 without changing their host binding when all new fields retain legacy defaults.
 - Authoring a native loop crossfade promotes the project to schema 9/8. Compiled instruments use schema 7 for the complete SFZ region contract and schema 8 when a native crossfade is present.
-- Older readable package and project schemas remain supported. Invalid ranges, loops outside playback, and crossfades larger than half the loop are rejected rather than repaired silently at playback time.
+- Older readable package and project schemas remain supported. Invalid ranges, loops that end at or before playback start, loop ends beyond playback end, and crossfades larger than half the loop are rejected rather than repaired silently at playback time.
 - Host state, save/reopen, Preview, Publish, and playable-package open all use the same typed region fields.
 
 ## Large sources

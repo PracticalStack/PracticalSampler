@@ -220,7 +220,7 @@ bool validateResolvedRanges(SfzRegionResolutionResult& result)
                 region.loopEndExclusive.provenance.location));
             valid = false;
         }
-        else if (region.loopStart.frame < region.playbackStart.frame
+        else if (region.loopEndExclusive.frame <= region.playbackStart.frame
                  || (region.playbackEndExclusive.present
                      && region.loopEndExclusive.frame > region.playbackEndExclusive.frame))
         {
@@ -229,7 +229,7 @@ bool validateResolvedRanges(SfzRegionResolutionResult& result)
                 SfzImportSupportDisposition::blocking,
                 "sfz.region.loop_range.outside_playback",
                 "SFZ loop lies outside the playback region",
-                "The resolved loop must be fully contained by the resolved playback range.",
+                "The resolved loop must be enterable from the resolved playback start and end within the resolved playback range.",
                 region.loopEndExclusive.provenance.location));
             valid = false;
         }
