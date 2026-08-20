@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - Native Layer Contract Iteration Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+    a { color: var(--blue); }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.025em; }
+    h1 { max-width: 1100px; margin-bottom: 18px; font-size: clamp(2.35rem, 5vw, 4.65rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code { padding: 0.12em 0.35em; border-radius: 5px; color: #26343c; background: #e9edeb; font: 0.9em "Cascadia Code", Consolas, monospace; }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero { position: relative; overflow: hidden; padding: 48px; border-radius: 27px; color: #fffaf3; background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2)); box-shadow: var(--shadow); }
+    .hero::after { content: "LAYERS"; position: absolute; right: 14px; bottom: -32px; color: rgba(255,255,255,0.045); font: 700 8rem/1 Georgia, serif; pointer-events: none; }
+    .eyebrow, .section-label { display: inline-block; margin-bottom: 10px; color: #efc39f; font-size: 0.75rem; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 1040px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+    .summary-grid, .grid-2, .grid-3, .grid-4 { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .toc, .section, .sprint, .callout { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .sprint { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.violet { border-top: 4px solid var(--violet); }
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 920px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242,238,230,0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: var(--red-soft); }
+    .status.should { color: var(--amber); background: var(--amber-soft); }
+    .status.later { color: var(--violet); background: var(--violet-soft); }
+    .sprint { overflow: hidden; padding: 0; }
+    .sprint-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .sprint-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .sprint-head h2 { margin: 0; font-size: 1.65rem; }
+    .sprint-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .sprint-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .sprint-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+    .contract { margin: 16px 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: #26343c; color: #f3f6f2; font: 0.95rem/1.7 "Cascadia Code", Consolas, monospace; overflow-x: auto; }
+    .contract .changed { color: #f5d69c; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 145px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+    @media (max-width: 1160px) { .summary-grid, .grid-3 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .flow { grid-template-columns: repeat(3, 1fr); } .flow-step:nth-child(3)::after { display: none; } .toc ol { columns: 2; } }
+    @media (max-width: 700px) { .page { width: calc(100% - 22px); padding-top: 18px; } .hero, .section { padding: 25px 22px; } .summary-grid, .grid-3, .flow { grid-template-columns: 1fr; } .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; } .toc ol { columns: 1; } .sprint-head { grid-template-columns: auto 1fr; } .sprint-focus { grid-column: 2; text-align: left; } .sprint-body { padding: 20px; } .hero::after { display: none; } }
+    @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .toc, .section, .sprint { box-shadow: none; } .sprint, .card, .callout, table { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Next Iteration | August 20, 2026</span>
+      <h1>Establish the Native Layer Contract</h1>
+      <p class="lede">Add a first-class layer model to Practical Sampler. A layer is a collection of groups, just as a group is a collection of zones. The contract must preserve independent group and layer behavior, create default group/layer containers for ungrouped imported zones, and provide a native foundation for layer-level crossfading.</p>
+      <div class="meta">
+        <span class="chip">Scope: PracticalSampler only</span>
+        <span class="chip">Native authoring + runtime contract</span>
+        <span class="chip">Groups remain independent objects</span>
+        <span class="chip">Default group + default layer</span>
+        <span class="chip">Crossfade-capable layers</span>
+        <span class="chip">SFZ Soft/Hard import deferred</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>8 / 10</strong><span>Estimated complexity</span></div>
+        <div class="summary-card"><strong>8 / 10</strong><span>Estimated implementation risk</span></div>
+        <div class="summary-card"><strong>6</strong><span>Contract surfaces to propagate</span></div>
+        <div class="summary-card"><strong>1</strong><span>New hierarchy: group → layer</span></div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#goal">Goal and Scope</a></li>
+        <li><a href="#current">Current Architecture</a></li>
+        <li><a href="#contract">Layer Contract</a></li>
+        <li><a href="#crossfade">Crossfade Contract</a></li>
+        <li><a href="#tasks">Development Tasklist</a></li>
+        <li><a href="#validation">Validation Matrix</a></li>
+        <li><a href="#risks">Risks and Guardrails</a></li>
+        <li><a href="#release">Release Gate</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="goal">
+      <span class="section-label">01 | Product frame</span>
+      <div class="heading"><h2>Goal and scope</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Creator outcome</h3>
+          <p>Creators can see and work with a stable hierarchy of layers, groups, and zones. A newly imported zone never becomes an orphan: it receives a group and a layer container through the same native contract.</p>
+        </article>
+        <article class="card good">
+          <h3>Engineering outcome</h3>
+          <p>Layers are persisted, validated, projected, prepared, and rendered as independent objects. Layer values are combined at runtime; they are not copied into child groups or zones.</p>
+        </article>
+        <article class="card warn">
+          <h3>Explicit non-goal</h3>
+          <p>This iteration does not infer Soft/Hard layers from the Soft String Spurs SFZ, add macros, or implement <code>amplitude_oncc</code>. Those features consume this contract later.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Scope boundary</h3>
+        <p>All implementation, tests, fixtures, and this plan belong to <code>PracticalSampler/</code>. The sibling <code>_analysis/Rhapsody/</code> tree is excluded. Existing HTML documentation is not rewritten; this file is the new planning artifact.</p>
+      </div>
+    </section>
+
+    <section class="section" id="current">
+      <span class="section-label">02 | Ground truth</span>
+      <div class="heading"><h2>Current architecture to extend</h2></div>
+      <p>Practical Sampler already has a useful group pattern. A zone stores its parent <code>groupId</code>; an authored group stores identity, gain, pan, routing, visibility, and an audition anchor. Group membership is derived from the zone parent relationship, while group routing and group gain remain independent runtime data.</p>
+      <div class="flow">
+        <div class="flow-step"><strong>Authoring zone</strong><span>Stores <code>groupId</code> and zone-local playback properties.</span></div>
+        <div class="flow-step"><strong>Authoring group</strong><span>Stores group identity and group-local gain, pan, routing, and UI state.</span></div>
+        <div class="flow-step"><strong>Snapshot route</strong><span>Materializes group membership as a group route with <code>zoneIds</code>.</span></div>
+        <div class="flow-step"><strong>Render model</strong><span>Combines zone, group, and master values without mutating the zone.</span></div>
+        <div class="flow-step"><strong>Voice / DSP</strong><span>Uses the effective route and group-owned processing path.</span></div>
+      </div>
+      <div class="grid-2">
+        <article class="card accent">
+          <h3>Layer extension</h3>
+          <p>Repeat this pattern one level higher: add a <code>layerId</code> to each group, add an authored layer object, derive layer membership, and carry layer metadata through the immutable snapshot and prepared playback products.</p>
+        </article>
+        <article class="card violet">
+          <h3>Why membership belongs on the child</h3>
+          <p>Zones already use the child-side <code>groupId</code> relationship. A child-side <code>layerId</code> on groups keeps one authoritative parent relationship, supports efficient validation, and allows layer member lists to remain derived views.</p>
+        </article>
+      </div>
+      <p class="files">Reference seams: <a href="../engine_adapter/include/drs/engine/RuntimeModel.h">RuntimeModel.h</a>, <a href="../engine_adapter/src/AuthoringSession.cpp">AuthoringSession.cpp</a>, <a href="../engine_adapter/src/PlaybackSnapshot.cpp">PlaybackSnapshot.cpp</a>, and <a href="../engine_adapter/src/SamplerRenderModel.cpp">SamplerRenderModel.cpp</a>.</p>
+    </section>
+
+    <section class="section" id="contract">
+      <span class="section-label">03 | Locked contract</span>
+      <div class="heading"><h2>Layer data model and defaulting rules</h2></div>
+      <div class="contract"><span class="changed">Hierarchy:</span><br />layer owns groups by group.layerId<br />group owns zones by zone.groupId<br /><br /><span class="changed">Runtime combination:</span><br />effective gain = zone + group + layer + master<br />effective pan = zone + group + layer</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Object</th><th>Required fields</th><th>Relationship</th><th>Default behavior</th></tr></thead>
+          <tbody>
+            <tr><td class="id">RuntimeProjectLayerDefinition</td><td><code>id</code>, <code>displayName</code>, <code>displayOrder</code>, <code>workspaceVisible</code>, <code>gainDb</code>, <code>pan</code>, routing identity, audition anchor group, crossfade descriptor.</td><td>Independent authored object; member groups are derived from <code>group.layerId</code>.</td><td>Neutral gain/pan, visible, master routing, no crossfade.</td></tr>
+            <tr><td class="id">RuntimeProjectGroupDefinition</td><td>Existing group fields plus <code>layerId</code>.</td><td>Exactly one layer when explicit layer schema is active.</td><td>Unassigned groups are attached to the default layer during normalization.</td></tr>
+            <tr><td class="id">RuntimeProjectZoneDefinition</td><td>Existing zone fields plus existing <code>groupId</code>.</td><td>Exactly one group when explicit group schema is active.</td><td>An imported zone with no group receives the default group.</td></tr>
+            <tr><td class="id">Snapshot / prepared layer route</td><td>Stable identity, member group IDs, display metadata, gain, pan, routing, crossfade runtime data.</td><td>Immutable projection of authored layer membership.</td><td>Every explicit group route is covered by exactly one layer route.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid-3">
+        <article class="card good"><h3>Default group</h3><p>When a zone enters an import or append path without a group, create a deterministic default group, attach the zone, and use the first valid member as its audition anchor.</p></article>
+        <article class="card good"><h3>Default layer</h3><p>At the same normalization boundary, create a deterministic default layer and attach the newly created default group. If groups already exist but have no layer, attach those groups to the default layer.</p></article>
+        <article class="card warn"><h3>No hidden orphan state</h3><p>Do not leave an empty <code>layerId</code> or <code>groupId</code> in a schema that claims explicit hierarchy. Validation must reject unresolved parent identities after migration/defaulting.</p></article>
+      </div>
+      <div class="callout decision">
+        <h3>Stable identity rule</h3>
+        <p>Use <code>default-layer</code> and <code>default-group</code> as preferred seeds. If either ID already exists, use the repository’s existing deterministic unique-ID suffix behavior. IDs must remain stable through save/load and import append operations.</p>
+      </div>
+    </section>
+
+    <section class="section" id="crossfade">
+      <span class="section-label">04 | Crossfade behavior</span>
+      <div class="heading"><h2>Layer-level crossfade contract</h2></div>
+      <p>Crossfade is a property of a set of sibling layers, not a property that is copied into every group or zone. The layer route resolves a gain weight for the active driver, then the renderer applies that weight to all zones routed through the layer.</p>
+      <div class="grid-2">
+        <article class="card accent">
+          <h3>Typed driver</h3>
+          <ul>
+            <li><code>none</code>: all eligible layers play at unity, matching the default group behavior.</li>
+            <li><code>velocity</code>: use the existing velocity crossfade semantics as the first reusable implementation.</li>
+            <li><code>controller</code>: reserve a typed MIDI CC source for the Soft/Hard use case; the initial target is a normalized CC-driven layer crossfade.</li>
+          </ul>
+        </article>
+        <article class="card violet">
+          <h3>Topology rules</h3>
+          <ul>
+            <li>Each crossfade set has one driver and one curve in this iteration; linear is the first supported curve.</li>
+            <li>Layer fade-in/fade-out windows must be complete, ordered, and non-overlapping beyond the intended shared window.</li>
+            <li>Ambiguous, missing, or incompatible layer partners produce structured validation findings.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="contract"><span class="changed">Crossfade runtime:</span><br />layerWeight = resolveLayerCrossfade(driverValue, layer.crossfade)<br />zoneEffectiveGain = zoneGain + groupGain + layerGain + masterGain<br />renderedAmplitude = zoneAmplitude * linearGain(layerWeight)</div>
+      <div class="callout warning">
+        <h3>Scope guardrail</h3>
+        <p>This iteration establishes the crossfade-capable contract and proves one native runtime path. It does not yet map SFZ <code>amplitude_oncc24/25</code> to layer controls. That importer work follows after layers, groups, and exposed macros are independently usable.</p>
+      </div>
+    </section>
+
+    <section class="section" id="tasks">
+      <span class="section-label">05 | Development plan</span>
+      <div class="heading"><h2>Tasklist and implementation sequence</h2></div>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">0</span><h2>Baseline and contract fixtures</h2><span class="sprint-focus">Contract first</span></div>
+        <p class="sprint-intent">Freeze the current group behavior and create fixtures that make the new hierarchy observable before schema changes land.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LY-0.1</span> Inventory every project, instrument, snapshot, prepared-playback, package, and UI path that currently assumes zones are grouped but not layered.</li>
+            <li><span class="task-id">LY-0.2</span> Add a minimal native fixture with one layer, two groups, and multiple zones; preserve independent zone and group gain/pan values.</li>
+            <li><span class="task-id">LY-0.3</span> Add a defaulting fixture with an imported zone whose group identity is empty.</li>
+            <li><span class="task-id">LY-0.4</span> Add crossfade fixtures for no crossfade, two velocity-driven layers, two controller-driven layers, and invalid/missing partner cases.</li>
+            <li><span class="task-id">LY-0.5</span> Record current group rendering and group-routing behavior as characterization tests.</li>
+          </ul>
+          <div class="exit"><h3>Sprint 0 gate</h3><p>Fixtures prove the existing zone→group behavior and define the expected layer hierarchy, defaulting, and crossfade cases without changing production behavior.</p></div>
+          <p class="files">Primary homes: <code>tests/src/LayerContractTests.cpp</code>, <code>tests/src/LayerRuntimeTests.cpp</code>, and focused project/import fixtures.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">1</span><h2>Authoring schema and migration</h2><span class="sprint-focus">Persist the hierarchy</span></div>
+        <p class="sprint-intent">Add first-class layer authoring data while preserving old projects and keeping group membership authoritative at the child relationship.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LY-1.1</span> Add the authored layer definition, layer collection, selected-layer state, and layer schema/version markers.</li>
+            <li><span class="task-id">LY-1.2</span> Add <code>layerId</code> to the authored group definition and document the one-group-to-one-layer rule for this iteration.</li>
+            <li><span class="task-id">LY-1.3</span> Add typed layer crossfade metadata with source kind, optional controller number, fade windows, and curve.</li>
+            <li><span class="task-id">LY-1.4</span> Serialize and load layers, group layer membership, crossfade metadata, selected layer, and stable default identities.</li>
+            <li><span class="task-id">LY-1.5</span> Migrate existing explicit-group projects by creating one default layer and assigning every existing group to it.</li>
+            <li><span class="task-id">LY-1.6</span> Validate duplicate IDs, missing parents, invalid ranges, invalid controller numbers, duplicate display order, and crossfade topology.</li>
+          </ul>
+          <div class="exit"><h3>Phase 1 gate</h3><p>Existing projects load unchanged in behavior, new projects can persist a layer hierarchy, and invalid layer/group relationships fail with actionable diagnostics.</p></div>
+          <p class="files">Primary homes: <code>engine_adapter/include/drs/engine/RuntimeModel.h</code>, <code>RuntimeLoader.cpp</code>, project validation, migration, and host-state tests.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">2</span><h2>Import and default-content materialization</h2><span class="sprint-focus">No orphan zones</span></div>
+        <p class="sprint-intent">Make every zone-import path produce a valid group and layer hierarchy through one shared normalization rule.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LY-2.1</span> Centralize default group/layer creation and unique-ID selection so SFZ, WAV, append, and legacy normalization paths cannot drift.</li>
+            <li><span class="task-id">LY-2.2</span> When an imported zone has no group, create <code>default-group</code>, attach the zone, and create/attach <code>default-layer</code> in the same document transaction.</li>
+            <li><span class="task-id">LY-2.3</span> When imported or migrated groups exist without layer membership, create or reuse <code>default-layer</code> and assign those groups without changing their gain, pan, routing, or order.</li>
+            <li><span class="task-id">LY-2.4</span> Ensure append imports preserve existing layer/group identities and only create defaults for genuinely unassigned content.</li>
+            <li><span class="task-id">LY-2.5</span> Preserve source provenance and emit notes when default containers were synthesized.</li>
+          </ul>
+          <div class="exit"><h3>Phase 2 gate</h3><p>Every supported import and append path produces zones with valid group parents and groups with valid layer parents. Existing authored containers remain untouched.</p></div>
+          <p class="files">Primary homes: <code>SfzImportProjection.cpp</code>, <code>AuthoringSession.cpp</code>, WAV import workflow, normalization helpers, and import tests.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">3</span><h2>Snapshot, preparation, and runtime hierarchy</h2><span class="sprint-focus">Independent layer route</span></div>
+        <p class="sprint-intent">Carry layers through immutable playback products and apply layer values at runtime without flattening them into groups or zones.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LY-3.1</span> Add layer routes to the playback snapshot and prepared playback model with complete group coverage.</li>
+            <li><span class="task-id">LY-3.2</span> Extend route validation so each group belongs to exactly one layer and every layer member relationship is consistent.</li>
+            <li><span class="task-id">LY-3.3</span> Update effective gain and pan calculation to include layer values while retaining independent zone and group fields.</li>
+            <li><span class="task-id">LY-3.4</span> Add layer-owned routing/DSP scope in the graph contract, preserving the existing zone→group→master path when layers are neutral.</li>
+            <li><span class="task-id">LY-3.5</span> Compile and execute one layer crossfade path, including controller input, smoothing, bounded runtime state, and no audio-thread allocation.</li>
+            <li><span class="task-id">LY-3.6</span> Verify selected-zone and selected-group preparation scopes retain the containing layer and all required sibling groups for crossfade evaluation.</li>
+          </ul>
+          <div class="exit"><h3>Phase 3 gate</h3><p>Neutral layers are sonically transparent, non-neutral layer gain/pan/routing work independently, and crossfade weights affect all groups within a layer without changing authored child values.</p></div>
+          <p class="files">Primary homes: <code>PlaybackSnapshot.h/.cpp</code>, <code>PreparedPlayback.h/.cpp</code>, <code>SamplerRenderModel.cpp</code>, DSP graph planning, and render tests.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">4</span><h2>Authoring and map workflow</h2><span class="sprint-focus">Make hierarchy usable</span></div>
+        <p class="sprint-intent">Expose layers in the UI without forcing users to identify raw groups by opaque IDs or manually reconstruct layer membership.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LY-4.1</span> Add a layer list/tree above the group list with clear counts for member groups and zones.</li>
+            <li><span class="task-id">LY-4.2</span> Make layer selection, rename, reorder, visibility, audition anchor, gain, pan, and routing follow the existing group transaction pattern.</li>
+            <li><span class="task-id">LY-4.3</span> Add group-to-layer assignment and multi-group movement with explicit confirmation when crossfade topology would change.</li>
+            <li><span class="task-id">LY-4.4</span> Show the active layer and group in Map context, and make navigation from a zone to its group and layer deterministic.</li>
+            <li><span class="task-id">LY-4.5</span> Add accessible names, keyboard traversal, empty states, and diagnostics for unassigned or invalid hierarchy.</li>
+            <li><span class="task-id">LY-4.6</span> Add a focused crossfade editor for source, controller, fade windows, curve, and partner validation.</li>
+          </ul>
+          <div class="exit"><h3>Phase 4 gate</h3><p>A user can understand and edit layer/group/zone hierarchy without reading internal IDs. Group operations remain available and do not silently rewrite zone-local values.</p></div>
+          <p class="files">Primary homes: <code>app/src/shared/AuthoringPanel.cpp</code>, group/map view models, UI tests, accessibility tests, and manual demonstration fixtures.</p>
+        </div>
+      </section>
+
+      <section class="sprint">
+        <div class="sprint-head"><span class="sprint-number">5</span><h2>Tests, documentation, and release hygiene</h2><span class="sprint-focus">Close the contract</span></div>
+        <p class="sprint-intent">Prove persistence, runtime behavior, import defaulting, UI operations, and compatibility from a clean checkout.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">LY-5.1</span> Add round-trip tests for legacy project → migrated layer model → save → reload.</li>
+            <li><span class="task-id">LY-5.2</span> Add import tests for ungrouped zones, existing groups, mixed grouped/ungrouped imports, and append imports.</li>
+            <li><span class="task-id">LY-5.3</span> Add runtime tests for neutral layers, layer gain/pan, layer routing, velocity crossfade, controller crossfade, invalid crossfade, and crossfade scope retention.</li>
+            <li><span class="task-id">LY-5.4</span> Add UI tests for layer/group selection, assignment, reorder, visibility, multi-selection, and accessibility.</li>
+            <li><span class="task-id">LY-5.5</span> Update active Markdown guidance and schema/policy references; do not retrofit old HTML documentation.</li>
+            <li><span class="task-id">LY-5.6</span> Run clean-checkout build, focused tests, aggregate tests, package reopen, standalone/plugin project recall, and release-artifact verification.</li>
+          </ul>
+          <div class="exit"><h3>Iteration gate</h3><p>The layer contract is implemented end to end, existing group behavior remains compatible, default containers are deterministic, crossfade behavior is covered, and the clean validation matrix passes.</p></div>
+          <p class="files">Primary homes: focused layer tests, project/package tests, active Markdown policy, release evidence, and this plan.</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="section" id="validation">
+      <span class="section-label">06 | Evidence</span>
+      <div class="heading"><h2>Validation matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Scenario</th><th>Expected result</th><th>Evidence</th><th>Priority</th></tr></thead>
+          <tbody>
+            <tr><td>Existing project with explicit groups and no layers</td><td>Loads with one default layer containing every group; zone/group values remain unchanged.</td><td>Migration and project round-trip tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Imported zone with no group</td><td>One default group and one default layer are created in the same transaction; the zone is reachable through both.</td><td>SFZ, WAV, and append import tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Imported zone with an existing group but no layer</td><td>Existing group is preserved and attached to the default layer.</td><td>Mixed import/defaulting tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Neutral layer</td><td>Audio, routing, and group behavior match the pre-layer implementation.</td><td>Render-model and offline audio regression tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Layer gain/pan</td><td>Effective output changes at layer scope; authored group and zone values are not rewritten.</td><td>Snapshot, render, persistence, and package tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Two velocity-driven layers</td><td>All groups in each layer receive the resolved layer weight and the expected overlap is audible/measurable.</td><td>Crossfade topology and offline render tests.</td><td><span class="priority">P1</span></td></tr>
+            <tr><td>Two controller-driven layers</td><td>One normalized CC value controls the layer set without audio-thread allocation or stale state.</td><td>Controller event, render, and concurrency tests.</td><td><span class="priority">P1</span></td></tr>
+            <tr><td>Invalid hierarchy</td><td>Missing parent, duplicate ID, unresolved layer, and invalid crossfade topology are rejected with stable diagnostics.</td><td>Loader, validator, package, and publish tests.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td>Selected-group preparation</td><td>Containing layer and required crossfade siblings are retained; unrelated content remains scoped out.</td><td>Preparation-scope tests.</td><td><span class="priority">P1</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <span class="section-label">07 | Risk control</span>
+      <div class="heading"><h2>Risks and guardrails</h2></div>
+      <div class="grid-2">
+        <article class="card warn"><h3>Risk: schema drift</h3><p>Layers must be added to every serialized and prepared representation together. Use a single schema/version policy and round-trip fixtures across standalone and plug-in loading.</p></article>
+        <article class="card warn"><h3>Risk: accidental flattening</h3><p>Do not add layer gain or pan to every group/zone during normalization. Effective values are calculated at render-route construction, preserving independent authored objects.</p></article>
+        <article class="card accent"><h3>Risk: defaulting divergence</h3><p>SFZ, WAV, append, and migration paths must call the same default hierarchy normalizer. Otherwise the same zone can receive different identities depending on its entry path.</p></article>
+        <article class="card violet"><h3>Risk: crossfade scope explosion</h3><p>Start with one typed driver and linear law per crossfade set. Reject ambiguous topology explicitly; do not silently invent layer partners or crossfade all layers globally.</p></article>
+      </div>
+      <div class="callout warning">
+        <h3>Compatibility guardrail</h3>
+        <p>Projects without authored layers must render as they do today after migration. A single default layer with neutral values is an organizational wrapper, not a sound-shaping change.</p>
+      </div>
+    </section>
+
+    <section class="section" id="release">
+      <span class="section-label">08 | Completion</span>
+      <div class="heading"><h2>Release gate</h2></div>
+      <div class="exit">
+        <h3>Iteration is complete when</h3>
+        <ul>
+          <li>Layers are first-class authored, snapshot, prepared, package, and runtime objects.</li>
+          <li>Groups remain independent objects and are members of exactly one layer in the explicit hierarchy.</li>
+          <li>An imported zone without a group receives a default group and default layer deterministically.</li>
+          <li>Existing projects migrate to a neutral default layer without changing their sound or authored group/zone values.</li>
+          <li>Layer gain, pan, routing, and the first crossfade path work without flattening child data.</li>
+          <li>Map and authoring workflows make layer/group membership understandable and editable.</li>
+          <li>Invalid hierarchy and crossfade topology are rejected consistently across load, prepare, publish, and package paths.</li>
+          <li>Focused and clean-checkout Practical Sampler tests pass.</li>
+        </ul>
+      </div>
+      <div class="callout decision">
+        <h3>Definition of done</h3>
+        <p>The feature is not complete when a layer appears in the document JSON. It is complete when the layer survives persistence and package projection, contains groups through a validated relationship, remains neutral by default, and can apply a tested crossfade weight to all of its groups in the actual runtime path.</p>
+      </div>
+    </section>
+
+    <footer>
+      Practical Sampler internal engineering plan · Next iteration: native layer contract · Scope locked to <code>PracticalSampler/</code> · Generated August 20, 2026
+    </footer>
+  </main>
+</body>
+</html>
