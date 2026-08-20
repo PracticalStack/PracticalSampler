@@ -27,6 +27,17 @@ namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 using ordered_json = nlohmann::ordered_json;
 
+bool sameLayerCrossfade(const RuntimeProjectLayerCrossfadeDefinition& left,
+                        const RuntimeProjectLayerCrossfadeDefinition& right) noexcept
+{
+    return left.source == right.source
+        && left.controllerNumber == right.controllerNumber
+        && left.low == right.low
+        && left.high == right.high
+        && left.curve == right.curve
+        && left.direction == right.direction;
+}
+
 std::uint64_t clockMicros() noexcept
 {
     return static_cast<std::uint64_t>(
@@ -130,6 +141,35 @@ ordered_json serializeGroupRoute(const PreparedPlaybackGroupRoute& route, bool i
     routeObject["pan"] = route.pan;
     routeObject["routingBusId"] = route.routingBusId;
     routeObject["auditionAnchorZoneId"] = route.auditionAnchorZoneId;
+    routeObject["layerId"] = route.layerId;
+    return routeObject;
+}
+
+ordered_json serializeLayerRoute(const PreparedPlaybackLayerRoute& route, bool includeWorkspaceVisible)
+{
+    ordered_json routeObject;
+    routeObject["layerId"] = route.layerId;
+    routeObject["groupIds"] = route.groupIds;
+    routeObject["zoneIds"] = route.zoneIds;
+    routeObject["displayName"] = route.displayName;
+    routeObject["displayOrder"] = route.displayOrder;
+    routeObject["routingSourceId"] = route.routingSourceId;
+    if (includeWorkspaceVisible)
+        routeObject["workspaceVisible"] = route.workspaceVisible;
+    routeObject["gainDb"] = route.gainDb;
+    routeObject["pan"] = route.pan;
+    routeObject["routingBusId"] = route.routingBusId;
+    routeObject["auditionAnchorGroupId"] = route.auditionAnchorGroupId;
+    routeObject["crossfade"] = {
+        { "source", route.crossfade.source == LayerCrossfadeSource::controller
+            ? "controller" : route.crossfade.source == LayerCrossfadeSource::velocity ? "velocity" : "none" },
+        { "controllerNumber", route.crossfade.controllerNumber.has_value()
+            ? *route.crossfade.controllerNumber : -1 },
+        { "low", route.crossfade.low },
+        { "high", route.crossfade.high },
+        { "curve", "linear" },
+        { "direction", route.crossfade.direction == LayerCrossfadeDirection::fadeOut ? "fade_out" : "fade_in" }
+    };
     return routeObject;
 }
 
@@ -147,6 +187,25 @@ PreparedPlaybackGroupRoute toPreparedGroupRoute(const PlaybackSnapshotGroupRoute
     preparedRoute.pan = route.pan;
     preparedRoute.routingBusId = route.routingBusId;
     preparedRoute.auditionAnchorZoneId = route.auditionAnchorZoneId;
+    preparedRoute.layerId = route.layerId;
+    return preparedRoute;
+}
+
+PreparedPlaybackLayerRoute toPreparedLayerRoute(const PlaybackSnapshotLayerRoute& route)
+{
+    PreparedPlaybackLayerRoute preparedRoute;
+    preparedRoute.layerId = route.layerId;
+    preparedRoute.groupIds = route.groupIds;
+    preparedRoute.zoneIds = route.zoneIds;
+    preparedRoute.displayName = route.displayName;
+    preparedRoute.displayOrder = route.displayOrder;
+    preparedRoute.routingSourceId = route.routingSourceId;
+    preparedRoute.workspaceVisible = route.workspaceVisible;
+    preparedRoute.gainDb = route.gainDb;
+    preparedRoute.pan = route.pan;
+    preparedRoute.routingBusId = route.routingBusId;
+    preparedRoute.auditionAnchorGroupId = route.auditionAnchorGroupId;
+    preparedRoute.crossfade = route.crossfade;
     return preparedRoute;
 }
 
@@ -159,6 +218,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
     root["compilerVersion"] = prepared.compilerVersion;
     root["draftRevision"] = prepared.draftRevision;
     root["selectedGroupId"] = prepared.selectedGroupId;
+    root["selectedLayerId"] = prepared.selectedLayerId;
     root["masterGainDb"] = prepared.masterGainDb;
     root["containerId"] = prepared.containerId;
     root["containerPath"] = prepared.containerPath;
@@ -291,6 +351,10 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
     for (const auto& route : prepared.groupRoutes)
         groupRoutes.push_back(serializeGroupRoute(route, includeDigest));
     root["groupRoutes"] = std::move(groupRoutes);
+    ordered_json layerRoutes = ordered_json::array();
+    for (const auto& route : prepared.layerRoutes)
+        layerRoutes.push_back(serializeLayerRoute(route, includeDigest));
+    root["layerRoutes"] = std::move(layerRoutes);
 
     ordered_json zones = ordered_json::array();
     for (const auto& zone : prepared.zones)
@@ -1142,6 +1206,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.compilerVersion = compilerVersion;
     result.prepared.draftRevision = snapshotResult.snapshot.draftRevision;
     result.prepared.selectedGroupId = snapshotResult.snapshot.selectedGroupId;
+    result.prepared.selectedLayerId = snapshotResult.snapshot.selectedLayerId;
     result.prepared.masterGainDb = snapshotResult.snapshot.masterGainDb;
     result.prepared.controllerDefaults = snapshotResult.snapshot.controllerDefaults;
     result.prepared.containerId = streamResult.container.containerId;
@@ -1155,6 +1220,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.ownershipRecords.reserve(resolvedRequest.sampleResolutions.size());
     result.prepared.samples.reserve(resolvedRequest.sampleResolutions.size());
     result.prepared.streams.reserve(resolvedRequest.sampleResolutions.size());
+    result.prepared.layerRoutes.reserve(snapshotResult.snapshot.layerRoutes.size());
     result.prepared.groupRoutes.reserve(snapshotResult.snapshot.groupRoutes.size());
     result.prepared.zones.reserve(snapshotResult.snapshot.zones.size());
 
@@ -1687,6 +1753,9 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             }
         }
     }
+
+    for (const auto& snapshotLayerRoute : snapshotResult.snapshot.layerRoutes)
+        result.prepared.layerRoutes.push_back(toPreparedLayerRoute(snapshotLayerRoute));
 
     result.metrics.preparedSampleCount = result.prepared.samples.size();
     result.metrics.preparedStreamCount = result.prepared.streams.size();
@@ -2668,8 +2737,22 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
             { "gainDb", route.gainDb },
             { "pan", route.pan },
             { "routingBusId", route.routingBusId },
-            { "auditionAnchorZoneId", route.auditionAnchorZoneId }
+            { "auditionAnchorZoneId", route.auditionAnchorZoneId },
+            { "layerId", route.layerId }
         });
+    }
+
+    auto layerRoutes = snapshot.layerRoutes;
+    std::sort(layerRoutes.begin(), layerRoutes.end(), [](const auto& left, const auto& right)
+    {
+        return left.layerId < right.layerId;
+    });
+    root["layerRoutes"] = ordered_json::array();
+    for (auto& route : layerRoutes)
+    {
+        std::sort(route.groupIds.begin(), route.groupIds.end());
+        std::sort(route.zoneIds.begin(), route.zoneIds.end());
+        root["layerRoutes"].push_back(serializeLayerRoute(toPreparedLayerRoute(route), true));
     }
 
     auto preparedGroupRoutes = prepared.groupRoutes;
@@ -2692,8 +2775,22 @@ std::string computePreparedPlaybackRouteDigest(const ImmutablePlaybackSnapshot& 
             { "gainDb", route.gainDb },
             { "pan", route.pan },
             { "routingBusId", route.routingBusId },
-            { "auditionAnchorZoneId", route.auditionAnchorZoneId }
+            { "auditionAnchorZoneId", route.auditionAnchorZoneId },
+            { "layerId", route.layerId }
         });
+    }
+
+    auto preparedLayerRoutes = prepared.layerRoutes;
+    std::sort(preparedLayerRoutes.begin(), preparedLayerRoutes.end(), [](const auto& left, const auto& right)
+    {
+        return left.layerId < right.layerId;
+    });
+    root["preparedLayerRoutes"] = ordered_json::array();
+    for (auto& route : preparedLayerRoutes)
+    {
+        std::sort(route.groupIds.begin(), route.groupIds.end());
+        std::sort(route.zoneIds.begin(), route.zoneIds.end());
+        root["preparedLayerRoutes"].push_back(serializeLayerRoute(route, true));
     }
 
     auto buses = snapshot.routingBuses;
@@ -2907,7 +3004,24 @@ bool operator==(const PreparedPlaybackGroupRoute& left, const PreparedPlaybackGr
         && left.gainDb == right.gainDb
         && left.pan == right.pan
         && left.routingBusId == right.routingBusId
-        && left.auditionAnchorZoneId == right.auditionAnchorZoneId;
+        && left.auditionAnchorZoneId == right.auditionAnchorZoneId
+        && left.layerId == right.layerId;
+}
+
+bool operator==(const PreparedPlaybackLayerRoute& left, const PreparedPlaybackLayerRoute& right)
+{
+    return left.layerId == right.layerId
+        && left.groupIds == right.groupIds
+        && left.zoneIds == right.zoneIds
+        && left.displayName == right.displayName
+        && left.displayOrder == right.displayOrder
+        && left.routingSourceId == right.routingSourceId
+        && left.workspaceVisible == right.workspaceVisible
+        && left.gainDb == right.gainDb
+        && left.pan == right.pan
+        && left.routingBusId == right.routingBusId
+        && left.auditionAnchorGroupId == right.auditionAnchorGroupId
+        && sameLayerCrossfade(left.crossfade, right.crossfade);
 }
 
 bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPlayback& right)
@@ -2917,6 +3031,7 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.compilerVersion == right.compilerVersion
         && left.draftRevision == right.draftRevision
         && left.selectedGroupId == right.selectedGroupId
+        && left.selectedLayerId == right.selectedLayerId
         && left.masterGainDb == right.masterGainDb
         && left.containerId == right.containerId
         && left.containerPath == right.containerPath
@@ -2929,6 +3044,7 @@ bool operator==(const ImmutablePreparedPlayback& left, const ImmutablePreparedPl
         && left.ownershipRecords == right.ownershipRecords
         && left.samples == right.samples
         && left.streams == right.streams
+        && left.layerRoutes == right.layerRoutes
         && left.groupRoutes == right.groupRoutes
         && left.zones == right.zones
         && left.controllerDefaults == right.controllerDefaults

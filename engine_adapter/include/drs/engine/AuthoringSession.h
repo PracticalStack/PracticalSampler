@@ -96,6 +96,7 @@ public:
     std::optional<RuntimeProjectZoneDefinition> getSelectedZone() const;
     std::vector<RuntimeProjectArticulationDefinition> getArticulations() const;
     std::optional<RuntimeProjectGroupDefinition> getSelectedGroup() const;
+    std::optional<RuntimeProjectLayerDefinition> getSelectedLayer() const;
     std::optional<RuntimeProjectMacroDefinition> getSelectedMacro() const;
     std::optional<std::size_t> getSelectedMacroIndex() const;
     AuthoringGroupRoundRobinStatus getSelectedGroupRoundRobinStatus() const;
@@ -106,6 +107,7 @@ public:
 
     RuntimeProjectDocumentActionResult selectZone(const std::string& zoneId);
     RuntimeProjectDocumentActionResult selectGroup(const std::string& groupId);
+    RuntimeProjectDocumentActionResult selectLayer(const std::string& layerId);
     RuntimeProjectDocumentActionResult selectMacro(const std::string& macroId);
     RuntimeProjectDocumentActionResult selectPerformanceBank(const std::string& performanceBankId);
     RuntimeProjectDocumentActionResult selectDspSlot(const std::string& fxSlotId);
@@ -174,6 +176,17 @@ public:
     RuntimeProjectDocumentActionResult reassignZonesToGroup(const std::vector<std::string>& zoneIds,
                                                             const std::string& groupId,
                                                             const std::string& label);
+    RuntimeProjectDocumentActionResult createLayer(const RuntimeProjectLayerDefinition& layer,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult updateLayer(std::size_t layerIndex,
+                                                   const RuntimeProjectLayerDefinition& layer,
+                                                   const std::string& label);
+    RuntimeProjectDocumentActionResult moveLayer(std::size_t layerIndex,
+                                                 int direction,
+                                                 const std::string& label);
+    RuntimeProjectDocumentActionResult reassignGroupsToLayer(const std::vector<std::string>& groupIds,
+                                                             const std::string& layerId,
+                                                             const std::string& label);
     RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedZone(const std::string& label);
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);
@@ -288,6 +301,7 @@ private:
     AuthoringDspSelection dspSelection;
     std::string selectedZoneId;
     std::string selectedGroupId;
+    std::string selectedLayerId;
     std::string selectedMacroId;
     std::size_t workspaceSelectionRevision = 0;
 

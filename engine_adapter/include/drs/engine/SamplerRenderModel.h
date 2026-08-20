@@ -185,6 +185,8 @@ struct SamplerRenderRoute
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
     std::uint64_t sampleEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
+    std::string layerId;
+    RuntimeProjectLayerCrossfadeDefinition layerCrossfade;
 };
 
 struct SamplerRenderModelBuildResult;

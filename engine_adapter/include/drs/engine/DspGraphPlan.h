@@ -9,7 +9,7 @@
 
 namespace drs::engine
 {
-enum class DspGraphOwnerKind : std::uint8_t { zone, group, master };
+enum class DspGraphOwnerKind : std::uint8_t { zone, group, layer, master };
 
 struct DspGraphParameterSlot
 {

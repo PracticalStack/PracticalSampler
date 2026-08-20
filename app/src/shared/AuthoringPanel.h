@@ -117,6 +117,7 @@ private:
     };
 
     void rebuildZoneSelector();
+    void rebuildLayerList();
     void rebuildGroupList();
     void rebuildMacroList();
     void rebuildMacroAssignmentList();
@@ -157,6 +158,10 @@ private:
     void applySelectedGroupNameEdit();
     void applySelectedGroupMixEdit(const juce::String& label);
     void createGroup();
+    void createLayer();
+    void applySelectedLayerEdit(const juce::String& label);
+    void moveSelectedLayer(int direction);
+    void assignSelectedGroupsToSelectedLayer();
     void assignSelectedZonesToSelectedGroup();
     void deleteSelectedGroup();
     void moveSelectedGroup(int direction);
@@ -262,6 +267,7 @@ private:
     std::size_t observedDocumentRevision = 0;
     std::size_t observedWorkspaceSelectionRevision = 0;
     int selectedGroupIndex = 0;
+    int selectedLayerIndex = 0;
     int selectedMacroIndex = 0;
     int selectedMacroTargetIndex = 0;
     int selectedFxSlotIndex = 0;
@@ -340,6 +346,24 @@ private:
     authoring::ZoneMappingEditor zoneMappingEditor;
     authoring::WaveformDetailView waveformPreview;
     juce::Label groupSectionLabel;
+    juce::Label layerSectionLabel;
+    authoring::RepeatedStructureList layerList;
+    juce::TextButton layerCreateButton;
+    juce::TextButton layerAssignGroupsButton;
+    juce::TextButton layerMoveUpButton;
+    juce::TextButton layerMoveDownButton;
+    juce::Label layerNameLabel;
+    juce::TextEditor layerNameEditor;
+    juce::ToggleButton layerVisibilityToggle;
+    juce::Slider layerGainSlider;
+    juce::Slider layerPanSlider;
+    juce::ComboBox layerCrossfadeSourceSelector;
+    juce::Slider layerCrossfadeControllerSlider;
+    juce::Slider layerCrossfadeLowSlider;
+    juce::Slider layerCrossfadeHighSlider;
+    juce::ComboBox layerCrossfadeDirectionSelector;
+    juce::ComboBox layerRoutingSelector;
+    juce::ComboBox layerAnchorSelector;
     juce::Label groupNameLabel;
     juce::TextEditor groupNameEditor;
     juce::TextButton groupCreateButton;
@@ -478,6 +502,8 @@ private:
     std::vector<std::string> routingInputSourceIds;
     std::vector<std::string> groupRoutingBusIds;
     std::vector<std::string> groupAnchorZoneIds;
+    std::vector<std::string> layerRoutingBusIds;
+    std::vector<std::string> layerAnchorGroupIds;
 
 };
 } // namespace drs::app

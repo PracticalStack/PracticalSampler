@@ -1,0 +1,13 @@
+{
+  "fixtureId": "layer-contract-defaulting-v1",
+  "purpose": "Phase 0 default hierarchy materialization contract for an imported zone with no group.",
+  "input": {
+    "zoneId": "imported-zone-1",
+    "groupId": ""
+  },
+  "expected": {
+    "layerId": "default-layer",
+    "groupId": "default-group",
+    "zoneId": "imported-zone-1"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "fixtureId": "layer-contract-hierarchy-v1",
+  "purpose": "Phase 0 contract fixture for the native layer hierarchy.",
+  "layerDefinitions": [
+    {
+      "id": "default-layer",
+      "displayName": "Default Layer",
+      "gainDb": 0.0,
+      "pan": 0.0,
+      "crossfade": {
+        "source": "none",
+        "curve": "linear"
+      }
+    }
+  ],
+  "groupDefinitions": [
+    {
+      "id": "soft-group",
+      "displayName": "Soft Group",
+      "layerId": "default-layer",
+      "gainDb": -2.0,
+      "pan": -0.15
+    },
+    {
+      "id": "hard-group",
+      "displayName": "Hard Group",
+      "layerId": "default-layer",
+      "gainDb": 1.5,
+      "pan": 0.2
+    }
+  ],
+  "zoneDefinitions": [
+    { "id": "soft-zone-a3", "groupId": "soft-group", "gainDb": -1.0, "pan": 0.05 },
+    { "id": "soft-zone-c4", "groupId": "soft-group", "gainDb": 0.5, "pan": -0.05 },
+    { "id": "hard-zone-a3", "groupId": "hard-group", "gainDb": -3.0, "pan": 0.1 }
+  ],
+  "expectedMembership": {
+    "default-layer": ["soft-group", "hard-group"],
+    "soft-group": ["soft-zone-a3", "soft-zone-c4"],
+    "hard-group": ["hard-zone-a3"]
+  }
+}

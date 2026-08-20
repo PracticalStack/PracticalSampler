@@ -2447,6 +2447,93 @@ add_test(
     COMMAND drs_phase1_zone_groups_schema_persistence_tests
 )
 
+# Layer contract Phase 0 baseline and characterization fixtures.
+add_executable(drs_layer_contract_phase0_tests
+    src/LayerContractTests.cpp
+)
+
+target_link_libraries(drs_layer_contract_phase0_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_layer_contract_phase0_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_layer_contract_phase0_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.layer_contract.phase0
+    COMMAND drs_layer_contract_phase0_tests
+)
+
+add_executable(drs_layer_schema_persistence_tests
+    src/LayerSchemaPersistenceTests.cpp
+)
+
+target_link_libraries(drs_layer_schema_persistence_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_layer_schema_persistence_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.layer_contract.schema_persistence
+    COMMAND drs_layer_schema_persistence_tests
+)
+
+add_executable(drs_layer_import_materialization_tests
+    src/LayerImportMaterializationTests.cpp
+)
+
+target_link_libraries(drs_layer_import_materialization_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_layer_import_materialization_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.layer_contract.import_materialization
+    COMMAND drs_layer_import_materialization_tests
+)
+
+add_executable(drs_layer_runtime_tests
+    src/LayerRuntimeTests.cpp
+)
+
+target_link_libraries(drs_layer_runtime_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sampler_core
+)
+
+target_compile_features(drs_layer_runtime_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.layer_contract.runtime
+    COMMAND drs_layer_runtime_tests
+)
+
+add_executable(drs_layer_authoring_tests
+    src/LayerAuthoringTests.cpp
+)
+
+target_link_libraries(drs_layer_authoring_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_layer_authoring_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.layer_contract.authoring
+    COMMAND drs_layer_authoring_tests
+)
+
 add_executable(drs_phase3_round_robin_fixture_characterization_tests
     src/Phase3RoundRobinFixtureCharacterizationTests.cpp
 )
@@ -4780,6 +4867,11 @@ add_dependencies(drs_all_tests
     drs_phase3_crossfade_prepared_playback_tests
     drs_phase1_zone_groups_contract_tests
     drs_phase1_zone_groups_schema_persistence_tests
+    drs_layer_contract_phase0_tests
+    drs_layer_schema_persistence_tests
+    drs_layer_import_materialization_tests
+    drs_layer_runtime_tests
+    drs_layer_authoring_tests
     drs_phase3_round_robin_contract_tests
     drs_phase3_round_robin_fixture_characterization_tests
     drs_phase3_round_robin_schema_persistence_tests

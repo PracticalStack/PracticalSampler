@@ -186,6 +186,31 @@ std::optional<drs::engine::RuntimeProjectModel> upgradeLoadedProjectToLatestSche
         upgradedProject = playbackRegionMigration.project;
     }
 
+    if (upgradedProject.schemaVersion == drs::engine::playbackRegionProjectSchemaVersion
+        && upgradedProject.authoring.schemaVersion == drs::engine::playbackRegionAuthoringSchemaVersion)
+    {
+        const auto loopCrossfadeMigration =
+            drs::engine::migrateRuntimeProjectToLoopCrossfadeSchema(upgradedProject);
+        if (!loopCrossfadeMigration.valid)
+        {
+            issues = loopCrossfadeMigration.issues;
+            return std::nullopt;
+        }
+        upgradedProject = loopCrossfadeMigration.project;
+    }
+
+    if (upgradedProject.schemaVersion == drs::engine::loopCrossfadeProjectSchemaVersion
+        && upgradedProject.authoring.schemaVersion == drs::engine::loopCrossfadeAuthoringSchemaVersion)
+    {
+        const auto layerMigration = drs::engine::migrateRuntimeProjectToLayerSchema(upgradedProject);
+        if (!layerMigration.valid)
+        {
+            issues = layerMigration.issues;
+            return std::nullopt;
+        }
+        upgradedProject = layerMigration.project;
+    }
+
     return upgradedProject;
 }
 
@@ -2117,10 +2142,10 @@ drs::engine::RuntimeProjectModel MainComponent::buildUnloadedProjectState() cons
 {
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = drs::engine::playbackRegionProjectSchemaVersion;
+    project.schemaVersion = drs::engine::layerContractProjectSchemaVersion;
     project.displayName = "No Project Loaded";
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = drs::engine::playbackRegionAuthoringSchemaVersion;
+    project.authoring.schemaVersion = drs::engine::layerContractAuthoringSchemaVersion;
     project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
     project.authoring.notes = { "Open a project or create a new one to begin authoring." };
     project.notes = { "This session starts without loading the checked-in reference project." };
@@ -2134,13 +2159,13 @@ drs::engine::RuntimeProjectModel MainComponent::buildEmptyProjectTemplate() cons
 
     drs::engine::RuntimeProjectModel project;
     project.schemaName = "drs.project";
-    project.schemaVersion = drs::engine::playbackRegionProjectSchemaVersion;
+    project.schemaVersion = drs::engine::layerContractProjectSchemaVersion;
     project.projectId = makeProjectId();
     project.displayName = "Untitled Project";
     project.contentRootPath = defaultProjectDirectory.getFullPathName().toStdString();
     project.defaultInstrumentManifestPath = defaultInstrumentFile.getFullPathName().toStdString();
     project.authoring.schemaName = "drs.authoring";
-    project.authoring.schemaVersion = drs::engine::playbackRegionAuthoringSchemaVersion;
+    project.authoring.schemaVersion = drs::engine::layerContractAuthoringSchemaVersion;
     project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
     project.authoring.notes = { "Created in the standalone authoring shell." };
     project.notes = {

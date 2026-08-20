@@ -256,7 +256,7 @@ int main()
                     && fixtureSnapshot.snapshot.fxSlots[1].unavailable
                     && fixtureSnapshot.snapshot.fxSlots[0].catalogResolved
                     && fixtureSnapshot.snapshot.fxSlots[0].cost.costUnits == 1
-                    && fixtureSnapshot.snapshot.fxSlots[0].supportedScopes.size() == 3
+                    && fixtureSnapshot.snapshot.fxSlots[0].supportedScopes.size() == 4
                     && fixtureSnapshot.snapshot.routingBuses[2].chainBypassed == false))
         {
             std::string details = "An immutable snapshot must contain complete authored DSP version, parameter, bypass, and availability state.";
@@ -269,7 +269,7 @@ int main()
                     && fixturePlan.plan.nodes[0].ownerId == "example"
                     && fixturePlan.plan.nodes[0].outputDestinationId == "groups/example"
                     && !fixturePlan.plan.directFastPath,
-                "The immutable graph plan must compile only executable zone/group/master nodes from the snapshot.");
+                "The immutable graph plan must compile only executable zone/group/layer/master nodes from the snapshot.");
         auto bypassedPlanSnapshot = fixtureSnapshot.snapshot;
         bypassedPlanSnapshot.fxSlots[0].bypassed = true;
         const auto bypassedPlan = drs::engine::compileDspGraphPlan(bypassedPlanSnapshot);

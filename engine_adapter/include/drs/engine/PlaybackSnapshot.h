@@ -122,6 +122,22 @@ struct PlaybackSnapshotArticulationDefinition
     std::optional<RuntimeProjectArticulationActivationDefinition> activation;
 };
 
+struct PlaybackSnapshotLayerRoute
+{
+    std::string layerId;
+    std::vector<std::string> groupIds;
+    std::vector<std::string> zoneIds;
+    std::string displayName;
+    int displayOrder = 0;
+    std::string routingSourceId;
+    bool workspaceVisible = true;
+    double gainDb = 0.0;
+    double pan = 0.0;
+    std::string routingBusId;
+    std::string auditionAnchorGroupId;
+    RuntimeProjectLayerCrossfadeDefinition crossfade;
+};
+
 struct PlaybackSnapshotGroupRoute
 {
     std::string groupId;
@@ -135,6 +151,7 @@ struct PlaybackSnapshotGroupRoute
     double pan = 0.0;
     std::string routingBusId;
     std::string auditionAnchorZoneId;
+    std::string layerId;
 };
 
 struct PlaybackSnapshotZone
@@ -193,6 +210,7 @@ struct ImmutablePlaybackSnapshot
     std::size_t draftRevision = 0;
     std::string selectedZoneId;
     std::string selectedGroupId;
+    std::string selectedLayerId;
     std::string selectedPerformanceBankId;
     double masterGainDb = 0.0;
     std::string contentDigest;
@@ -203,6 +221,7 @@ struct ImmutablePlaybackSnapshot
     std::vector<PlaybackSnapshotRoutingBusReference> routingBuses;
     std::vector<PlaybackSnapshotArticulationRoute> articulationRoutes;
     std::vector<PlaybackSnapshotArticulationDefinition> articulationDefinitions;
+    std::vector<PlaybackSnapshotLayerRoute> layerRoutes;
     std::vector<PlaybackSnapshotGroupRoute> groupRoutes;
     std::vector<PlaybackSnapshotZone> zones;
     std::vector<RuntimeControllerDefault> controllerDefaults;

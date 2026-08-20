@@ -1,0 +1,39 @@
+{
+  "fixtureId": "layer-contract-crossfade-v1",
+  "purpose": "Phase 0 crossfade topology cases for the future layer runtime.",
+  "cases": [
+    {
+      "id": "no-crossfade",
+      "source": "none",
+      "layers": ["default-layer"],
+      "expected": "all eligible layer groups play at unity"
+    },
+    {
+      "id": "velocity-crossfade",
+      "source": "velocity",
+      "curve": "linear",
+      "direction": "fade_out",
+      "layers": ["soft-layer", "hard-layer"],
+      "overlap": { "low": 61, "high": 84 },
+      "expected": "adjacent layers crossfade through the declared velocity overlap"
+    },
+    {
+      "id": "controller-crossfade",
+      "source": "controller",
+      "controllerNumber": 1,
+      "curve": "linear",
+      "direction": "fade_in",
+      "layers": ["soft-layer", "hard-layer"],
+      "overlap": { "low": 32, "high": 95 },
+      "expected": "one normalized controller drives the layer weights"
+    },
+    {
+      "id": "invalid-missing-partner",
+      "source": "velocity",
+      "curve": "linear",
+      "layers": ["soft-layer"],
+      "overlap": { "low": 61, "high": 84 },
+      "expected": "structured missing-partner validation finding"
+    }
+  ]
+}

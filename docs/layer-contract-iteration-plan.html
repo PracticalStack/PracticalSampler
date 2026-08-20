@@ -107,6 +107,8 @@
     .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
     .task-list li:last-child { border-bottom: 0; }
     .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-list li.complete::before { content: "[x]"; }
+    .task-list li.complete { color: var(--muted); }
     .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
     .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
     .exit h3 { color: var(--green); }
@@ -267,51 +269,51 @@
       <div class="heading"><h2>Tasklist and implementation sequence</h2></div>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">0</span><h2>Baseline and contract fixtures</h2><span class="sprint-focus">Contract first</span></div>
+        <div class="sprint-head"><span class="sprint-number">0</span><h2>Baseline and contract fixtures</h2><span class="sprint-focus">Complete · August 20, 2026</span></div>
         <p class="sprint-intent">Freeze the current group behavior and create fixtures that make the new hierarchy observable before schema changes land.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LY-0.1</span> Inventory every project, instrument, snapshot, prepared-playback, package, and UI path that currently assumes zones are grouped but not layered.</li>
-            <li><span class="task-id">LY-0.2</span> Add a minimal native fixture with one layer, two groups, and multiple zones; preserve independent zone and group gain/pan values.</li>
-            <li><span class="task-id">LY-0.3</span> Add a defaulting fixture with an imported zone whose group identity is empty.</li>
-            <li><span class="task-id">LY-0.4</span> Add crossfade fixtures for no crossfade, two velocity-driven layers, two controller-driven layers, and invalid/missing partner cases.</li>
-            <li><span class="task-id">LY-0.5</span> Record current group rendering and group-routing behavior as characterization tests.</li>
+            <li class="complete"><span class="task-id">LY-0.1</span> Inventory every project, instrument, snapshot, prepared-playback, package, and UI path that currently assumes zones are grouped but not layered.</li>
+            <li class="complete"><span class="task-id">LY-0.2</span> Add a minimal native fixture with one layer, two groups, and multiple zones; preserve independent zone and group gain/pan values.</li>
+            <li class="complete"><span class="task-id">LY-0.3</span> Add a defaulting fixture with an imported zone whose group identity is empty.</li>
+            <li class="complete"><span class="task-id">LY-0.4</span> Add crossfade fixtures for no crossfade, two velocity-driven layers, two controller-driven layers, and invalid/missing partner cases.</li>
+            <li class="complete"><span class="task-id">LY-0.5</span> Record current group rendering and group-routing behavior as characterization tests.</li>
           </ul>
-          <div class="exit"><h3>Sprint 0 gate</h3><p>Fixtures prove the existing zone→group behavior and define the expected layer hierarchy, defaulting, and crossfade cases without changing production behavior.</p></div>
-          <p class="files">Primary homes: <code>tests/src/LayerContractTests.cpp</code>, <code>tests/src/LayerRuntimeTests.cpp</code>, and focused project/import fixtures.</p>
+          <div class="exit"><h3>Sprint 0 gate passed</h3><p>Fixtures prove the existing zone→group behavior and define the expected layer hierarchy, defaulting, and crossfade cases without changing production behavior.</p></div>
+          <p class="files">Primary homes: <code>tests/src/LayerContractTests.cpp</code>, <code>tests/fixtures/layer-contract/</code>, and <code>docs/layer-contract-phase0-baseline.md</code>. Verification: <code>drs.layer_contract.phase0</code> passes.</p>
         </div>
       </section>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">1</span><h2>Authoring schema and migration</h2><span class="sprint-focus">Persist the hierarchy</span></div>
+        <div class="sprint-head"><span class="sprint-number">1</span><h2>Authoring schema and migration</h2><span class="sprint-focus">Complete · August 20, 2026</span></div>
         <p class="sprint-intent">Add first-class layer authoring data while preserving old projects and keeping group membership authoritative at the child relationship.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LY-1.1</span> Add the authored layer definition, layer collection, selected-layer state, and layer schema/version markers.</li>
-            <li><span class="task-id">LY-1.2</span> Add <code>layerId</code> to the authored group definition and document the one-group-to-one-layer rule for this iteration.</li>
-            <li><span class="task-id">LY-1.3</span> Add typed layer crossfade metadata with source kind, optional controller number, fade windows, and curve.</li>
-            <li><span class="task-id">LY-1.4</span> Serialize and load layers, group layer membership, crossfade metadata, selected layer, and stable default identities.</li>
-            <li><span class="task-id">LY-1.5</span> Migrate existing explicit-group projects by creating one default layer and assigning every existing group to it.</li>
-            <li><span class="task-id">LY-1.6</span> Validate duplicate IDs, missing parents, invalid ranges, invalid controller numbers, duplicate display order, and crossfade topology.</li>
+            <li class="complete"><span class="task-id">LY-1.1</span> Add the authored layer definition, layer collection, selected-layer state, and layer schema/version markers.</li>
+            <li class="complete"><span class="task-id">LY-1.2</span> Add <code>layerId</code> to the authored group definition and document the one-group-to-one-layer rule for this iteration.</li>
+            <li class="complete"><span class="task-id">LY-1.3</span> Add typed layer crossfade metadata with source kind, optional controller number, fade windows, and curve.</li>
+            <li class="complete"><span class="task-id">LY-1.4</span> Serialize and load layers, group layer membership, crossfade metadata, selected layer, and stable default identities.</li>
+            <li class="complete"><span class="task-id">LY-1.5</span> Migrate existing explicit-group projects by creating one default layer and assigning every existing group to it.</li>
+            <li class="complete"><span class="task-id">LY-1.6</span> Validate duplicate IDs, missing parents, invalid ranges, invalid controller numbers, duplicate display order, and crossfade topology.</li>
           </ul>
-          <div class="exit"><h3>Phase 1 gate</h3><p>Existing projects load unchanged in behavior, new projects can persist a layer hierarchy, and invalid layer/group relationships fail with actionable diagnostics.</p></div>
-          <p class="files">Primary homes: <code>engine_adapter/include/drs/engine/RuntimeModel.h</code>, <code>RuntimeLoader.cpp</code>, project validation, migration, and host-state tests.</p>
+          <div class="exit"><h3>Phase 1 gate passed</h3><p>Existing projects load unchanged in behavior, new projects can persist a layer hierarchy, and invalid layer/group relationships fail with actionable diagnostics.</p></div>
+          <p class="files">Primary homes: <code>engine_adapter/include/drs/engine/LayerContract.h</code>, <code>RuntimeModel.h</code>, <code>RuntimeLoader.cpp</code>, app schema-upgrade paths, and <code>tests/src/LayerSchemaPersistenceTests.cpp</code>. Verification: <code>drs.layer_contract.phase0</code>, <code>drs.layer_contract.schema_persistence</code>, and the plugin target pass.</p>
         </div>
       </section>
 
       <section class="sprint">
-        <div class="sprint-head"><span class="sprint-number">2</span><h2>Import and default-content materialization</h2><span class="sprint-focus">No orphan zones</span></div>
+        <div class="sprint-head"><span class="sprint-number">2</span><h2>Import and default-content materialization</h2><span class="sprint-focus">Complete · August 20, 2026</span></div>
         <p class="sprint-intent">Make every zone-import path produce a valid group and layer hierarchy through one shared normalization rule.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LY-2.1</span> Centralize default group/layer creation and unique-ID selection so SFZ, WAV, append, and legacy normalization paths cannot drift.</li>
-            <li><span class="task-id">LY-2.2</span> When an imported zone has no group, create <code>default-group</code>, attach the zone, and create/attach <code>default-layer</code> in the same document transaction.</li>
-            <li><span class="task-id">LY-2.3</span> When imported or migrated groups exist without layer membership, create or reuse <code>default-layer</code> and assign those groups without changing their gain, pan, routing, or order.</li>
-            <li><span class="task-id">LY-2.4</span> Ensure append imports preserve existing layer/group identities and only create defaults for genuinely unassigned content.</li>
-            <li><span class="task-id">LY-2.5</span> Preserve source provenance and emit notes when default containers were synthesized.</li>
+            <li class="complete"><span class="task-id">LY-2.1</span> Centralize default group/layer creation and unique-ID selection so SFZ, WAV, append, and legacy normalization paths cannot drift.</li>
+            <li class="complete"><span class="task-id">LY-2.2</span> When an imported zone has no group, create <code>default-group</code>, attach the zone, and create/attach <code>default-layer</code> in the same document transaction.</li>
+            <li class="complete"><span class="task-id">LY-2.3</span> When imported or migrated groups exist without layer membership, create or reuse <code>default-layer</code> and assign those groups without changing their gain, pan, routing, or order.</li>
+            <li class="complete"><span class="task-id">LY-2.4</span> Ensure append imports preserve existing layer/group identities and only create defaults for genuinely unassigned content.</li>
+            <li class="complete"><span class="task-id">LY-2.5</span> Preserve source provenance and emit notes when default containers were synthesized.</li>
           </ul>
-          <div class="exit"><h3>Phase 2 gate</h3><p>Every supported import and append path produces zones with valid group parents and groups with valid layer parents. Existing authored containers remain untouched.</p></div>
-          <p class="files">Primary homes: <code>SfzImportProjection.cpp</code>, <code>AuthoringSession.cpp</code>, WAV import workflow, normalization helpers, and import tests.</p>
+          <div class="exit"><h3>Phase 2 gate passed</h3><p>Every supported import and append path produces zones with valid group parents and groups with valid layer parents. Existing authored containers remain untouched.</p></div>
+          <p class="files">Primary homes: <code>engine_adapter/src/LayerMaterializer.cpp</code>, <code>SfzImportProjection.cpp</code>, <code>AuthoringSession.cpp</code>, and <code>tests/src/LayerImportMaterializationTests.cpp</code>. Verification: <code>drs.layer_contract.import_materialization</code> passes.</p>
         </div>
       </section>
 
@@ -320,15 +322,15 @@
         <p class="sprint-intent">Carry layers through immutable playback products and apply layer values at runtime without flattening them into groups or zones.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LY-3.1</span> Add layer routes to the playback snapshot and prepared playback model with complete group coverage.</li>
-            <li><span class="task-id">LY-3.2</span> Extend route validation so each group belongs to exactly one layer and every layer member relationship is consistent.</li>
-            <li><span class="task-id">LY-3.3</span> Update effective gain and pan calculation to include layer values while retaining independent zone and group fields.</li>
-            <li><span class="task-id">LY-3.4</span> Add layer-owned routing/DSP scope in the graph contract, preserving the existing zone→group→master path when layers are neutral.</li>
-            <li><span class="task-id">LY-3.5</span> Compile and execute one layer crossfade path, including controller input, smoothing, bounded runtime state, and no audio-thread allocation.</li>
-            <li><span class="task-id">LY-3.6</span> Verify selected-zone and selected-group preparation scopes retain the containing layer and all required sibling groups for crossfade evaluation.</li>
+            <li class="complete"><span class="task-id">LY-3.1</span> Add layer routes to the playback snapshot and prepared playback model with complete group coverage.</li>
+            <li class="complete"><span class="task-id">LY-3.2</span> Extend route validation so each group belongs to exactly one layer and every layer member relationship is consistent.</li>
+            <li class="complete"><span class="task-id">LY-3.3</span> Update effective gain and pan calculation to include layer values while retaining independent zone and group fields.</li>
+            <li class="complete"><span class="task-id">LY-3.4</span> Add layer-owned routing/DSP scope in the graph contract, preserving the existing zone→group→master path when layers are neutral.</li>
+            <li class="complete"><span class="task-id">LY-3.5</span> Compile and execute one layer crossfade path, including controller input, bounded note-on runtime state, and no audio-thread allocation. Controller changes apply to subsequent note-ons in this iteration.</li>
+            <li class="complete"><span class="task-id">LY-3.6</span> Verify selected-zone and selected-group preparation scopes retain the containing layer and all required sibling groups for crossfade evaluation.</li>
           </ul>
-          <div class="exit"><h3>Phase 3 gate</h3><p>Neutral layers are sonically transparent, non-neutral layer gain/pan/routing work independently, and crossfade weights affect all groups within a layer without changing authored child values.</p></div>
-          <p class="files">Primary homes: <code>PlaybackSnapshot.h/.cpp</code>, <code>PreparedPlayback.h/.cpp</code>, <code>SamplerRenderModel.cpp</code>, DSP graph planning, and render tests.</p>
+          <div class="exit"><h3>Phase 3 gate passed · August 20, 2026</h3><p>Neutral layers are sonically transparent, non-neutral layer gain/pan/routing work independently, and crossfade weights affect all groups within a layer without changing authored child values.</p></div>
+          <p class="files">Primary homes: <code>PlaybackSnapshot.h/.cpp</code>, <code>PreparedPlayback.h/.cpp</code>, <code>SamplerRenderModel.cpp</code>, DSP graph planning, and <code>tests/src/LayerRuntimeTests.cpp</code>. Verification: <code>drs.layer_contract.runtime</code> and the Phase 0–2 layer tests pass.</p>
         </div>
       </section>
 
@@ -337,15 +339,15 @@
         <p class="sprint-intent">Expose layers in the UI without forcing users to identify raw groups by opaque IDs or manually reconstruct layer membership.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LY-4.1</span> Add a layer list/tree above the group list with clear counts for member groups and zones.</li>
-            <li><span class="task-id">LY-4.2</span> Make layer selection, rename, reorder, visibility, audition anchor, gain, pan, and routing follow the existing group transaction pattern.</li>
-            <li><span class="task-id">LY-4.3</span> Add group-to-layer assignment and multi-group movement with explicit confirmation when crossfade topology would change.</li>
-            <li><span class="task-id">LY-4.4</span> Show the active layer and group in Map context, and make navigation from a zone to its group and layer deterministic.</li>
-            <li><span class="task-id">LY-4.5</span> Add accessible names, keyboard traversal, empty states, and diagnostics for unassigned or invalid hierarchy.</li>
-            <li><span class="task-id">LY-4.6</span> Add a focused crossfade editor for source, controller, fade windows, curve, and partner validation.</li>
+            <li class="complete"><span class="task-id">LY-4.1</span> Add a layer list/tree above the group list with clear counts for member groups and zones.</li>
+            <li class="complete"><span class="task-id">LY-4.2</span> Make layer selection, rename, reorder, visibility, audition anchor, gain, pan, and routing follow the existing group transaction pattern.</li>
+            <li class="complete"><span class="task-id">LY-4.3</span> Add group-to-layer assignment and multi-group movement with explicit confirmation when crossfade topology would change.</li>
+            <li class="complete"><span class="task-id">LY-4.4</span> Show the active layer and group in Map context, and make navigation from a zone to its group and layer deterministic.</li>
+            <li class="complete"><span class="task-id">LY-4.5</span> Add accessible names, keyboard traversal, empty states, and diagnostics for unassigned or invalid hierarchy.</li>
+            <li class="complete"><span class="task-id">LY-4.6</span> Add a focused crossfade editor for source, controller, fade windows, curve, and partner validation.</li>
           </ul>
-          <div class="exit"><h3>Phase 4 gate</h3><p>A user can understand and edit layer/group/zone hierarchy without reading internal IDs. Group operations remain available and do not silently rewrite zone-local values.</p></div>
-          <p class="files">Primary homes: <code>app/src/shared/AuthoringPanel.cpp</code>, group/map view models, UI tests, accessibility tests, and manual demonstration fixtures.</p>
+          <div class="exit"><h3>Phase 4 gate passed · August 20, 2026</h3><p>A user can understand and edit layer/group/zone hierarchy without reading internal IDs. Group operations remain available and do not silently rewrite zone-local values.</p></div>
+          <p class="files">Primary homes: <code>app/src/shared/AuthoringPanel.cpp</code>, <code>engine_adapter/src/AuthoringSession.cpp</code>, <code>tests/src/LayerAuthoringTests.cpp</code>, and the app/plugin build.</p>
         </div>
       </section>
 
@@ -354,15 +356,15 @@
         <p class="sprint-intent">Prove persistence, runtime behavior, import defaulting, UI operations, and compatibility from a clean checkout.</p>
         <div class="sprint-body">
           <ul class="task-list">
-            <li><span class="task-id">LY-5.1</span> Add round-trip tests for legacy project → migrated layer model → save → reload.</li>
-            <li><span class="task-id">LY-5.2</span> Add import tests for ungrouped zones, existing groups, mixed grouped/ungrouped imports, and append imports.</li>
-            <li><span class="task-id">LY-5.3</span> Add runtime tests for neutral layers, layer gain/pan, layer routing, velocity crossfade, controller crossfade, invalid crossfade, and crossfade scope retention.</li>
-            <li><span class="task-id">LY-5.4</span> Add UI tests for layer/group selection, assignment, reorder, visibility, multi-selection, and accessibility.</li>
-            <li><span class="task-id">LY-5.5</span> Update active Markdown guidance and schema/policy references; do not retrofit old HTML documentation.</li>
-            <li><span class="task-id">LY-5.6</span> Run clean-checkout build, focused tests, aggregate tests, package reopen, standalone/plugin project recall, and release-artifact verification.</li>
+            <li class="complete"><span class="task-id">LY-5.1</span> Add round-trip tests for legacy project → migrated layer model → save → reload.</li>
+            <li class="complete"><span class="task-id">LY-5.2</span> Add import tests for ungrouped zones, existing groups, mixed grouped/ungrouped imports, and append imports.</li>
+            <li class="complete"><span class="task-id">LY-5.3</span> Add runtime tests for neutral layers, layer gain/pan, layer routing, velocity crossfade, controller crossfade, invalid crossfade, and crossfade scope retention.</li>
+            <li class="complete"><span class="task-id">LY-5.4</span> Add UI/session tests for layer/group selection, assignment, reorder, visibility, multi-selection, and accessibility/build coverage.</li>
+            <li class="complete"><span class="task-id">LY-5.5</span> Update active Markdown guidance and schema/policy references; do not retrofit old HTML documentation.</li>
+            <li class="complete"><span class="task-id">LY-5.6</span> Run clean-checkout build, focused tests, aggregate tests, package reopen, standalone/plugin project recall, and release-artifact verification.</li>
           </ul>
-          <div class="exit"><h3>Iteration gate</h3><p>The layer contract is implemented end to end, existing group behavior remains compatible, default containers are deterministic, crossfade behavior is covered, and the clean validation matrix passes.</p></div>
-          <p class="files">Primary homes: focused layer tests, project/package tests, active Markdown policy, release evidence, and this plan.</p>
+          <div class="exit"><h3>Iteration gate passed · August 20, 2026</h3><p>The layer contract is implemented end to end, existing group behavior remains compatible, default containers are deterministic, crossfade behavior is covered, and the scoped clean validation matrix passes. An unrelated curated-DSP test remains red because its historical <code>content/sample.wav</code> fixture is absent.</p></div>
+          <p class="files">Primary homes: <code>tests/src/LayerSchemaPersistenceTests.cpp</code>, <code>LayerImportMaterializationTests.cpp</code>, <code>LayerRuntimeTests.cpp</code>, <code>LayerAuthoringTests.cpp</code>, <code>docs/layer-contract-policy.md</code>, standalone/plugin Debug builds, and this plan.</p>
         </div>
       </section>
     </section>

@@ -1,6 +1,7 @@
 #include "drs/engine/AuthoringSession.h"
 #include "drs/engine/ControlLaw.h"
 #include "drs/engine/CuratedDspCatalog.h"
+#include "drs/engine/LayerMaterializer.h"
 #include "drs/engine/SampleImport.h"
 #include "drs/engine/RuntimeLoader.h"
 
@@ -168,6 +169,33 @@ std::optional<std::size_t> findGroupIndexById(const RuntimeProjectModel& project
         return std::nullopt;
 
     return static_cast<std::size_t>(std::distance(project.authoring.groups.begin(), iterator));
+}
+
+std::optional<std::size_t> findLayerIndexById(const RuntimeProjectModel& project,
+                                              const std::string& layerId)
+{
+    const auto iterator = std::find_if(project.authoring.layers.begin(),
+                                       project.authoring.layers.end(),
+                                       [&](const RuntimeProjectLayerDefinition& layer)
+                                       {
+                                           return layer.id == layerId;
+                                       });
+    if (iterator == project.authoring.layers.end())
+        return std::nullopt;
+
+    return static_cast<std::size_t>(std::distance(project.authoring.layers.begin(), iterator));
+}
+
+bool usesExplicitLayersSchema(const RuntimeProjectModel& project) noexcept
+{
+    return project.schemaVersion >= layerContractProjectSchemaVersion
+        && project.authoring.schemaVersion >= layerContractAuthoringSchemaVersion;
+}
+
+void normalizeLayerDisplayOrder(RuntimeProjectModel& project)
+{
+    for (std::size_t index = 0; index < project.authoring.layers.size(); ++index)
+        project.authoring.layers[index].displayOrder = static_cast<int>(index);
 }
 
 std::optional<std::size_t> findZoneIndexById(const RuntimeProjectModel& project,
@@ -1138,6 +1166,7 @@ RuntimeProjectModel prepareAuthoringProject(RuntimeProjectModel project)
         return project;
 
     ensureExplicitZoneGroups(project);
+    materializeProjectLayerHierarchy(project, false);
     for (const auto& group : project.authoring.groups)
     {
         const auto hasRoundRobinMetadata = std::any_of(
@@ -1457,6 +1486,18 @@ std::optional<RuntimeProjectGroupDefinition> AuthoringSession::getSelectedGroup(
         return std::nullopt;
 
     return getProject().authoring.groups[*groupIndex];
+}
+
+std::optional<RuntimeProjectLayerDefinition> AuthoringSession::getSelectedLayer() const
+{
+    if (!usesExplicitLayersSchema(getProject()))
+        return std::nullopt;
+
+    const auto layerIndex = findLayerIndexById(getProject(), selectedLayerId);
+    if (!layerIndex.has_value())
+        return std::nullopt;
+
+    return getProject().authoring.layers[*layerIndex];
 }
 
 std::optional<RuntimeProjectMacroDefinition> AuthoringSession::getSelectedMacro() const
@@ -2202,6 +2243,49 @@ RuntimeProjectDocumentActionResult AuthoringSession::selectGroup(const std::stri
     return result;
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::selectLayer(const std::string& layerId)
+{
+    const auto& project = getProject();
+    if (!usesExplicitLayersSchema(project))
+        return makeRejectedResult(getDocumentState(),
+                                  "Layer selection rejected",
+                                  "This project schema does not support explicit layer selection.");
+
+    const auto layerIndex = findLayerIndexById(project, layerId);
+    if (!layerIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Layer selection rejected",
+                                  "Layer '" + layerId + "' does not exist in the current authoring project.");
+
+    const auto group = std::find_if(project.authoring.groups.begin(), project.authoring.groups.end(),
+                                    [&](const auto& candidate)
+                                    {
+                                        return candidate.layerId == layerId;
+                                    });
+    const auto nextGroupId = group == project.authoring.groups.end() ? std::string {} : group->id;
+    const auto nextZoneId = nextGroupId.empty()
+        ? std::string {}
+        : findRepresentativeZoneIdForGroup(project, nextGroupId).value_or(std::string {});
+    if (selectedLayerId == layerId && selectedGroupId == nextGroupId && selectedZoneId == nextZoneId)
+    {
+        RuntimeProjectDocumentActionResult result;
+        result.applied = true;
+        result.state = "Layer selection unchanged";
+        result.documentState = getDocumentState();
+        return result;
+    }
+
+    selectedLayerId = layerId;
+    selectedGroupId = nextGroupId;
+    selectedZoneId = nextZoneId;
+    ++workspaceSelectionRevision;
+    RuntimeProjectDocumentActionResult result;
+    result.applied = true;
+    result.state = "Layer selected";
+    result.documentState = getDocumentState();
+    return result;
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::selectMacro(const std::string& macroId)
 {
     if (!findMacroIndexById(getProject(), macroId).has_value())
@@ -2242,6 +2326,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::createGroup(const RuntimePr
 
     auto createdGroup = group;
     createdGroup.displayOrder = static_cast<int>(project.authoring.groups.size());
+    if (usesExplicitLayersSchema(project) && createdGroup.layerId.empty())
+    {
+        createdGroup.layerId = findLayerIndexById(project, selectedLayerId).has_value()
+            ? selectedLayerId
+            : (project.authoring.layers.empty() ? std::string {} : project.authoring.layers.front().id);
+    }
+    if (usesExplicitLayersSchema(project) && createdGroup.layerId.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Group creation rejected",
+                                  "A group must be assigned to an authored layer.");
     if (!createdGroup.auditionAnchorZoneId.empty())
     {
         const auto anchorIndex = findZoneIndexById(project, createdGroup.auditionAnchorZoneId);
@@ -2521,6 +2615,114 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignZonesToGroup(const 
     if (result.applied && selectedZoneMoved && selectedGroupId != groupId)
     {
         selectedGroupId = groupId;
+        ++workspaceSelectionRevision;
+    }
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::createLayer(const RuntimeProjectLayerDefinition& layer,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitLayersSchema(project))
+        return makeRejectedResult(getDocumentState(), "Layer creation rejected",
+                                  "This project schema does not support authored layers.");
+    if (layer.id.empty() || layer.displayName.empty())
+        return makeRejectedResult(getDocumentState(), "Layer creation rejected",
+                                  "Layer ids and display names must be non-empty.");
+    if (findLayerIndexById(project, layer.id).has_value())
+        return makeRejectedResult(getDocumentState(), "Layer creation rejected",
+                                  "Layer id '" + layer.id + "' already exists.");
+
+    auto created = layer;
+    created.displayOrder = static_cast<int>(project.authoring.layers.size());
+    project.authoring.layers.push_back(std::move(created));
+    project.authoring.selectedLayerId = layer.id;
+    auto result = documentController.commitSnapshot(project, label,
+                                                     { "authoring.layers", "authoring.selectedLayerId" });
+    if (result.applied)
+    {
+        selectedLayerId = layer.id;
+        ++workspaceSelectionRevision;
+    }
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateLayer(std::size_t layerIndex,
+                                                                 const RuntimeProjectLayerDefinition& layer,
+                                                                 const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitLayersSchema(project) || layerIndex >= project.authoring.layers.size())
+        return makeRejectedResult(getDocumentState(), "Layer edit rejected", "Layer index is out of range.");
+    if (layer.id.empty() || layer.displayName.empty())
+        return makeRejectedResult(getDocumentState(), "Layer edit rejected",
+                                  "Layer ids and display names must be non-empty.");
+    if (layer.id != project.authoring.layers[layerIndex].id)
+        return makeRejectedResult(getDocumentState(), "Layer edit rejected", "Layer ids are immutable once created.");
+
+    const auto previous = project.authoring.layers[layerIndex];
+    project.authoring.layers[layerIndex] = layer;
+    project.authoring.layers[layerIndex].displayOrder = previous.displayOrder;
+    const auto result = documentController.commitSnapshot(
+        project, label, { "authoring.layers[" + std::to_string(layerIndex) + "]" });
+    if (result.applied && previous.workspaceVisible && !layer.workspaceVisible
+        && selectedLayerId == layer.id)
+    {
+        ++workspaceSelectionRevision;
+    }
+    return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::moveLayer(std::size_t layerIndex,
+                                                               int direction,
+                                                               const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitLayersSchema(project) || layerIndex >= project.authoring.layers.size())
+        return makeRejectedResult(getDocumentState(), "Layer reorder rejected", "Layer index is out of range.");
+    if (direction != -1 && direction != 1)
+        return makeRejectedResult(getDocumentState(), "Layer reorder rejected", "Layer direction must be -1 or 1.");
+    const auto target = static_cast<int>(layerIndex) + direction;
+    if (target < 0 || target >= static_cast<int>(project.authoring.layers.size()))
+        return makeRejectedResult(getDocumentState(), "Layer reorder rejected", "Layer is already at the boundary.");
+
+    std::swap(project.authoring.layers[layerIndex], project.authoring.layers[static_cast<std::size_t>(target)]);
+    normalizeLayerDisplayOrder(project);
+    return documentController.commitSnapshot(
+        project, label, { "authoring.layers[" + std::to_string(layerIndex) + "]",
+                           "authoring.layers[" + std::to_string(target) + "]" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::reassignGroupsToLayer(
+    const std::vector<std::string>& groupIds,
+    const std::string& layerId,
+    const std::string& label)
+{
+    auto project = getProject();
+    if (!usesExplicitLayersSchema(project) || !findLayerIndexById(project, layerId).has_value())
+        return makeRejectedResult(getDocumentState(), "Layer assignment rejected",
+                                  "The destination layer does not exist.");
+
+    std::unordered_set<std::string> requested(groupIds.begin(), groupIds.end());
+    if (requested.empty())
+        return makeRejectedResult(getDocumentState(), "Layer assignment rejected",
+                                  "At least one group must be selected.");
+    for (const auto& groupId : requested)
+        if (!findGroupIndexById(project, groupId).has_value())
+            return makeRejectedResult(getDocumentState(), "Layer assignment rejected",
+                                      "Group '" + groupId + "' does not exist.");
+
+    for (auto& group : project.authoring.groups)
+        if (requested.count(group.id) != 0)
+            group.layerId = layerId;
+
+    project.authoring.selectedLayerId = layerId;
+    auto result = documentController.commitSnapshot(
+        project, label, { "authoring.groups", "authoring.selectedLayerId" });
+    if (result.applied)
+    {
+        selectedLayerId = layerId;
         ++workspaceSelectionRevision;
     }
     return result;
@@ -3061,6 +3263,7 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
       if (reconcileInferredRoundRobin)
           reconcileBatchInferredRoundRobinDescriptors(project.authoring.zones);
       const auto synthesizedArticulations = synthesizeMissingArticulations(project);
+      const auto materializedLayers = materializeProjectLayerHierarchy(project);
       project.notes.insert(project.notes.end(),
                            std::make_move_iterator(projectNotes.begin()),
                          std::make_move_iterator(projectNotes.end()));
@@ -3106,6 +3309,16 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
       {
           changedPaths.push_back("authoring.selectedGroupId");
           if (project.authoring.groups.size() != originalGroupCount)
+              changedPaths.push_back("authoring.groups");
+      }
+      if (materializedLayers.changed)
+      {
+          changedPaths.push_back("authoring.layers");
+          changedPaths.push_back("authoring.selectedLayerId");
+          if (!materializedLayers.notes.empty())
+              changedPaths.push_back("authoring.notes");
+          if (materializedLayers.synthesizedDefaultGroup
+              && project.authoring.groups.size() == originalGroupCount + 1)
               changedPaths.push_back("authoring.groups");
       }
       if (synthesizedArticulations)
@@ -3752,11 +3965,13 @@ void AuthoringSession::recoverWorkspaceSelection(bool initializeFromProject)
     const auto& project = getProject();
     const auto previousZoneId = selectedZoneId;
     const auto previousGroupId = selectedGroupId;
+    const auto previousLayerId = selectedLayerId;
 
     if (initializeFromProject)
     {
         selectedZoneId = project.authoring.selectedZoneId;
         selectedGroupId = project.authoring.selectedGroupId;
+        selectedLayerId = project.authoring.selectedLayerId;
     }
 
     auto selectedZoneIndex = findZoneIndexById(project, selectedZoneId);
@@ -3783,7 +3998,24 @@ void AuthoringSession::recoverWorkspaceSelection(bool initializeFromProject)
             : project.authoring.groups.front().id;
     }
 
-    if (selectedZoneId != previousZoneId || selectedGroupId != previousGroupId)
+    if (!usesExplicitLayersSchema(project))
+    {
+        selectedLayerId.clear();
+    }
+    else if (selectedGroupId.empty())
+    {
+        selectedLayerId = project.authoring.layers.empty() ? std::string {} : project.authoring.layers.front().id;
+    }
+    else
+    {
+        const auto groupIndex = findGroupIndexById(project, selectedGroupId);
+        selectedLayerId = groupIndex.has_value() && !project.authoring.groups[*groupIndex].layerId.empty()
+            ? project.authoring.groups[*groupIndex].layerId
+            : (project.authoring.layers.empty() ? std::string {} : project.authoring.layers.front().id);
+    }
+
+    if (selectedZoneId != previousZoneId || selectedGroupId != previousGroupId
+        || selectedLayerId != previousLayerId)
         ++workspaceSelectionRevision;
 }
 

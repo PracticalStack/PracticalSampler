@@ -384,6 +384,78 @@ std::vector<RuntimeProjectGroupDefinition> synthesizeProjectGroupsFromZones(
     return groups;
 }
 
+std::string extractLayerIdFromRoutingSourceId(std::string_view sourceId)
+{
+    constexpr std::string_view prefix { "layers/" };
+    return sourceId.rfind(prefix, 0) == 0 && sourceId.size() > prefix.size()
+        ? std::string(sourceId.substr(prefix.size())) : std::string {};
+}
+
+const char* layerCrossfadeSourceId(const LayerCrossfadeSource source) noexcept
+{
+    switch (source)
+    {
+        case LayerCrossfadeSource::none: return "none";
+        case LayerCrossfadeSource::velocity: return "velocity";
+        case LayerCrossfadeSource::controller: return "controller";
+    }
+    return "none";
+}
+
+bool parseLayerCrossfadeSource(const std::string& value, LayerCrossfadeSource& source) noexcept
+{
+    if (value == "none") source = LayerCrossfadeSource::none;
+    else if (value == "velocity") source = LayerCrossfadeSource::velocity;
+    else if (value == "controller") source = LayerCrossfadeSource::controller;
+    else return false;
+    return true;
+}
+
+const char* layerCrossfadeCurveId(const LayerCrossfadeCurve curve) noexcept
+{
+    switch (curve)
+    {
+        case LayerCrossfadeCurve::linear: return "linear";
+    }
+    return "linear";
+}
+
+bool parseLayerCrossfadeCurve(const std::string& value, LayerCrossfadeCurve& curve) noexcept
+{
+    if (value != "linear")
+        return false;
+    curve = LayerCrossfadeCurve::linear;
+    return true;
+}
+
+const char* layerCrossfadeDirectionId(const LayerCrossfadeDirection direction) noexcept
+{
+    return direction == LayerCrossfadeDirection::fadeOut ? "fade_out" : "fade_in";
+}
+
+bool parseLayerCrossfadeDirection(const std::string& value, LayerCrossfadeDirection& direction) noexcept
+{
+    if (value == "fade_in") direction = LayerCrossfadeDirection::fadeIn;
+    else if (value == "fade_out") direction = LayerCrossfadeDirection::fadeOut;
+    else return false;
+    return true;
+}
+
+std::vector<RuntimeProjectLayerDefinition> synthesizeDefaultLayerFromGroups(
+    const std::vector<RuntimeProjectGroupDefinition>& groups)
+{
+    if (groups.empty())
+        return {};
+
+    RuntimeProjectLayerDefinition layer;
+    layer.id = "default-layer";
+    layer.displayName = "Default Layer";
+    layer.displayOrder = 0;
+    layer.workspaceVisible = true;
+    layer.auditionAnchorGroupId = groups.front().id;
+    return { std::move(layer) };
+}
+
 std::string resolveSelectedGroupIdFromSelectedZone(const RuntimeProjectAuthoringState& authoring)
 {
     if (!authoring.selectedZoneId.empty())
@@ -986,6 +1058,8 @@ ordered_json serializeProjectGroups(const std::vector<RuntimeProjectGroupDefinit
     {
         ordered_json groupObject;
         groupObject["id"] = group.id;
+        if (!group.layerId.empty())
+            groupObject["layerId"] = group.layerId;
         groupObject["displayName"] = group.displayName;
         groupObject["displayOrder"] = group.displayOrder;
         groupObject["workspaceVisible"] = group.workspaceVisible;
@@ -996,6 +1070,39 @@ ordered_json serializeProjectGroups(const std::vector<RuntimeProjectGroupDefinit
         if (!group.auditionAnchorZoneId.empty())
             groupObject["auditionAnchorZoneId"] = group.auditionAnchorZoneId;
         array.push_back(std::move(groupObject));
+    }
+
+    return array;
+}
+
+ordered_json serializeProjectLayers(const std::vector<RuntimeProjectLayerDefinition>& layers)
+{
+    ordered_json array = ordered_json::array();
+
+    for (const auto& layer : layers)
+    {
+        ordered_json layerObject;
+        layerObject["id"] = layer.id;
+        layerObject["displayName"] = layer.displayName;
+        layerObject["displayOrder"] = layer.displayOrder;
+        layerObject["workspaceVisible"] = layer.workspaceVisible;
+        layerObject["gainDb"] = layer.gainDb;
+        layerObject["pan"] = layer.pan;
+        if (!layer.routingBusId.empty())
+            layerObject["routingBusId"] = layer.routingBusId;
+        if (!layer.auditionAnchorGroupId.empty())
+            layerObject["auditionAnchorGroupId"] = layer.auditionAnchorGroupId;
+
+        ordered_json crossfade;
+        crossfade["source"] = layerCrossfadeSourceId(layer.crossfade.source);
+        if (layer.crossfade.controllerNumber.has_value())
+            crossfade["controllerNumber"] = *layer.crossfade.controllerNumber;
+        crossfade["low"] = layer.crossfade.low;
+        crossfade["high"] = layer.crossfade.high;
+        crossfade["curve"] = layerCrossfadeCurveId(layer.crossfade.curve);
+        crossfade["direction"] = layerCrossfadeDirectionId(layer.crossfade.direction);
+        layerObject["crossfade"] = std::move(crossfade);
+        array.push_back(std::move(layerObject));
     }
 
     return array;
@@ -1315,7 +1422,7 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
     if (project.schemaVersion >= 2
-        && project.schemaVersion <= loopCrossfadeProjectSchemaVersion)
+        && project.schemaVersion <= layerContractProjectSchemaVersion)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1337,6 +1444,9 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
             if (const auto selectedGroupId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedGroupId", "Project authoring"))
                 authoring.selectedGroupId = *selectedGroupId;
+
+            if (const auto selectedLayerId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedLayerId", "Project authoring"))
+                authoring.selectedLayerId = *selectedLayerId;
 
             if (const auto selectedPerformanceBankId = readOptional<RuntimeProjectLoadResult, std::string>(*authoringIterator, result, "selectedPerformanceBankId", "Project authoring"))
                 authoring.selectedPerformanceBankId = *selectedPerformanceBankId;
@@ -1653,6 +1763,11 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
 
                         if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(groupObject, result, "id", context.c_str()))
                             group.id = *id;
+                        if (project.schemaVersion >= layerContractProjectSchemaVersion)
+                        {
+                            if (const auto layerId = readRequired<RuntimeProjectLoadResult, std::string>(groupObject, result, "layerId", context.c_str()))
+                                group.layerId = *layerId;
+                        }
                         if (const auto displayName = readRequired<RuntimeProjectLoadResult, std::string>(groupObject, result, "displayName", context.c_str()))
                             group.displayName = *displayName;
                         if (const auto displayOrder = readRequired<RuntimeProjectLoadResult, int>(groupObject, result, "displayOrder", context.c_str()))
@@ -1669,6 +1784,82 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                             group.auditionAnchorZoneId = *auditionAnchorZoneId;
 
                         authoring.groups.push_back(std::move(group));
+                    }
+                }
+            }
+
+            if (project.schemaVersion >= layerContractProjectSchemaVersion
+                && authoring.schemaVersion >= layerContractAuthoringSchemaVersion)
+            {
+                const auto layersIterator = authoringIterator->find("layers");
+                if (layersIterator == authoringIterator->end() || !isObjectArray(*layersIterator))
+                {
+                    addIssue(result, "Project authoring field 'layers' must be an array of objects.");
+                }
+                else
+                {
+                    authoring.layers.reserve(layersIterator->size());
+
+                    for (std::size_t index = 0; index < layersIterator->size(); ++index)
+                    {
+                        const auto& layerObject = layersIterator->at(index);
+                        const auto context = "ProjectLayer[" + std::to_string(index) + "]";
+                        RuntimeProjectLayerDefinition layer;
+
+                        if (const auto id = readRequired<RuntimeProjectLoadResult, std::string>(layerObject, result, "id", context.c_str()))
+                            layer.id = *id;
+                        if (const auto displayName = readRequired<RuntimeProjectLoadResult, std::string>(layerObject, result, "displayName", context.c_str()))
+                            layer.displayName = *displayName;
+                        if (const auto displayOrder = readRequired<RuntimeProjectLoadResult, int>(layerObject, result, "displayOrder", context.c_str()))
+                            layer.displayOrder = *displayOrder;
+                        if (const auto workspaceVisible = readRequired<RuntimeProjectLoadResult, bool>(layerObject, result, "workspaceVisible", context.c_str()))
+                            layer.workspaceVisible = *workspaceVisible;
+                        if (const auto gainDb = readRequired<RuntimeProjectLoadResult, double>(layerObject, result, "gainDb", context.c_str()))
+                            layer.gainDb = *gainDb;
+                        if (const auto pan = readRequired<RuntimeProjectLoadResult, double>(layerObject, result, "pan", context.c_str()))
+                            layer.pan = *pan;
+                        if (const auto routingBusId = readOptional<RuntimeProjectLoadResult, std::string>(layerObject, result, "routingBusId", context.c_str()))
+                            layer.routingBusId = *routingBusId;
+                        if (const auto auditionAnchorGroupId = readOptional<RuntimeProjectLoadResult, std::string>(layerObject, result, "auditionAnchorGroupId", context.c_str()))
+                            layer.auditionAnchorGroupId = *auditionAnchorGroupId;
+
+                        const auto crossfadeIterator = layerObject.find("crossfade");
+                        if (crossfadeIterator == layerObject.end() || !crossfadeIterator->is_object())
+                        {
+                            addIssue(result, context + " field 'crossfade' must be an object.");
+                        }
+                        else
+                        {
+                            if (const auto source = readRequired<RuntimeProjectLoadResult, std::string>(
+                                    *crossfadeIterator, result, "source", (context + ".crossfade").c_str()))
+                            {
+                                if (!parseLayerCrossfadeSource(*source, layer.crossfade.source))
+                                    addIssue(result, context + ".crossfade field 'source' is unsupported.");
+                            }
+                            if (const auto controllerNumber = readOptional<RuntimeProjectLoadResult, int>(
+                                    *crossfadeIterator, result, "controllerNumber", (context + ".crossfade").c_str()))
+                                layer.crossfade.controllerNumber = *controllerNumber;
+                            if (const auto low = readRequired<RuntimeProjectLoadResult, int>(
+                                    *crossfadeIterator, result, "low", (context + ".crossfade").c_str()))
+                                layer.crossfade.low = *low;
+                            if (const auto high = readRequired<RuntimeProjectLoadResult, int>(
+                                    *crossfadeIterator, result, "high", (context + ".crossfade").c_str()))
+                                layer.crossfade.high = *high;
+                            if (const auto curve = readRequired<RuntimeProjectLoadResult, std::string>(
+                                    *crossfadeIterator, result, "curve", (context + ".crossfade").c_str()))
+                            {
+                                if (!parseLayerCrossfadeCurve(*curve, layer.crossfade.curve))
+                                    addIssue(result, context + ".crossfade field 'curve' is unsupported.");
+                            }
+                            if (const auto direction = readOptional<RuntimeProjectLoadResult, std::string>(
+                                    *crossfadeIterator, result, "direction", (context + ".crossfade").c_str()))
+                            {
+                                if (!parseLayerCrossfadeDirection(*direction, layer.crossfade.direction))
+                                    addIssue(result, context + ".crossfade field 'direction' is unsupported.");
+                            }
+                        }
+
+                        authoring.layers.push_back(std::move(layer));
                     }
                 }
             }
@@ -2394,9 +2585,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         && project.schemaVersion != 4 && project.schemaVersion != 5 && project.schemaVersion != 6
         && project.schemaVersion != continuousDamperProjectSchemaVersion
         && project.schemaVersion != playbackRegionProjectSchemaVersion
-        && project.schemaVersion != loopCrossfadeProjectSchemaVersion)
+        && project.schemaVersion != loopCrossfadeProjectSchemaVersion
+        && project.schemaVersion != layerContractProjectSchemaVersion)
     {
-        addIssue(result, "Project schemaVersion must be between 1 and 9.");
+        addIssue(result, "Project schemaVersion must be between 1 and 10.");
     }
 
     if (project.projectId.empty())
@@ -2431,7 +2623,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= loopCrossfadeProjectSchemaVersion)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= layerContractProjectSchemaVersion)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -2461,6 +2653,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         if (project.schemaVersion == loopCrossfadeProjectSchemaVersion
             && authoring.schemaVersion != loopCrossfadeAuthoringSchemaVersion)
             addIssue(result, "Project authoring schemaVersion must be 8 for schemaVersion 9 projects.");
+        if (project.schemaVersion == layerContractProjectSchemaVersion
+            && authoring.schemaVersion != layerContractAuthoringSchemaVersion)
+            addIssue(result, "Project authoring schemaVersion must be 9 for schemaVersion 10 projects.");
 
         if (!std::isfinite(authoring.masterGainDb))
             addIssue(result, "Project authoring masterGainDb must be finite.");
@@ -2474,6 +2669,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         if (explicitGroupsRequired && hasDuplicateIds(authoring.groups))
             addIssue(result, "Project authoring group ids must be unique.");
+
+        const auto explicitLayersRequired = project.schemaVersion >= layerContractProjectSchemaVersion;
+        if (explicitLayersRequired && hasDuplicateIds(authoring.layers))
+            addIssue(result, "Project authoring layer ids must be unique.");
 
         if (hasDuplicateIds(authoring.macros))
             addIssue(result, "Project authoring macro ids must be unique.");
@@ -2493,6 +2692,44 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         std::unordered_map<std::string, std::string> zoneGroupIds;
         std::unordered_set<std::string> groupIds;
+        std::unordered_set<std::string> layerIds;
+        if (explicitLayersRequired)
+        {
+            for (const auto& layer : authoring.layers)
+            {
+                if (layer.id.empty())
+                    addIssue(result, "Project layers must have non-empty ids.");
+                else
+                    layerIds.insert(layer.id);
+
+                if (layer.displayName.empty())
+                    addIssue(result, "Project layer '" + layer.id + "' must have a displayName.");
+
+                if (layer.displayOrder < 0)
+                    addIssue(result, "Project layer '" + layer.id + "' must not have a negative displayOrder.");
+
+                if (!std::isfinite(layer.gainDb) || !std::isfinite(layer.pan))
+                    addIssue(result, "Project layer '" + layer.id + "' must have finite gainDb and pan.");
+
+                if (layer.pan < -1.0 || layer.pan > 1.0)
+                    addIssue(result, "Project layer '" + layer.id + "' pan must be normalized to -1 through 1.");
+
+                const auto& crossfade = layer.crossfade;
+                if (crossfade.low < 0 || crossfade.high > 127 || crossfade.low >= crossfade.high)
+                    addIssue(result, "Project layer '" + layer.id + "' crossfade low/high must be ordered within 0-127.");
+
+                if (crossfade.source == LayerCrossfadeSource::controller)
+                {
+                    if (!crossfade.controllerNumber.has_value()
+                        || *crossfade.controllerNumber < 0 || *crossfade.controllerNumber > 127)
+                        addIssue(result, "Project layer '" + layer.id + "' controller crossfade requires controllerNumber 0-127.");
+                }
+                else if (crossfade.controllerNumber.has_value())
+                {
+                    addIssue(result, "Project layer '" + layer.id + "' must not declare controllerNumber unless its crossfade source is controller.");
+                }
+            }
+        }
         if (explicitGroupsRequired)
         {
             for (const auto& group : authoring.groups)
@@ -2507,6 +2744,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
                 if (group.displayOrder < 0)
                     addIssue(result, "Project group '" + group.id + "' must not have a negative displayOrder.");
+
+                if (explicitLayersRequired)
+                {
+                    if (group.layerId.empty())
+                        addIssue(result, "Project group '" + group.id + "' must have a layerId.");
+                    else if (!layerIds.count(group.layerId))
+                        addIssue(result, "Project group '" + group.id + "' references unknown layerId '" + group.layerId + "'.");
+                }
             }
         }
 
@@ -2633,6 +2878,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         if (explicitGroupsRequired && !authoring.selectedGroupId.empty() && !groupIds.count(authoring.selectedGroupId))
             addIssue(result,
                      "Project authoring selectedGroupId references unknown group '" + authoring.selectedGroupId + "'.");
+
+        if (explicitLayersRequired && !authoring.selectedLayerId.empty() && !layerIds.count(authoring.selectedLayerId))
+            addIssue(result,
+                     "Project authoring selectedLayerId references unknown layer '" + authoring.selectedLayerId + "'.");
 
         std::unordered_set<std::string> fxSlotIds;
         std::size_t totalDspParameterCount = 0;
@@ -2796,6 +3045,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         std::unordered_set<std::string> routingBusIds;
         std::unordered_set<std::string> groupOwnedRoutingBusIds;
+        std::unordered_set<std::string> layerOwnedRoutingBusIds;
         std::unordered_map<std::string, std::size_t> fxSlotOwnerCounts;
         std::unordered_set<std::string> routingSourceOwners;
         for (const auto& bus : authoring.routingBuses)
@@ -2816,7 +3066,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                      && !zoneIds.count(extractZoneIdFromRoutingSourceId(bus.inputSourceId)))
             {
                 const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
-                if (groupId.empty() || !explicitGroupsRequired || !groupIds.count(groupId))
+                const auto layerId = extractLayerIdFromRoutingSourceId(bus.inputSourceId);
+                if ((!groupId.empty() && (!explicitGroupsRequired || !groupIds.count(groupId)))
+                    || (!layerId.empty() && (!explicitLayersRequired || !layerIds.count(layerId)))
+                    || (groupId.empty() && layerId.empty()))
                 {
                     addIssue(result,
                              "Project routing bus '" + bus.id + "' references unknown inputSourceId '"
@@ -2891,6 +3144,57 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                 }
             }
 
+            if (explicitLayersRequired)
+            {
+                for (const auto& layer : authoring.layers)
+                {
+                    if (!layer.auditionAnchorGroupId.empty()
+                        && !groupIds.count(layer.auditionAnchorGroupId))
+                    {
+                        addIssue(result,
+                                 "Project layer '" + layer.id
+                                     + "' references unknown auditionAnchorGroupId '"
+                                     + layer.auditionAnchorGroupId + "'.");
+                    }
+                }
+            }
+
+            if (explicitLayersRequired)
+            {
+                for (const auto& layer : authoring.layers)
+                {
+                    if (layer.routingBusId.empty())
+                        continue;
+                    const auto busIterator = std::find_if(authoring.routingBuses.begin(),
+                                                          authoring.routingBuses.end(),
+                                                          [&](const auto& bus)
+                                                              {
+                                                                  return bus.id == layer.routingBusId;
+                                                              });
+                    if (busIterator == authoring.routingBuses.end())
+                    {
+                        addIssue(result,
+                                 "Project layer '" + layer.id + "' references unknown routingBusId '"
+                                     + layer.routingBusId + "'.");
+                        continue;
+                    }
+                    const auto expectedInputSourceId = "layers/" + layer.id;
+                    if (busIterator->inputSourceId != expectedInputSourceId)
+                    {
+                        addIssue(result,
+                                 "Project layer '" + layer.id
+                                     + "' must reference a routingBusId whose inputSourceId is '"
+                                     + expectedInputSourceId + "'.");
+                    }
+                    else if (!layerOwnedRoutingBusIds.insert(layer.routingBusId).second)
+                    {
+                        addIssue(result,
+                                 "Project routingBusId '" + layer.routingBusId
+                                     + "' must not be assigned to more than one layer.");
+                    }
+                }
+            }
+
             for (const auto& bus : authoring.routingBuses)
             {
                 const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
@@ -2899,6 +3203,14 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
                     addIssue(result,
                              "Project routing bus '" + bus.id + "' targets group source '"
                                  + bus.inputSourceId + "' but no group claims that routingBusId.");
+                }
+
+                const auto layerId = extractLayerIdFromRoutingSourceId(bus.inputSourceId);
+                if (!layerId.empty() && !layerOwnedRoutingBusIds.count(bus.id))
+                {
+                    addIssue(result,
+                             "Project routing bus '" + bus.id + "' targets layer source '"
+                                 + bus.inputSourceId + "' but no layer claims that routingBusId.");
                 }
             }
         }
@@ -3310,6 +3622,57 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToLoopCrossfadeSchema(
     result.valid = validation.valid;
     result.migrated = validation.valid;
     result.state = validation.valid ? "Project migrated to the loop-crossfade schema"
+                                    : validation.state;
+    return result;
+}
+
+RuntimeProjectMigrationResult migrateRuntimeProjectToLayerSchema(
+    const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project layer migration failed";
+
+    if (project.schemaVersion == layerContractProjectSchemaVersion
+        && project.authoring.schemaVersion == layerContractAuthoringSchemaVersion)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid ? "Project already uses the layer contract schema"
+                                        : validation.state;
+        return result;
+    }
+
+    if (project.schemaVersion != loopCrossfadeProjectSchemaVersion
+        || project.authoring.schemaVersion != loopCrossfadeAuthoringSchemaVersion)
+    {
+        addIssue(result,
+                 "Only Project schemaVersion 9 with authoring schemaVersion 8 can migrate to the layer contract schema.");
+        return result;
+    }
+
+    auto migrated = project;
+    migrated.schemaVersion = layerContractProjectSchemaVersion;
+    migrated.authoring.schemaVersion = layerContractAuthoringSchemaVersion;
+    migrated.authoring.layers = synthesizeDefaultLayerFromGroups(migrated.authoring.groups);
+
+    for (auto& group : migrated.authoring.groups)
+        group.layerId = migrated.authoring.layers.empty() ? std::string {} : migrated.authoring.layers.front().id;
+
+    if (!migrated.authoring.layers.empty())
+    {
+        migrated.authoring.selectedLayerId = migrated.authoring.layers.front().id;
+        migrated.authoring.notes.push_back(
+            "Migrated explicit groups into the initial default layer; layer-level crossfade defaults to none.");
+    }
+
+    const auto validation = validateRuntimeProjectModel(migrated);
+    result.project = std::move(migrated);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to the layer contract schema"
                                     : validation.state;
     return result;
 }
@@ -4154,6 +4517,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
         authoring["selectedZoneId"] = project.authoring.selectedZoneId;
         if (project.schemaVersion >= 4)
             authoring["selectedGroupId"] = project.authoring.selectedGroupId;
+        if (project.schemaVersion >= layerContractProjectSchemaVersion)
+            authoring["selectedLayerId"] = project.authoring.selectedLayerId;
         authoring["selectedPerformanceBankId"] = project.authoring.selectedPerformanceBankId;
         authoring["masterGainDb"] = project.authoring.masterGainDb;
         if (project.schemaVersion >= 6)
@@ -4169,6 +4534,8 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
                                                      project.schemaVersion >= loopCrossfadeProjectSchemaVersion);
         if (project.schemaVersion >= 4)
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
+        if (project.schemaVersion >= layerContractProjectSchemaVersion)
+            authoring["layers"] = serializeProjectLayers(project.authoring.layers);
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
         authoring["fxSlots"] = serializeFxSlots(project.authoring.fxSlots, project.schemaVersion >= 5);
         authoring["routingBuses"] = serializeRoutingBuses(project.authoring.routingBuses, project.schemaVersion >= 5);

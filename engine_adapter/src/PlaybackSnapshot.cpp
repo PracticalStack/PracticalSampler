@@ -217,6 +217,11 @@ std::string buildGroupRoutingSourceId(const std::string& groupId)
     return groupId.empty() ? std::string {} : "groups/" + groupId;
 }
 
+std::string buildLayerRoutingSourceId(const std::string& layerId)
+{
+    return layerId.empty() ? std::string {} : "layers/" + layerId;
+}
+
 bool isGroupRoutingSourceId(std::string_view sourceId) noexcept
 {
     return sourceId.rfind("groups/", 0) == 0;
@@ -252,6 +257,42 @@ ordered_json serializeGroupRoute(const PlaybackSnapshotGroupRoute& route, bool i
     routeObject["pan"] = route.pan;
     routeObject["routingBusId"] = route.routingBusId;
     routeObject["auditionAnchorZoneId"] = route.auditionAnchorZoneId;
+    routeObject["layerId"] = route.layerId;
+    return routeObject;
+}
+
+std::string extractLayerIdFromRoutingSourceId(std::string_view sourceId)
+{
+    constexpr std::string_view prefix { "layers/" };
+    return sourceId.rfind(prefix, 0) == 0 && sourceId.size() > prefix.size()
+        ? std::string(sourceId.substr(prefix.size())) : std::string {};
+}
+
+ordered_json serializeLayerRoute(const PlaybackSnapshotLayerRoute& route, bool includeWorkspaceVisible)
+{
+    ordered_json routeObject;
+    routeObject["layerId"] = route.layerId;
+    routeObject["groupIds"] = serializeStringArray(route.groupIds);
+    routeObject["zoneIds"] = serializeStringArray(route.zoneIds);
+    routeObject["displayName"] = route.displayName;
+    routeObject["displayOrder"] = route.displayOrder;
+    routeObject["routingSourceId"] = route.routingSourceId;
+    if (includeWorkspaceVisible)
+        routeObject["workspaceVisible"] = route.workspaceVisible;
+    routeObject["gainDb"] = route.gainDb;
+    routeObject["pan"] = route.pan;
+    routeObject["routingBusId"] = route.routingBusId;
+    routeObject["auditionAnchorGroupId"] = route.auditionAnchorGroupId;
+    routeObject["crossfade"] = {
+        { "source", route.crossfade.source == LayerCrossfadeSource::controller
+            ? "controller" : route.crossfade.source == LayerCrossfadeSource::velocity ? "velocity" : "none" },
+        { "controllerNumber", route.crossfade.controllerNumber.has_value()
+            ? *route.crossfade.controllerNumber : -1 },
+        { "low", route.crossfade.low },
+        { "high", route.crossfade.high },
+        { "curve", "linear" },
+        { "direction", route.crossfade.direction == LayerCrossfadeDirection::fadeOut ? "fade_out" : "fade_in" }
+    };
     return routeObject;
 }
 
@@ -441,6 +482,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     root["draftRevision"] = snapshot.draftRevision;
     root["selectedZoneId"] = snapshot.selectedZoneId;
     root["selectedGroupId"] = snapshot.selectedGroupId;
+    root["selectedLayerId"] = snapshot.selectedLayerId;
     root["selectedPerformanceBankId"] = snapshot.selectedPerformanceBankId;
     root["masterGainDb"] = snapshot.masterGainDb;
 
@@ -572,6 +614,11 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     for (const auto& route : snapshot.groupRoutes)
         groupRoutes.push_back(serializeGroupRoute(route, includeDigest));
     root["groupRoutes"] = std::move(groupRoutes);
+
+    ordered_json layerRoutes = ordered_json::array();
+    for (const auto& route : snapshot.layerRoutes)
+        layerRoutes.push_back(serializeLayerRoute(route, includeDigest));
+    root["layerRoutes"] = std::move(layerRoutes);
 
     ordered_json zones = ordered_json::array();
     for (const auto& zone : snapshot.zones)
@@ -730,6 +777,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     result.snapshot.draftRevision = request.requestedDraftRevision;
     result.snapshot.selectedZoneId = project.authoring.selectedZoneId;
     result.snapshot.selectedGroupId = project.authoring.selectedGroupId;
+    result.snapshot.selectedLayerId = project.authoring.selectedLayerId;
     result.snapshot.selectedPerformanceBankId = project.authoring.selectedPerformanceBankId;
     result.snapshot.masterGainDb = project.authoring.masterGainDb;
     result.snapshot.notes = project.notes;
@@ -851,6 +899,8 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
 
     const auto usesExplicitGroupDefinitions = project.schemaVersion >= 4
         && project.authoring.schemaVersion >= 3;
+    const auto usesExplicitLayerDefinitions = project.schemaVersion >= layerContractProjectSchemaVersion
+        && project.authoring.schemaVersion >= layerContractAuthoringSchemaVersion;
 
     std::unordered_set<std::string> authoredZoneIds;
     authoredZoneIds.reserve(project.authoring.zones.size());
@@ -868,6 +918,17 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
         {
             if (!group.id.empty())
                 authoredGroupIds.insert(group.id);
+        }
+    }
+
+    std::unordered_set<std::string> authoredLayerIds;
+    if (usesExplicitLayerDefinitions)
+    {
+        authoredLayerIds.reserve(project.authoring.layers.size());
+        for (const auto& layer : project.authoring.layers)
+        {
+            if (!layer.id.empty())
+                authoredLayerIds.insert(layer.id);
         }
     }
 
@@ -901,20 +962,29 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                  && !authoredZoneIds.count(extractZoneIdFromRoutingSourceId(routingBus.inputSourceId)))
         {
             const auto groupId = extractGroupIdFromRoutingSourceId(routingBus.inputSourceId);
+            const auto layerId = extractLayerIdFromRoutingSourceId(routingBus.inputSourceId);
             if (!groupId.empty() && usesExplicitGroupDefinitions && authoredGroupIds.count(groupId))
             {
                 // Group input sources are legal in Sprint 4 when they resolve to an authored group.
+            }
+            else if (!layerId.empty() && usesExplicitLayerDefinitions && authoredLayerIds.count(layerId))
+            {
+                // Layer input sources are legal when they resolve to an authored layer.
             }
             else
             {
                 addFinding(result,
                            PlaybackSnapshotFindingSeverity::error,
-                           groupId.empty() ? "unknown-routing-input-source" : "unknown-group-routing-input-source",
+                           !groupId.empty() ? "unknown-group-routing-input-source"
+                               : !layerId.empty() ? "unknown-layer-routing-input-source" : "unknown-routing-input-source",
                            path + ".inputSourceId",
-                           groupId.empty()
+                           !groupId.empty()
                                ? "Routing bus '" + routingBus.id + "' references unknown input source '"
                                    + routingBus.inputSourceId + "'."
-                               : "Routing bus '" + routingBus.id + "' references unknown group input source '"
+                               : !layerId.empty()
+                               ? "Routing bus '" + routingBus.id + "' references unknown layer input source '"
+                                   + routingBus.inputSourceId + "'."
+                               : "Routing bus '" + routingBus.id + "' references unknown input source '"
                                    + routingBus.inputSourceId + "'.");
             }
         }
@@ -955,6 +1025,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             if (zoneId.empty() && authoredZoneIds.count(bus.inputSourceId))
                 zoneId = bus.inputSourceId;
             const auto groupId = extractGroupIdFromRoutingSourceId(bus.inputSourceId);
+            const auto layerId = extractLayerIdFromRoutingSourceId(bus.inputSourceId);
             if (!zoneId.empty() && authoredZoneIds.count(zoneId))
             {
                 bus.inputSourceId = "zones/" + zoneId;
@@ -964,6 +1035,11 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             {
                 bus.inputSourceId = "groups/" + groupId;
                 scope = CuratedDspScope::group;
+            }
+            else if (!layerId.empty() && authoredLayerIds.count(layerId))
+            {
+                bus.inputSourceId = buildLayerRoutingSourceId(layerId);
+                scope = CuratedDspScope::layer;
             }
             else
             {
@@ -1025,8 +1101,41 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     }
 
     std::unordered_map<std::string, std::size_t> articulationRouteIndices;
+    std::unordered_map<std::string, std::size_t> layerRouteIndices;
     std::unordered_map<std::string, std::size_t> groupRouteIndices;
     std::unordered_map<std::string, std::size_t> zoneIndices;
+    if (usesExplicitLayerDefinitions)
+    {
+        result.snapshot.layerRoutes.reserve(project.authoring.layers.size());
+        for (std::size_t index = 0; index < project.authoring.layers.size(); ++index)
+        {
+            const auto& layer = project.authoring.layers[index];
+            const auto path = "authoring.layers[" + std::to_string(index) + "]";
+            if (layer.id.empty())
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "missing-layer-id", path + ".id",
+                           "Layer ids must be non-empty.");
+            }
+            else if (!layerRouteIndices.emplace(layer.id, result.snapshot.layerRoutes.size()).second)
+            {
+                addFinding(result, PlaybackSnapshotFindingSeverity::error, "duplicate-layer-id", path + ".id",
+                           "Layer id '" + layer.id + "' is duplicated.");
+            }
+
+            PlaybackSnapshotLayerRoute route;
+            route.layerId = layer.id;
+            route.displayName = layer.displayName;
+            route.displayOrder = layer.displayOrder;
+            route.routingSourceId = "layers/" + layer.id;
+            route.workspaceVisible = layer.workspaceVisible;
+            route.gainDb = layer.gainDb;
+            route.pan = layer.pan;
+            route.routingBusId = layer.routingBusId;
+            route.auditionAnchorGroupId = layer.auditionAnchorGroupId;
+            route.crossfade = layer.crossfade;
+            result.snapshot.layerRoutes.push_back(std::move(route));
+        }
+    }
     if (usesExplicitGroupDefinitions)
     {
         result.snapshot.groupRoutes.reserve(project.authoring.groups.size());
@@ -1083,6 +1192,24 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             route.pan = group.pan;
             route.routingBusId = group.routingBusId;
             route.auditionAnchorZoneId = group.auditionAnchorZoneId;
+            route.layerId = group.layerId;
+            if (usesExplicitLayerDefinitions)
+            {
+                const auto layerIterator = layerRouteIndices.find(group.layerId);
+                if (layerIterator == layerRouteIndices.end())
+                {
+                    addFinding(result,
+                               PlaybackSnapshotFindingSeverity::error,
+                               "unknown-group-layer-reference",
+                               path + ".layerId",
+                               "Group '" + group.id + "' references unknown authored layer '" + group.layerId + "'.");
+                }
+                else
+                {
+                    auto& layerRoute = result.snapshot.layerRoutes[layerIterator->second];
+                    layerRoute.groupIds.push_back(group.id);
+                }
+            }
             result.snapshot.groupRoutes.push_back(std::move(route));
         }
 
@@ -1147,6 +1274,56 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                    "missing-group-definitions",
                    "authoring.groups",
                    "Projects with playable zones must carry explicit authored groups in the immutable snapshot build.");
+    }
+
+    if (usesExplicitLayerDefinitions)
+    {
+        std::unordered_set<std::string> claimedLayerRoutingBusIds;
+        for (std::size_t index = 0; index < project.authoring.layers.size(); ++index)
+        {
+            const auto& layer = project.authoring.layers[index];
+            if (layer.routingBusId.empty())
+                continue;
+            const auto busIndex = routingBusIndices.find(layer.routingBusId);
+            if (busIndex == routingBusIndices.end())
+                continue;
+            const auto& bus = project.authoring.routingBuses[busIndex->second];
+            const auto path = "authoring.layers[" + std::to_string(index) + "]";
+            const auto expectedSourceId = buildLayerRoutingSourceId(layer.id);
+            if (bus.inputSourceId != expectedSourceId)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "mismatched-layer-routing-bus-source",
+                           path + ".routingBusId",
+                           "Layer '" + layer.id + "' must reference a routing bus sourced from '"
+                               + expectedSourceId + "'.");
+            }
+            else if (!claimedLayerRoutingBusIds.insert(layer.routingBusId).second)
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "duplicate-layer-routing-bus-assignment",
+                           path + ".routingBusId",
+                           "Routing bus '" + layer.routingBusId
+                               + "' is already assigned to another layer.");
+            }
+        }
+
+        for (std::size_t index = 0; index < project.authoring.routingBuses.size(); ++index)
+        {
+            const auto& bus = project.authoring.routingBuses[index];
+            if (!extractLayerIdFromRoutingSourceId(bus.inputSourceId).empty()
+                && !claimedLayerRoutingBusIds.count(bus.id))
+            {
+                addFinding(result,
+                           PlaybackSnapshotFindingSeverity::error,
+                           "orphaned-layer-routing-bus",
+                           "authoring.routingBuses[" + std::to_string(index) + "].inputSourceId",
+                           "Routing bus '" + bus.id + "' targets layer source '"
+                               + bus.inputSourceId + "' but no authored layer claims that bus.");
+            }
+        }
     }
 
     result.snapshot.zones.reserve(project.authoring.zones.size());
@@ -1373,6 +1550,18 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                     route.articulationIds.push_back(zone.articulationId);
             }
         }
+
+        if (usesExplicitLayerDefinitions)
+        {
+            const auto groupIterator = groupRouteIndices.find(zone.groupId);
+            if (groupIterator != groupRouteIndices.end())
+            {
+                const auto& groupRoute = result.snapshot.groupRoutes[groupIterator->second];
+                const auto layerIterator = layerRouteIndices.find(groupRoute.layerId);
+                if (layerIterator != layerRouteIndices.end())
+                    result.snapshot.layerRoutes[layerIterator->second].zoneIds.push_back(zone.id);
+            }
+        }
     }
 
     for (const auto& finding : crossfadeTopologyFindings)
@@ -1434,6 +1623,14 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
     {
         addFinding(result, PlaybackSnapshotFindingSeverity::warning, "unknown-selected-group", "authoring.selectedGroupId",
                    "Selected group '" + project.authoring.selectedGroupId + "' does not exist in the snapshot group set.");
+    }
+
+    if (usesExplicitLayerDefinitions
+        && !project.authoring.selectedLayerId.empty()
+        && !layerRouteIndices.count(project.authoring.selectedLayerId))
+    {
+        addFinding(result, PlaybackSnapshotFindingSeverity::warning, "unknown-selected-layer", "authoring.selectedLayerId",
+                   "Selected layer '" + project.authoring.selectedLayerId + "' does not exist in the snapshot layer set.");
     }
 
     if (result.snapshot.zones.empty())
@@ -1598,6 +1795,50 @@ PlaybackSnapshotBuildResult scopePlaybackSnapshotForPreparation(
         }
     }
 
+    // A layer crossfade is evaluated across every routed child group. A scoped
+    // preparation must therefore retain the containing layer's sibling zones,
+    // otherwise the same authored layer would audition differently from the
+    // full project.
+    if (!source.snapshot.layerRoutes.empty())
+    {
+        std::string containingGroupId;
+        if (request.scope == PlaybackPreparationScope::selectedGroup)
+        {
+            containingGroupId = request.selectedGroupId;
+        }
+        else if (request.scope == PlaybackPreparationScope::selectedZone)
+        {
+            const auto zone = std::find_if(source.snapshot.zones.begin(), source.snapshot.zones.end(),
+                                           [&](const auto& candidate)
+                                           {
+                                               return candidate.id == request.selectedZoneId;
+                                           });
+            if (zone != source.snapshot.zones.end())
+                containingGroupId = zone->groupId;
+        }
+
+        const auto group = std::find_if(source.snapshot.groupRoutes.begin(), source.snapshot.groupRoutes.end(),
+                                        [&](const auto& candidate)
+                                        {
+                                            return candidate.groupId == containingGroupId;
+                                        });
+        if (group != source.snapshot.groupRoutes.end() && !group->layerId.empty())
+        {
+            const auto layer = std::find_if(source.snapshot.layerRoutes.begin(), source.snapshot.layerRoutes.end(),
+                                            [&](const auto& candidate)
+                                            {
+                                                return candidate.layerId == group->layerId;
+                                            });
+            if (layer != source.snapshot.layerRoutes.end()
+                && layer->crossfade.source != LayerCrossfadeSource::none)
+            {
+                for (const auto& zoneId : layer->zoneIds)
+                    if (!containsValue(retainedZoneIds, zoneId))
+                        retainedZoneIds.push_back(zoneId);
+            }
+        }
+    }
+
     const auto requestedZoneExists = request.scope != PlaybackPreparationScope::selectedZone
         || std::any_of(source.snapshot.zones.begin(),
                        source.snapshot.zones.end(),
@@ -1664,6 +1905,7 @@ PlaybackSnapshotBuildResult scopePlaybackSnapshotForPreparation(
         scoped.sampleIdentities.end());
     retainScopedRoutes(scoped.articulationRoutes, retainedZoneIds);
     retainScopedRoutes(scoped.groupRoutes, retainedZoneIds);
+    retainScopedRoutes(scoped.layerRoutes, retainedZoneIds);
     scoped.routingBuses.erase(
         std::remove_if(scoped.routingBuses.begin(),
                        scoped.routingBuses.end(),
@@ -1691,6 +1933,16 @@ PlaybackSnapshotBuildResult scopePlaybackSnapshotForPreparation(
         scoped.selectedGroupId = request.selectedGroupId;
     else if (!scoped.zones.empty())
         scoped.selectedGroupId = scoped.zones.front().groupId;
+    if (!scoped.zones.empty())
+    {
+        const auto group = std::find_if(scoped.groupRoutes.begin(), scoped.groupRoutes.end(),
+                                        [&](const auto& route)
+                                        {
+                                            return containsValue(route.zoneIds, scoped.zones.front().id);
+                                        });
+        if (group != scoped.groupRoutes.end())
+            scoped.selectedLayerId = group->layerId;
+    }
     scoped.dspGraphDigest = computePlaybackSnapshotDspGraphDigest(scoped);
     scoped.contentDigest = computePlaybackSnapshotContentDigest(scoped);
     result.retainedZoneCount = scoped.zones.size();

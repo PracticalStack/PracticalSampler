@@ -75,6 +75,7 @@ add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HostSessionState.cpp
     src/HostStatePublicationService.cpp
+    src/LayerMaterializer.cpp
     src/PlaybackSnapshot.cpp
     src/PlaybackSnapshotWorker.cpp
     src/PerformancePublishController.cpp
@@ -115,6 +116,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/AuthoringPreviewController.h
     include/drs/engine/AuthoringPreviewRecovery.h
     include/drs/engine/AuthoringSession.h
+    include/drs/engine/LayerContract.h
+    include/drs/engine/LayerMaterializer.h
     include/drs/engine/VelocityCrossfadeAuthoring.h
     include/drs/engine/ControlLaw.h
     include/drs/engine/ContinuousDamper.h

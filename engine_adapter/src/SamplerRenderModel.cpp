@@ -68,6 +68,17 @@ double combineGroupPan(double zonePan, double groupPan) noexcept
     return std::clamp(zonePan + groupPan, -1.0, 1.0);
 }
 
+bool sameLayerCrossfade(const RuntimeProjectLayerCrossfadeDefinition& left,
+                        const RuntimeProjectLayerCrossfadeDefinition& right) noexcept
+{
+    return left.source == right.source
+        && left.controllerNumber == right.controllerNumber
+        && left.low == right.low
+        && left.high == right.high
+        && left.curve == right.curve
+        && left.direction == right.direction;
+}
+
 std::uint64_t computeFnv1a64(std::string_view text) noexcept
 {
     std::uint64_t hash = 14695981039346656037ull;
@@ -372,6 +383,12 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             group.groupId,
             std::unordered_set<std::string>(group.zoneIds.begin(), group.zoneIds.end()));
     }
+    std::unordered_map<std::string, const PlaybackSnapshotLayerRoute*> snapshotLayersById;
+    std::unordered_map<std::string, const PreparedPlaybackLayerRoute*> preparedLayersById;
+    for (const auto& layer : snapshot.layerRoutes)
+        snapshotLayersById.emplace(layer.layerId, &layer);
+    for (const auto& layer : prepared.layerRoutes)
+        preparedLayersById.emplace(layer.layerId, &layer);
 
     std::unordered_set<std::string> preparedZoneIds;
     preparedZoneIds.reserve(prepared.zones.size());
@@ -480,6 +497,23 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
                 {
                     addError(result, "render-model-prepared-group-route-mismatch", path + ".zoneId",
                              "Prepared group routing metadata must match the immutable authored group route.");
+                }
+
+                if (!snapshotGroupRoute->layerId.empty())
+                {
+                    const auto snapshotLayer = snapshotLayersById.find(snapshotGroupRoute->layerId);
+                    const auto preparedLayer = preparedLayersById.find(snapshotGroupRoute->layerId);
+                    if (snapshotLayer == snapshotLayersById.end() || preparedLayer == preparedLayersById.end()
+                        || !containsZoneId(snapshotLayer->second->zoneIds, zone.zoneId)
+                        || !containsZoneId(preparedLayer->second->zoneIds, zone.zoneId)
+                        || snapshotLayer->second->gainDb != preparedLayer->second->gainDb
+                        || snapshotLayer->second->pan != preparedLayer->second->pan
+                        || !sameLayerCrossfade(snapshotLayer->second->crossfade,
+                                               preparedLayer->second->crossfade))
+                    {
+                        addError(result, "render-model-layer-route-mismatch", path + ".zoneId",
+                                 "Prepared layer routing metadata must match the immutable layer route.");
+                    }
                 }
             }
         }
@@ -627,12 +661,17 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
             ? snapshotGroupsById.end() : snapshotGroupsById.find(snapshotZone->groupId);
         const auto* snapshotGroupRoute = snapshotGroupEntry == snapshotGroupsById.end()
             ? nullptr : snapshotGroupEntry->second;
+        const auto* snapshotLayerRoute = snapshotGroupRoute == nullptr || snapshotGroupRoute->layerId.empty()
+            ? nullptr
+            : (snapshotLayersById.count(snapshotGroupRoute->layerId)
+                ? snapshotLayersById.at(snapshotGroupRoute->layerId) : nullptr);
         const auto gainDb = combineRouteGainDb(zone.gainDb,
                                                snapshotGroupRoute == nullptr ? 0.0 : snapshotGroupRoute->gainDb,
-                                               snapshot.masterGainDb);
-        const auto pan = snapshotGroupRoute == nullptr
-            ? zone.pan
-            : combineGroupPan(zone.pan, snapshotGroupRoute->pan);
+                                               snapshot.masterGainDb)
+            + (snapshotLayerRoute == nullptr ? 0.0 : snapshotLayerRoute->gainDb);
+        const auto pan = combineGroupPan(
+            combineGroupPan(zone.pan, snapshotGroupRoute == nullptr ? 0.0 : snapshotGroupRoute->pan),
+            snapshotLayerRoute == nullptr ? 0.0 : snapshotLayerRoute->pan);
         const auto* triggerRoute = triggerRoutesByZone[index];
         model->routes.push_back({ index,
                                   zone.preparedSampleIndex,
@@ -682,6 +721,9 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         model->routes.back().loopMode = zone.loopMode;
         model->routes.back().sampleEndFrame = zone.sampleEndFrame;
         model->routes.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
+        model->routes.back().layerId = snapshotLayerRoute == nullptr ? std::string {} : snapshotLayerRoute->layerId;
+        if (snapshotLayerRoute != nullptr)
+            model->routes.back().layerCrossfade = snapshotLayerRoute->crossfade;
     }
     for (const auto& route : model->routes)
     {

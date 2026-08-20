@@ -235,6 +235,11 @@ bool routeHasCrossfadeRuntime(const SamplerRenderRoute& route) noexcept
     return hasAnyVelocityCrossfadeRuntimeValue(route.velocityCrossfadeRuntime);
 }
 
+bool routeHasLayerCrossfade(const SamplerRenderRoute& route) noexcept
+{
+    return route.layerCrossfade.source != LayerCrossfadeSource::none;
+}
+
 double computeRouteCrossfadeGain(const SamplerRenderRoute& route, int velocity) noexcept
 {
     return computeFirstPassVelocityCrossfadeGain(
@@ -242,9 +247,38 @@ double computeRouteCrossfadeGain(const SamplerRenderRoute& route, int velocity) 
         velocity);
 }
 
+double computeLayerCrossfadeGain(const SamplerRenderRoute& route,
+                                 int velocity,
+                                 const std::array<std::uint8_t, 128>& controllerValues) noexcept
+{
+    if (!routeHasLayerCrossfade(route))
+        return 1.0;
+
+    int value = velocity;
+    if (route.layerCrossfade.source == LayerCrossfadeSource::controller)
+    {
+        if (!route.layerCrossfade.controllerNumber.has_value()
+            || *route.layerCrossfade.controllerNumber < 0
+            || *route.layerCrossfade.controllerNumber > 127)
+            return 1.0;
+        value = controllerValues[static_cast<std::size_t>(*route.layerCrossfade.controllerNumber)];
+    }
+
+    if (route.layerCrossfade.low >= route.layerCrossfade.high)
+        return 1.0;
+    const auto fraction = std::clamp(
+        static_cast<double>(value - route.layerCrossfade.low)
+            / static_cast<double>(route.layerCrossfade.high - route.layerCrossfade.low),
+        0.0, 1.0);
+    return route.layerCrossfade.direction == LayerCrossfadeDirection::fadeOut
+        ? 1.0 - fraction : fraction;
+}
+
 bool areCrossfadeNeighbors(const SamplerRenderRoute& left,
                            const SamplerRenderRoute& right) noexcept
 {
+    if (!left.layerId.empty() && !right.layerId.empty() && left.layerId != right.layerId)
+        return true;
     return left.velocityCrossfadeRuntime.fadeInNeighborZoneId == right.zoneId
         || left.velocityCrossfadeRuntime.fadeOutNeighborZoneId == right.zoneId
         || right.velocityCrossfadeRuntime.fadeInNeighborZoneId == left.zoneId
@@ -772,6 +806,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
             std::array<CrossfadeCandidate, crossfadeRouteLimit> crossfadeCandidates {};
             std::size_t positiveCrossfadeCount = 0;
             bool hasCrossfadeMatch = false;
+            bool hasLayerCrossfadeMatch = false;
             bool hasNonCrossfadeMatch = false;
             bool crossfadeFallback = false;
 
@@ -788,20 +823,27 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   controllerValues))
                     continue;
 
-                if (!routeHasCrossfade(routes[routeIndex]))
+                if (!routeHasCrossfade(routes[routeIndex])
+                    && !routeHasLayerCrossfade(routes[routeIndex]))
                 {
                     hasNonCrossfadeMatch = true;
                     continue;
                 }
 
                 hasCrossfadeMatch = true;
-                if (!routeHasCrossfadeRuntime(routes[routeIndex]))
+                hasLayerCrossfadeMatch = hasLayerCrossfadeMatch || routeHasLayerCrossfade(routes[routeIndex]);
+                if (routeHasCrossfade(routes[routeIndex])
+                    && !routeHasCrossfadeRuntime(routes[routeIndex]))
                 {
                     crossfadeFallback = true;
                     continue;
                 }
 
-                const auto gainMultiplier = computeRouteCrossfadeGain(routes[routeIndex], routingVelocity);
+                const auto zoneGainMultiplier = routeHasCrossfade(routes[routeIndex])
+                    ? computeRouteCrossfadeGain(routes[routeIndex], routingVelocity) : 1.0;
+                const auto layerGainMultiplier = computeLayerCrossfadeGain(
+                    routes[routeIndex], routingVelocity, controllerValues);
+                const auto gainMultiplier = zoneGainMultiplier * layerGainMultiplier;
                 if (!std::isfinite(gainMultiplier) || gainMultiplier <= 0.0)
                     continue;
 
@@ -819,7 +861,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 {
                     useLegacyRouting = true;
                 }
-                else if (positiveCrossfadeCount == crossfadeRouteLimit)
+                else if (!hasLayerCrossfadeMatch && positiveCrossfadeCount == crossfadeRouteLimit)
                 {
                     const auto& firstRoute = routes[crossfadeCandidates[0].routeIndex];
                     const auto& secondRoute = routes[crossfadeCandidates[1].routeIndex];
@@ -905,7 +947,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                       controllerValues))
                         continue;
 
-                    startRoute(routeIndex, 1.0, false);
+                    const auto layerGainMultiplier = routeHasLayerCrossfade(routes[routeIndex])
+                        ? computeLayerCrossfadeGain(routes[routeIndex], routingVelocity, controllerValues) : 1.0;
+                    startRoute(routeIndex, layerGainMultiplier, false);
                 }
                 ++nextTriggerId;
                 if (nextTriggerId == 0)
@@ -924,7 +968,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                                   event.performanceEvent,
                                   event.sustainPedalDown,
                                   controllerValues)
-                    || routeHasCrossfade(routes[routeIndex]))
+                    || routeHasCrossfade(routes[routeIndex])
+                    || routeHasLayerCrossfade(routes[routeIndex]))
                 {
                     continue;
                 }

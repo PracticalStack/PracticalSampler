@@ -1,6 +1,7 @@
 #include "drs/engine/SfzImportProjection.h"
 
 #include "drs/engine/PlaybackSnapshot.h"
+#include "drs/engine/LayerMaterializer.h"
 #include "drs/engine/RuntimeLoader.h"
 #include "drs/engine/SfzRegionContract.h"
 
@@ -1118,6 +1119,8 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
         else
             project.authoring.selectedGroupId.clear();
     }
+
+    materializeProjectLayerHierarchy(project);
 
     return project;
 }

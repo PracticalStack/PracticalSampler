@@ -8,7 +8,7 @@
 
 namespace drs::engine
 {
-enum class CuratedDspScope : std::uint8_t { zone, group, instrument };
+enum class CuratedDspScope : std::uint8_t { zone, group, layer, instrument };
 enum class CuratedDspParameterUnit : std::uint8_t { decibels, normalized, boolean, milliseconds, seconds, hertz, ratio, semitones };
 enum class CuratedDspSmoothing : std::uint8_t { none, linear, logarithmic };
 enum class CuratedDspStateClass : std::uint8_t { stateless, bounded, delay, reverb };

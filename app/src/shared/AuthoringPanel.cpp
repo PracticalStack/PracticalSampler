@@ -810,6 +810,17 @@ juce::String formatRoutingInputSourceLabel(const drs::engine::RuntimeProjectMode
     if (inputSourceId.rfind(groupPrefix, 0) == 0)
         return "Group: " + findGroupDisplayName(project, inputSourceId.substr(std::char_traits<char>::length(groupPrefix)));
 
+    constexpr auto layerPrefix = "layers/";
+    if (inputSourceId.rfind(layerPrefix, 0) == 0)
+    {
+        const auto layerId = inputSourceId.substr(std::char_traits<char>::length(layerPrefix));
+        const auto iterator = std::find_if(project.authoring.layers.begin(), project.authoring.layers.end(),
+                                           [&](const auto& layer) { return layer.id == layerId; });
+        return "Layer: " + (iterator == project.authoring.layers.end()
+            ? juce::String::fromUTF8(layerId.c_str())
+            : juce::String::fromUTF8(iterator->displayName.c_str()));
+    }
+
     return "Zone: " + findZoneDisplayName(project, inputSourceId);
 }
 
@@ -818,6 +829,8 @@ juce::String buildGroupListStatusText(const drs::engine::RuntimeProjectModel& pr
 {
     juce::String status = group.workspaceVisible ? "Shown" : "Hidden";
     status << " | " << static_cast<int>(countZonesInGroup(project, group.id)) << " zones";
+    if (!group.layerId.empty())
+        status << " | layer " << juce::String::fromUTF8(group.layerId.c_str());
 
     if (!group.routingBusId.empty())
         status << " | " << findRoutingBusDisplayName(project, group.routingBusId);
@@ -1154,6 +1167,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       onCancelSourceValidation(std::move(nextCancelSourceValidation)),
       previewCommandCallback(std::move(nextPreviewCommandCallback)),
       sampleFilesDroppedCallback(std::move(nextSampleFilesDroppedCallback)),
+      layerList("authoringLayerList",
+                "authoringLayerListBox",
+                "authoringLayerListEmptyState"),
       groupList("authoringGroupList",
                 "authoringGroupListBox",
                 "authoringGroupListEmptyState"),
@@ -1206,10 +1222,12 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     configureSectionLabel(waveformLabel, "Waveform Detail");
     configureSectionLabel(zoneLabel, "Selected Zone");
     configureSectionLabel(groupSectionLabel, "Zone Groups");
+    configureSectionLabel(layerSectionLabel, "Layers");
     configureSectionLabel(fxSectionLabel, "Selected Insert");
     configureSectionLabel(routingSectionLabel, "Bus & Signal Path");
 
     configureFieldLabel(groupNameLabel, "Group Name");
+    configureFieldLabel(layerNameLabel, "Layer Name");
     configureFieldLabel(macroNameLabel, "Macro Name");
     configureFieldLabel(macroExposeLabel, "Perform");
     configureFieldLabel(macroAssignmentLabel, "Parameter");
@@ -1767,6 +1785,51 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     groupMoveDownButton.onClick = [this] { moveSelectedGroup(1); };
     groupVisibilityButton.onClick = [this] { toggleSelectedGroupVisibility(); };
 
+    layerCreateButton.setButtonText("New Layer");
+    layerCreateButton.onClick = [this] { createLayer(); };
+    layerAssignGroupsButton.setButtonText("Assign Group");
+    layerAssignGroupsButton.onClick = [this] { assignSelectedGroupsToSelectedLayer(); };
+    layerMoveUpButton.setButtonText("Move Up");
+    layerMoveUpButton.onClick = [this] { moveSelectedLayer(-1); };
+    layerMoveDownButton.setButtonText("Move Down");
+    layerMoveDownButton.onClick = [this] { moveSelectedLayer(1); };
+    layerVisibilityToggle.setButtonText("Visible In Workspace");
+    layerNameEditor.setMultiLine(false);
+    layerNameEditor.setReturnKeyStartsNewLine(false);
+    layerNameEditor.onReturnKey = [this] { applySelectedLayerEdit("Rename layer"); };
+    layerNameEditor.onFocusLost = [this] { applySelectedLayerEdit("Rename layer"); };
+    configureEditorSlider(layerGainSlider, -24.0, 24.0, 0.1);
+    configureEditorSlider(layerPanSlider, -1.0, 1.0, 0.01);
+    configureEditorSlider(layerCrossfadeControllerSlider, 0.0, 127.0, 1.0);
+    configureEditorSlider(layerCrossfadeLowSlider, 0.0, 127.0, 1.0);
+    configureEditorSlider(layerCrossfadeHighSlider, 0.0, 127.0, 1.0);
+    layerGainSlider.onDragEnd = [this] { applySelectedLayerEdit("Update layer gain"); };
+    layerPanSlider.onDragEnd = [this] { applySelectedLayerEdit("Update layer pan"); };
+    layerVisibilityToggle.onClick = [this] { applySelectedLayerEdit("Toggle layer visibility"); };
+    layerCrossfadeSourceSelector.addItem("None", 1);
+    layerCrossfadeSourceSelector.addItem("Velocity", 2);
+    layerCrossfadeSourceSelector.addItem("Controller", 3);
+    layerCrossfadeSourceSelector.onChange = [this] { applySelectedLayerEdit("Update layer crossfade"); };
+    layerCrossfadeLowSlider.onDragEnd = [this] { applySelectedLayerEdit("Update layer crossfade low"); };
+    layerCrossfadeHighSlider.onDragEnd = [this] { applySelectedLayerEdit("Update layer crossfade high"); };
+    layerCrossfadeDirectionSelector.addItem("Fade In", 1);
+    layerCrossfadeDirectionSelector.addItem("Fade Out", 2);
+    layerCrossfadeDirectionSelector.onChange = [this] { applySelectedLayerEdit("Update layer crossfade direction"); };
+    layerRoutingSelector.onChange = [this] { applySelectedLayerEdit("Update layer routing"); };
+    layerAnchorSelector.onChange = [this] { applySelectedLayerEdit("Update layer audition anchor"); };
+
+    layerList.setOnSelectionChanged([this](int nextIndex)
+    {
+        if (isRefreshing)
+            return;
+        const auto& layers = authoringSession.getProject().authoring.layers;
+        if (nextIndex < 0 || static_cast<std::size_t>(nextIndex) >= layers.size())
+            return;
+        selectedLayerIndex = nextIndex;
+        if (authoringSession.selectLayer(layers[static_cast<std::size_t>(nextIndex)].id).applied)
+            refreshSelectionFromSession();
+    });
+
     groupNameEditor.setMultiLine(false);
     groupNameEditor.setReturnKeyStartsNewLine(false);
     groupNameEditor.onReturnKey = [this] { applySelectedGroupNameEdit(); };
@@ -2277,6 +2340,24 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&previewEnabledToggle),
              static_cast<juce::Component*>(&previewStopButton),
              static_cast<juce::Component*>(&zoneMap),
+             static_cast<juce::Component*>(&layerSectionLabel),
+             static_cast<juce::Component*>(&layerList),
+             static_cast<juce::Component*>(&layerCreateButton),
+             static_cast<juce::Component*>(&layerAssignGroupsButton),
+             static_cast<juce::Component*>(&layerMoveUpButton),
+             static_cast<juce::Component*>(&layerMoveDownButton),
+             static_cast<juce::Component*>(&layerNameLabel),
+             static_cast<juce::Component*>(&layerNameEditor),
+             static_cast<juce::Component*>(&layerVisibilityToggle),
+             static_cast<juce::Component*>(&layerGainSlider),
+             static_cast<juce::Component*>(&layerPanSlider),
+             static_cast<juce::Component*>(&layerCrossfadeSourceSelector),
+             static_cast<juce::Component*>(&layerCrossfadeControllerSlider),
+             static_cast<juce::Component*>(&layerCrossfadeLowSlider),
+             static_cast<juce::Component*>(&layerCrossfadeHighSlider),
+             static_cast<juce::Component*>(&layerCrossfadeDirectionSelector),
+             static_cast<juce::Component*>(&layerRoutingSelector),
+             static_cast<juce::Component*>(&layerAnchorSelector),
              static_cast<juce::Component*>(&groupSectionLabel),
              static_cast<juce::Component*>(&groupNameLabel),
              static_cast<juce::Component*>(&groupNameEditor),
@@ -2574,6 +2655,51 @@ void AuthoringPanel::configureAccessibilityAndFocus()
     configureAccessibleMetadata(groupList,
                                 "Zone group list",
                                 "Lists authored zone groups and their workspace visibility state.");
+    configureAccessibleMetadata(layerList,
+                                "Layer list",
+                                "Lists authored layers with their group and zone counts.",
+                                "Select a layer to make it the active parent for group authoring.");
+    configureAccessibleMetadata(layerCreateButton,
+                                "Create layer",
+                                "Creates a new parent layer for groups.",
+                                "Press to create a new layer.");
+    configureAccessibleMetadata(layerAssignGroupsButton,
+                                "Assign group to layer",
+                                "Assigns the selected group to the active layer.",
+                                "Press to move the selected group into the active layer.");
+    configureAccessibleMetadata(layerMoveUpButton,
+                                "Move layer up",
+                                "Moves the selected layer earlier in layer order.",
+                                "Press to move the selected layer up.");
+    configureAccessibleMetadata(layerMoveDownButton,
+                                "Move layer down",
+                                "Moves the selected layer later in layer order.",
+                                "Press to move the selected layer down.");
+    configureAccessibleMetadata(layerNameEditor,
+                                "Layer name",
+                                "Renames the selected layer.",
+                                "Type a new layer name and press Enter to commit it.");
+    configureAccessibleMetadata(layerVisibilityToggle,
+                                "Layer visibility",
+                                "Controls whether the selected layer is visible in the map workspace.");
+    configureAccessibleMetadata(layerCrossfadeSourceSelector,
+                                "Layer crossfade source",
+                                "Selects none, velocity, or controller input for the selected layer crossfade.");
+    configureAccessibleMetadata(layerRoutingSelector,
+                                "Layer routing",
+                                "Selects the layer-owned routing bus when one is authored.");
+    configureAccessibleMetadata(layerAnchorSelector,
+                                "Layer audition anchor",
+                                "Selects the group used as the layer audition anchor.");
+    configureAccessibleMetadata(layerCrossfadeLowSlider,
+                                "Layer crossfade low",
+                                "Sets the lower bound of the selected layer crossfade window.");
+    configureAccessibleMetadata(layerCrossfadeHighSlider,
+                                "Layer crossfade high",
+                                "Sets the upper bound of the selected layer crossfade window.");
+    configureAccessibleMetadata(layerCrossfadeDirectionSelector,
+                                "Layer crossfade direction",
+                                "Selects whether the layer fades in or fades out across its window.");
     configureAccessibleMetadata(groupVisibilityButton,
                                 "Toggle group visibility",
                                 "Shows or hides the selected group on the workspace map without changing audio.",
@@ -3607,6 +3733,44 @@ void AuthoringPanel::resized()
 
     auto layoutGroupManager = [&](juce::Rectangle<int> groupManagerArea)
     {
+        layerSectionLabel.setBounds(groupManagerArea.removeFromTop(20));
+        groupManagerArea.removeFromTop(2);
+        auto layerRow = groupManagerArea.removeFromTop(34);
+        auto layerButtons = layerRow.removeFromRight(std::min(250, layerRow.getWidth()));
+        layerMoveDownButton.setBounds(layerButtons.removeFromRight(58));
+        layerButtons.removeFromRight(4);
+        layerMoveUpButton.setBounds(layerButtons.removeFromRight(58));
+        layerButtons.removeFromRight(4);
+        layerAssignGroupsButton.setBounds(layerButtons.removeFromRight(92));
+        layerButtons.removeFromRight(4);
+        layerCreateButton.setBounds(layerButtons);
+        layerList.setBounds(layerRow);
+        groupManagerArea.removeFromTop(4);
+        auto layerEditorRow = groupManagerArea.removeFromTop(28);
+        layerNameLabel.setBounds(layerEditorRow.removeFromLeft(72));
+        layerEditorRow.removeFromLeft(4);
+        layerNameEditor.setBounds(layerEditorRow.removeFromLeft(150));
+        layerEditorRow.removeFromLeft(6);
+        layerGainSlider.setBounds(layerEditorRow.removeFromLeft(120));
+        layerEditorRow.removeFromLeft(6);
+        layerPanSlider.setBounds(layerEditorRow.removeFromLeft(120));
+        layerEditorRow.removeFromLeft(6);
+        layerVisibilityToggle.setBounds(layerEditorRow);
+        auto layerCrossfadeRow = groupManagerArea.removeFromTop(28);
+        layerCrossfadeSourceSelector.setBounds(layerCrossfadeRow.removeFromLeft(120));
+        layerCrossfadeRow.removeFromLeft(6);
+        layerCrossfadeControllerSlider.setBounds(layerCrossfadeRow.removeFromLeft(120));
+        layerCrossfadeRow.removeFromLeft(6);
+        layerRoutingSelector.setBounds(layerCrossfadeRow.removeFromLeft(120));
+        layerCrossfadeRow.removeFromLeft(6);
+        layerAnchorSelector.setBounds(layerCrossfadeRow);
+        auto layerCrossfadeRangeRow = groupManagerArea.removeFromTop(28);
+        layerCrossfadeLowSlider.setBounds(layerCrossfadeRangeRow.removeFromLeft(120));
+        layerCrossfadeRangeRow.removeFromLeft(6);
+        layerCrossfadeHighSlider.setBounds(layerCrossfadeRangeRow.removeFromLeft(120));
+        layerCrossfadeRangeRow.removeFromLeft(6);
+        layerCrossfadeDirectionSelector.setBounds(layerCrossfadeRangeRow);
+        groupManagerArea.removeFromTop(4);
         groupSectionLabel.setBounds(groupManagerArea.removeFromTop(22));
         groupManagerArea.removeFromTop(4);
         const auto wrapGroupManagerButtons = groupManagerArea.getWidth() < 360;
@@ -3654,7 +3818,7 @@ void AuthoringPanel::resized()
         groupMoveDownButton.setBounds(managerButtonColumn.removeFromTop(20));
     };
 
-    const auto desiredGroupManagerHeight = expanded ? 112 : 124;
+    const auto desiredGroupManagerHeight = expanded ? 252 : 264;
     const auto canStackGroupManager = shellArea.getHeight() >= authoring::minimumMapVisibleHeight + desiredGroupManagerHeight + 8;
     if (canStackGroupManager)
     {
@@ -4137,6 +4301,45 @@ void AuthoringPanel::rebuildZoneSelector()
     }
 
     zoneSelector.setSelectedId(selectedItemId, juce::dontSendNotification);
+}
+
+void AuthoringPanel::rebuildLayerList()
+{
+    const auto& project = authoringSession.getProject();
+    const auto selectedLayer = authoringSession.getSelectedLayer();
+    authoring::RepeatedStructureListViewModel viewModel;
+    viewModel.emptyStateText = "No layers are authored in this project yet.";
+    selectedLayerIndex = -1;
+    viewModel.rows.reserve(project.authoring.layers.size());
+    for (std::size_t index = 0; index < project.authoring.layers.size(); ++index)
+    {
+        const auto& layer = project.authoring.layers[index];
+        auto row = authoring::RepeatedStructureRowViewModel {};
+        row.key = layer.id;
+        row.title = layer.displayName;
+        const auto groupCount = static_cast<int>(std::count_if(
+            project.authoring.groups.begin(), project.authoring.groups.end(),
+            [&](const auto& group) { return group.layerId == layer.id; }));
+        const auto zoneCount = static_cast<int>(std::count_if(
+            project.authoring.zones.begin(), project.authoring.zones.end(),
+            [&](const auto& zone)
+            {
+                return std::any_of(project.authoring.groups.begin(), project.authoring.groups.end(),
+                                   [&](const auto& group)
+                                   {
+                                       return group.id == zone.groupId && group.layerId == layer.id;
+                                   });
+            }));
+        row.statusText = std::to_string(groupCount) + " groups · " + std::to_string(zoneCount) + " zones"
+            + (layer.workspaceVisible ? " · visible" : " · hidden");
+        viewModel.rows.push_back(std::move(row));
+        if (selectedLayer.has_value() && selectedLayer->id == layer.id)
+            selectedLayerIndex = static_cast<int>(index);
+    }
+    if (selectedLayerIndex < 0 && !project.authoring.layers.empty())
+        selectedLayerIndex = 0;
+    viewModel.selectedIndex = selectedLayerIndex;
+    layerList.setViewModel(std::move(viewModel));
 }
 
 void AuthoringPanel::rebuildGroupList()
@@ -6112,6 +6315,7 @@ void AuthoringPanel::refreshFromSession()
     const juce::ScopedValueSetter<bool> refreshGuard(isRefreshing, true);
 
     rebuildZoneSelector();
+    rebuildLayerList();
     rebuildGroupList();
     rebuildMacroList();
     rebuildMacroAssignmentList();
@@ -6903,6 +7107,79 @@ void AuthoringPanel::refreshSelectionFromSession()
     if (selectedGroupIndex >= 0)
         groupList.setSelectedIndex(selectedGroupIndex);
 
+    const auto selectedLayer = authoringSession.getSelectedLayer();
+    selectedLayerIndex = -1;
+    if (selectedLayer.has_value())
+    {
+        for (std::size_t index = 0; index < project.authoring.layers.size(); ++index)
+        {
+            if (project.authoring.layers[index].id == selectedLayer->id)
+            {
+                selectedLayerIndex = static_cast<int>(index);
+                break;
+            }
+        }
+    }
+    if (selectedLayerIndex >= 0)
+        layerList.setSelectedIndex(selectedLayerIndex);
+    if (selectedLayer.has_value())
+    {
+        layerNameEditor.setText(juce::String::fromUTF8(selectedLayer->displayName.c_str()),
+                                juce::dontSendNotification);
+        layerVisibilityToggle.setToggleState(selectedLayer->workspaceVisible, juce::dontSendNotification);
+        layerGainSlider.setValue(selectedLayer->gainDb, juce::dontSendNotification);
+        layerPanSlider.setValue(selectedLayer->pan, juce::dontSendNotification);
+        layerCrossfadeSourceSelector.setSelectedId(
+            selectedLayer->crossfade.source == drs::engine::LayerCrossfadeSource::velocity ? 2
+                : selectedLayer->crossfade.source == drs::engine::LayerCrossfadeSource::controller ? 3 : 1,
+            juce::dontSendNotification);
+        layerCrossfadeControllerSlider.setValue(
+            selectedLayer->crossfade.controllerNumber.value_or(1), juce::dontSendNotification);
+        layerCrossfadeLowSlider.setValue(selectedLayer->crossfade.low, juce::dontSendNotification);
+        layerCrossfadeHighSlider.setValue(selectedLayer->crossfade.high, juce::dontSendNotification);
+        layerCrossfadeDirectionSelector.setSelectedId(
+            selectedLayer->crossfade.direction == drs::engine::LayerCrossfadeDirection::fadeOut ? 2 : 1,
+            juce::dontSendNotification);
+
+        layerRoutingBusIds.clear();
+        layerRoutingSelector.clear(juce::dontSendNotification);
+        layerRoutingSelector.addItem("(none)", 1);
+        layerRoutingBusIds.push_back({});
+        int routingItem = 2;
+        for (const auto& bus : project.authoring.routingBuses)
+        {
+            if (bus.inputSourceId != "layers/" + selectedLayer->id)
+                continue;
+            layerRoutingSelector.addItem(juce::String::fromUTF8(bus.displayName.c_str()), routingItem++);
+            layerRoutingBusIds.push_back(bus.id);
+        }
+        const auto routingIndex = std::find(layerRoutingBusIds.begin(), layerRoutingBusIds.end(),
+                                            selectedLayer->routingBusId);
+        layerRoutingSelector.setSelectedId(routingIndex == layerRoutingBusIds.end()
+                                               ? 1
+                                               : static_cast<int>(std::distance(layerRoutingBusIds.begin(), routingIndex)) + 1,
+                                           juce::dontSendNotification);
+
+        layerAnchorGroupIds.clear();
+        layerAnchorSelector.clear(juce::dontSendNotification);
+        layerAnchorSelector.addItem("(none)", 1);
+        layerAnchorGroupIds.push_back({});
+        int anchorItem = 2;
+        for (const auto& group : project.authoring.groups)
+        {
+            if (group.layerId != selectedLayer->id)
+                continue;
+            layerAnchorSelector.addItem(juce::String::fromUTF8(group.displayName.c_str()), anchorItem++);
+            layerAnchorGroupIds.push_back(group.id);
+        }
+        const auto anchorIndex = std::find(layerAnchorGroupIds.begin(), layerAnchorGroupIds.end(),
+                                           selectedLayer->auditionAnchorGroupId);
+        layerAnchorSelector.setSelectedId(anchorIndex == layerAnchorGroupIds.end()
+                                              ? 1
+                                              : static_cast<int>(std::distance(layerAnchorGroupIds.begin(), anchorIndex)) + 1,
+                                          juce::dontSendNotification);
+    }
+
     syncZoneMapSelectionState();
     zoneMap.setSelectionState({ zoneMapSelectedZoneIds,
                                 selectedZone.has_value() ? selectedZone->id : std::string {} });
@@ -7112,6 +7389,112 @@ void AuthoringPanel::createGroup()
                                                "Create Group Failed",
                                                buildIssueSummary(result.issues));
     }
+}
+
+void AuthoringPanel::createLayer()
+{
+    const auto& layers = authoringSession.getProject().authoring.layers;
+    auto nextIndex = layers.size() + 1;
+    std::string nextId;
+    do
+    {
+        nextId = "layer-" + std::to_string(nextIndex++);
+    }
+    while (std::any_of(layers.begin(), layers.end(),
+                       [&](const auto& layer) { return layer.id == nextId; }));
+
+    drs::engine::RuntimeProjectLayerDefinition layer;
+    layer.id = nextId;
+    layer.displayName = "New Layer " + std::to_string(layers.size() + 1);
+    layer.displayOrder = static_cast<int>(layers.size());
+    layer.workspaceVisible = true;
+    const auto result = authoringSession.createLayer(layer, "Create layer");
+    if (result.applied)
+        refreshFromSession();
+    else
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Create Layer Failed",
+                                               buildIssueSummary(result.issues));
+}
+
+void AuthoringPanel::applySelectedLayerEdit(const juce::String& label)
+{
+    if (isRefreshing || selectedLayerIndex < 0)
+        return;
+    const auto selectedLayer = authoringSession.getSelectedLayer();
+    if (!selectedLayer.has_value())
+        return;
+
+    auto editedLayer = *selectedLayer;
+    const auto editedName = layerNameEditor.getText().trim();
+    if (editedName.isEmpty())
+        return;
+    editedLayer.displayName = editedName.toStdString();
+    editedLayer.workspaceVisible = layerVisibilityToggle.getToggleState();
+    editedLayer.gainDb = layerGainSlider.getValue();
+    editedLayer.pan = layerPanSlider.getValue();
+    const auto routingIndex = layerRoutingSelector.getSelectedId() - 1;
+    editedLayer.routingBusId = routingIndex >= 0
+            && static_cast<std::size_t>(routingIndex) < layerRoutingBusIds.size()
+        ? layerRoutingBusIds[static_cast<std::size_t>(routingIndex)] : std::string {};
+    const auto anchorIndex = layerAnchorSelector.getSelectedId() - 1;
+    editedLayer.auditionAnchorGroupId = anchorIndex >= 0
+            && static_cast<std::size_t>(anchorIndex) < layerAnchorGroupIds.size()
+        ? layerAnchorGroupIds[static_cast<std::size_t>(anchorIndex)] : std::string {};
+    const auto sourceId = layerCrossfadeSourceSelector.getSelectedId();
+    editedLayer.crossfade.source = sourceId == 2 ? drs::engine::LayerCrossfadeSource::velocity
+        : sourceId == 3 ? drs::engine::LayerCrossfadeSource::controller
+                        : drs::engine::LayerCrossfadeSource::none;
+    editedLayer.crossfade.low = static_cast<int>(layerCrossfadeLowSlider.getValue());
+    editedLayer.crossfade.high = static_cast<int>(layerCrossfadeHighSlider.getValue());
+    if (editedLayer.crossfade.low >= editedLayer.crossfade.high)
+        editedLayer.crossfade.high = std::min(127, editedLayer.crossfade.low + 1);
+    editedLayer.crossfade.direction = layerCrossfadeDirectionSelector.getSelectedId() == 2
+        ? drs::engine::LayerCrossfadeDirection::fadeOut
+        : drs::engine::LayerCrossfadeDirection::fadeIn;
+    if (editedLayer.crossfade.source == drs::engine::LayerCrossfadeSource::controller)
+    {
+        editedLayer.crossfade.controllerNumber = static_cast<int>(layerCrossfadeControllerSlider.getValue());
+    }
+    else
+    {
+        editedLayer.crossfade.controllerNumber.reset();
+    }
+
+    if (authoringSession.updateLayer(static_cast<std::size_t>(selectedLayerIndex),
+                                     editedLayer,
+                                     label.toStdString()).applied)
+        refreshFromSession();
+}
+
+void AuthoringPanel::moveSelectedLayer(const int direction)
+{
+    if (selectedLayerIndex < 0)
+        return;
+    if (authoringSession.moveLayer(static_cast<std::size_t>(selectedLayerIndex),
+                                   direction,
+                                   direction < 0 ? "Move layer earlier" : "Move layer later").applied)
+    {
+        selectedLayerIndex = std::max(0, selectedLayerIndex + direction);
+        refreshFromSession();
+    }
+}
+
+void AuthoringPanel::assignSelectedGroupsToSelectedLayer()
+{
+    const auto selectedLayer = authoringSession.getSelectedLayer();
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    if (!selectedLayer.has_value() || !selectedGroup.has_value())
+        return;
+
+    const auto result = authoringSession.reassignGroupsToLayer(
+        { selectedGroup->id }, selectedLayer->id, "Assign group to layer");
+    if (result.applied)
+        refreshFromSession();
+    else
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                               "Assign Group Failed",
+                                               buildIssueSummary(result.issues));
 }
 
 void AuthoringPanel::assignSelectedZonesToSelectedGroup()

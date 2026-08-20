@@ -4,6 +4,7 @@
 #include <limits>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace drs::engine
 {
@@ -46,7 +47,11 @@ DspGraphPlanBuildResult compileDspGraphPlan(const ImmutablePlaybackSnapshot& sna
     for (const auto& slot : snapshot.fxSlots) slots.emplace(slot.id, &slot);
     std::unordered_map<std::string, std::size_t> slotOwnerCounts;
     std::unordered_map<std::string, std::string> zoneGroups;
+    std::unordered_map<std::string, std::string> groupLayers;
+    std::unordered_set<std::string> layerIds;
     for (const auto& zone : snapshot.zones) zoneGroups.emplace(zone.id, zone.groupId);
+    for (const auto& group : snapshot.groupRoutes) groupLayers.emplace(group.groupId, group.layerId);
+    for (const auto& layer : snapshot.layerRoutes) layerIds.insert(layer.layerId);
 
     std::vector<std::size_t> orderedBusIndices;
     orderedBusIndices.reserve(snapshot.routingBuses.size());
@@ -57,8 +62,9 @@ DspGraphPlanBuildResult compileDspGraphPlan(const ImmutablePlaybackSnapshot& sna
         const auto& source = snapshot.routingBuses[index].inputSourceId;
         if (source.rfind("zones/", 0) == 0) return 0;
         if (source.rfind("groups/", 0) == 0) return 1;
-        if (source == "master") return 2;
-        return 3;
+        if (source.rfind("layers/", 0) == 0) return 2;
+        if (source == "master") return 3;
+        return 4;
     };
     std::stable_sort(orderedBusIndices.begin(), orderedBusIndices.end(),
                      [&](const auto left, const auto right)
@@ -86,10 +92,21 @@ DspGraphPlanBuildResult compileDspGraphPlan(const ImmutablePlaybackSnapshot& sna
         {
             kind = DspGraphOwnerKind::group;
             ownerId = bus.inputSourceId.substr(7);
+            const auto group = groupLayers.find(ownerId);
+            destination = group != groupLayers.end() && !group->second.empty()
+                ? "layers/" + group->second : "master";
+        }
+        else if (bus.inputSourceId.rfind("layers/", 0) == 0)
+        {
+            kind = DspGraphOwnerKind::layer;
+            ownerId = bus.inputSourceId.substr(7);
+            if (!layerIds.count(ownerId))
+                addFinding(result, "graph-invalid-layer-owner", "routingBuses[" + std::to_string(busIndex) + "]",
+                           "Layer owner is absent from snapshot layer routes.");
             destination = "master";
         }
         else if (bus.inputSourceId == "master") { ownerId = "master"; }
-        else addFinding(result, "graph-invalid-owner-source", "routingBuses[" + std::to_string(busIndex) + "]", "Only canonical zone, group, or master sources are compilable.");
+        else addFinding(result, "graph-invalid-owner-source", "routingBuses[" + std::to_string(busIndex) + "]", "Only canonical zone, group, layer, or master sources are compilable.");
 
         for (const auto& slotId : bus.fxSlotIds)
         {

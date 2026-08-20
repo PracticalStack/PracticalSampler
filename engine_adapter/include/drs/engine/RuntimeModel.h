@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/ContinuousDamper.h"
+#include "drs/engine/LayerContract.h"
 #include "drs/engine/PlaybackRegionContract.h"
 #include "drs/engine/VelocityCrossfade.h"
 
@@ -286,6 +287,7 @@ struct RuntimeProjectMacroDefinition
 struct RuntimeProjectGroupDefinition
 {
     std::string id;
+    std::string layerId;
     std::string displayName;
     int displayOrder = 0;
     bool workspaceVisible = true;
@@ -293,6 +295,19 @@ struct RuntimeProjectGroupDefinition
     double pan = 0.0;
     std::string routingBusId;
     std::string auditionAnchorZoneId;
+};
+
+struct RuntimeProjectLayerDefinition
+{
+    std::string id;
+    std::string displayName;
+    int displayOrder = 0;
+    bool workspaceVisible = true;
+    double gainDb = 0.0;
+    double pan = 0.0;
+    std::string routingBusId;
+    std::string auditionAnchorGroupId;
+    RuntimeProjectLayerCrossfadeDefinition crossfade;
 };
 
 struct RuntimeProjectFxSlotDefinition
@@ -370,6 +385,7 @@ struct RuntimeProjectAuthoringState
     int schemaVersion = 0;
     std::string selectedZoneId;
     std::string selectedGroupId;
+    std::string selectedLayerId;
     std::string selectedPerformanceBankId;
     double masterGainDb = 0.0;
     std::vector<RuntimeProjectArticulationDefinition> articulations;
@@ -377,6 +393,7 @@ struct RuntimeProjectAuthoringState
     std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<RuntimeProjectGroupDefinition> groups;
+    std::vector<RuntimeProjectLayerDefinition> layers;
     std::vector<RuntimeProjectMacroDefinition> macros;
     std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
     std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;
