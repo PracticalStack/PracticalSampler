@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Practical Sampler — Unified Instrument Workspace Development Plan</title>
+  <style>
+    :root {
+      --paper:#f2eee6; --surface:#fffdf8; --surface-alt:#f8f3eb;
+      --ink:#222b30; --muted:#687278; --line:#d8d0c3;
+      --charcoal:#253238; --charcoal-2:#34464d; --brown:#8a4615;
+      --blue:#286c83; --green:#24715e; --amber:#946315; --red:#9a3f38; --violet:#69509a;
+      --green-soft:#dfeee8; --amber-soft:#f5e8ce; --red-soft:#f4dfdc; --violet-soft:#ebe4f5;
+      --shadow:0 18px 42px rgba(53,43,32,.08);
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;color:var(--ink);background:radial-gradient(circle at 7% 0%,rgba(138,70,21,.11),transparent 31rem),radial-gradient(circle at 95% 8%,rgba(40,108,131,.11),transparent 29rem),var(--paper);font-family:Inter,"Segoe UI Variable Text","Segoe UI",sans-serif;line-height:1.58}
+    a{color:var(--blue)} h1,h2,h3,p{margin-top:0} h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.025em} h1{max-width:1050px;margin-bottom:18px;font-size:clamp(2.35rem,5vw,4.65rem);line-height:.98} h2{margin-bottom:14px;font-size:clamp(1.7rem,3vw,2.55rem);line-height:1.08} h3{margin-bottom:9px;font-size:1.3rem} p{margin-bottom:14px} ul,ol{margin:10px 0 0;padding-left:1.3rem} li+li{margin-top:6px} code{padding:.12em .35em;border-radius:5px;color:#26343c;background:#e9edeb;font:.9em "Cascadia Code",Consolas,monospace}
+    .page{width:min(1340px,calc(100% - 36px));margin:0 auto;padding:30px 0 76px}.hero{position:relative;overflow:hidden;padding:48px;border-radius:27px;color:#fffaf3;background:linear-gradient(135deg,var(--charcoal),var(--charcoal-2));box-shadow:var(--shadow)}.hero::after{content:"UNIFIED";position:absolute;right:14px;bottom:-32px;color:rgba(255,255,255,.045);font:700 7rem/1 Georgia,serif;pointer-events:none}.eyebrow,.section-label{display:inline-block;margin-bottom:10px;color:#efc39f;font-size:.75rem;font-weight:850;letter-spacing:.14em;text-transform:uppercase}.section-label{color:var(--brown)}.lede{position:relative;z-index:1;max-width:1040px;color:#dce3df;font-size:1.08rem}.meta{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}.chip{padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.08);font-size:.83rem}.hero a{color:#cceaf2}.summary-grid,.grid-2,.grid-3,.flow{display:grid;gap:15px}.summary-grid{position:relative;z-index:1;grid-template-columns:repeat(4,1fr);margin-top:28px}.summary-card{padding:17px;border:1px solid rgba(255,255,255,.13);border-radius:15px;background:rgba(255,255,255,.07)}.summary-card strong{display:block;margin-bottom:3px;color:#fff;font:600 1.7rem Georgia,serif}.summary-card span{color:#d7dedb;font-size:.84rem}.grid-2{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(3,1fr)}
+    .toc,.section,.phase,.callout{border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:var(--shadow)}.toc{margin-top:20px;padding:21px 25px}.toc ol{columns:3;column-gap:34px}.toc li{break-inside:avoid}.section,.phase{margin-top:24px;padding:30px}.heading{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;margin-bottom:18px}.heading h2{margin:0}.heading::after{content:"";height:1px;background:var(--line)}.card{padding:21px;border:1px solid var(--line);border-radius:16px;background:var(--surface-alt)}.card p:last-child,.card ul:last-child{margin-bottom:0}.card.accent{border-top:4px solid var(--blue)}.card.good{border-top:4px solid var(--green)}.card.warn{border-top:4px solid var(--amber)}.card.problem{border-top:4px solid var(--red)}.card.violet{border-top:4px solid var(--violet)}.callout{margin-top:18px;padding:18px 21px;border-left:6px solid var(--blue)}.callout.problem{border-left-color:var(--red);background:#fff8f6}.callout.decision{border-left-color:var(--green);background:#f7fcfa}.callout.warning{border-left-color:var(--amber);background:#fffaf0}.callout p:last-child{margin-bottom:0}
+    .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px} table{width:100%;min-width:900px;border-collapse:collapse;background:var(--surface)}th,td{padding:13px 15px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{color:#fff;background:var(--charcoal);font-size:.77rem;letter-spacing:.08em;text-transform:uppercase}tbody tr:last-child td{border-bottom:0}td:first-child{font-weight:700}.id{white-space:nowrap;color:var(--brown);font-family:"Cascadia Code",Consolas,monospace}.priority{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;background:var(--brown);font-size:.72rem;font-weight:800}.priority.p1{background:var(--blue)}.priority.p2{background:var(--muted)}
+    .contract{margin-top:18px;padding:23px;color:#d9e2df;background:#28363c;border-radius:15px;font-family:"Cascadia Code",Consolas,monospace;white-space:pre-line}.contract strong{color:#f0c39e}.flow{grid-template-columns:repeat(5,1fr);margin-top:18px}.flow-step{position:relative;padding:18px;border:1px solid var(--line);border-top:4px solid var(--blue);border-radius:13px;background:var(--surface-alt)}.flow-step:not(:last-child)::after{content:"→";position:absolute;right:-13px;top:42%;z-index:2;color:var(--brown);font-size:1.4rem;font-weight:900}.flow-step strong{display:block;margin-bottom:5px}.flow-step span{color:var(--muted);font-size:.86rem}
+    .phase{padding:0;overflow:hidden}.phase-head{display:grid;grid-template-columns:58px 1fr auto;gap:14px;align-items:center;padding:20px 24px;color:#fff;background:var(--charcoal)}.phase-number{display:grid;place-items:center;width:44px;height:44px;border:1px solid rgba(255,255,255,.28);border-radius:50%;font:600 1.35rem Georgia,serif}.phase-head h2{margin:0;font-size:1.8rem}.phase-focus{color:#cbd8d5;font-size:.84rem}.phase-intent{margin:0;padding:18px 24px;border-bottom:1px solid var(--line);background:var(--surface-alt)}.phase-body{padding:22px 24px 24px}.task-list{padding:0;list-style:none}.task-list li{position:relative;min-height:40px;margin-top:0;padding:10px 12px 10px 104px;border-bottom:1px solid #e3ddd2}.task-list li:last-child{border-bottom:0}.task-id{position:absolute;left:10px;top:10px;width:80px;color:var(--brown);font:700 .78rem "Cascadia Code",Consolas,monospace}.gate{margin-top:18px;padding:17px 19px;border-left:5px solid var(--green);background:var(--green-soft)}.gate h3{margin-bottom:4px}.gate p{margin:0}.files{margin-top:18px;padding:13px 15px;color:var(--muted);background:var(--surface-alt);border:1px dashed var(--line);border-radius:11px;font-size:.88rem}.files a{white-space:nowrap}.checklist{columns:2;column-gap:36px}.checklist li{break-inside:avoid}.dependency{display:grid;grid-template-columns:140px 1fr 1fr;gap:1px;margin-top:16px;background:var(--line);border:1px solid var(--line)}.dependency>div{padding:12px 14px;background:var(--surface)}.dependency .head{color:#fff;background:var(--charcoal);font-size:.76rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.status-new{color:var(--blue)}.status-change{color:var(--amber)}.status-retire{color:var(--red)}footer{margin-top:28px;padding:20px 4px;color:var(--muted);font-size:.85rem}
+    @media(max-width:920px){.summary-grid,.grid-3,.flow{grid-template-columns:repeat(2,1fr)}.toc ol{columns:2}.phase-head{grid-template-columns:48px 1fr}.phase-focus{grid-column:2}.flow-step::after{display:none}}@media(max-width:620px){.page{width:min(100% - 20px,1340px)}.hero{padding:28px 24px}.summary-grid,.grid-2,.grid-3,.flow{grid-template-columns:1fr}.toc ol,.checklist{columns:1}.section{padding:22px}.phase-head{padding:17px}.phase-body{padding:18px}.task-list li{padding-left:12px}.task-id{position:static;display:block;width:auto;margin-bottom:5px}.dependency{grid-template-columns:1fr}.dependency .head{display:none}}@media print{body{background:#fff}.page{width:100%;padding:0}.hero,.toc,.section,.phase{box-shadow:none}.phase,.card,.callout{break-inside:avoid}}
+  </style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <span class="eyebrow">Engineering plan | 21 August 2026</span>
+    <h1>Implement the Unified Instrument Workspace</h1>
+    <p class="lede">Replace the separate Map and Structure modes with one persistent Instrument → Layer → Group → Zone workspace. Preserve the existing Zone Map and authoring transactions, add a hierarchy browser and context-sensitive inspector, and make <strong>Show Map</strong> and <strong>Show Zones</strong> independent, testable commands.</p>
+    <div class="meta">
+      <span class="chip">Scope: PracticalSampler</span>
+      <span class="chip">Status: Ready for execution</span>
+      <span class="chip">No project-schema change</span>
+      <span class="chip">Existing Zone Map retained</span>
+      <span class="chip"><a href="structure-viewer-high-level-design.html">Unified Instrument Workspace HLD</a></span>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-card"><strong>7</strong><span>Mergeable phases including contract and hardening</span></div>
+      <div class="summary-card"><strong>8 / 10</strong><span>Implementation complexity</span></div>
+      <div class="summary-card"><strong>6 / 10</strong><span>Migration risk with existing seams retained</span></div>
+      <div class="summary-card"><strong>3</strong><span>Independent workspace states: selection, scope, visibility</span></div>
+    </div>
+  </section>
+
+  <nav class="toc" aria-label="Document contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#goal">Goal and scope</a></li>
+      <li><a href="#baseline">Current baseline</a></li>
+      <li><a href="#contract">Locked behavior</a></li>
+      <li><a href="#architecture">Target architecture</a></li>
+      <li><a href="#phases">Development phases</a></li>
+      <li><a href="#validation">Validation strategy</a></li>
+      <li><a href="#risks">Risks and guardrails</a></li>
+      <li><a href="#release">Release gate</a></li>
+    </ol>
+  </nav>
+
+  <section class="section" id="goal">
+    <span class="section-label">01 | Product frame</span>
+    <div class="heading"><h2>Goal and scope</h2></div>
+    <div class="grid-3">
+      <article class="card accent"><h3>Creator outcome</h3><p>A creator can navigate the complete hierarchy, understand the active path, edit the selected object or compatible multi-selection, and ask the existing Map to show exactly the relevant zones without leaving the workspace.</p></article>
+      <article class="card good"><h3>Engineering outcome</h3><p>One stable-ID selection drives inspector context; a separate stable-ID scope drives Map membership; a third workspace flag drives Map visibility. All authored edits continue through validated <code>AuthoringSession</code> transactions.</p></article>
+      <article class="card warn"><h3>Explicit non-goals</h3><p>No audio-engine behavior, project schema, mapping geometry, Zone Map renderer, lower-workbench content, cross-type batch editing, or authored visibility semantics change in this iteration.</p></article>
+    </div>
+    <div class="callout decision"><h3>Source of truth</h3><p>The product contract and visual behavior are defined by the <a href="structure-viewer-high-level-design.html">Unified Instrument Workspace High-Level Design</a>. The older <a href="structure-viewer-iteration-plan.html">Structure Viewer iteration plan</a> is historical implementation evidence only where its separate mode switch and three-column presentation conflict with the new HLD.</p></div>
+  </section>
+
+  <section class="section" id="baseline">
+    <span class="section-label">02 | Ground truth</span>
+    <div class="heading"><h2>Current baseline to migrate</h2></div>
+    <p>The previous iteration already delivered much of the hard infrastructure. The work should refactor and recompose it, not recreate it inside <code>AuthoringPanel</code>.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Existing seam</th><th>Current capability</th><th>Plan</th></tr></thead>
+        <tbody>
+          <tr><td class="id">AuthoringStructureSelection</td><td>Typed, same-kind, stable-ID selection with range/toggle gestures and reconciliation.</td><td><span class="status-change">Extend</span> with instrument-root selection; retain as inspector authority.</td></tr>
+          <tr><td class="id">StructureViewModels</td><td>Pure hierarchy rows, counts, coverage, filters, diagnostics, and accessible text.</td><td><span class="status-change">Refactor</span> to produce flattened tree rows and retain pure projection rules.</td></tr>
+          <tr><td class="id">StructureViewer</td><td>Three resizable Layer / Group / Zone columns.</td><td><span class="status-retire">Replace presentation</span> with one virtual hierarchy browser; preserve reusable selection and projection tests.</td></tr>
+          <tr><td class="id">StructureInspector</td><td>Context snapshot, editable shared fields, mixed values, actions, and batch patch callbacks.</td><td><span class="status-change">Promote</span> into the authoritative Layer / Group / Zone inspector host and add Show Zones.</td></tr>
+          <tr><td class="id">ZoneMapCanvas / Overview</td><td>Dense rendering, multi-selection, range gestures, velocity crossfades, audition, pan/zoom, fit, and minimap.</td><td><span class="status-new">Reuse intact</span>; add only public scope-fit and overlap-stack access seams.</td></tr>
+          <tr><td class="id">StructureViewState</td><td>Map / Structure mode, three column widths, filters, sort, and scroll anchors.</td><td><span class="status-change">Migrate</span> to tree disclosure/width plus independent Map visibility and scope.</td></tr>
+          <tr><td class="id">AuthoringPanel</td><td>Composition root for view switching, selection adapters, inspector commits, Map summaries, and layout.</td><td><span class="status-change">Simplify</span> by moving scope derivation and workspace composition into focused helpers/components.</td></tr>
+          <tr><td class="id">StructureViewerFixtures</td><td>Empty containers, multiple layers/groups, stacked zones, events, RR, and production-scale extension.</td><td><span class="status-new">Reuse and expand</span> for scope, disclosure, overlap-stack, and compact-layout cases.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="files">Primary existing files: <a href="../app/src/shared/AuthoringPanel.h">AuthoringPanel.h</a>, <a href="../app/src/shared/AuthoringPanel.cpp">AuthoringPanel.cpp</a>, <a href="../app/src/shared/authoring/AuthoringStructureSelection.h">AuthoringStructureSelection.h</a>, <a href="../app/src/shared/authoring/StructureViewState.h">StructureViewState.h</a>, <a href="../app/src/shared/authoring/StructureViewModels.h">StructureViewModels.h</a>, <a href="../app/src/shared/authoring/StructureViewer.h">StructureViewer.h</a>, <a href="../app/src/shared/authoring/StructureInspector.h">StructureInspector.h</a>, <a href="../app/src/shared/authoring/ZoneMapCanvas.h">ZoneMapCanvas.h</a>, and <a href="../app/src/shared/authoring/AuthoringWorkspaceLayout.h">AuthoringWorkspaceLayout.h</a>.</p>
+  </section>
+
+  <section class="section" id="contract">
+    <span class="section-label">03 | Locked product contract</span>
+    <div class="heading"><h2>Three states, two controls, one Map</h2></div>
+    <div class="contract"><strong>Selection</strong>
+AuthoringStructureSelection = instrument | layer | group | zone
+controls hierarchy highlight, primary object, inspector type, and edit targets
+selection alone never changes Map membership
+
+<strong>Map scope</strong>
+StructureScope = instrument root | one layer ID | one group ID
+controls which zone summaries are supplied to the existing ZoneMapCanvas
+changes only when Show Zones is invoked or when invalid IDs are reconciled
+
+<strong>Map visibility</strong>
+MapPaneVisible = true | false
+controls layout only; Show Map changes only this value
+Show Zones may set it true, but never sets it false
+
+<strong>Authored document</strong>
+visibility, order, membership, mix, routing, mapping, release, RR, and trigger fields
+change only through validated AuthoringSession transactions</div>
+    <div class="table-wrap" style="margin-top:18px">
+      <table>
+        <thead><tr><th>Gesture</th><th>Selection</th><th>Scope</th><th>Map visibility</th><th>Inspector</th></tr></thead>
+        <tbody>
+          <tr><td>Select instrument/layer/group</td><td>Replace with selected entity.</td><td>Unchanged.</td><td>Unchanged.</td><td>Switch to matching context.</td></tr>
+          <tr><td>Select zone(s) in tree or Map</td><td>Replace/toggle/range-select stable zone IDs.</td><td>Unchanged while valid.</td><td>Unchanged.</td><td>Zone or multi-Zone context.</td></tr>
+          <tr><td>Show Map</td><td>Unchanged.</td><td>Unchanged.</td><td>Toggle.</td><td>Retained and widened/narrowed by layout.</td></tr>
+          <tr><td>Show Zones</td><td>Unchanged.</td><td>Instrument, selected layer/group, zone parent group, or smallest common ancestor.</td><td>Set true if hidden.</td><td>Retain invoking context.</td></tr>
+          <tr><td>Document topology change</td><td>Reconcile stable IDs.</td><td>Retain if valid; otherwise deterministic nearest valid ancestor.</td><td>Unchanged.</td><td>Refresh from reconciled selection.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout warning"><h3>Map preservation rule</h3><p><code>ZoneMapCanvas</code> remains the production mapping surface. Scoping changes its input vector, not its renderer, hit testing, drag transactions, minimap, pan/zoom, velocity-crossfade behavior, or group tint policy.</p></div>
+  </section>
+
+  <section class="section" id="architecture">
+    <span class="section-label">04 | Target architecture</span>
+    <div class="heading"><h2>Focused components around the existing Map</h2></div>
+    <div class="flow" aria-label="Unified workspace data flow">
+      <div class="flow-step"><strong>Instrument browser</strong><span>Emits typed stable-ID selection and contextual commands.</span></div>
+      <div class="flow-step"><strong>Selection coordinator</strong><span>Reconciles one inspector/edit selection without changing scope.</span></div>
+      <div class="flow-step"><strong>Show Zones policy</strong><span>Derives the smallest useful container scope from selection.</span></div>
+      <div class="flow-step"><strong>Scoped projection</strong><span>Filters cached zone summaries by <code>layerId</code>/<code>groupId</code>.</span></div>
+      <div class="flow-step"><strong>Existing Map + inspector</strong><span>Render/edit independently and refresh through session state.</span></div>
+    </div>
+    <div class="table-wrap" style="margin-top:20px">
+      <table>
+        <thead><tr><th>Seam</th><th>Responsibility</th><th>Dependency rule</th></tr></thead>
+        <tbody>
+          <tr><td class="id">StructureScope</td><td>Container kind/ID, stable-ID validity, equality, and accessible summary.</td><td>Plain value type; no JUCE component or project-object pointer.</td></tr>
+          <tr><td class="id">StructureScopePolicy</td><td>Derive instrument/layer/group scope from one or many selected IDs; reconcile after topology change.</td><td>Pure model helper; tests cover smallest common ancestor and missing parents.</td></tr>
+          <tr><td class="id">ScopedZoneProjection</td><td>Build Map input from zone summaries, parent membership, authored visibility, existing view filters, and selected-zone emphasis.</td><td>No paint or transaction work; cache by document revision, scope, and filter fingerprint.</td></tr>
+          <tr><td class="id">InstrumentStructureBrowser</td><td>Virtual flattened tree, disclosure, hierarchy path, search, commands, selection gestures, focus, and accessibility.</td><td>Consumes row models and emits intents; never writes the runtime model.</td></tr>
+          <tr><td class="id">WorkspaceToolbar</td><td>Show Map toggle, current scope summary, Map view filters, Fit Scope, and overflow commands.</td><td>Show Map changes visibility only; Map filters do not alter authored visibility.</td></tr>
+          <tr><td class="id">ContextInspectorHost</td><td>Dispatch Layer, Group, Zone, and same-type plural snapshots; expose Show Zones and object actions.</td><td>Emits typed patch/action intents; <code>AuthoringPanel</code>/<code>AuthoringSession</code> own commits.</td></tr>
+          <tr><td class="id">UnifiedWorkspaceLayout</td><td>Expanded and compact geometry for tree, optional Map, inspector, splitters/drawer, and lower workbench.</td><td>Pure layout calculation where practical; no selection or transaction logic.</td></tr>
+          <tr><td class="id">ZoneMapOverlapIndex</td><td>Identify coincident/substantially occluded hit candidates and provide stack-menu rows.</td><td>Derived from cached geometry; selection callback remains stable-ID based.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout decision"><h3>File strategy</h3><p>Add focused pure helpers before UI changes: <code>StructureScope.{h,cpp}</code>, <code>StructureScopePolicy.{h,cpp}</code>, and <code>ScopedZoneProjection.{h,cpp}</code>. Introduce <code>InstrumentStructureBrowser.{h,cpp}</code> and <code>UnifiedWorkspaceLayout.{h,cpp}</code>. Keep <code>StructureViewer</code> available only during migration, then remove its mode/column state and tests after parity.</p></div>
+  </section>
+
+  <section id="phases">
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">0</div><h2>Contract and characterization</h2><span class="phase-focus">Make the migration measurable before changing layout</span></div>
+      <p class="phase-intent">Lock the current Map, inspector, selection, layout, and workbench behavior so the unified composition can be introduced without silently regressing mature authoring paths.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW0.1</span> Add contract tests proving selection-only navigation does not change document revision, dirty state, undo depth, current Map input, or Map visibility.</li>
+        <li><span class="task-id">UIW0.2</span> Characterize current Map selection, marquee, range drag, crossfade drag, audition, file drop, delete, zoom, pan, fit, minimap, and Show in Structure callbacks.</li>
+        <li><span class="task-id">UIW0.3</span> Record current compact/expanded bounds from <code>AuthoringPanel::resized()</code>, including lower-workbench open/closed states and the existing Map/Structure toggle geometry.</li>
+        <li><span class="task-id">UIW0.4</span> Extend <code>StructureViewerFixtures</code> with an empty instrument, empty layer/group, same-group stacks, same-layer multi-group zones, cross-layer multi-selection, hidden containers, and missing-parent repair cases.</li>
+        <li><span class="task-id">UIW0.5</span> Capture baseline message-thread timings and component snapshots at 820×700, 1120×800, and a 1,700-zone production fixture.</li>
+        <li><span class="task-id">UIW0.6</span> Add new CTest targets <code>drs.unified_workspace.contract</code>, <code>drs.unified_workspace.ui</code>, and <code>drs.unified_workspace.qualification</code>; keep existing <code>drs.structure_viewer.*</code> targets until the retirement gate.</li>
+      </ul><div class="gate"><h3>Gate 0</h3><p>Baseline screenshots, geometry, state invariants, Map interactions, and timing budgets are executable. No implementation task relies on unrecorded behavior from the old mode switch.</p></div></div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">1</div><h2>Independent workspace state and scope policy</h2><span class="phase-focus">Separate what is selected, shown, and visible</span></div>
+      <p class="phase-intent">Create the non-visual state model that every later phase consumes.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW1.1</span> Add <code>instrument</code> to <code>StructureSelectionKind</code>; define root selection behavior without adding a selected-instrument field to the authored project.</li>
+        <li><span class="task-id">UIW1.2</span> Implement <code>StructureScope</code> with kinds instrument/layer/group, stable ID, equality, validation, and deterministic instrument-root fallback.</li>
+        <li><span class="task-id">UIW1.3</span> Implement pure <code>deriveStructureScope(project, selection)</code>: layer → layer; group → group; one zone → parent group; same-group zones → group; same-layer zones → layer; otherwise instrument.</li>
+        <li><span class="task-id">UIW1.4</span> Implement scope reconciliation after delete, reparent, import, reload, undo, and redo; prefer the nearest valid ancestor and never select an arbitrary sibling.</li>
+        <li><span class="task-id">UIW1.5</span> Evolve <code>StructureViewState</code>: add <code>mapPaneVisible</code>, active <code>StructureScope</code>, tree width, disclosure IDs, and tree scroll anchor; retain search/filter/sort values.</li>
+        <li><span class="task-id">UIW1.6</span> Add workspace snapshot round-trip tests and assert that visibility, scope, disclosure, width, search, and Map view state never enter serialized project JSON.</li>
+        <li><span class="task-id">UIW1.7</span> Add <code>ScopedZoneProjection</code> tests for instrument/layer/group membership, hidden-container policy, selected-zone emphasis, filter composition, stable authored order, and empty results.</li>
+      </ul><div class="gate"><h3>Gate 1</h3><p>Tests can independently change selection, scope, and Map visibility; scope derivation is deterministic for every supported selection shape and remains workspace-only.</p></div></div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">2</div><h2>Persistent Instrument Structure browser</h2><span class="phase-focus">Replace the three columns with one navigable hierarchy</span></div>
+      <p class="phase-intent">Deliver the persistent tree as a complete navigation surface before removing the old Structure viewer.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW2.1</span> Add flattened <code>InstrumentStructureRow</code> models for instrument, layer, group, and zone with depth, disclosure, counts, coverage, visibility, path, selected/primary state, group tint, and accessibility text.</li>
+        <li><span class="task-id">UIW2.2</span> Build <code>InstrumentStructureBrowser</code> on a virtual <code>ListBox</code>; render only visible flattened rows and keep collapse state by stable ID.</li>
+        <li><span class="task-id">UIW2.3</span> Implement pointer, Ctrl/Cmd toggle, Shift range selection among same-type visible peers, double-click disclosure, and deterministic primary selection.</li>
+        <li><span class="task-id">UIW2.4</span> Implement Up/Down traversal, Left/Right collapse/parent/first-child behavior, Enter selection, type-ahead/search focus, and focus restoration after refresh.</li>
+        <li><span class="task-id">UIW2.5</span> Add hierarchy action bar commands for New Layer, New Group, New Zone/import, Duplicate, Delete, and More; reuse existing session transactions and disable invalid contexts with reasons.</li>
+        <li><span class="task-id">UIW2.6</span> Reuse existing search, visibility, articulation/event, overlap, and diagnostic projections without allowing filters to delete selection or authored objects.</li>
+        <li><span class="task-id">UIW2.7</span> Add Show Zones to the action bar and row context menu as an intent only; Phase 4 supplies the command implementation.</li>
+        <li><span class="task-id">UIW2.8</span> Add component tests for empty containers, disclosure persistence, filtered ancestors, selection gestures, search, keyboard navigation, accessible row descriptions, and 1,700-row refresh.</li>
+      </ul><div class="gate"><h3>Gate 2</h3><p>Pointer and keyboard users can reach every valid hierarchy object in one tree, preserve a complete path, and drive the correct inspector selection without changing Map scope.</p></div></div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">3</div><h2>Unified shell and Show Map</h2><span class="phase-focus">Compose tree, optional Map, inspector, and workbench</span></div>
+      <p class="phase-intent">Replace the Map | Structure switch with the unified layout while leaving Map filtering unchanged until Phase 4.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW3.1</span> Add <code>UnifiedWorkspaceLayout</code> calculations for expanded and compact shells, splitter constraints, Map-hidden wide inspector, compact inspector drawer, and maximum-Map state.</li>
+        <li><span class="task-id">UIW3.2</span> Add persistent <code>Show Map</code> toggle and component ID; it changes only <code>mapPaneVisible</code>, calls layout, and restores the same scope, selection, pan, and zoom.</li>
+        <li><span class="task-id">UIW3.3</span> Remove <code>mappingMapViewButton</code>, <code>mappingStructureViewButton</code>, and <code>setMappingView()</code> from <code>AuthoringPanel</code> after parity tests pass.</li>
+        <li><span class="task-id">UIW3.4</span> Make the hierarchy browser persistent across Waveform, Groups, Macros, Routing, Performance, and Articulations tabs; workbench state must not control tree or inspector visibility.</li>
+        <li><span class="task-id">UIW3.5</span> Place the authoritative context inspector on the right; when Map is hidden, use the reclaimed width for a two-column inspector instead of retaining an empty Map placeholder.</li>
+        <li><span class="task-id">UIW3.6</span> Preserve existing Zone Map size minimums, minimap reachability, workbench splitter, preview, and lower-tab bounds at 820×700 and 1120×800.</li>
+        <li><span class="task-id">UIW3.7</span> Rebuild explicit focus order and accessibility metadata: tree → Show Map/Map toolbar/canvas when visible → inspector → workbench.</li>
+        <li><span class="task-id">UIW3.8</span> Add layout snapshots for Show Map on/off, workbench open/closed, compact/expanded, inspector drawer, and maximum Map; compare against Gate 0 bounds.</li>
+      </ul><div class="gate"><h3>Gate 3</h3><p>The old view switch is gone. Show Map changes layout only, the browser and inspector remain authoritative, and the current Zone Map still passes every characterized interaction.</p></div></div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">4</div><h2>Show Zones and scoped Map projection</h2><span class="phase-focus">Connect hierarchy intent to the existing Map</span></div>
+      <p class="phase-intent">Implement the command that makes the unified workspace useful without coupling scope back to ordinary selection.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW4.1</span> Add one <code>showZonesForCurrentSelection()</code> coordinator path; all inspector, tree action bar, context-menu, and keyboard invocations call this path.</li>
+        <li><span class="task-id">UIW4.2</span> Derive and commit <code>StructureScope</code>, set Map visible when needed, build the scoped zone projection, call <code>ZoneMapCanvas::setZoneSummaries()</code>, then fit the projected content.</li>
+        <li><span class="task-id">UIW4.3</span> Add a public <code>fitAllVisible()</code>/<code>fitScope()</code> seam to <code>ZoneMapCanvas</code>; do not reach into private viewport math from <code>AuthoringPanel</code>.</li>
+        <li><span class="task-id">UIW4.4</span> Replace <code>buildVisibleZoneSummaries()</code> with the tested <code>ScopedZoneProjection</code>; retain authored visibility exceptions for selected zones only where the HLD requires them.</li>
+        <li><span class="task-id">UIW4.5</span> Add the toolbar summary “Showing zones: {scope name} · {count}” plus an accessible scope kind/path; expose Fit Scope and filter state without turning the summary into selection.</li>
+        <li><span class="task-id">UIW4.6</span> Preserve Layer or Group inspector context after Show Zones. Only a subsequent Zone Map click changes selection and dispatches the Zone inspector.</li>
+        <li><span class="task-id">UIW4.7</span> When one or many zones invoke Show Zones, reveal selected zones inside the derived parent/common-ancestor scope without hiding siblings.</li>
+        <li><span class="task-id">UIW4.8</span> Reconcile scope and selection independently on reparent/delete/undo/reload; prevent callback loops among session selection, tree selection, Map selection, and refresh.</li>
+        <li><span class="task-id">UIW4.9</span> Add contract/integration tests for every selection-to-scope row in the HLD, Map-hidden invocation, repeated invocation, empty scope, filters, and unchanged document/undo state.</li>
+      </ul><div class="gate"><h3>Gate 4</h3><p>Show Zones produces the exact instrument/layer/group/common-ancestor zone set, opens and fits the existing Map, and preserves the invoking selection and inspector.</p></div></div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">5</div><h2>Inspector completion and overlap access</h2><span class="phase-focus">Finish the production authoring workflow</span></div>
+      <p class="phase-intent">Consolidate editable inspectors and ensure intentional Map overlap never makes a zone unreachable.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW5.1</span> Promote <code>StructureInspectorHost</code> from alias to explicit host dispatch; reuse current Layer/Group snapshots and <code>ZoneMappingEditor</code> callbacks rather than duplicating fields.</li>
+        <li><span class="task-id">UIW5.2</span> Add Show Zones as the primary contextual action for instrument/layer/group/zone/plural-zone contexts; retain Audition, Open Waveform, Select Children, Duplicate, and overflow actions as applicable.</li>
+        <li><span class="task-id">UIW5.3</span> Verify every multi-select-compatible Layer, Group, and Zone field reports shared/mixed state and commits one atomic patch with one undo record.</li>
+        <li><span class="task-id">UIW5.4</span> Implement wide two-column inspector layout when Map is hidden and the compact drawer variant when the shell cannot preserve useful tree/Map/inspector widths.</li>
+        <li><span class="task-id">UIW5.5</span> Build <code>ZoneMapOverlapIndex</code> from cached visible geometry; identify exact and substantially occluded candidates without changing paint order.</li>
+        <li><span class="task-id">UIW5.6</span> Add a count-backed stack affordance and native chooser showing zone name, key/velocity, RR, articulation, and event; selecting a candidate changes zone selection only.</li>
+        <li><span class="task-id">UIW5.7</span> Add Next/Previous Zone-in-Stack keyboard commands, focus announcements, tree reveal, and inspector synchronization.</li>
+        <li><span class="task-id">UIW5.8</span> Add transaction and UI tests for inspector dispatch, mixed values, Show Zones placement, overlap chooser ordering, coincident hit access, focus, and unchanged scope.</li>
+      </ul><div class="gate"><h3>Gate 5</h3><p>Every hierarchy context has a real editable inspector, Show Zones is consistently available, and every coincident Map zone is independently reachable by pointer and keyboard.</p></div></div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-head"><div class="phase-number">6</div><h2>Qualification, cleanup, and release</h2><span class="phase-focus">Prove the unified workspace and remove obsolete code</span></div>
+      <p class="phase-intent">Close the migration only after focused evidence and mature authoring regressions pass in both product shells.</p>
+      <div class="phase-body"><ul class="task-list">
+        <li><span class="task-id">UIW6.1</span> Run contract, UI, integration, accessibility, layout, and 1,700-zone qualification targets; record average/p95 scope projection, refresh, resize, and paint evidence.</li>
+        <li><span class="task-id">UIW6.2</span> Verify no scope derivation, projection, hierarchy traversal, Map filtering, selection, or pane visibility work runs on or synchronizes with the audio thread.</li>
+        <li><span class="task-id">UIW6.3</span> Run Map range-edit, velocity-crossfade, grouping, layer, preview, waveform, routing, workbench, import, host-state, undo/redo, responsiveness, plugin, and standalone regressions.</li>
+        <li><span class="task-id">UIW6.4</span> Perform keyboard-only and screen-reader qualification for current selection, Map scope, Show Map state, Show Zones action, tree disclosure, stack candidates, inspector context, and focus order.</li>
+        <li><span class="task-id">UIW6.5</span> Capture Release visual evidence at 820×700 and 1120×800 for Show Map on/off, instrument/layer/group/zone scopes, compact drawer, wide inspector, and overlap chooser.</li>
+        <li><span class="task-id">UIW6.6</span> Remove the old <code>StructureViewMode</code>, three column widths/collapse state, Map/Structure button IDs/callbacks, old Reveal in Map semantics, and obsolete <code>StructureViewer</code>/<code>StructureZoneList</code> code after parity.</li>
+        <li><span class="task-id">UIW6.7</span> Update <code>app/CMakeLists.txt</code>, <code>tests/CMakeLists.txt</code>, test README, authoring guidance, accessibility inventory, and release evidence; mark the historical Structure Viewer plan superseded.</li>
+        <li><span class="task-id">UIW6.8</span> Build standalone and VST3 Debug targets, perform representative Release host qualification, run diff/clean-checkout checks, and confirm no generated artifacts or workspace state are committed.</li>
+      </ul><div class="gate"><h3>Gate 6</h3><p>All release criteria pass, obsolete separate-view code is removed, both application targets build, and the new workspace remains within the existing message-thread and host-size budgets.</p></div></div>
+    </article>
+  </section>
+
+  <section class="section" id="validation">
+    <span class="section-label">06 | Evidence strategy</span>
+    <div class="heading"><h2>Validation matrix</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Area</th><th>Required evidence</th><th>Failure prevented</th></tr></thead>
+        <tbody>
+          <tr><td class="id">State independence</td><td>Selection, scope, and visibility can change independently and round-trip as workspace state without dirtying the project.</td><td>Ordinary navigation unexpectedly filters or mutates the instrument.</td></tr>
+          <tr><td class="id">Scope policy</td><td>Instrument, layer, group, one-zone, same-group, same-layer, and cross-layer selections derive the specified smallest useful scope.</td><td>Show Zones hides siblings or exposes unrelated zones.</td></tr>
+          <tr><td class="id">Hierarchy browser</td><td>Stable-ID disclosure, search, filtered ancestors, multi-selection, keyboard traversal, empty states, and refresh reconciliation.</td><td>Collapsed/filter state selects the wrong object or loses hierarchy context.</td></tr>
+          <tr><td class="id">Map preservation</td><td>Existing paint, hit test, range edits, crossfades, minimap, zoom/pan, audition, drag/drop, and selection tests remain green with scoped input.</td><td>The workspace redesign weakens the production Map.</td></tr>
+          <tr><td class="id">Inspector</td><td>Correct dispatch, shared/mixed values, atomic patches, one-step undo/redo, wide/compact layouts, and Show Zones action.</td><td>Displayed values are read-only, misleading, or partially applied.</td></tr>
+          <tr><td class="id">Overlap access</td><td>Every coincident zone appears in stack order and can be selected by pointer and keyboard without changing scope.</td><td>Zones remain technically present but practically unreachable.</td></tr>
+          <tr><td class="id">Layout</td><td>Snapshots at 820×700 and 1120×800 cover Map on/off, drawer, splitters, workbench open/closed, and maximum Map.</td><td>Controls clip or the inspector recreates the original cramped layout.</td></tr>
+          <tr><td class="id">Performance</td><td>1,700-zone cached scope projection, tree flattening, refresh, resize, and Map paint average/p95 evidence.</td><td>Hierarchy traversal or filtering degrades message-thread responsiveness.</td></tr>
+          <tr><td class="id">Accessibility</td><td>Accessible names/state for selection, scope, visibility, Show Zones, disclosure, stack candidates, and inspector; complete keyboard route.</td><td>Users cannot distinguish what is selected from what the Map shows.</td></tr>
+          <tr><td class="id">Regression</td><td>Standalone/VST3, host recall, import, routing, waveform, grouping, layers, velocity crossfade, preview, and undo/redo suites.</td><td>The shell migration destabilizes unrelated authoring or host behavior.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout decision"><h3>Focused test targets</h3><p><code>drs.unified_workspace.contract</code> owns pure state/scope/projection tests; <code>drs.unified_workspace.ui</code> owns JUCE browser/layout/inspector/command tests; <code>drs.unified_workspace.qualification</code> owns production topology, screenshot, and timing evidence. Existing <code>drs.structure_viewer.*</code> tests remain migration guards until Gate 6.</p></div>
+  </section>
+
+  <section class="section" id="risks">
+    <span class="section-label">07 | Guardrails</span>
+    <div class="heading"><h2>Risks and mitigations</h2></div>
+    <div class="grid-3">
+      <article class="card problem"><h3>Selection–scope recoupling</h3><p>Do not filter Map input in tree selection callbacks. Only the Show Zones coordinator may commit scope; tests assert the Map vector is unchanged by selection alone.</p></article>
+      <article class="card warn"><h3>AuthoringPanel growth</h3><p>Keep scope derivation, projection, tree flattening, overlap indexing, and layout math in focused helpers. <code>AuthoringPanel</code> composes and routes intents.</p></article>
+      <article class="card violet"><h3>Map regression</h3><p>Change Map input and add narrow public seams only. Avoid renderer rewrites, new coordinate systems, or duplicated selection state.</p></article>
+      <article class="card accent"><h3>Workspace-state migration</h3><p>Read old snapshots defensively, map old Map mode to Map visible, discard obsolete column widths, and never publish presentation state into the document.</p></article>
+      <article class="card warn"><h3>Compact-shell pressure</h3><p>Enforce minimum useful Map and tree sizes, then use the specified inspector drawer/full-inspector state. Do not solve pressure by clipping controls or restoring three columns.</p></article>
+      <article class="card problem"><h3>Premature deletion</h3><p>Keep the old Structure viewer and tests until the persistent tree, selection, inspector, and Show Zones paths reach parity. Remove them in one final cleanup phase.</p></article>
+    </div>
+    <div class="callout warning"><h3>Sequencing rule</h3><p>Do not begin shell surgery before Phase 1 state contracts pass. Do not remove the old viewer before Phase 5 completes. Do not optimize projection by changing audio/runtime ownership; all performance work remains UI-side and cache-based.</p></div>
+  </section>
+
+  <section class="section" id="release">
+    <span class="section-label">08 | Completion criteria</span>
+    <div class="heading"><h2>Release gate</h2></div>
+    <div class="callout decision"><h3>The Unified Instrument Workspace is complete when</h3>
+      <ul class="checklist">
+        <li>No Map | Structure mode switch or three-column Structure Viewer remains in production.</li>
+        <li>The Instrument Structure browser is persistent across every workbench tab.</li>
+        <li>Selection, Map scope, and Map visibility remain independent, workspace-only, stable-ID state.</li>
+        <li>Show Map changes layout only and restores prior Map state.</li>
+        <li>Show Zones derives the specified scope, opens/fits the existing Map, and preserves inspector context.</li>
+        <li>The existing Zone Map retains dense rendering, minimap, selection, editing, audition, and navigation behavior.</li>
+        <li>Layer, Group, Zone, and compatible plural inspectors are editable, accurate, atomic, and undoable.</li>
+        <li>Every coincident zone is reachable through the tree and Map stack access.</li>
+        <li>820×700 and 1120×800 layouts preserve useful Map, tree, inspector, and workbench surfaces.</li>
+        <li>Keyboard and screen-reader users can distinguish selection, scope, visibility, and commands.</li>
+        <li>1,700-zone responsiveness remains inside the established message-thread budget.</li>
+        <li>Standalone and VST3 builds plus focused and regression suites pass from a clean checkout.</li>
+      </ul>
+    </div>
+    <p class="files">Likely implementation surfaces: <a href="../app/src/shared/AuthoringPanel.h">AuthoringPanel.h</a>, <a href="../app/src/shared/AuthoringPanel.cpp">AuthoringPanel.cpp</a>, <a href="../app/src/shared/authoring/AuthoringStructureSelection.h">AuthoringStructureSelection.h</a>, <a href="../app/src/shared/authoring/StructureViewState.h">StructureViewState.h</a>, <a href="../app/src/shared/authoring/StructureViewModels.h">StructureViewModels.h</a>, <a href="../app/src/shared/authoring/StructureInspector.h">StructureInspector.h</a>, <a href="../app/src/shared/authoring/ZoneMapCanvas.h">ZoneMapCanvas.h</a>, <a href="../app/src/shared/authoring/ZoneMapOverview.h">ZoneMapOverview.h</a>, <a href="../app/src/shared/authoring/AuthoringWorkspaceLayout.h">AuthoringWorkspaceLayout.h</a>, <a href="../tests/support/StructureViewerFixtures.h">StructureViewerFixtures.h</a>, <a href="../app/CMakeLists.txt">app/CMakeLists.txt</a>, and <a href="../tests/CMakeLists.txt">tests/CMakeLists.txt</a>.</p>
+  </section>
+
+  <footer>Practical Sampler internal engineering plan · Unified Instrument Workspace · Design source: <a href="structure-viewer-high-level-design.html">Unified Instrument Workspace High-Level Design</a> · Historical baseline: <a href="structure-viewer-iteration-plan.html">Structure Viewer iteration plan</a></footer>
+</main>
+</body>
+</html>

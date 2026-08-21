@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practical Sampler — Layer and Group Inspector Redesign</title>
+  <style>
+    :root {
+      --ink:#273035; --muted:#5f686b; --disabled:#8a9293;
+      --shell:#e9ece8; --surface:#fff; --subtle:#f7f8f5; --hover:#edf0ec;
+      --map:#fbfaf5; --border:#bac2c1; --border-strong:#879395;
+      --selection:#b6531d; --selection-soft:#f7e7dc; --focus:#28658f;
+      --success:#4f7e3b; --warning:#93601e; --error:#a6453e;
+      --group-a:#6f91aa; --group-b:#789581; --group-c:#8e7ea1;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--ink); background:#f2f4f1; line-height:1.55;
+    }
+    *{box-sizing:border-box} body{margin:0} a{color:var(--focus)}
+    main{max-width:1220px;margin:0 auto;padding:44px 28px 72px}
+    h1,h2,h3{line-height:1.18;margin-top:0} h1{max-width:900px;margin-bottom:12px;font-size:clamp(2rem,5vw,3.35rem);letter-spacing:-.04em}
+    h2{margin-bottom:16px;font-size:clamp(1.4rem,3vw,1.95rem);letter-spacing:-.025em} h3{margin-bottom:9px;font-size:1.04rem}
+    p{margin:0 0 14px} ul{margin:10px 0 0;padding-left:22px} li+li{margin-top:7px}
+    code{font-family:"Cascadia Code",Consolas,monospace;color:#202729}
+    .eyebrow{display:inline-block;margin-bottom:18px;color:var(--selection);font-size:.76rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+    .lede{max-width:900px;font-size:1.15rem;color:#3e484c}.meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:24px;color:var(--muted);font-size:.88rem}.meta strong{color:var(--ink)}
+    .section{margin-top:44px;padding-top:34px;border-top:1px solid #d5dad6}.decision{margin-top:26px;padding:21px 23px;border-left:5px solid var(--selection);background:var(--surface);box-shadow:0 8px 24px rgba(39,48,53,.06)}.decision strong{color:var(--selection)}
+    .grid-2,.grid-3{display:grid;gap:18px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{padding:19px;background:var(--surface);border:1px solid #d5dad6;box-shadow:0 7px 20px rgba(39,48,53,.045)}.card p:last-child{margin-bottom:0}.old{border-top:4px solid var(--error)}.new{border-top:4px solid var(--success)}
+    .table-wrap{overflow-x:auto} table{width:100%;border-collapse:collapse;background:var(--surface)}th,td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid #d8ddda}th{color:var(--muted);background:var(--subtle);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}td:first-child{font-weight:650}
+    figure{margin:24px 0 0}figcaption{margin-top:10px;color:var(--muted);font-size:.84rem}.mockup-scroll{overflow-x:auto;padding:4px 4px 16px}.product-frame{overflow:hidden;min-width:900px;color:var(--ink);background:var(--shell);border:1px solid var(--border-strong);box-shadow:0 16px 42px rgba(39,48,53,.12);font-size:11px}
+    .app-titlebar{display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 11px;color:#fff;background:#30383b}.app-titlebar span:last-child{opacity:.72}
+    .app-toolbar{display:flex;align-items:center;gap:7px;min-height:39px;padding:6px 8px;background:var(--surface);border-bottom:1px solid var(--border)}
+    .button,.field,.chip{display:inline-flex;align-items:center;justify-content:center;min-height:25px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:2px;white-space:nowrap}.button.active{color:#fff;background:var(--selection);border-color:var(--selection)}.button.danger{color:var(--error)}.field{justify-content:flex-start;color:var(--muted);background:var(--subtle)}.chip{min-height:21px;color:var(--muted);background:var(--subtle);border-color:transparent}.spacer{flex:1}
+    .authoring-grid{display:grid;grid-template-columns:224px minmax(300px,1fr) 318px;min-height:430px}
+    .tree-panel{display:flex;flex-direction:column;min-width:0;background:var(--surface);border-right:1px solid var(--border-strong)}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;height:31px;padding:0 9px;border-bottom:1px solid var(--border);font-weight:750}.panel-head span:last-child{color:var(--muted);font-size:9px;font-weight:500}
+    .tree{flex:1;padding:4px 0;background:var(--subtle)}.tree-row{display:grid;grid-template-columns:16px 12px minmax(0,1fr);align-items:center;min-height:24px;padding:2px 7px;border-left:3px solid transparent}.tree-row.depth-1{padding-left:13px}.tree-row.depth-2{padding-left:27px}.tree-row.depth-3{padding-left:41px}.tree-row.selected{background:var(--selection-soft);border-left-color:var(--selection);outline:1px solid #dfb89e;outline-offset:-1px}.disclosure{color:var(--muted);font-size:9px;text-align:center}.entity-dot{width:8px;height:8px;border-radius:50%;background:var(--border-strong)}.entity-dot.layer{background:var(--success)}.entity-dot.a{background:var(--group-a)}.entity-dot.b{background:var(--group-b)}.entity-dot.c{background:var(--group-c)}
+    .row-copy{min-width:0}.row-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}.row-meta{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:8px}.tree-empty{padding:12px;color:var(--muted);text-align:center}
+    .tree-actions{padding:7px;border-top:1px solid var(--border);background:var(--surface)}.action-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.action-row+.action-row{margin-top:5px}.action-row .button{min-width:0;padding:3px 4px;font-size:9px}.search{display:flex;align-items:center;gap:5px;margin-top:7px;padding:4px 6px;color:var(--muted);background:var(--subtle);border:1px solid var(--border)}.search span:last-child{margin-left:auto;color:var(--focus)}
+    .map-canvas{position:relative;overflow:hidden;min-width:0;background-color:var(--map);background-image:linear-gradient(to right,rgba(135,147,149,.18) 1px,transparent 1px),linear-gradient(to bottom,rgba(135,147,149,.18) 1px,transparent 1px);background-size:12.5% 100%,100% 20%}.map-zone{position:absolute;height:58px;padding:7px;color:#fff;border:2px solid rgba(255,255,255,.82);box-shadow:0 2px 8px rgba(39,48,53,.17)}.map-zone.a{left:12%;top:67px;width:48%;background:rgba(111,145,170,.92)}.map-zone.b{left:36%;top:155px;width:50%;background:rgba(120,149,129,.92)}.map-zone.c{left:23%;top:252px;width:37%;background:rgba(142,126,161,.92)}.keyboard{position:absolute;inset:auto 0 0;height:38px;display:flex;background:#fff;border-top:1px solid var(--border-strong)}.keyboard i{flex:1;border-right:1px solid #d8ddda}
+    .inspector{min-width:0;background:var(--surface);border-left:1px solid var(--border-strong)}.inspector-head{padding:12px 13px 10px;border-bottom:1px solid var(--border)}.inspector-kicker{color:var(--selection);font-size:9px;font-weight:750;letter-spacing:.09em;text-transform:uppercase}.inspector-title{margin-top:3px;font-size:16px;font-weight:700}.inspector-path{margin-top:2px;color:var(--muted)}.inspector-actions{display:flex;gap:5px;margin-top:9px}.inspector-section{padding:10px 13px 12px;border-bottom:1px solid #dde1de}.inspector-section-title{margin-bottom:8px;font-size:10px;font-weight:750;letter-spacing:.06em;text-transform:uppercase}.field-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(88px,.95fr);gap:6px 8px;align-items:center}.field-label{color:var(--muted)}.control{min-height:24px;padding:4px 6px;border:1px solid var(--border);background:var(--subtle)}.toggle{display:flex;align-items:center;gap:5px}.check{width:11px;height:11px;background:var(--selection)}.range{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px}.read-only{color:var(--muted);background:transparent;border-color:transparent}
+    .workbench{min-width:900px;background:var(--surface);border:1px solid var(--border-strong);border-top:0}.tabs{display:flex;gap:4px;padding:5px 7px;border-bottom:1px solid var(--border)}.workbench-body{display:grid;grid-template-columns:1fr 310px;gap:10px;min-height:125px;padding:9px;background:var(--subtle)}.waveform{position:relative;overflow:hidden;background:#252d30}.waveform::after{content:"";position:absolute;inset:18px 6px;background:linear-gradient(165deg,transparent 0 10%,rgba(111,145,170,.9) 11% 14%,transparent 15% 23%,rgba(111,145,170,.7) 24% 29%,transparent 30% 42%,rgba(111,145,170,.95) 43% 47%,transparent 48% 59%,rgba(111,145,170,.65) 60% 65%,transparent 66% 100%)}.wave-controls{display:grid;grid-template-columns:1fr 1fr;gap:6px}.wave-controls .control{font-size:9px}
+    .state-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}.state{padding:15px;background:var(--surface);border-left:4px solid var(--group-a)}.state:nth-child(2){border-left-color:var(--group-b)}.state:nth-child(3){border-left-color:var(--group-c)}.state strong{display:block;margin-bottom:4px}.state span{color:var(--muted);font-size:.88rem}
+    .component-tree{padding:20px 22px;background:var(--surface);border-left:4px solid var(--focus);font-family:"Cascadia Code",Consolas,monospace;font-size:.88rem;line-height:1.8}.indent-1{padding-left:22px}.indent-2{padding-left:44px}.component-tree em{color:var(--muted);font-style:normal}
+    .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:20px}.flow-step{position:relative;min-height:120px;padding:16px;background:var(--surface);border-top:4px solid var(--focus)}.flow-step:not(:last-child)::after{content:"→";position:absolute;right:-15px;top:40%;z-index:2;color:var(--selection);font-size:24px;font-weight:700}.flow-step p{margin:0;color:var(--muted);font-size:.88rem}
+    .acceptance{counter-reset:item;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;list-style:none}.acceptance li{position:relative;min-height:78px;margin:0;padding:14px 14px 14px 46px;background:var(--surface);border:1px solid #d5dad6}.acceptance li::before{counter-increment:item;content:counter(item);position:absolute;left:14px;top:14px;display:grid;place-items:center;width:22px;height:22px;color:#fff;background:var(--success);border-radius:50%;font-size:11px;font-weight:700}.footer{margin-top:50px;padding-top:18px;color:var(--muted);border-top:1px solid #d5dad6;font-size:.82rem}
+    @media(max-width:860px){main{padding:28px 16px 52px}.grid-2,.grid-3,.state-strip,.flow,.acceptance{grid-template-columns:1fr}.flow-step:not(:last-child)::after{content:"↓";right:50%;top:auto;bottom:-20px}}
+    @media print{body{background:#fff}main{max-width:none;padding:20px}.mockup-scroll{overflow:visible}.product-frame,.workbench{min-width:0;box-shadow:none}.section{break-inside:avoid}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">Authoring UX · Focused redesign</span>
+    <h1>Layer and Group Inspector</h1>
+    <p class="lede">Replace the alternating Layer and Group editors with a persistent Instrument Structure browser and one context-sensitive property inspector. The lower Waveform and Groups tabs stop controlling which hierarchy editor is visible.</p>
+    <div class="meta"><span><strong>Status:</strong> Proposed</span><span><strong>Scope:</strong> Focused foundation for the unified workspace</span><span><strong>Date:</strong> 21 August 2026</span><span><strong>Related:</strong> <a href="structure-viewer-high-level-design.html">Unified Instrument Workspace HLD</a></span></div>
+    <div class="decision"><strong>Core decision.</strong> The left side becomes navigation only. The right side becomes editing only. Workbench tabs change the specialized tool below the map, never the hierarchy browser or the inspector selection.</div>
+  </header>
+
+  <section class="section" id="problem">
+    <span class="eyebrow">01 · Problem and correction</span>
+    <h2>Stop making the tab bar choose the hierarchy UI</h2>
+    <div class="grid-2">
+      <article class="card old"><h3>Current behavior</h3><p>Layer and Group controls compete for the same cramped left-side area. The visible editor appears to change with Waveform/Groups context, selection is hard to understand, and the map loses space to rows of fields.</p></article>
+      <article class="card new"><h3>Proposed behavior</h3><p>A compact tree always shows Instrument → Layer → Group → Zone. Selecting a node changes one right-side inspector. Waveform and Groups remain specialized lower workbenches and do not replace either surface.</p></article>
+    </div>
+  </section>
+
+  <section class="section" id="layout">
+    <span class="eyebrow">02 · Placement</span>
+    <h2>Persistent browser, map, context inspector</h2>
+    <figure aria-labelledby="primary-caption">
+      <div class="mockup-scroll">
+        <div class="product-frame">
+          <div class="app-titlebar"><span>Practical Sampler · Authoring</span><span>Accurate Salamander 2</span></div>
+          <div class="app-toolbar"><span class="button active">Map</span><span class="button">Structure</span><span class="chip">Layer: sfz-sustain</span><span class="chip">Group: Keys 45–76</span><span class="spacer"></span><span class="button">Fit zones</span><span class="button">•••</span></div>
+          <div class="authoring-grid">
+            <aside class="tree-panel">
+              <div class="panel-head"><span>Instrument Structure</span><span>5 zones</span></div>
+              <div class="tree">
+                <div class="tree-row"><span class="disclosure">▼</span><i class="entity-dot"></i><div class="row-copy"><div class="row-title">AccurateSalamander2</div><div class="row-meta">2 layers · 2 groups · 5 zones</div></div></div>
+                <div class="tree-row depth-1 selected"><span class="disclosure">▼</span><i class="entity-dot layer"></i><div class="row-copy"><div class="row-title">sfz-sustain</div><div class="row-meta">2 groups · 4 zones · C3–C6</div></div></div>
+                <div class="tree-row depth-2"><span class="disclosure">▼</span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">Keys 45–76</div><div class="row-meta">V 48–52 · 2 zones</div></div></div>
+                <div class="tree-row depth-3"><span></span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">045 A2v06</div><div class="row-meta">A2 · V 1–72</div></div></div>
+                <div class="tree-row depth-3"><span></span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">045 A2v07</div><div class="row-meta">A2 · V 65–127</div></div></div>
+                <div class="tree-row depth-2"><span class="disclosure">▼</span><i class="entity-dot b"></i><div class="row-copy"><div class="row-title">Keys 46–47</div><div class="row-meta">V 1–127 · 1 zone</div></div></div>
+                <div class="tree-row depth-3"><span></span><i class="entity-dot b"></i><div class="row-copy"><div class="row-title">046 B2v01</div><div class="row-meta">B2 · V 1–127</div></div></div>
+                <div class="tree-row depth-1"><span class="disclosure">▶</span><i class="entity-dot layer"></i><div class="row-copy"><div class="row-title">sfz-release</div><div class="row-meta">1 group · 1 zone · C3–C6</div></div></div>
+              </div>
+              <div class="tree-actions">
+                <div class="action-row"><span class="button">+ Layer</span><span class="button">+ Group</span><span class="button">+ Zone</span></div>
+                <div class="action-row"><span class="button">Duplicate</span><span class="button danger">Delete</span><span class="button">More…</span></div>
+                <div class="search"><span>Search / filter…</span><span>⌕</span></div>
+              </div>
+            </aside>
+            <div class="map-canvas"><div class="map-zone a">Sustain soft · A2–C5</div><div class="map-zone b">Sustain loud · B2–C6</div><div class="map-zone c">Release · C3–B5</div><div class="keyboard"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <aside class="inspector">
+              <div class="inspector-head"><div class="inspector-kicker">Layer</div><div class="inspector-title">sfz-sustain</div><div class="inspector-path">AccurateSalamander2 › sfz-sustain</div><div class="inspector-actions"><span class="button">Audition</span><span class="button">Select groups</span><span class="button">•••</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Identity</div><div class="field-grid"><span class="field-label">Name</span><span class="control">sfz-sustain</span><span class="field-label">Visible</span><span class="control toggle"><i class="check"></i> On</span><span class="field-label">Order</span><span class="control">1</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Mix &amp; routing</div><div class="field-grid"><span class="field-label">Gain</span><span class="control">0.0 dB</span><span class="field-label">Pan</span><span class="control">Center</span><span class="field-label">Output</span><span class="control">Main out</span><span class="field-label">Anchor group</span><span class="control">Keys 45–76</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Crossfade</div><div class="field-grid"><span class="field-label">Source</span><span class="control">None</span><span class="field-label">Window</span><span class="range"><span class="control">0</span><span>–</span><span class="control">127</span></span><span class="field-label">Direction</span><span class="control">Fade in</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Summary</div><div class="field-grid"><span class="field-label">Groups</span><span class="control read-only">2</span><span class="field-label">Zones</span><span class="control read-only">4</span><span class="field-label">Key coverage</span><span class="control read-only">C3–C6</span></div></div>
+            </aside>
+          </div>
+        </div>
+        <div class="workbench">
+          <div class="tabs"><span class="button active">Waveform</span><span class="button">Groups</span><span class="button">Macros</span><span class="button">Routing</span><span class="button">Performance</span><span class="button">Articulations</span></div>
+          <div class="workbench-body"><div class="waveform"></div><div class="wave-controls"><span class="control">Playback start · 0</span><span class="control">End · 185204</span><span class="control">Loop mode · Sustain</span><span class="control">Crossfade · 256</span><span class="control">Audition selection</span><span class="control">Snap · On</span></div></div>
+        </div>
+      </div>
+      <figcaption id="primary-caption"><strong>Waveform remains selected.</strong> The tree still shows the whole hierarchy, the selected Layer still owns the right inspector, and the lower workbench remains a waveform tool. Changing tabs does not swap out the browser or inspector.</figcaption>
+    </figure>
+  </section>
+
+  <section class="section" id="browser">
+    <span class="eyebrow">03 · Instrument Structure browser</span>
+    <h2>A compact tree with predictable actions</h2>
+    <div class="state-strip"><div class="state"><strong>Layer selected</strong><span>Right inspector becomes Layer. + Group is enabled and creates beneath the selected layer.</span></div><div class="state"><strong>Group selected</strong><span>Right inspector becomes Group. + Zone is enabled and creates beneath the selected group.</span></div><div class="state"><strong>Zone selected</strong><span>Right inspector becomes Zone. Map selection and waveform context follow the zone.</span></div></div>
+    <div class="table-wrap" style="margin-top:20px"><table><thead><tr><th>Element</th><th>Behavior</th></tr></thead><tbody>
+      <tr><td>Instrument row</td><td>Root of the tree; cannot be deleted or reordered. Disclosure expands/collapses the hierarchy.</td></tr>
+      <tr><td>Layer row</td><td>Name plus group/zone counts and aggregate key coverage. Selecting it does not change the active workbench tab.</td></tr>
+      <tr><td>Group row</td><td>Stable group tint, name, key/velocity summary, and zone count. Children are its zones.</td></tr>
+      <tr><td>Zone row</td><td>Sample display name, root/note identity, and velocity summary. Selecting it reveals the zone in Map.</td></tr>
+      <tr><td>Disclosure</td><td>Changes presentation state only; it does not change selection or dirty the project.</td></tr>
+      <tr><td>Search/filter</td><td>Matches layer, group, zone, or sample name. Ancestors remain visible so the path is never lost.</td></tr>
+      <tr><td>Action toolbar</td><td>Two rows preserve readable labels at 224 px. Invalid actions are disabled with a tooltip rather than silently retargeted.</td></tr>
+      <tr><td>Context menu</td><td>Rename, duplicate, move/reassign, reveal, audition, and delete commands appropriate to the selected type.</td></tr>
+    </tbody></table></div>
+  </section>
+
+  <section class="section" id="inspectors">
+    <span class="eyebrow">04 · Property inspectors</span>
+    <h2>Real controls with one consistent structure</h2>
+    <div class="grid-2">
+      <article class="card"><h3>Layer inspector</h3><ul><li>Header: type, name, path, audition, select groups, overflow.</li><li>Identity: name, visibility, authored order.</li><li>Mix &amp; routing: gain, pan, output bus, audition anchor group.</li><li>Crossfade: source, controller, window, direction, curve.</li><li>Read-only summary: group count, zone count, aggregate coverage, effective output.</li></ul></article>
+      <article class="card"><h3>Group inspector</h3><ul><li>Header: type, name, path, audition, select zones, overflow.</li><li>Identity: name, parent layer, visibility, authored order.</li><li>Mix &amp; routing: gain, pan, output bus, audition anchor zone.</li><li>Playback: round-robin enabled and mode.</li><li>Read-only summary: zone count, aggregate coverage, effective layer/group mix.</li></ul></article>
+    </div>
+    <div class="decision"><strong>Editing rule.</strong> Every value in an editable section is a real JUCE control connected to an AuthoringSession transaction. Selection never dirties the project. Text/numeric controls commit on Enter or focus loss, toggles and combos commit immediately, and a slider gesture creates one undo step.</div>
+  </section>
+
+  <section class="section" id="tabs">
+    <span class="eyebrow">05 · Workbench independence</span>
+    <h2>Selection and tab state are separate</h2>
+    <div class="table-wrap"><table><thead><tr><th>User action</th><th>Tree</th><th>Inspector</th><th>Workbench</th></tr></thead><tbody>
+      <tr><td>Select Layer</td><td>Layer becomes primary.</td><td>Shows Layer controls.</td><td>Active tab stays unchanged.</td></tr>
+      <tr><td>Select Group</td><td>Group becomes primary.</td><td>Shows Group controls.</td><td>Active tab stays unchanged; Groups tab refreshes if already active.</td></tr>
+      <tr><td>Select Zone</td><td>Zone becomes primary.</td><td>Shows Zone controls.</td><td>Waveform refreshes if already active.</td></tr>
+      <tr><td>Click Waveform tab</td><td>No change.</td><td>No change.</td><td>Shows waveform for primary zone or a clear no-zone state.</td></tr>
+      <tr><td>Click Groups tab</td><td>No change.</td><td>No change.</td><td>Shows specialized group detail for primary group or its zone's parent group.</td></tr>
+      <tr><td>Explicit “Open Waveform”</td><td>Zone selection is retained.</td><td>Remains Zone.</td><td>Switches to Waveform.</td></tr>
+    </tbody></table></div>
+  </section>
+
+  <section class="section" id="compact">
+    <span class="eyebrow">06 · Responsive behavior</span>
+    <h2>Preserve Map width at the compact shell</h2>
+    <div class="grid-3"><article class="card"><h3>Expanded · 1120 px</h3><p>Tree 224–248 px, map consumes the middle, right inspector 320–360 px. Both side surfaces are user-collapsible.</p></article><article class="card"><h3>Compact · 820 px</h3><p>Tree 206–224 px remains visible. The inspector becomes a 292 px right drawer over Map and closes with Escape.</p></article><article class="card"><h3>Maximum Map</h3><p>The tree collapses to a 32 px Structure rail. The inspector collapses completely. Both restore the current selection when reopened.</p></article></div>
+  </section>
+
+  <section class="section" id="implementation">
+    <span class="eyebrow">07 · Implementable architecture</span>
+    <h2>Reuse the completed selection and transaction foundations</h2>
+    <div class="component-tree"><div>AuthoringPanel <em>composition root</em></div><div class="indent-1">InstrumentStructurePanel</div><div class="indent-2">VirtualStructureTree <em>flattened ListBox rows</em></div><div class="indent-2">StructureActionBar</div><div class="indent-2">StructureSearchField</div><div class="indent-1">ZoneMapCanvas</div><div class="indent-1">ContextInspectorHost</div><div class="indent-2">LayerInspector | GroupInspector | ZoneMappingEditor</div><div class="indent-1">WorkbenchHost <em>tab state independent from selection</em></div></div>
+    <div class="flow"><article class="flow-step"><h3>Tree gesture</h3><p>Emits entity kind plus stable ID. Disclosure state stays workspace-only.</p></article><article class="flow-step"><h3>Typed selection</h3><p><code>AuthoringStructureSelection</code> becomes the single UI selection authority.</p></article><article class="flow-step"><h3>Session context</h3><p>Select layer, group, or zone without an edit transaction or automatic tab switch.</p></article><article class="flow-step"><h3>Inspector commit</h3><p>Validated batch/session method commits one authored transaction and refreshes all views.</p></article></div>
+    <h3 style="margin-top:28px">Performance boundary</h3>
+    <ul><li>Use a flattened virtual row model; do not create an editor component per tree node.</li><li>Collapsed descendants do not enter the visible row vector.</li><li>Search and expansion rebuild lightweight rows from existing hierarchy projections.</li><li>Keep controls exclusively in the right inspector so a 1,700-zone project does not create 1,700 JUCE control trees.</li><li>Preserve selected and expanded stable IDs across refresh, undo/redo, filtering, and project reload.</li></ul>
+  </section>
+
+  <section class="section" id="accessibility">
+    <span class="eyebrow">08 · Keyboard and accessibility</span>
+    <h2>Standard tree navigation</h2>
+    <div class="table-wrap"><table><thead><tr><th>Key</th><th>Behavior</th></tr></thead><tbody><tr><td>Up / Down</td><td>Move through visible rows.</td></tr><tr><td>Right</td><td>Expand parent or move to first child.</td></tr><tr><td>Left</td><td>Collapse parent or move to parent.</td></tr><tr><td>Enter / Space</td><td>Select focused entity; Enter on a zone may reveal it in Map.</td></tr><tr><td>F2</td><td>Rename selected layer, group, or zone.</td></tr><tr><td>Delete</td><td>Invokes the validated delete command and confirmation policy.</td></tr><tr><td>Tab</td><td>Moves from tree to action bar/search, Map, inspector, then workbench.</td></tr></tbody></table></div>
+    <p style="margin-top:14px">Each row announces entity type, name, parent path, child count, selection, expansion, visibility, and key/velocity summary. Group tint and indentation are supplementary.</p>
+  </section>
+
+  <section class="section" id="acceptance">
+    <span class="eyebrow">09 · Acceptance criteria</span>
+    <h2>This focused redesign is complete when</h2>
+    <ol class="acceptance"><li>The left side shows one Instrument Structure browser in both Waveform and Groups workbench states.</li><li>The tree exposes Instrument → Layer → Group → Zone with disclosure, search, stable group tint, and readable metadata.</li><li>Selecting a layer or group from Map changes one right-side inspector without switching workbench tabs.</li><li>Layer and Group inspectors contain real editable controls and clearly separated read-only summaries.</li><li>Create, duplicate, rename, reorder/reassign, and delete actions target the selected entity deterministically.</li><li>Waveform and Groups tabs update only the lower workbench and never replace the tree or inspector.</li><li>The 1120 px layout fits persistent tree and inspector; the 820 px layout uses an inspector drawer and preserves usable Map width.</li><li>Selection, expansion, and search survive refresh by stable ID and do not dirty the project.</li><li>Keyboard and screen-reader users can traverse the full hierarchy and reach every action.</li><li>The 1,700-zone responsiveness baseline remains within budget.</li></ol>
+  </section>
+  <footer class="footer">Practical Sampler internal engineering design · Focused Layer and Group Inspector redesign · Visual hierarchy direction informed by the supplied Instrument Structure tree reference.</footer>
+</main>
+</body>
+</html>

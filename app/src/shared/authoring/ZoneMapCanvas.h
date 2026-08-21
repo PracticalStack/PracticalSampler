@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace drs::app::authoring
@@ -45,6 +46,8 @@ public:
     ZoneMapCanvas();
 
     void setZoneSummaries(std::vector<drs::engine::AuthoringZoneSummary> summaries);
+    void setScopeSummary(std::string summary);
+    const std::vector<drs::engine::AuthoringZoneSummary>& getZoneSummaries() const noexcept { return zoneSummaries; }
     void setSelectionState(SelectionState nextSelectionState);
     SelectionState getSelectionState() const;
     void setOnZoneSelectionRequested(std::function<void(const std::string& zoneId)> nextCallback);
@@ -59,6 +62,8 @@ public:
                            int overlapHigh)> nextCallback);
     void setOnZoneAuditionRequested(
         std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback);
+    void setOnOverlappingZonesRequested(
+        std::function<void(const std::vector<std::string>& zoneIds)> nextCallback);
     void setOnShowInStructureRequested(
         std::function<void(const std::vector<std::string>& zoneIds,
                            const std::string& primaryZoneId)> nextCallback);
@@ -69,6 +74,7 @@ public:
     void fileDragExit(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
     bool requestSelectionAt(juce::Point<float> position, SelectionMode mode = SelectionMode::replace);
+    bool requestOverlapChooserAt(juce::Point<float> position);
     bool requestSelectionInBounds(juce::Rectangle<float> bounds, SelectionMode mode = SelectionMode::replace);
     bool requestAuditionAt(juce::Point<float> position);
     bool requestDeleteSelectedSample();
@@ -83,6 +89,9 @@ public:
     bool requestPanBy(juce::Point<float> pixelDelta);
     bool zoomBy(float wheelDelta);
     bool fitSelected(float paddingProportion = 0.04f);
+    // Public semantic seam used by the unified workspace. It intentionally
+    // delegates to the mature Map viewport implementation.
+    void fitAllVisible() { resetViewport(); }
     void resetViewport();
     float getZoomFactor() const noexcept { return viewport.getZoom(); }
     int getDisplayedZoomPercentage() const noexcept { return viewport.getDisplayedZoomPercentage(); }
@@ -93,6 +102,7 @@ public:
     std::size_t getCachedGeometryCount() const noexcept { return cachedZoneGeometry.size(); }
     std::size_t getLastVisibleZoneCount() const noexcept { return lastVisibleZoneCount; }
     ZoneMapOverview& getOverview() noexcept { return overview; }
+    juce::Label& getScopeSummaryLabel() noexcept { return scopeSummaryLabel; }
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& event) override;
@@ -205,6 +215,8 @@ private:
                        int overlapLow,
                        int overlapHigh)> onVelocityCrossfadeCommitRequested;
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
+    std::function<void(const std::vector<std::string>& zoneIds)> onOverlappingZonesRequested;
+    juce::Point<float> contextMenuPosition;
     std::function<void(const std::vector<std::string>& zoneIds,
                        const std::string& primaryZoneId)> onShowInStructureRequested;
     std::function<void(std::vector<juce::File>)> onSampleFilesDropped;
@@ -221,6 +233,7 @@ private:
     juce::TextButton zoomOutButton;
     juce::TextButton zoomInButton;
     juce::Label zoomValueLabel;
+    juce::Label scopeSummaryLabel;
     ZoneMapOverview overview;
     std::optional<std::size_t> pendingHoverZoneIndex;
     std::optional<std::size_t> hoveredZoneIndex;

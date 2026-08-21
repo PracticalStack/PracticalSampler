@@ -4,8 +4,12 @@
 
 namespace drs::app::authoring
 {
-// Stable seam name for future inspector dispatch expansion. The first
-// implementation is intentionally a single context-sensitive inspector so
-// Map and Structure share one right-hand host slot.
-using StructureInspectorHost = StructureInspector;
+// Explicit host type keeps dispatch ownership separate from the editable
+// inspector implementation. It currently forwards to the single context
+// inspector while preserving one authoritative right-hand slot.
+class StructureInspectorHost final : public StructureInspector
+{
+public:
+    using StructureInspector::StructureInspector;
+};
 } // namespace drs::app::authoring

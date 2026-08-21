@@ -33,6 +33,7 @@ constexpr float velocityAxisWidth = 36.0f;
 constexpr float pitchAxisHeight = 24.0f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
 constexpr int showInStructureMenuItemId = 2;
+constexpr int chooseOverlapMenuItemId = 3;
 
 bool isSupportedSampleFile(const juce::String& path)
 {
@@ -68,6 +69,7 @@ ZoneMapCanvas::ZoneMapCanvas()
     zoomOutButton.setComponentID("authoringZoneMapZoomOut");
     zoomInButton.setComponentID("authoringZoneMapZoomIn");
     zoomValueLabel.setComponentID("authoringZoneMapZoomValue");
+    scopeSummaryLabel.setComponentID("authoringZoneMapScopeSummary");
 
     fitAllButton.setButtonText("Fit All");
     fitSelectedButton.setButtonText("Fit Selected");
@@ -83,6 +85,10 @@ ZoneMapCanvas::ZoneMapCanvas()
     zoomOutButton.setTooltip("Zoom out around the centre of the current view.");
     zoomInButton.setTooltip("Zoom in around the centre of the current view.");
     zoomValueLabel.setTooltip("Current Zone Map zoom. Fit All is the 25% overview.");
+    scopeSummaryLabel.setColour(juce::Label::textColourId, visual::textMuted);
+    scopeSummaryLabel.setFont(juce::Font(11.0f));
+    scopeSummaryLabel.setJustificationType(juce::Justification::centredLeft);
+    scopeSummaryLabel.setInterceptsMouseClicks(false, false);
     zoomValueLabel.setJustificationType(juce::Justification::centred);
     zoomValueLabel.setInterceptsMouseClicks(false, false);
     fitAllButton.setExplicitFocusOrder(34);
@@ -95,7 +101,8 @@ ZoneMapCanvas::ZoneMapCanvas()
                          static_cast<juce::Component*>(&fitSelectedButton),
                          static_cast<juce::Component*>(&zoomOutButton),
                          static_cast<juce::Component*>(&zoomInButton),
-                         static_cast<juce::Component*>(&zoomValueLabel) })
+                         static_cast<juce::Component*>(&zoomValueLabel),
+                         static_cast<juce::Component*>(&scopeSummaryLabel) })
     {
         navigationToolbar.addAndMakeVisible(child);
     }
@@ -179,6 +186,17 @@ void ZoneMapCanvas::setOnZoneAuditionRequested(
     onZoneAuditionRequested = std::move(nextCallback);
 }
 
+void ZoneMapCanvas::setOnOverlappingZonesRequested(
+    std::function<void(const std::vector<std::string>& zoneIds)> nextCallback)
+{
+    onOverlappingZonesRequested = std::move(nextCallback);
+}
+
+void ZoneMapCanvas::setScopeSummary(std::string summary)
+{
+    scopeSummaryLabel.setText(juce::String::fromUTF8(summary.c_str()), juce::dontSendNotification);
+}
+
 void ZoneMapCanvas::setOnShowInStructureRequested(
     std::function<void(const std::vector<std::string>& zoneIds,
                        const std::string& primaryZoneId)> nextCallback)
@@ -237,11 +255,44 @@ bool ZoneMapCanvas::requestSelectionAt(juce::Point<float> position, SelectionMod
     if (activeGesture.has_value() || activeMarqueeGesture.has_value() || activePanGesture.has_value())
         return false;
 
-    const auto hitZoneIndex = findZoneIndexAt(position);
-    if (!hitZoneIndex.has_value())
+    const auto layouts = buildZoneLayouts();
+    std::vector<ZoneLayout> hits;
+    for (const auto& layout : layouts)
+        if (layout.bounds.contains(position))
+            hits.push_back(layout);
+    if (hits.empty())
         return false;
 
-    return requestSelectionByIndex(*hitZoneIndex, mode);
+    std::sort(hits.begin(), hits.end(), [](const ZoneLayout& left, const ZoneLayout& right)
+    {
+        return left.bounds.getWidth() * left.bounds.getHeight()
+            < right.bounds.getWidth() * right.bounds.getHeight();
+    });
+    return requestSelectionByIndex(hits.front().index, mode);
+}
+
+bool ZoneMapCanvas::requestOverlapChooserAt(juce::Point<float> position)
+{
+    if (!onOverlappingZonesRequested)
+        return false;
+    const auto layouts = buildZoneLayouts();
+    std::vector<ZoneLayout> hits;
+    for (const auto& layout : layouts)
+        if (layout.bounds.contains(position))
+            hits.push_back(layout);
+    if (hits.size() < 2)
+        return false;
+    std::sort(hits.begin(), hits.end(), [](const ZoneLayout& left, const ZoneLayout& right)
+    {
+        return left.bounds.getWidth() * left.bounds.getHeight()
+            < right.bounds.getWidth() * right.bounds.getHeight();
+    });
+    std::vector<std::string> ids;
+    ids.reserve(hits.size());
+    for (const auto& hit : hits)
+        ids.push_back(zoneSummaries[hit.index].id);
+    onOverlappingZonesRequested(ids);
+    return true;
 }
 
 bool ZoneMapCanvas::requestSelectionInBounds(juce::Rectangle<float> bounds, SelectionMode mode)
@@ -403,6 +454,10 @@ void ZoneMapCanvas::resized()
     fitAllButton.setBounds(toolbar.removeFromLeft(std::min(62, toolbar.getWidth())));
     toolbar.removeFromLeft(std::min(4, toolbar.getWidth()));
     fitSelectedButton.setBounds(toolbar.removeFromLeft(std::min(92, toolbar.getWidth())));
+
+    const auto summaryWidth = std::min(280, std::max(0, toolbar.getWidth() - 120));
+    scopeSummaryLabel.setBounds(toolbar.removeFromLeft(summaryWidth));
+    toolbar.removeFromLeft(std::min(5, toolbar.getWidth()));
 
     auto zoomControls = toolbar.removeFromRight(std::min(114, toolbar.getWidth()));
     zoomOutButton.setBounds(zoomControls.removeFromLeft(std::min(28, zoomControls.getWidth())));
@@ -768,6 +823,7 @@ void ZoneMapCanvas::mouseDown(const juce::MouseEvent& event)
                 requestSelectionByIndex(*hitZoneIndex, SelectionMode::replace);
             }
         }
+        contextMenuPosition = event.position;
         showContextMenuAt(event.getScreenPosition());
         return;
     }
@@ -810,6 +866,15 @@ void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
     menu.addItem(showInStructureMenuItemId,
                  "Show in Structure",
                  selectionCount > 0 && onShowInStructureRequested != nullptr);
+    const auto overlapCount = [&]
+    {
+        const auto layouts = buildZoneLayouts();
+        return static_cast<int>(std::count_if(layouts.begin(), layouts.end(), [&](const auto& layout)
+                                               { return layout.bounds.contains(contextMenuPosition); }));
+    }();
+    const auto overlapAvailable = onOverlappingZonesRequested != nullptr && overlapCount > 1;
+    menu.addItem(chooseOverlapMenuItemId,
+                 "Choose overlapping zone (" + juce::String(overlapCount) + ")…", overlapAvailable);
 
     auto safeThis = juce::Component::SafePointer<ZoneMapCanvas>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
@@ -824,6 +889,8 @@ void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
                                     && safeThis->onShowInStructureRequested != nullptr)
                                safeThis->onShowInStructureRequested(safeThis->selectionState.zoneIds,
                                                                     safeThis->selectionState.primaryZoneId);
+                           else if (menuItemId == chooseOverlapMenuItemId)
+                               safeThis->requestOverlapChooserAt(safeThis->contextMenuPosition);
                        });
 }
 
@@ -988,6 +1055,40 @@ bool ZoneMapCanvas::keyPressed(const juce::KeyPress& key)
                                                gesture.previewHigh);
         repaint();
         return true;
+    }
+
+    if (key.getModifiers().isAltDown()
+        && (key == juce::KeyPress::leftKey || key == juce::KeyPress::rightKey))
+    {
+        const auto selectedIndex = findSelectedZoneIndex();
+        if (selectedIndex.has_value())
+        {
+            const auto layouts = buildZoneLayouts();
+            const auto selectedLayout = std::find_if(layouts.begin(), layouts.end(),
+                                                     [&](const auto& layout) { return layout.index == *selectedIndex; });
+            if (selectedLayout != layouts.end())
+            {
+                std::vector<ZoneLayout> stack;
+                for (const auto& layout : layouts)
+                    if (layout.bounds.contains(selectedLayout->bounds.getCentre()))
+                        stack.push_back(layout);
+                std::sort(stack.begin(), stack.end(), [](const auto& left, const auto& right)
+                {
+                    return left.bounds.getWidth() * left.bounds.getHeight()
+                        < right.bounds.getWidth() * right.bounds.getHeight();
+                });
+                const auto current = std::find_if(stack.begin(), stack.end(),
+                                                  [&](const auto& layout) { return layout.index == *selectedIndex; });
+                if (stack.size() > 1 && current != stack.end())
+                {
+                    const auto currentPosition = static_cast<int>(std::distance(stack.begin(), current));
+                    const auto nextPosition = juce::jlimit(0, static_cast<int>(stack.size()) - 1,
+                                                           currentPosition + (key == juce::KeyPress::leftKey ? -1 : 1));
+                    if (nextPosition != currentPosition)
+                        return requestSelectionByIndex(stack[static_cast<std::size_t>(nextPosition)].index);
+                }
+            }
+        }
     }
 
     if (key == juce::KeyPress::leftKey || key == juce::KeyPress::upKey)

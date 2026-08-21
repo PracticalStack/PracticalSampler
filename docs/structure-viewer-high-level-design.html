@@ -3,485 +3,231 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Practical Sampler Structure Viewer — High-Level Design</title>
+  <title>Practical Sampler — Unified Instrument Workspace</title>
   <style>
     :root {
-      color-scheme: light dark;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.55;
+      --ink:#273035; --muted:#5f686b; --disabled:#8a9293;
+      --shell:#e9ece8; --surface:#fff; --subtle:#f7f8f5; --hover:#edf0ec;
+      --map:#fbfaf5; --border:#bac2c1; --border-strong:#879395;
+      --selection:#b6531d; --selection-soft:#f7e7dc; --focus:#28658f;
+      --success:#4f7e3b; --warning:#93601e; --error:#a6453e;
+      --group-a:#6f91aa; --group-b:#789581; --group-c:#ad895c; --group-d:#8e7ea1;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--ink); background:#f2f4f1; line-height:1.55;
     }
-
-    body {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-
-    h1, h2, h3 {
-      line-height: 1.2;
-    }
-
-    h1 {
-      margin-bottom: 0.25rem;
-    }
-
-    h2 {
-      margin-top: 2.25rem;
-      padding-bottom: 0.35rem;
-      border-bottom: 1px solid currentColor;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1rem 0;
-    }
-
-    th, td {
-      padding: 0.55rem 0.7rem;
-      text-align: left;
-      vertical-align: top;
-      border: 1px solid currentColor;
-    }
-
-    pre {
-      overflow-x: auto;
-      padding: 1rem;
-      border: 1px solid currentColor;
-      border-radius: 0.25rem;
-    }
-
-    code {
-      font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-    }
-
-    .metadata {
-      margin-top: 0;
-      opacity: 0.75;
-    }
-
-    .callout {
-      padding: 0.8rem 1rem;
-      border-left: 4px solid currentColor;
-      background: color-mix(in srgb, CanvasText 7%, Canvas);
-    }
+    *{box-sizing:border-box} body{margin:0} a{color:var(--focus)}
+    main{max-width:1240px;margin:0 auto;padding:44px 28px 72px}
+    h1,h2,h3{line-height:1.18;margin-top:0} h1{max-width:930px;margin-bottom:12px;font-size:clamp(2rem,5vw,3.55rem);letter-spacing:-.04em}
+    h2{margin-bottom:16px;font-size:clamp(1.45rem,3vw,2rem);letter-spacing:-.025em} h3{margin-bottom:9px;font-size:1.05rem}
+    p{margin:0 0 14px} ul,ol{margin:10px 0 0;padding-left:22px} li+li{margin-top:7px}
+    code{font-family:"Cascadia Code",Consolas,monospace;color:#202729}
+    .eyebrow{display:inline-block;margin-bottom:18px;color:var(--selection);font-size:.76rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+    .lede{max-width:920px;font-size:1.15rem;color:#3e484c}.meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:24px;color:var(--muted);font-size:.88rem}.meta strong{color:var(--ink)}
+    .section{margin-top:44px;padding-top:34px;border-top:1px solid #d5dad6}.decision{margin-top:26px;padding:21px 23px;border-left:5px solid var(--selection);background:var(--surface);box-shadow:0 8px 24px rgba(39,48,53,.06)}.decision strong{color:var(--selection)}
+    .grid-2,.grid-3{display:grid;gap:18px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{padding:19px;background:var(--surface);border:1px solid #d5dad6;box-shadow:0 7px 20px rgba(39,48,53,.045)}.card p:last-child{margin-bottom:0}.good{border-top:4px solid var(--success)}.accent{border-top:4px solid var(--focus)}.warn{border-top:4px solid var(--warning)}
+    .table-wrap{overflow-x:auto} table{width:100%;border-collapse:collapse;background:var(--surface)}th,td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid #d8ddda}th{color:var(--muted);background:var(--subtle);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}td:first-child{font-weight:650}
+    figure{margin:24px 0 0}figcaption{margin-top:10px;color:var(--muted);font-size:.84rem}.mockup-scroll{overflow-x:auto;padding:4px 4px 16px}.product-frame{overflow:hidden;min-width:940px;color:var(--ink);background:var(--shell);border:1px solid var(--border-strong);box-shadow:0 16px 42px rgba(39,48,53,.12);font-size:11px}
+    .app-titlebar{display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 11px;color:#fff;background:#30383b}.app-titlebar span:last-child{opacity:.72}
+    .toolbar{display:flex;align-items:center;gap:7px;min-height:40px;padding:6px 8px;background:var(--surface);border-bottom:1px solid var(--border)}
+    .button,.field,.chip{display:inline-flex;align-items:center;justify-content:center;min-height:25px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:2px;white-space:nowrap}.button.active{color:#fff;background:var(--selection);border-color:var(--selection)}.button.command{color:var(--selection);border-color:var(--selection);font-weight:700}.button.ghost{background:transparent}.button.danger{color:var(--error)}.field{justify-content:flex-start;color:var(--muted);background:var(--subtle)}.chip{min-height:21px;color:var(--muted);background:var(--subtle);border-color:transparent}.spacer{flex:1}.toggle-mark{width:10px;height:10px;margin-right:5px;background:#fff;border:1px solid rgba(255,255,255,.8)}
+    .workspace{display:grid;grid-template-columns:224px minmax(340px,1fr) 318px;min-height:445px}.workspace.map-hidden{grid-template-columns:274px minmax(0,1fr)}
+    .tree-panel{display:flex;flex-direction:column;min-width:0;background:var(--surface);border-right:1px solid var(--border-strong)}.panel-head{display:flex;align-items:center;justify-content:space-between;height:31px;padding:0 9px;border-bottom:1px solid var(--border);font-weight:750}.panel-head span:last-child{color:var(--muted);font-size:9px;font-weight:500}
+    .tree{flex:1;padding:4px 0;background:var(--subtle)}.tree-row{display:grid;grid-template-columns:16px 12px minmax(0,1fr);align-items:center;min-height:25px;padding:2px 7px;border-left:3px solid transparent}.tree-row.depth-1{padding-left:13px}.tree-row.depth-2{padding-left:27px}.tree-row.depth-3{padding-left:41px}.tree-row.selected{background:var(--selection-soft);border-left-color:var(--selection);outline:1px solid #dfb89e;outline-offset:-1px}.tree-row.path{background:#f0f2ef}.disclosure{color:var(--muted);font-size:9px;text-align:center}.entity-dot{width:8px;height:8px;border-radius:50%;background:var(--border-strong)}.entity-dot.layer{background:var(--success)}.entity-dot.a{background:var(--group-a)}.entity-dot.b{background:var(--group-b)}.entity-dot.c{background:var(--group-c)}
+    .row-copy{min-width:0}.row-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}.row-meta{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:8px}.tree-actions{padding:7px;border-top:1px solid var(--border);background:var(--surface)}.action-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.action-row+.action-row{margin-top:5px}.action-row .button{min-width:0;padding:3px 4px;font-size:9px}.search{display:flex;align-items:center;gap:5px;margin-top:7px;padding:4px 6px;color:var(--muted);background:var(--subtle);border:1px solid var(--border)}.search span:last-child{margin-left:auto;color:var(--focus)}
+    .map-pane{position:relative;overflow:hidden;min-width:0;background:#a9aaa7}.map-pane::before{content:"";position:absolute;inset:0 0 30px;background:repeating-linear-gradient(to right,transparent 0 18px,rgba(35,42,44,.2) 19px 20px),repeating-linear-gradient(to bottom,transparent 0 54px,rgba(35,42,44,.11) 55px 56px);z-index:2;pointer-events:none}.map-scope{position:absolute;left:9px;top:8px;z-index:6;padding:5px 7px;color:var(--ink);background:rgba(255,255,255,.93);border:1px solid var(--border);box-shadow:0 2px 6px rgba(39,48,53,.12)}.map-zone{position:absolute;top:0;bottom:30px;border:1px solid rgba(42,48,50,.56);box-shadow:inset 1px 0 rgba(255,255,255,.38)}.map-zone.a{background:rgba(111,145,170,.54)}.map-zone.b{background:rgba(120,149,129,.54)}.map-zone.c{background:rgba(142,126,161,.54)}.map-zone.d{background:rgba(173,137,92,.54)}.map-zone.selected{z-index:4;background:rgba(111,145,170,.7);outline:2px solid #f7f8f5;outline-offset:-3px}.zone-label{position:absolute;left:36%;top:142px;z-index:7;min-width:178px;padding:8px 11px 8px 23px;color:#fff;background:rgba(39,48,53,.82);font-size:14px;font-weight:700}.selection-handle{position:absolute;left:calc(36% - 7px);top:137px;z-index:8;width:20px;height:20px;background:#fff;border:2px solid #586164;border-radius:50%;box-shadow:-9px 9px 0 -2px #fff,-9px 9px 0 0 #586164,0 17px 0 -2px #fff,0 17px 0 0 #586164}.map-overview{position:absolute;right:12px;bottom:43px;z-index:7;width:154px;height:84px;padding:11px;background:rgba(255,255,255,.93);border:1px solid #929b9c;box-shadow:0 2px 8px rgba(39,48,53,.18)}.overview-field{position:relative;height:100%;background:repeating-linear-gradient(to right,rgba(111,145,170,.42) 0 4px,rgba(142,126,161,.38) 4px 8px,rgba(120,149,129,.4) 8px 12px,rgba(173,137,92,.4) 12px 16px)}.overview-window{position:absolute;inset:20px 15px 12px;border:2px solid #fff;outline:1px solid #667173}.keyboard{position:absolute;inset:auto 0 0;z-index:5;height:30px;display:flex;background:#f7f8f5;border-top:1px solid var(--border-strong)}.keyboard i{flex:1;border-right:1px solid #cbd0ce}.keyboard i:nth-child(12n+1){border-right-color:#687275}.map-axis-label{position:absolute;left:9px;bottom:7px;z-index:6;color:var(--muted);font-size:8px}.stack-badge{position:absolute;right:-7px;top:-9px;display:grid;place-items:center;min-width:23px;height:19px;padding:0 5px;color:#fff;background:var(--warning);border:2px solid #fff;border-radius:9px;font-size:8px;font-weight:700}
+    .inspector{min-width:0;background:var(--surface);border-left:1px solid var(--border-strong)}.wide-inspector{border-left:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-content:start}.wide-inspector .inspector-head{grid-column:1/-1}.wide-inspector .inspector-section{border-right:1px solid #dde1de}.inspector-head{padding:12px 13px 10px;border-bottom:1px solid var(--border)}.inspector-kicker{color:var(--selection);font-size:9px;font-weight:750;letter-spacing:.09em;text-transform:uppercase}.inspector-title{margin-top:3px;font-size:16px;font-weight:700}.inspector-path{margin-top:2px;color:var(--muted)}.inspector-actions{display:flex;gap:5px;margin-top:9px}.inspector-section{padding:10px 13px 12px;border-bottom:1px solid #dde1de}.inspector-section-title{margin-bottom:8px;font-size:10px;font-weight:750;letter-spacing:.06em;text-transform:uppercase}.field-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(88px,.95fr);gap:6px 8px;align-items:center}.field-label{color:var(--muted)}.control{min-height:24px;padding:4px 6px;border:1px solid var(--border);background:var(--subtle)}.toggle{display:flex;align-items:center;gap:5px}.check{width:11px;height:11px;background:var(--selection)}.range{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px}.read-only{color:var(--muted);background:transparent;border-color:transparent}
+    .workbench{min-width:940px;background:var(--surface);border:1px solid var(--border-strong);border-top:0}.tabs{display:flex;gap:4px;padding:5px 7px;border-bottom:1px solid var(--border)}.workbench-body{display:grid;grid-template-columns:1fr 310px;gap:10px;min-height:118px;padding:9px;background:var(--subtle)}.waveform{position:relative;overflow:hidden;background:#252d30}.waveform::after{content:"";position:absolute;inset:16px 6px;background:linear-gradient(165deg,transparent 0 10%,rgba(111,145,170,.9) 11% 14%,transparent 15% 23%,rgba(111,145,170,.7) 24% 29%,transparent 30% 42%,rgba(111,145,170,.95) 43% 47%,transparent 48% 59%,rgba(111,145,170,.65) 60% 65%,transparent 66% 100%)}.wave-controls{display:grid;grid-template-columns:1fr 1fr;gap:6px}.wave-controls .control{font-size:9px}
+    .scope-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.scope-example{overflow:hidden;background:var(--surface);border:1px solid #d5dad6}.scope-head{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700}.scope-head span:last-child{color:var(--muted);font-size:9px;font-weight:500}.mini-map{position:relative;height:160px;background:#a9aaa7}.mini-map::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(to right,transparent 0 15px,rgba(35,42,44,.2) 16px 17px);pointer-events:none}.mini-zone{position:absolute;top:0!important;bottom:0;height:auto!important;border:1px solid rgba(42,48,50,.52);box-shadow:inset 1px 0 rgba(255,255,255,.35)}.mini-zone.a{background:rgba(111,145,170,.58)}.mini-zone.b{background:rgba(120,149,129,.58)}.mini-zone.c{background:rgba(142,126,161,.58)}.mini-zone.d{background:rgba(173,137,92,.58)}.scope-note{padding:9px 10px;color:var(--muted);font-size:.83rem}
+    .state-model{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:stretch}.state-box{padding:19px;background:var(--surface);border-top:4px solid var(--focus)}.state-box:last-child{border-top-color:var(--selection)}.state-arrow{display:grid;place-items:center;color:var(--selection);font-size:28px;font-weight:700}.state-box ul{font-size:.9rem}
+    .responsive-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:18px}.screen{overflow:hidden;background:var(--shell);border:1px solid var(--border-strong)}.screen-label{padding:8px 10px;color:var(--muted);background:var(--subtle);border-bottom:1px solid var(--border);font-size:10px}.screen-body{display:grid;grid-template-columns:22% 47% 31%;min-height:185px}.screen-tree{padding:8px;background:var(--surface);border-right:1px solid var(--border)}.screen-row{height:17px;margin-bottom:5px;background:var(--subtle);border-left:3px solid var(--group-a)}.screen-row:nth-child(2){margin-left:9px;border-left-color:var(--group-b)}.screen-row:nth-child(3){margin-left:18px;border-left-color:var(--group-c)}.screen-map{background:var(--map);background-image:linear-gradient(to right,rgba(135,147,149,.2) 1px,transparent 1px);background-size:20% 100%}.screen-inspector{padding:8px;background:var(--surface);border-left:1px solid var(--border)}.screen-field{height:17px;margin-bottom:6px;background:var(--subtle);border:1px solid var(--border)}.compact-screen .screen-body{position:relative;grid-template-columns:30% 70%}.compact-screen .screen-inspector{position:absolute;right:0;top:0;bottom:0;width:48%;box-shadow:-8px 0 20px rgba(39,48,53,.16)}
+    .component-tree{padding:20px 22px;background:var(--surface);border-left:4px solid var(--focus);font-family:"Cascadia Code",Consolas,monospace;font-size:.88rem;line-height:1.8}.indent-1{padding-left:22px}.indent-2{padding-left:44px}.component-tree em{color:var(--muted);font-style:normal}
+    .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:20px}.flow-step{position:relative;min-height:120px;padding:16px;background:var(--surface);border-top:4px solid var(--focus)}.flow-step:not(:last-child)::after{content:"→";position:absolute;right:-15px;top:40%;z-index:2;color:var(--selection);font-size:24px;font-weight:700}.flow-step p{margin:0;color:var(--muted);font-size:.88rem}
+    .acceptance{counter-reset:item;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;list-style:none}.acceptance li{position:relative;min-height:78px;margin:0;padding:14px 14px 14px 46px;background:var(--surface);border:1px solid #d5dad6}.acceptance li::before{counter-increment:item;content:counter(item);position:absolute;left:14px;top:14px;display:grid;place-items:center;width:22px;height:22px;color:#fff;background:var(--success);border-radius:50%;font-size:11px;font-weight:700}.footer{margin-top:50px;padding-top:18px;color:var(--muted);border-top:1px solid #d5dad6;font-size:.82rem}
+    @media(max-width:860px){main{padding:28px 16px 52px}.grid-2,.grid-3,.scope-grid,.state-model,.responsive-grid,.flow,.acceptance{grid-template-columns:1fr}.state-arrow{transform:rotate(90deg)}.flow-step:not(:last-child)::after{content:"↓";right:50%;top:auto;bottom:-20px}}
+    @media print{body{background:#fff}main{max-width:none;padding:20px}.mockup-scroll{overflow:visible}.product-frame,.workbench{min-width:0;box-shadow:none}.section{break-inside:avoid}}
   </style>
 </head>
 <body>
-  <main>
-    <h1>Structure Viewer</h1>
-    <p class="metadata">High-Level Design · Practical Sampler Authoring Workspace · August 2026</p>
-    <p><strong>Related engineering plan:</strong> <a href="structure-viewer-iteration-plan.html">Structure Viewer Iteration Plan</a></p>
+<main>
+  <header>
+    <span class="eyebrow">Authoring UX · Canonical design</span>
+    <h1>Unified Instrument Workspace</h1>
+    <p class="lede">One authoring view combines the complete Instrument → Layer → Group → Zone hierarchy, the existing Zone Map, and a context-sensitive inspector. <strong>Show Map</strong> controls the workspace layout; <strong>Show Zones</strong> sends the current hierarchy selection to the Map as a zone filter.</p>
+    <div class="meta"><span><strong>Status:</strong> Ready for implementation planning</span><span><strong>Revision:</strong> 3.1</span><span><strong>Date:</strong> 21 August 2026</span><span><strong>Focused foundation:</strong> <a href="layer-group-inspector-high-level-design.html">Layer and Group Inspector HLD</a></span><span><strong>Historical implementation:</strong> <a href="structure-viewer-iteration-plan.html">first Structure Viewer iteration</a></span></div>
+    <div class="decision"><strong>Product decision.</strong> Remove the Map | Structure mode switch. Keep the Instrument Structure browser persistent. <strong>Show Map</strong> reveals or hides the existing Map pane and never changes its contents. <strong>Show Zones</strong> is a contextual command: it derives scope from the current instrument, layer, group, or zone selection, opens the Map when necessary, filters the existing Zone Map to that scope, and fits the result without changing the active inspector.</div>
+  </header>
 
-    <h2>1. Summary</h2>
-    <p>
-      The Structure Viewer is a second way to view and edit an authored instrument. It presents the
-      complete <strong>Instrument → Layer → Group → Zone</strong> hierarchy as a column browser with a
-      context-sensitive inspector. It complements the existing Zone Map rather than replacing it.
-    </p>
-    <p>
-      The Zone Map remains the preferred spatial editor for key and velocity mapping. The Structure
-      Viewer becomes the preferred workspace for hierarchy navigation, comparing zones that overlap,
-      moving objects between parents, diagnosing ambiguous mappings, and editing multiple objects at once.
-    </p>
-
-    <div class="callout">
-      <strong>Core principle:</strong> Map answers “where does this zone play?” Structure answers
-      “where does this object belong, what else is beside it, and what properties do these objects share?”
+  <section class="section" id="principles">
+    <span class="eyebrow">01 · Design principles</span>
+    <h2>One place to navigate, see, and edit</h2>
+    <div class="grid-3">
+      <article class="card good"><h3>Hierarchy is persistent</h3><p>The Instrument Structure tree is the primary navigation surface in every workbench state. It is never replaced by a Layer editor, Group editor, or alternate viewer.</p></article>
+      <article class="card accent"><h3>The Map is scoped on request</h3><p>Selecting an entity changes the inspector. Invoking Show Zones derives the appropriate descendant-zone filter and publishes it to the Map. The active Map scope remains visible above the canvas.</p></article>
+      <article class="card warn"><h3>Selection stays independent</h3><p>Clicking a zone selects it for editing but does not narrow the Map to that single zone. Scope and edit selection are separate pieces of workspace state.</p></article>
     </div>
+  </section>
 
-    <h2>2. Goals</h2>
-    <ul>
-      <li>Make layers, groups, and zones easy to browse as one coherent hierarchy.</li>
-      <li>Make zones with identical or overlapping key ranges independently visible and selectable.</li>
-      <li>Provide a predictable inspector for layers, groups, single zones, and same-type multi-selections.</li>
-      <li>Support fast batch edits with clear mixed-value behavior and one undo transaction per gesture.</li>
-      <li>Share selection and authoring context with the existing Zone Map and lower workbenches.</li>
-      <li>Scale to production instruments without rendering every row as a heavyweight component.</li>
-      <li>Preserve the existing authored object model; the viewer is not a new hierarchy or data format.</li>
-    </ul>
+  <section class="section" id="primary-layout">
+    <span class="eyebrow">02 · Primary layout</span>
+    <h2>Hierarchy, scoped Zone Map, inspector</h2>
+    <figure aria-labelledby="workspace-caption">
+      <div class="mockup-scroll">
+        <div class="product-frame">
+          <div class="app-titlebar"><span>Practical Sampler · Authoring</span><span>Accurate Salamander 2</span></div>
+          <div class="toolbar"><span class="button active"><i class="toggle-mark"></i>Show Map</span><span class="chip">Showing zones: Keys 45–76 · 24</span><span class="button ghost">All events</span><span class="button ghost">Visible only</span><span class="spacer"></span><span class="button">Fit scope</span><span class="button">•••</span></div>
+          <div class="workspace">
+            <aside class="tree-panel">
+              <div class="panel-head"><span>Instrument Structure</span><span>5 zones</span></div>
+              <div class="tree">
+                <div class="tree-row path"><span class="disclosure">▼</span><i class="entity-dot"></i><div class="row-copy"><div class="row-title">AccurateSalamander2</div><div class="row-meta">2 layers · 2 groups · 5 zones</div></div></div>
+                <div class="tree-row depth-1 path"><span class="disclosure">▼</span><i class="entity-dot layer"></i><div class="row-copy"><div class="row-title">sfz-sustain</div><div class="row-meta">2 groups · 4 zones · C3–C6</div></div></div>
+                <div class="tree-row depth-2 selected"><span class="disclosure">▼</span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">Keys 45–76</div><div class="row-meta">V 1–127 · 24 zones</div></div></div>
+                <div class="tree-row depth-3"><span></span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">045 A2v06</div><div class="row-meta">A2 · V 1–72</div></div></div>
+                <div class="tree-row depth-3"><span></span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">045 A2v07</div><div class="row-meta">A2 · V 65–127</div></div></div>
+                <div class="tree-row depth-2"><span class="disclosure">▶</span><i class="entity-dot b"></i><div class="row-copy"><div class="row-title">Keys 46–47</div><div class="row-meta">V 1–127 · 1 zone</div></div></div>
+                <div class="tree-row depth-1"><span class="disclosure">▶</span><i class="entity-dot layer"></i><div class="row-copy"><div class="row-title">sfz-release</div><div class="row-meta">1 group · 1 zone · C3–C6</div></div></div>
+              </div>
+              <div class="tree-actions"><div class="action-row"><span class="button">+ Layer</span><span class="button">+ Group</span><span class="button">+ Zone</span></div><div class="action-row"><span class="button">Duplicate</span><span class="button danger">Delete</span><span class="button">More…</span></div><div class="search"><span>Search / filter…</span><span>⌕</span></div></div>
+            </aside>
+            <div class="map-pane">
+              <div class="map-scope">Showing zones: Keys 45–76 · 24 zones</div>
+              <i class="map-zone c" style="left:1%;width:4.2%"></i><i class="map-zone a" style="left:5.4%;width:3.8%"></i><i class="map-zone b" style="left:9.5%;width:4.8%"></i><i class="map-zone d" style="left:14.6%;width:3.4%"></i><i class="map-zone c" style="left:18.3%;width:5.2%"></i><i class="map-zone d" style="left:23.8%;width:3.5%"></i><i class="map-zone b" style="left:27.6%;width:4.6%"></i><i class="map-zone c" style="left:32.5%;width:3.4%"></i><i class="map-zone a selected" style="left:36.2%;width:4.2%"></i><i class="map-zone b" style="left:40.7%;width:3.8%"></i><i class="map-zone d" style="left:44.8%;width:4.6%"></i><i class="map-zone c" style="left:49.7%;width:3.7%"></i><i class="map-zone a" style="left:53.7%;width:4.4%"></i><i class="map-zone b" style="left:58.4%;width:3.6%"></i><i class="map-zone d" style="left:62.3%;width:4.8%"></i><i class="map-zone c" style="left:67.4%;width:3.5%"></i><i class="map-zone a" style="left:71.2%;width:4.3%"></i><i class="map-zone b" style="left:75.8%;width:3.8%"></i><i class="map-zone d" style="left:79.9%;width:4.9%"></i><i class="map-zone c" style="left:85.1%;width:3.6%"></i><i class="map-zone a" style="left:89%;width:4.4%"></i><i class="map-zone b" style="left:93.7%;width:5.1%"></i>
+              <span class="selection-handle" aria-hidden="true"></span><span class="zone-label">045 A2v06</span>
+              <div class="map-overview"><div class="overview-field"><i class="overview-window"></i></div></div>
+              <div class="keyboard"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <span class="map-axis-label">A2</span>
+            </div>
+            <aside class="inspector">
+              <div class="inspector-head"><div class="inspector-kicker">Group</div><div class="inspector-title">Keys 45–76</div><div class="inspector-path">sfz-sustain › Keys 45–76</div><div class="inspector-actions"><span class="button command">Show Zones</span><span class="button">Audition</span><span class="button">•••</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Identity &amp; organization</div><div class="field-grid"><span class="field-label">Name</span><span class="control">Keys 45–76</span><span class="field-label">Layer</span><span class="control">sfz-sustain</span><span class="field-label">Visible</span><span class="control toggle"><i class="check"></i> On</span><span class="field-label">Order</span><span class="control">1</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Playback</div><div class="field-grid"><span class="field-label">Gain</span><span class="control">0.0 dB</span><span class="field-label">Pan</span><span class="control">Center</span><span class="field-label">Output</span><span class="control">Main out</span><span class="field-label">Round robin</span><span class="control">Sequential</span></div></div>
+              <div class="inspector-section"><div class="inspector-section-title">Map context</div><div class="field-grid"><span class="field-label">Showing zones</span><span class="control read-only">This group</span><span class="field-label">Visible zones</span><span class="control read-only">24</span></div></div>
+            </aside>
+          </div>
+        </div>
+        <div class="workbench"><div class="tabs"><span class="button active">Waveform</span><span class="button">Groups</span><span class="button">Macros</span><span class="button">Routing</span><span class="button">Performance</span><span class="button">Articulations</span></div><div class="workbench-body"><div class="waveform"></div><div class="wave-controls"><span class="control">Playback start · 0</span><span class="control">End · 185204</span><span class="control">Loop mode · Sustain</span><span class="control">Crossfade · 256</span><span class="control">Audition selection</span><span class="control">Snap · On</span></div></div></div>
+      </div>
+      <figcaption id="workspace-caption"><strong>Group Inspector after Show Zones.</strong> The Group remains selected and its editable inspector stays active. Show Zones has opened the existing dense Zone Map, filtered it to the group's 24 zones, and fit that scope. The canvas keeps the current overlapping vertical ranges, selection marker, keyboard axis, pan/zoom behavior, and minimap.</figcaption>
+    </figure>
+  </section>
 
-    <h2>3. Non-Goals</h2>
-    <ul>
-      <li>Replacing the Zone Map or reproducing all of its direct spatial editing gestures.</li>
-      <li>Changing runtime composition, routing order, project schema, or layer contract semantics.</li>
-      <li>Automatically correcting intentional overlaps.</li>
-      <li>Allowing one edit selection to contain layers, groups, and zones simultaneously.</li>
-      <li>Moving specialized waveform, DSP, macro, routing, or performance editors into the inspector.</li>
-    </ul>
+  <section class="section" id="scope">
+    <span class="eyebrow">03 · Scope behavior</span>
+    <h2>Show Zones projects the selection into the existing Map</h2>
+    <p>Map scope has exactly one owner: the instrument, one layer, or one group. Selection alone changes the inspector; invoking Show Zones derives the smallest useful container scope, supplies only its descendant zones to the existing Zone Map, and fits the result.</p>
+    <div class="scope-grid">
+      <figure class="scope-example">
+        <div class="scope-head"><span>Instrument scope</span><span>5 zones</span></div>
+        <div class="mini-map"><i class="mini-zone a" style="left:8%;top:24px;width:49%"></i><i class="mini-zone a" style="left:8%;top:55px;width:49%"></i><i class="mini-zone b" style="left:38%;top:87px;width:44%"></i><i class="mini-zone c" style="left:19%;top:119px;width:37%"></i><i class="mini-zone d" style="left:58%;top:24px;width:27%"></i></div>
+        <figcaption class="scope-note">All descendant zones across every visible layer and group. Useful for instrument-wide coverage and gaps.</figcaption>
+      </figure>
+      <figure class="scope-example">
+        <div class="scope-head"><span>Layer scope · sfz-sustain</span><span>4 zones</span></div>
+        <div class="mini-map"><i class="mini-zone a" style="left:8%;top:24px;width:49%"></i><i class="mini-zone a" style="left:8%;top:55px;width:49%"></i><i class="mini-zone b" style="left:38%;top:87px;width:44%"></i><i class="mini-zone b" style="left:38%;top:119px;width:44%"></i></div>
+        <figcaption class="scope-note">Zones from every group whose <code>layerId</code> is the selected layer. Release-layer zones are absent.</figcaption>
+      </figure>
+      <figure class="scope-example">
+        <div class="scope-head"><span>Group scope · Keys 45–76</span><span>2 zones</span></div>
+        <div class="mini-map"><i class="mini-zone a" style="left:8%;top:39px;width:49%"></i><i class="mini-zone a" style="left:8%;top:84px;width:49%"></i></div>
+        <figcaption class="scope-note">Only zones whose <code>groupId</code> is the selected group. Identical ranges remain individually selectable.</figcaption>
+      </figure>
+    </div>
+    <div class="table-wrap" style="margin-top:20px"><table><thead><tr><th>Current selection when Show Zones is invoked</th><th>Derived Map scope</th><th>Inspector after command</th><th>Zone Map result</th></tr></thead><tbody>
+      <tr><td>Instrument</td><td>Instrument</td><td>Instrument summary remains active.</td><td>All descendant zones.</td></tr>
+      <tr><td>Layer</td><td>Selected layer</td><td>Editable Layer inspector remains active.</td><td>Zones from every child group.</td></tr>
+      <tr><td>Group</td><td>Selected group</td><td>Editable Group inspector remains active.</td><td>Only zones belonging to that group.</td></tr>
+      <tr><td>One zone</td><td>Its parent group</td><td>Editable Zone inspector remains active.</td><td>Parent-group peers remain visible; selected zone is revealed.</td></tr>
+      <tr><td>Several zones</td><td>Smallest shared ancestor: group, then layer, then instrument.</td><td>Multi-Zone inspector remains active.</td><td>Shared context is visible; selected zones are revealed.</td></tr>
+      <tr><td>No valid entity</td><td>No change</td><td>No change.</td><td>Show Zones is disabled with an accessible explanation.</td></tr>
+    </tbody></table></div>
+    <div class="decision"><strong>Command behavior.</strong> If the Map is hidden, Show Zones first turns Show Map on. If the Map is already visible, it only changes the zone projection and fits the derived scope. It never changes the authoring selection, inspector type, project data, or workbench tab.</div>
+  </section>
 
-    <h2>4. Location in the UI</h2>
-    <p>
-      The viewer lives in the main Authoring mapping surface as a peer to the Zone Map. A persistent
-      segmented control switches between the two views:
-    </p>
+  <section class="section" id="state-model">
+    <span class="eyebrow">04 · State model</span>
+    <h2>Scope and edit selection must be separate</h2>
+    <div class="state-model">
+      <article class="state-box"><h3><code>StructureScope</code></h3><ul><li>Kind: instrument, layer, or group.</li><li>Exactly one stable ID, except instrument root.</li><li>Determines Zone Map membership.</li><li>Changed by the Show Zones command, not selection alone.</li><li>Workspace-only; never dirties the project.</li></ul></article>
+      <div class="state-arrow">≠</div>
+      <article class="state-box"><h3><code>AuthoringStructureSelection</code></h3><ul><li>Kind: layer, group, or zone.</li><li>One or more same-type stable IDs.</li><li>Determines inspector type and edit targets.</li><li>Zone selection does not alter valid parent scope.</li><li>Selection-only changes are not transactions.</li></ul></article>
+    </div>
+    <div class="decision"><strong>Three independent states.</strong> <code>AuthoringStructureSelection</code> controls the inspector. <code>StructureScope</code> controls which zones the Map receives. <code>MapPaneVisible</code> controls whether the Map consumes layout space. Show Zones may update scope and set pane visibility to true, but Show Map only changes pane visibility.</div>
+  </section>
 
-    <pre><code>AUTHORING
+  <section class="section" id="show-zones">
+    <span class="eyebrow">05 · Map controls</span>
+    <h2>Show Map and Show Zones are deliberately different</h2>
+    <div class="grid-2">
+      <article class="card good"><h3>Show Map · layout toggle</h3><p>A persistent toolbar toggle reveals or hides the Map pane. Off gives the inspector the reclaimed workspace; on restores the last scope, zone selection, pan, and zoom. It never changes selection or filtering.</p></article>
+      <article class="card accent"><h3>Show Zones · contextual command</h3><p>An action in the active inspector, structure action bar, and hierarchy context menu. It derives scope from the current entity, ensures the Map is visible, filters the existing Zone Map, and fits the result.</p></article>
+    </div>
+    <div class="table-wrap" style="margin-top:20px"><table><thead><tr><th>Control</th><th>Placement</th><th>Changes</th><th>Does not change</th></tr></thead><tbody><tr><td>Show Map</td><td>Persistent workspace toolbar</td><td><code>MapPaneVisible</code> only</td><td>Selection, scope, filter, inspector, project data</td></tr><tr><td>Show Zones</td><td>Inspector primary action; structure action bar; context menu</td><td><code>StructureScope</code>; zone projection; fit; visibility only when currently hidden</td><td>Selection, inspector type, workbench, project data</td></tr></tbody></table></div>
+    <figure aria-labelledby="hidden-caption">
+      <div class="mockup-scroll"><div class="product-frame">
+        <div class="app-titlebar"><span>Practical Sampler · Authoring</span><span>Accurate Salamander 2</span></div>
+        <div class="toolbar"><span class="button"><span style="width:10px;height:10px;margin-right:5px;border:1px solid var(--border-strong)"></span>Show Map</span><span class="chip">Last Map scope: sfz-sustain</span><span class="spacer"></span></div>
+        <div class="workspace map-hidden">
+          <aside class="tree-panel"><div class="panel-head"><span>Instrument Structure</span><span>5 zones</span></div><div class="tree"><div class="tree-row path"><span class="disclosure">▼</span><i class="entity-dot"></i><div class="row-copy"><div class="row-title">AccurateSalamander2</div><div class="row-meta">2 layers · 2 groups · 5 zones</div></div></div><div class="tree-row depth-1 selected"><span class="disclosure">▼</span><i class="entity-dot layer"></i><div class="row-copy"><div class="row-title">sfz-sustain</div><div class="row-meta">2 groups · 4 zones · C3–C6</div></div></div><div class="tree-row depth-2"><span class="disclosure">▶</span><i class="entity-dot a"></i><div class="row-copy"><div class="row-title">Keys 45–76</div><div class="row-meta">V 48–52 · 2 zones</div></div></div><div class="tree-row depth-2"><span class="disclosure">▶</span><i class="entity-dot b"></i><div class="row-copy"><div class="row-title">Keys 46–47</div><div class="row-meta">V 1–127 · 1 zone</div></div></div><div class="tree-row depth-1"><span class="disclosure">▶</span><i class="entity-dot layer"></i><div class="row-copy"><div class="row-title">sfz-release</div><div class="row-meta">1 group · 1 zone · C3–C6</div></div></div></div><div class="tree-actions"><div class="action-row"><span class="button">+ Layer</span><span class="button">+ Group</span><span class="button">+ Zone</span></div><div class="search"><span>Search / filter…</span><span>⌕</span></div></div></aside>
+          <aside class="inspector wide-inspector"><div class="inspector-head"><div class="inspector-kicker">Layer</div><div class="inspector-title">sfz-sustain</div><div class="inspector-path">AccurateSalamander2 › sfz-sustain</div><div class="inspector-actions"><span class="button command">Show Zones</span><span class="button">Audition</span><span class="button">Select groups</span><span class="button">Duplicate</span><span class="button">•••</span></div></div><div class="inspector-section"><div class="inspector-section-title">Identity &amp; organization</div><div class="field-grid"><span class="field-label">Name</span><span class="control">sfz-sustain</span><span class="field-label">Visible</span><span class="control toggle"><i class="check"></i> On</span><span class="field-label">Order</span><span class="control">1</span><span class="field-label">Anchor group</span><span class="control">Keys 45–76</span></div></div><div class="inspector-section"><div class="inspector-section-title">Mix &amp; routing</div><div class="field-grid"><span class="field-label">Gain</span><span class="control">0.0 dB</span><span class="field-label">Pan</span><span class="control">Center</span><span class="field-label">Output</span><span class="control">Main out</span><span class="field-label">Effective output</span><span class="control read-only">Main out</span></div></div><div class="inspector-section"><div class="inspector-section-title">Crossfade</div><div class="field-grid"><span class="field-label">Source</span><span class="control">None</span><span class="field-label">Window</span><span class="range"><span class="control">0</span><span>–</span><span class="control">127</span></span><span class="field-label">Direction</span><span class="control">Fade in</span><span class="field-label">Curve</span><span class="control">Linear</span></div></div><div class="inspector-section"><div class="inspector-section-title">Summary</div><div class="field-grid"><span class="field-label">Groups</span><span class="control read-only">2</span><span class="field-label">Zones</span><span class="control read-only">4</span><span class="field-label">Coverage</span><span class="control read-only">C3–C6</span></div></div></aside>
+        </div>
+      </div></div>
+      <figcaption id="hidden-caption"><strong>Show Map off.</strong> The Map is removed rather than left blank, so the editable Layer Inspector uses the reclaimed width. Show Zones remains available as a contextual action; invoking it opens the Map and replaces the prior sfz-sustain projection with the zones derived from the current selection.</figcaption>
+    </figure>
+  </section>
 
-Mapping View   [ Map | Structure ]   Search…   Filters
+  <section class="section" id="overlaps">
+    <span class="eyebrow">06 · Overlapping zones</span>
+    <h2>Filtering helps; stack access finishes the job</h2>
+    <p>Hierarchy scope reduces unrelated overlap, but intentional stacks can still share identical key and velocity geometry. The tree guarantees access to every zone, while Map adds a compact stack affordance.</p>
+    <div class="grid-3"><article class="card"><h3>Stack badge</h3><p>A small count appears on coincident or substantially occluded rectangles. The badge is visible only when more than one selectable zone shares the hit region.</p></article><article class="card"><h3>Click behavior</h3><p>Clicking the badge opens a native menu listing zone name, velocity, RR, articulation, and event. Selecting an item changes zone selection without changing scope.</p></article><article class="card"><h3>Keyboard behavior</h3><p>A focused stack supports Next/Previous Zone commands. The inspector and tree reveal the chosen stable ID, and the map keeps every scoped peer visible.</p></article></div>
+  </section>
 
-┌────────────────────────────────────────────────┬──────────────────────┐
-│ Current Map or Structure viewer                │ Context inspector    │
-│                                                │                      │
-│                                                │ Layer / Group / Zone │
-└────────────────────────────────────────────────┴──────────────────────┘
+  <section class="section" id="inspector">
+    <span class="eyebrow">07 · Inspector behavior</span>
+    <h2>Container scope, object editing</h2>
+    <div class="table-wrap"><table><thead><tr><th>Primary selection</th><th>Inspector</th><th>Map scope before Show Zones</th><th>Map scope after Show Zones</th></tr></thead><tbody><tr><td>Layer</td><td>Name, visibility/order, gain/pan, routing, anchor group, crossfade, summary.</td><td>Unchanged.</td><td>The selected layer.</td></tr><tr><td>Group</td><td>Name, parent layer, visibility/order, gain/pan, routing, anchor zone, RR, summary.</td><td>Unchanged.</td><td>The selected group.</td></tr><tr><td>Zone</td><td>Mapping, sample, mix, release, trigger/event, RR/choke/controller, loop, waveform actions.</td><td>Unchanged.</td><td>The selected zone's parent group.</td></tr><tr><td>Multiple zones</td><td>Compatible shared/mixed fields and atomic batch actions.</td><td>Unchanged.</td><td>The smallest shared ancestor container.</td></tr><tr><td>Instrument root</td><td>Compact instrument summary; no invented editable layer/group fields.</td><td>Unchanged.</td><td>The whole instrument.</td></tr></tbody></table></div>
+    <div class="decision"><strong>Editing contract.</strong> Every editable value is a real JUCE control wired to a validated session transaction. Read-only derived values are grouped under Summary. Selection, scope, Map visibility, expansion, filters, and pan/zoom remain workspace state and never dirty the project.</div>
+  </section>
 
-[ Waveform | Groups | Macros | Routing | Performance | Articulations ]</code></pre>
+  <section class="section" id="responsive">
+    <span class="eyebrow">08 · Responsive layout</span>
+    <h2>One model at both supported shell sizes</h2>
+    <figure class="responsive-grid" aria-label="Expanded and compact layout comparison">
+      <div class="screen"><div class="screen-label">Expanded · 1120 px: 224–248 tree + scoped Map + 320–360 inspector</div><div class="screen-body"><div class="screen-tree"><div class="screen-row"></div><div class="screen-row"></div><div class="screen-row"></div></div><div class="screen-map"></div><div class="screen-inspector"><div class="screen-field"></div><div class="screen-field"></div><div class="screen-field"></div><div class="screen-field"></div></div></div></div>
+      <div class="screen compact-screen"><div class="screen-label">Compact · 820 px: 206–224 tree + Map; inspector drawer</div><div class="screen-body"><div class="screen-tree"><div class="screen-row"></div><div class="screen-row"></div><div class="screen-row"></div></div><div class="screen-map"></div><div class="screen-inspector"><div class="screen-field"></div><div class="screen-field"></div><div class="screen-field"></div></div></div></div>
+    </figure>
+    <div class="table-wrap" style="margin-top:20px"><table><thead><tr><th>State</th><th>Expanded shell</th><th>Compact shell</th></tr></thead><tbody><tr><td>Show Map on</td><td>All three surfaces persist; splitters resize tree and inspector within limits.</td><td>Tree + Map persist; inspector is a 292 px right drawer.</td></tr><tr><td>Show Map off</td><td>Tree widens to 260–300 px; inspector fills the remainder in two columns.</td><td>Tree 224 px; inspector fills the remainder as a normal pane.</td></tr><tr><td>Show Zones invoked</td><td colspan="2">Opens the Map if hidden, applies the derived scope, and fits zones without changing the inspector layout or active selection.</td></tr><tr><td>Maximum Map</td><td colspan="2">Tree may collapse to a 32 px Structure rail and inspector may close. Reopening either preserves state.</td></tr></tbody></table></div>
+  </section>
 
-    <p>
-      The lower workbench tabs remain available. They are specialized editors; Structure is the hierarchy
-      navigator and batch-editing surface. In the long term, Structure assumes the organizational duties of
-      the separate layer and group lists currently placed around the Map, allowing Map mode to devote more
-      space to the key/velocity canvas.
-    </p>
+  <section class="section" id="implementation">
+    <span class="eyebrow">09 · Implementable architecture</span>
+    <h2>Compose existing foundations into one workspace</h2>
+    <div class="component-tree"><div>AuthoringPanel <em>composition root</em></div><div class="indent-1">WorkspaceToolbar</div><div class="indent-2">ShowMapToggle | ActiveScopeSummary | MapViewFilters</div><div class="indent-1">InstrumentStructurePanel</div><div class="indent-2">VirtualStructureTree | StructureActionBar | StructureSearchField | ShowZonesCommand</div><div class="indent-1">ScopedZoneMapHost</div><div class="indent-2">ScopeBreadcrumb | ExistingZoneMapCanvas | ExistingMapMinimap | OverlapStackMenu</div><div class="indent-1">ContextInspectorHost</div><div class="indent-2">LayerInspector | GroupInspector | ZoneMappingEditor | ShowZonesCommand</div><div class="indent-1">WorkbenchHost <em>tab state independent from visibility, scope, and selection</em></div></div>
+    <div class="flow"><article class="flow-step"><h3>Entity selection</h3><p>Select instrument, layer, group, or zones; update only <code>AuthoringStructureSelection</code> and inspector dispatch.</p></article><article class="flow-step"><h3>Show Zones</h3><p>Derive the smallest useful container and reconcile one stable <code>StructureScope</code>.</p></article><article class="flow-step"><h3>Map projection</h3><p>Set Map visible, filter cached zones by hierarchy IDs, retain view filters, then fit scope.</p></article><article class="flow-step"><h3>Continue editing</h3><p>Keep the invoking selection and inspector active; subsequent Map clicks may change zone selection without changing scope.</p></article></div>
+    <h3 style="margin-top:28px">Projection and performance rules</h3>
+    <ul><li>Instrument scope includes every zone whose parent group and layer are valid descendants.</li><li>Layer scope derives groups by <code>group.layerId</code>, then zones by those group IDs.</li><li>Group scope derives zones directly by <code>zone.groupId</code>.</li><li>Scope membership, overlap stacks, and normalized geometry are cached by document revision and relevant view filters.</li><li>The tree uses flattened virtual rows; collapsed descendants do not enter the visible row vector.</li><li>The Map retains its existing dense paint path and does no hierarchy traversal during paint.</li><li>No scope, selection, filter, or Show Zones operation performs work on the audio thread.</li></ul>
+  </section>
 
-    <h2>5. Invocation</h2>
-    <h3>5.1 Primary entry point</h3>
-    <p>
-      The user clicks <strong>Structure</strong> in the <strong>Map | Structure</strong> switch. The selected
-      mapping view is workspace state and is not persisted as authored project data.
-    </p>
+  <section class="section" id="navigation">
+    <span class="eyebrow">10 · Keyboard and accessibility</span>
+    <h2>Predictable movement between three surfaces</h2>
+    <div class="table-wrap"><table><thead><tr><th>Command</th><th>Behavior</th></tr></thead><tbody><tr><td>Tree Up / Down</td><td>Move through visible hierarchy rows and update the context inspector.</td></tr><tr><td>Tree Left / Right</td><td>Collapse, expand, or move between parent and first child.</td></tr><tr><td>Enter on layer/group</td><td>Selects the entity and opens its inspector; Map scope is unchanged.</td></tr><tr><td>Enter on zone</td><td>Selects the zone and opens its inspector; Map scope is unchanged.</td></tr><tr><td>Show Map shortcut</td><td>Toggles Map pane visibility and returns focus to the invoking control.</td></tr><tr><td>Show Zones shortcut</td><td>Derives scope from selection, opens the Map if needed, filters/fits zones, then returns focus to the invoking control.</td></tr><tr><td>Map stack Next / Previous</td><td>Cycles selectable coincident zones without changing scope.</td></tr><tr><td>Tab</td><td>Moves tree → Map toolbar/canvas when visible → inspector → workbench in visual order.</td></tr><tr><td>Escape</td><td>Closes stack menu or compact inspector drawer before clearing selection.</td></tr></tbody></table></div>
+    <p style="margin-top:14px">The scope breadcrumb has an accessible name that includes kind, name, and zone count. Every Map zone announces its scoped parent path. Stack badges announce the number of candidate zones and expose the same descriptive fields as the visual menu.</p>
+  </section>
 
-    <h3>5.2 Contextual entry points</h3>
-    <ul>
-      <li><strong>Show in Structure</strong> from a zone's Map context menu.</li>
-      <li><strong>Reveal in Structure</strong> from the Zone inspector.</li>
-      <li>Activate an overlap or collision summary to open Structure at the relevant group.</li>
-      <li>Use an open/reveal action from a layer or group summary elsewhere in Authoring.</li>
-      <li>Use <strong>View → Mapping View → Structure</strong> in hosts that expose the application menu.</li>
-    </ul>
+  <section class="section" id="delivery">
+    <span class="eyebrow">11 · Delivery slices</span>
+    <h2>Recommended implementation sequence</h2>
+    <div class="grid-3"><article class="card"><h3>Slice A · Unified shell</h3><ul><li>Remove Map | Structure switch.</li><li>Land persistent hierarchy tree.</li><li>Add independent <code>MapPaneVisible</code> state and Show Map toggle.</li><li>Make Layer/Group/Zone inspector dispatch authoritative.</li></ul></article><article class="card"><h3>Slice B · Scoped Map command</h3><ul><li>Add <code>StructureScope</code> independent from selection.</li><li>Implement Show Zones derivation for instrument/layer/group/zone selections.</li><li>Feed the filtered set to the existing Zone Map and fit it.</li><li>Add scope summary and preserve invoking selection.</li></ul></article><article class="card"><h3>Slice C · Fit and finish</h3><ul><li>Add overlap stack menu/cycling.</li><li>Add Map-hidden wide inspector.</li><li>Qualify compact drawer, splitters, and both shortcuts.</li><li>Run accessibility and 1,700-zone performance evidence.</li></ul></article></div>
+  </section>
 
-    <p>
-      Optional shortcuts may use <code>Ctrl/Cmd+1</code> for Map and <code>Ctrl/Cmd+2</code> for Structure,
-      subject to host shortcut testing. Buttons and menus remain the authoritative entry points.
-    </p>
-
-    <h2>6. Main Interaction Model</h2>
-    <p>
-      The main area uses three related columns. A selection in a parent column determines the children
-      displayed in the next column. The complete path remains visible, avoiding repeated drill-in and back
-      navigation.
-    </p>
-
-    <pre><code>┌──────────────┬──────────────────┬────────────────────────────────────┐
-│ Layers       │ Groups           │ Zones                              │
-│              │                  │                                    │
-│ Piano        │ Sustain          │ Grand Piano C3   C2 ━━━━━ B3       │
-│ Strings      │ Release          │ Grand Piano C3   C2 ━━━━━ B3       │
-│ Percussion   │ Pedal            │ Grand Piano C3   C2 ━━━━━ B3       │
-│              │                  │                                    │
-└──────────────┴──────────────────┴────────────────────────────────────┘</code></pre>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Action</th>
-          <th>Result</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Select a layer</td>
-          <td>Shows its groups and opens the Layer inspector.</td>
-        </tr>
-        <tr>
-          <td>Select a group</td>
-          <td>Shows its zones and opens the Group inspector.</td>
-        </tr>
-        <tr>
-          <td>Select a zone</td>
-          <td>Opens the Zone inspector without changing the hierarchy path.</td>
-        </tr>
-        <tr>
-          <td>Select several siblings</td>
-          <td>Opens the plural inspector and displays shared or mixed property values.</td>
-        </tr>
-        <tr>
-          <td>Activate a row's disclosure/open action</td>
-          <td>Moves keyboard focus into its child column.</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <h3>6.1 Column sizing</h3>
-    <p>
-      Layers and Groups use compact, resizable columns. Zones receives the greatest width because it
-      contains the range visualization. Column widths and scroll positions are remembered as workspace
-      state. At narrow widths, ancestor columns collapse to named breadcrumb rails and can be temporarily
-      expanded; the active hierarchy path must never become invisible.
-    </p>
-
-    <h3>6.2 Row content</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Row type</th>
-          <th>Primary content</th>
-          <th>Secondary content</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Layer</td>
-          <td>Name, selection, visibility</td>
-          <td>Group count, zone count, aggregate key coverage, routing state</td>
-        </tr>
-        <tr>
-          <td>Group</td>
-          <td>Stable group tint, name, selection, visibility</td>
-          <td>Zone count, aggregate key coverage, round-robin state, routing state</td>
-        </tr>
-        <tr>
-          <td>Zone</td>
-          <td>Name/sample identity and aligned key-range bar</td>
-          <td>Root marker, velocity range, RR position, trigger/event badges, diagnostics</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <h2>7. Zone Range Presentation</h2>
-    <p>
-      Every zone occupies its own row beneath a shared 128-note keyboard ruler. Key-range bars are aligned
-      horizontally across all rows, so identical and partially overlapping ranges can be compared without
-      one zone obscuring another. A distinct velocity track or compact numeric range accompanies each row.
-    </p>
-    <p>
-      The first release should favor legibility over miniature two-dimensional maps: a shared key ruler,
-      one key-range bar per row, a root marker, and a separate velocity range. Detailed range manipulation
-      remains available in the Zone Map and inspector.
-    </p>
-
-    <h3>7.1 Relationship and overlap classification</h3>
-    <p>The viewer may classify related zones using conservative, descriptive labels:</p>
-    <ul>
-      <li><strong>Velocity stack:</strong> matching key ranges with differentiated velocity ranges.</li>
-      <li><strong>Round-robin stack:</strong> compatible ranges assigned to a common RR pool.</li>
-      <li><strong>Potential collision:</strong> overlapping key and velocity ranges without an obvious RR, crossfade, or trigger distinction.</li>
-      <li><strong>Exact duplicate:</strong> zones whose relevant mapping and trigger conditions appear indistinguishable.</li>
-    </ul>
-    <p>
-      These are navigation aids, not validation errors. Trigger events, articulations, controllers, choke
-      behavior, and intentional layering can make overlapping zones valid. Diagnostic details must explain
-      which fields were compared and allow the user to dismiss or ignore nothing in project data.
-    </p>
-
-    <h3>7.2 Search, sort, and filters</h3>
-    <ul>
-      <li>Search by layer, group, zone, or sample display name.</li>
-      <li>Show overlaps only.</li>
-      <li>Show potential collisions only.</li>
-      <li>Show exact key-range stacks.</li>
-      <li>Filter to the current articulation or performance event.</li>
-      <li>Show visible/audible objects only.</li>
-      <li>Sort by authored order, name, key low, root key, velocity low, or diagnostic state.</li>
-    </ul>
-    <p>
-      Authored order remains the default. A temporary sort does not rewrite display order unless the user
-      invokes an explicit reorder command.
-    </p>
-
-    <h2>8. Selection Model</h2>
-    <p>
-      Structure distinguishes the <strong>primary selection</strong> from the <strong>edit selection</strong>.
-      The most recently selected object is primary and determines inspector type and hierarchy focus. All
-      selected objects of that type form the edit selection.
-    </p>
-    <ul>
-      <li>A selection contains layers, groups, or zones, never a mixture of types.</li>
-      <li>Standard Ctrl/Cmd and Shift selection conventions apply within a column.</li>
-      <li>The inspector header always states the scope, such as “7 Zones” or “3 Groups.”</li>
-      <li>Selecting a different entity type clears the previous edit selection.</li>
-      <li>When several parents are selected, the child column may show their combined children grouped beneath parent headings.</li>
-      <li>The primary parent's children remain the fallback if a combined child view is deferred from the first release.</li>
-    </ul>
-
-    <h2>9. Context-Sensitive Inspector</h2>
-    <p>
-      The inspector occupies the same right-hand location in Map and Structure modes. It has a sticky header,
-      a scrollable body of compact sections, and stable visual structure across entity types. The header shows
-      entity type, name or selection count, hierarchy path, audition action where applicable, and an overflow menu.
-    </p>
-
-    <h3>9.1 Layer inspector</h3>
-    <ul>
-      <li>Name and authored order</li>
-      <li>Workspace visibility</li>
-      <li>Gain and pan</li>
-      <li>Routing bus</li>
-      <li>Audition anchor group</li>
-      <li>Crossfade source, low/high range, direction, and curve</li>
-      <li>Group and zone counts</li>
-      <li>Read-only effective routing and mix summary</li>
-    </ul>
-
-    <h3>9.2 Group inspector</h3>
-    <ul>
-      <li>Name and authored order</li>
-      <li>Parent layer, including multi-group reassignment</li>
-      <li>Workspace visibility</li>
-      <li>Gain and pan</li>
-      <li>Routing bus</li>
-      <li>Audition anchor zone</li>
-      <li>Round-robin enablement and mode</li>
-      <li>Zone count</li>
-      <li>Read-only effective routing and mix summary</li>
-    </ul>
-
-    <h3>9.3 Zone inspector</h3>
-    <ul>
-      <li>Sample identity, group membership, and articulation</li>
-      <li>Root key, key range, velocity range, and velocity crossfade</li>
-      <li>Gain, pan, fine tuning, and velocity tracking</li>
-      <li>Release seconds, release shape, and trigger mode</li>
-      <li>Performance event and pitch behavior</li>
-      <li>Round-robin membership</li>
-      <li>Choke group and choke release</li>
-      <li>Controller conditions and damper behavior</li>
-      <li>Playback region, loop behavior, and waveform actions</li>
-      <li>Read-only effective layer/group/zone composition summary</li>
-    </ul>
-
-    <h3>9.4 Mixed values and batch edits</h3>
-    <ul>
-      <li>Identical values are displayed normally.</li>
-      <li>Different values display as <strong>Mixed</strong>; no arbitrary selected object supplies the visible value.</li>
-      <li>Entering a value sets that property absolutely on all selected objects.</li>
-      <li>Nudge controls may apply a relative delta while preserving differences.</li>
-      <li>Unsupported combinations remain visible but disabled with a concise reason.</li>
-      <li>One completed control gesture produces one document transaction and one undo step.</li>
-      <li>Validation occurs before commit; partial application is not permitted.</li>
-    </ul>
-
-    <h2>10. Editing and Organization Commands</h2>
-    <ul>
-      <li>Create, duplicate, rename, reorder, and delete at each appropriate hierarchy level.</li>
-      <li>Move groups between layers using the Group inspector's parent control.</li>
-      <li>Move zones between groups using the Zone inspector's group control.</li>
-      <li>Support drag reorder within a column after the basic command path is established.</li>
-      <li>Support drag reassignment only when the target and resulting parent are unambiguous.</li>
-      <li>Provide <strong>Reveal in Map</strong>, <strong>Open Waveform</strong>, and audition commands for zones.</li>
-      <li>Provide select-all-children and select-visible-children commands on layers and groups.</li>
-    </ul>
-
-    <p>
-      Delete commands must follow the existing document rules. For example, a non-empty group cannot be
-      deleted unless the session contract provides an explicit reassignment or cascading operation.
-    </p>
-
-    <h2>11. Map and Structure Synchronization</h2>
-    <ul>
-      <li>A zone selected in Map is selected and revealed in Structure.</li>
-      <li>A group or layer selected in Structure becomes the active authoring context used by creation and assignment commands.</li>
-      <li>Zone multi-selection is preserved when switching views.</li>
-      <li>Returning to Map emphasizes or scopes the active layer/group without silently changing workspace visibility.</li>
-      <li>Map zoom/pan and Structure column/scroll state are remembered independently.</li>
-      <li>Changes made in either view refresh the other from the same session/project state.</li>
-    </ul>
-
-    <p>
-      The Map and Structure viewers must not maintain separate authoritative selections. A shared typed
-      selection model should drive both, while each viewer may retain non-authoritative presentation state.
-    </p>
-
-    <h2>12. Keyboard and Accessibility</h2>
-    <ul>
-      <li>Up/Down moves among rows in the focused column.</li>
-      <li>Right Arrow enters the child column; Left Arrow returns to the parent column.</li>
-      <li>Home/End and Page Up/Page Down follow standard list behavior.</li>
-      <li>Shift extends selection and Ctrl/Cmd toggles selection.</li>
-      <li>Enter invokes the row's default open/reveal action; audition uses an explicit documented command.</li>
-      <li>Every visual diagnostic also has text, an accessible name, and an accessible description.</li>
-      <li>Group tint is supplementary; names, hierarchy, badges, and selection states remain authoritative.</li>
-      <li>Focus remains in a predictable column after refresh, reorder, reassignment, or view switching.</li>
-      <li>Collapsed narrow-width columns expose their full path through accessible breadcrumb controls.</li>
-    </ul>
-
-    <h2>13. Performance and Scale</h2>
-    <ul>
-      <li>Use virtualized lists and recycled row presentation for groups and zones.</li>
-      <li>Compute aggregate coverage and overlap classifications when topology or relevant fields change, not during paint.</li>
-      <li>Cache normalized key-range geometry independently from viewport pixels.</li>
-      <li>Filter and sort immutable lightweight view models rather than copying full project objects into UI rows.</li>
-      <li>Preserve selection by stable object ID across filtering, sorting, and row recycling.</li>
-      <li>Keep diagnostic analysis off the audio thread and avoid blocking preview or document transactions.</li>
-    </ul>
-
-    <h2>14. Workspace State</h2>
-    <p>The following are presentation preferences and should not alter the authored instrument:</p>
-    <ul>
-      <li>Map or Structure mode</li>
-      <li>Column widths, collapsed columns, and scroll positions</li>
-      <li>Active search, sort, and diagnostic filters</li>
-      <li>Expanded stack/relationship groups</li>
-      <li>Inspector section expansion</li>
-    </ul>
-    <p>
-      Authored selection context such as <code>selectedLayerId</code>, project visibility fields, object order,
-      parent membership, and edited property values continue to use the existing session and project contracts.
-    </p>
-
-    <h2>15. Terminology</h2>
-    <p>
-      <strong>Layer</strong> now has one precise meaning: the authored parent of a group. Existing UI that uses
-      “Layer Stack” for a set of zones divided by velocity should be renamed <strong>Velocity Stack</strong> to
-      avoid confusing a zone relationship with the Instrument → Layer → Group → Zone hierarchy.
-    </p>
-
-    <h2>16. Suggested Delivery</h2>
-    <h3>Phase 1 — Navigation foundation</h3>
-    <ul>
-      <li>Add the Map | Structure switch and workspace persistence.</li>
-      <li>Add virtualized Layers, Groups, and Zones columns.</li>
-      <li>Share typed selection with Map.</li>
-      <li>Add basic layer, group, and zone context inspectors.</li>
-      <li>Add the shared key ruler and one aligned key-range bar per zone.</li>
-    </ul>
-
-    <h3>Phase 2 — Batch editing and organization</h3>
-    <ul>
-      <li>Add mixed-value presentation and atomic multi-object edits.</li>
-      <li>Add group/layer reassignment, explicit reorder commands, and creation commands.</li>
-      <li>Add search, temporary sorting, and visibility/articulation filters.</li>
-      <li>Add Reveal in Map, Reveal in Structure, Open Waveform, and audition actions.</li>
-    </ul>
-
-    <h3>Phase 3 — Relationship diagnostics</h3>
-    <ul>
-      <li>Add velocity-stack and round-robin grouping.</li>
-      <li>Add potential-collision and exact-duplicate classification.</li>
-      <li>Add overlap-focused filters and explanatory diagnostic details.</li>
-      <li>Add combined child views for multi-selected parents if user testing supports them.</li>
-    </ul>
-
-    <h3>Phase 4 — Live playback feedback</h3>
-    <ul>
-      <li>Highlight zones matching incoming MIDI key and velocity.</li>
-      <li>Distinguish the triggered zone from zones rejected by articulation, controller, event, or RR state.</li>
-      <li>Keep live feedback observational; it must not mutate selection or project data.</li>
-    </ul>
-
-    <h2>17. Acceptance Criteria for the Initial Release</h2>
-    <ul>
-      <li>The user can switch between Map and Structure without losing zone selection.</li>
-      <li>The user can reach any zone through its layer and group without opening a modal dialog.</li>
-      <li>Zones with identical key ranges remain separately visible and selectable.</li>
-      <li>Selecting a layer, group, or zone displays the correct inspector type.</li>
-      <li>Same-type multi-selection presents shared and mixed values correctly.</li>
-      <li>A valid batch edit is atomic and produces one undo step.</li>
-      <li>Keyboard-only navigation can traverse all three hierarchy columns and enter the inspector.</li>
-      <li>Filtering or sorting does not mutate authored order or lose stable-ID selection.</li>
-      <li>The viewer remains responsive with a production-scale instrument and does no work on the audio thread.</li>
-    </ul>
-
-    <h2>18. Open Design Decisions</h2>
-    <ul>
-      <li>Whether multi-selected parents initially show combined children or only the primary parent's children.</li>
-      <li>Whether the Zone column uses one velocity track per row or a compact numeric field in the first release.</li>
-      <li>Which inspector sections remain shared between Map and Structure and which are Structure-only.</li>
-      <li>Whether drag reassignment is valuable enough to add beyond the safer explicit parent controls.</li>
-      <li>Whether overlap diagnostics should be scoped to one group, one layer, or the entire instrument by default.</li>
-      <li>Which shortcuts can be offered safely across standalone and plugin hosts.</li>
-    </ul>
-  </main>
+  <section class="section" id="acceptance">
+    <span class="eyebrow">12 · Acceptance criteria</span>
+    <h2>The unified workspace is successful when</h2>
+    <ol class="acceptance"><li>There is no separate Structure Viewer mode or Map | Structure switch.</li><li>The Instrument Structure tree remains visible and unchanged when workbench tabs change.</li><li>Show Map hides and restores the Map pane without changing scope, filtering, selection, inspector, pan, or zoom.</li><li>Show Zones derives the correct instrument, layer, group, or parent-container scope and filters the existing Zone Map to exactly its descendant zones.</li><li>Invoking Show Zones opens the Map when hidden, fits the derived scope, and preserves the invoking selection and inspector type.</li><li>Clicking a zone changes edit selection and inspector without hiding scoped peers.</li><li>The Map retains its existing dense vertical range presentation, minimap, pan/zoom, selection marker, and range-editing behavior.</li><li>Layer, Group, and Zone inspectors use one right-side host and contain real editable controls.</li><li>Coincident zones are accessible through the tree and a count-backed Map stack affordance.</li><li>The expanded 1120 px and compact 820 px layouts preserve a useful Map and readable controls.</li><li>Scope, selection, disclosure, filters, and pane visibility remain independent workspace-only state stable by ID.</li><li>All edits use validated session transactions with one undo step per gesture.</li><li>Keyboard and screen-reader users can distinguish Show Map from Show Zones and understand current scope, selection, hierarchy, and stack candidates.</li><li>The 1,700-zone responsiveness baseline remains within the existing message-thread budget.</li></ol>
+  </section>
+  <footer class="footer">Practical Sampler internal engineering design · Unified Instrument Workspace · Supersedes the separate Structure Viewer layout while retaining its typed selection, hierarchy projection, diagnostics, transaction, and performance foundations.</footer>
+</main>
 </body>
 </html>

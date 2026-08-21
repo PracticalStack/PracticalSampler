@@ -29,6 +29,7 @@ std::string collectField(const std::vector<const Value*>& values, Formatter form
 
 std::string kindName(const StructureSelectionKind kind)
 {
+    if (kind == StructureSelectionKind::instrument) return "Instrument";
     if (kind == StructureSelectionKind::layer) return "Layer";
     if (kind == StructureSelectionKind::group) return "Group";
     if (kind == StructureSelectionKind::zone) return "Zone";
@@ -46,7 +47,17 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
     if (selection.getKind() == StructureSelectionKind::none || selection.getIds().empty())
         return result;
 
-    if (selection.getKind() == StructureSelectionKind::layer)
+    if (selection.getKind() == StructureSelectionKind::instrument)
+    {
+        result.title = "Instrument";
+        result.fields = {
+            { "Layers", std::to_string(project.authoring.layers.size()) },
+            { "Groups", std::to_string(project.authoring.groups.size()) },
+            { "Zones", std::to_string(project.authoring.zones.size()) },
+            { "Map scope", "Instrument" }
+        };
+    }
+    else if (selection.getKind() == StructureSelectionKind::layer)
     {
         std::vector<const drs::engine::RuntimeProjectLayerDefinition*> layers;
         for (const auto& layer : project.authoring.layers)
@@ -222,10 +233,7 @@ StructureInspector::StructureInspector()
     {
         if (onActionRequested == nullptr)
             return;
-        if (snapshot.kind == StructureSelectionKind::zone)
-            onActionRequested(StructureInspectorAction::revealInMap);
-        else
-            onActionRequested(StructureInspectorAction::selectChildren);
+        onActionRequested(StructureInspectorAction::showZones);
     };
     secondaryActionButton.onClick = [this]
     {
@@ -271,12 +279,16 @@ void StructureInspector::setSnapshot(StructureInspectorSnapshot nextSnapshot)
     gainEditor.setText(stripSuffix(valueOrBlank("Gain"), ' '), juce::dontSendNotification);
     panEditor.setText(stripSuffix(valueOrBlank("Pan"), '%'), juce::dontSendNotification);
     releaseEditor.setText(stripSuffix(valueOrBlank("Release"), ' '), juce::dontSendNotification);
-    const auto editable = snapshot.kind != StructureSelectionKind::none;
+    const auto editable = snapshot.kind == StructureSelectionKind::layer
+        || snapshot.kind == StructureSelectionKind::group
+        || snapshot.kind == StructureSelectionKind::zone;
+    const auto actionable = snapshot.kind != StructureSelectionKind::none;
     visibilityTouched = false;
     const auto visibilityValue = fieldValues["Visibility"];
     visibilityToggle.setButtonText(visibilityValue == "Mixed" ? "Visibility: Mixed" : "Visible");
     visibilityToggle.setToggleState(visibilityValue == "Visible", juce::dontSendNotification);
-    editHint.setVisible(editable);
+    editHint.setText(editable ? "Edit shared values" : "Instrument actions", juce::dontSendNotification);
+    editHint.setVisible(actionable);
     nameEditor.setVisible(editable);
     parentEditor.setVisible(editable && snapshot.kind != StructureSelectionKind::layer);
     gainEditor.setVisible(editable);
@@ -288,19 +300,24 @@ void StructureInspector::setSnapshot(StructureInspectorSnapshot nextSnapshot)
     gainPlusButton.setVisible(editable);
     panMinusButton.setVisible(editable);
     panPlusButton.setVisible(editable);
-    primaryActionButton.setVisible(editable);
-    secondaryActionButton.setVisible(editable);
-    tertiaryActionButton.setVisible(editable);
+    primaryActionButton.setVisible(actionable);
+    secondaryActionButton.setVisible(actionable);
+    tertiaryActionButton.setVisible(actionable);
     if (snapshot.kind == StructureSelectionKind::zone)
     {
-        primaryActionButton.setButtonText("Reveal in Map");
+        primaryActionButton.setButtonText("Show Zones");
         secondaryActionButton.setButtonText("Open Waveform");
         tertiaryActionButton.setButtonText("Audition Zone");
     }
+    else if (snapshot.kind == StructureSelectionKind::instrument)
+    {
+        primaryActionButton.setButtonText("Show Zones");
+        secondaryActionButton.setButtonText("Select Layers");
+        tertiaryActionButton.setButtonText("Audition Anchor");
+    }
     else
     {
-        primaryActionButton.setButtonText(snapshot.kind == StructureSelectionKind::layer
-                                               ? "Select all Groups" : "Select all Zones");
+        primaryActionButton.setButtonText("Show Zones");
         secondaryActionButton.setButtonText(snapshot.kind == StructureSelectionKind::layer
                                                 ? "Select visible Groups" : "Select visible Zones");
         tertiaryActionButton.setButtonText("Audition Anchor");

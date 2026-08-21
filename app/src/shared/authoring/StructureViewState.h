@@ -4,7 +4,9 @@
 #include <string>
 #include <optional>
 #include <utility>
+#include <vector>
 #include "drs/engine/RuntimeModel.h"
+#include "shared/authoring/StructureScope.h"
 
 namespace drs::app::authoring
 {
@@ -48,15 +50,41 @@ public:
         int layerScrollAnchor = 0;
         int groupScrollAnchor = 0;
         int zoneScrollAnchor = 0;
+        bool mapPaneVisible = true;
+        StructureScope scope = makeInstrumentStructureScope();
+        int treeWidth = 300;
+        std::vector<std::string> disclosedIds;
+        std::vector<std::string> collapsedIds;
+        int treeScrollAnchor = 0;
     };
 
     Snapshot exportWorkspaceSnapshot() const
     {
-        return { mode, layerColumnWidth, groupColumnWidth, zoneColumnWidth,
-                 layerColumnCollapsed, groupColumnCollapsed, searchText, sortMode,
-                 showOverlapsOnly, showPotentialCollisionsOnly, showExactStacksOnly, visibleOnly,
-                 articulationFilter, performanceEventFilter,
-                 layerScrollAnchor, groupScrollAnchor, zoneScrollAnchor };
+        Snapshot snapshot;
+        snapshot.mode = mode;
+        snapshot.layerColumnWidth = layerColumnWidth;
+        snapshot.groupColumnWidth = groupColumnWidth;
+        snapshot.zoneColumnWidth = zoneColumnWidth;
+        snapshot.layerColumnCollapsed = layerColumnCollapsed;
+        snapshot.groupColumnCollapsed = groupColumnCollapsed;
+        snapshot.searchText = searchText;
+        snapshot.sortMode = sortMode;
+        snapshot.showOverlapsOnly = showOverlapsOnly;
+        snapshot.showPotentialCollisionsOnly = showPotentialCollisionsOnly;
+        snapshot.showExactStacksOnly = showExactStacksOnly;
+        snapshot.visibleOnly = visibleOnly;
+        snapshot.articulationFilter = articulationFilter;
+        snapshot.performanceEventFilter = performanceEventFilter;
+        snapshot.layerScrollAnchor = layerScrollAnchor;
+        snapshot.groupScrollAnchor = groupScrollAnchor;
+        snapshot.zoneScrollAnchor = zoneScrollAnchor;
+        snapshot.mapPaneVisible = mapPaneVisible;
+        snapshot.scope = scope;
+        snapshot.treeWidth = treeWidth;
+        snapshot.disclosedIds = disclosedIds;
+        snapshot.collapsedIds = collapsedIds;
+        snapshot.treeScrollAnchor = treeScrollAnchor;
+        return snapshot;
     }
 
     void importWorkspaceSnapshot(const Snapshot& snapshot)
@@ -78,6 +106,12 @@ public:
         layerScrollAnchor = std::max(0, snapshot.layerScrollAnchor);
         groupScrollAnchor = std::max(0, snapshot.groupScrollAnchor);
         zoneScrollAnchor = std::max(0, snapshot.zoneScrollAnchor);
+        mapPaneVisible = snapshot.mapPaneVisible;
+        scope = snapshot.scope;
+        setTreeWidth(snapshot.treeWidth);
+        disclosedIds = snapshot.disclosedIds;
+        collapsedIds = snapshot.collapsedIds;
+        treeScrollAnchor = std::max(0, snapshot.treeScrollAnchor);
     }
     void setMode(const StructureViewMode nextMode) noexcept { mode = nextMode; }
     StructureViewMode getMode() const noexcept { return mode; }
@@ -119,6 +153,37 @@ public:
     int getGroupScrollAnchor() const noexcept { return groupScrollAnchor; }
     int getZoneScrollAnchor() const noexcept { return zoneScrollAnchor; }
 
+    void setMapPaneVisible(const bool visible) noexcept { mapPaneVisible = visible; }
+    bool isMapPaneVisible() const noexcept { return mapPaneVisible; }
+    void setScope(StructureScope nextScope) { scope = std::move(nextScope); }
+    const StructureScope& getScope() const noexcept { return scope; }
+    void setTreeWidth(const int width) noexcept { treeWidth = std::clamp(width, 220, 720); }
+    int getTreeWidth() const noexcept { return treeWidth; }
+    void setTreeScrollAnchor(const int row) noexcept { treeScrollAnchor = std::max(0, row); }
+    int getTreeScrollAnchor() const noexcept { return treeScrollAnchor; }
+    const std::vector<std::string>& getDisclosedIds() const noexcept { return disclosedIds; }
+    bool isDisclosed(const std::string& id) const noexcept
+    {
+        return std::find(disclosedIds.begin(), disclosedIds.end(), id) != disclosedIds.end();
+    }
+    void setDisclosed(const std::string& id, const bool disclosed)
+    {
+        const auto it = std::find(disclosedIds.begin(), disclosedIds.end(), id);
+        if (disclosed && it == disclosedIds.end()) disclosedIds.push_back(id);
+        if (!disclosed && it != disclosedIds.end()) disclosedIds.erase(it);
+    }
+    void setCollapsed(const std::string& id, const bool collapsed)
+    {
+        const auto it = std::find(collapsedIds.begin(), collapsedIds.end(), id);
+        if (collapsed && it == collapsedIds.end()) collapsedIds.push_back(id);
+        if (!collapsed && it != collapsedIds.end()) collapsedIds.erase(it);
+    }
+    bool isCollapsed(const std::string& id) const noexcept
+    {
+        return std::find(collapsedIds.begin(), collapsedIds.end(), id) != collapsedIds.end();
+    }
+    const std::vector<std::string>& getCollapsedIds() const noexcept { return collapsedIds; }
+
 private:
     static int clampWidth(const int width) noexcept
     {
@@ -142,5 +207,11 @@ private:
     int layerScrollAnchor = 0;
     int groupScrollAnchor = 0;
     int zoneScrollAnchor = 0;
+    bool mapPaneVisible = true;
+    StructureScope scope = makeInstrumentStructureScope();
+    int treeWidth = 300;
+    std::vector<std::string> disclosedIds;
+    std::vector<std::string> collapsedIds;
+    int treeScrollAnchor = 0;
 };
 } // namespace drs::app::authoring

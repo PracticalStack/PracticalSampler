@@ -3304,6 +3304,57 @@ add_test(
 
 set_target_properties(drs_structure_viewer_qualification_tests PROPERTIES FOLDER "Tests")
 
+juce_add_console_app(drs_unified_workspace_contract_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Unified Workspace Contract Tests"
+)
+
+target_sources(drs_unified_workspace_contract_tests
+    PRIVATE
+        src/UnifiedWorkspaceContractTests.cpp
+)
+
+target_link_libraries(drs_unified_workspace_contract_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_unified_workspace_contract_tests PRIVATE cxx_std_17)
+target_include_directories(drs_unified_workspace_contract_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME drs.unified_workspace.contract COMMAND drs_unified_workspace_contract_tests)
+set_target_properties(drs_unified_workspace_contract_tests PROPERTIES FOLDER "Tests")
+
+juce_add_console_app(drs_unified_workspace_ui_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Unified Workspace UI Tests"
+)
+target_sources(drs_unified_workspace_ui_tests PRIVATE src/UnifiedWorkspaceUiTests.cpp)
+target_link_libraries(drs_unified_workspace_ui_tests
+    PRIVATE drs_app_shared drs_engine_adapter juce::juce_gui_extra
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_unified_workspace_ui_tests PRIVATE cxx_std_17)
+target_include_directories(drs_unified_workspace_ui_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME drs.unified_workspace.ui COMMAND drs_unified_workspace_ui_tests)
+set_target_properties(drs_unified_workspace_ui_tests PROPERTIES FOLDER "Tests")
+
+juce_add_console_app(drs_unified_workspace_qualification_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Unified Workspace Qualification Tests"
+)
+target_sources(drs_unified_workspace_qualification_tests PRIVATE src/UnifiedWorkspaceQualificationTests.cpp)
+target_link_libraries(drs_unified_workspace_qualification_tests
+    PRIVATE drs_app_shared drs_engine_adapter
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_unified_workspace_qualification_tests PRIVATE cxx_std_17)
+target_include_directories(drs_unified_workspace_qualification_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME drs.unified_workspace.qualification COMMAND drs_unified_workspace_qualification_tests)
+set_target_properties(drs_unified_workspace_qualification_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_phase2_authoring_import_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Authoring Import Tests"
 )

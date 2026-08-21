@@ -95,4 +95,35 @@ inline drs::engine::RuntimeProjectModel makeStructureViewerFixture(const std::si
     project.authoring.selectedZoneId = "zone-piano-low";
     return project;
 }
+
+inline drs::engine::RuntimeProjectModel makeUnifiedWorkspaceEdgeCaseFixture()
+{
+    auto project = makeStructureViewerFixture();
+    project.authoring.layers.push_back({ "layer-hidden", "Hidden Layer", 3, false, 0.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "group-hidden", "layer-hidden", "Hidden Group", 0, false, 0.0, 0.0, {}, {} });
+    drs::engine::RuntimeProjectZoneDefinition hiddenZone;
+    hiddenZone.id = "zone-hidden";
+    hiddenZone.displayName = "Hidden Zone";
+    hiddenZone.groupId = "group-hidden";
+    hiddenZone.sampleSourceId = "sample-zone-hidden";
+    hiddenZone.keyLow = 20;
+    hiddenZone.keyHigh = 30;
+    project.authoring.zones.push_back(hiddenZone);
+    drs::engine::RuntimeProjectGroupDefinition orphanGroup;
+    orphanGroup.id = "group-missing-parent";
+    orphanGroup.layerId = "layer-missing-parent";
+    orphanGroup.displayName = "Missing Parent Group";
+    project.authoring.groups.push_back(orphanGroup);
+    return project;
+}
+
+inline drs::engine::RuntimeProjectModel makeEmptyInstrumentFixture()
+{
+    drs::engine::RuntimeProjectModel project;
+    project.projectId = "empty-instrument";
+    project.displayName = "Empty Instrument";
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = 9;
+    return project;
+}
 } // namespace drs::tests

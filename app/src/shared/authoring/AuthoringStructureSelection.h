@@ -8,6 +8,7 @@ namespace drs::app::authoring
 enum class StructureSelectionKind
 {
     none,
+    instrument,
     layer,
     group,
     zone

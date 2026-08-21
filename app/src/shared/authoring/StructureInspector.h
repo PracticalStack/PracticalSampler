@@ -24,7 +24,7 @@ struct StructureInspectorSnapshot
 
 enum class StructureInspectorAction
 {
-    revealInMap,
+    showZones,
     openWaveform,
     audition,
     selectChildren,
@@ -35,7 +35,7 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
     const drs::engine::RuntimeProjectModel& project,
     const AuthoringStructureSelection& selection);
 
-class StructureInspector final : public juce::Component
+class StructureInspector : public juce::Component
 {
 public:
     using PatchCallback = std::function<void(StructureSelectionKind,

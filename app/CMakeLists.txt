@@ -42,6 +42,16 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/authoring/AuthoringViewModels.h
     src/shared/authoring/AuthoringStructureSelection.cpp
     src/shared/authoring/AuthoringStructureSelection.h
+    src/shared/authoring/StructureScope.cpp
+    src/shared/authoring/StructureScope.h
+    src/shared/authoring/ScopedZoneProjection.cpp
+    src/shared/authoring/ScopedZoneProjection.h
+    src/shared/authoring/InstrumentStructureBrowser.cpp
+    src/shared/authoring/InstrumentStructureBrowser.h
+    src/shared/authoring/ZoneMapOverlapIndex.cpp
+    src/shared/authoring/ZoneMapOverlapIndex.h
+    src/shared/authoring/UnifiedWorkspaceLayout.cpp
+    src/shared/authoring/UnifiedWorkspaceLayout.h
     src/shared/authoring/StructureViewModels.cpp
     src/shared/authoring/StructureViewModels.h
     src/shared/authoring/StructureViewState.h
