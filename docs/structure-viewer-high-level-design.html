@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practical Sampler Structure Viewer — High-Level Design</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    body {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.2;
+    }
+
+    h1 {
+      margin-bottom: 0.25rem;
+    }
+
+    h2 {
+      margin-top: 2.25rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid currentColor;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    th, td {
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+      vertical-align: top;
+      border: 1px solid currentColor;
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 1rem;
+      border: 1px solid currentColor;
+      border-radius: 0.25rem;
+    }
+
+    code {
+      font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+    }
+
+    .metadata {
+      margin-top: 0;
+      opacity: 0.75;
+    }
+
+    .callout {
+      padding: 0.8rem 1rem;
+      border-left: 4px solid currentColor;
+      background: color-mix(in srgb, CanvasText 7%, Canvas);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Structure Viewer</h1>
+    <p class="metadata">High-Level Design · Practical Sampler Authoring Workspace · August 2026</p>
+    <p><strong>Related engineering plan:</strong> <a href="structure-viewer-iteration-plan.html">Structure Viewer Iteration Plan</a></p>
+
+    <h2>1. Summary</h2>
+    <p>
+      The Structure Viewer is a second way to view and edit an authored instrument. It presents the
+      complete <strong>Instrument → Layer → Group → Zone</strong> hierarchy as a column browser with a
+      context-sensitive inspector. It complements the existing Zone Map rather than replacing it.
+    </p>
+    <p>
+      The Zone Map remains the preferred spatial editor for key and velocity mapping. The Structure
+      Viewer becomes the preferred workspace for hierarchy navigation, comparing zones that overlap,
+      moving objects between parents, diagnosing ambiguous mappings, and editing multiple objects at once.
+    </p>
+
+    <div class="callout">
+      <strong>Core principle:</strong> Map answers “where does this zone play?” Structure answers
+      “where does this object belong, what else is beside it, and what properties do these objects share?”
+    </div>
+
+    <h2>2. Goals</h2>
+    <ul>
+      <li>Make layers, groups, and zones easy to browse as one coherent hierarchy.</li>
+      <li>Make zones with identical or overlapping key ranges independently visible and selectable.</li>
+      <li>Provide a predictable inspector for layers, groups, single zones, and same-type multi-selections.</li>
+      <li>Support fast batch edits with clear mixed-value behavior and one undo transaction per gesture.</li>
+      <li>Share selection and authoring context with the existing Zone Map and lower workbenches.</li>
+      <li>Scale to production instruments without rendering every row as a heavyweight component.</li>
+      <li>Preserve the existing authored object model; the viewer is not a new hierarchy or data format.</li>
+    </ul>
+
+    <h2>3. Non-Goals</h2>
+    <ul>
+      <li>Replacing the Zone Map or reproducing all of its direct spatial editing gestures.</li>
+      <li>Changing runtime composition, routing order, project schema, or layer contract semantics.</li>
+      <li>Automatically correcting intentional overlaps.</li>
+      <li>Allowing one edit selection to contain layers, groups, and zones simultaneously.</li>
+      <li>Moving specialized waveform, DSP, macro, routing, or performance editors into the inspector.</li>
+    </ul>
+
+    <h2>4. Location in the UI</h2>
+    <p>
+      The viewer lives in the main Authoring mapping surface as a peer to the Zone Map. A persistent
+      segmented control switches between the two views:
+    </p>
+
+    <pre><code>AUTHORING
+
+Mapping View   [ Map | Structure ]   Search…   Filters
+
+┌────────────────────────────────────────────────┬──────────────────────┐
+│ Current Map or Structure viewer                │ Context inspector    │
+│                                                │                      │
+│                                                │ Layer / Group / Zone │
+└────────────────────────────────────────────────┴──────────────────────┘
+
+[ Waveform | Groups | Macros | Routing | Performance | Articulations ]</code></pre>
+
+    <p>
+      The lower workbench tabs remain available. They are specialized editors; Structure is the hierarchy
+      navigator and batch-editing surface. In the long term, Structure assumes the organizational duties of
+      the separate layer and group lists currently placed around the Map, allowing Map mode to devote more
+      space to the key/velocity canvas.
+    </p>
+
+    <h2>5. Invocation</h2>
+    <h3>5.1 Primary entry point</h3>
+    <p>
+      The user clicks <strong>Structure</strong> in the <strong>Map | Structure</strong> switch. The selected
+      mapping view is workspace state and is not persisted as authored project data.
+    </p>
+
+    <h3>5.2 Contextual entry points</h3>
+    <ul>
+      <li><strong>Show in Structure</strong> from a zone's Map context menu.</li>
+      <li><strong>Reveal in Structure</strong> from the Zone inspector.</li>
+      <li>Activate an overlap or collision summary to open Structure at the relevant group.</li>
+      <li>Use an open/reveal action from a layer or group summary elsewhere in Authoring.</li>
+      <li>Use <strong>View → Mapping View → Structure</strong> in hosts that expose the application menu.</li>
+    </ul>
+
+    <p>
+      Optional shortcuts may use <code>Ctrl/Cmd+1</code> for Map and <code>Ctrl/Cmd+2</code> for Structure,
+      subject to host shortcut testing. Buttons and menus remain the authoritative entry points.
+    </p>
+
+    <h2>6. Main Interaction Model</h2>
+    <p>
+      The main area uses three related columns. A selection in a parent column determines the children
+      displayed in the next column. The complete path remains visible, avoiding repeated drill-in and back
+      navigation.
+    </p>
+
+    <pre><code>┌──────────────┬──────────────────┬────────────────────────────────────┐
+│ Layers       │ Groups           │ Zones                              │
+│              │                  │                                    │
+│ Piano        │ Sustain          │ Grand Piano C3   C2 ━━━━━ B3       │
+│ Strings      │ Release          │ Grand Piano C3   C2 ━━━━━ B3       │
+│ Percussion   │ Pedal            │ Grand Piano C3   C2 ━━━━━ B3       │
+│              │                  │                                    │
+└──────────────┴──────────────────┴────────────────────────────────────┘</code></pre>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Select a layer</td>
+          <td>Shows its groups and opens the Layer inspector.</td>
+        </tr>
+        <tr>
+          <td>Select a group</td>
+          <td>Shows its zones and opens the Group inspector.</td>
+        </tr>
+        <tr>
+          <td>Select a zone</td>
+          <td>Opens the Zone inspector without changing the hierarchy path.</td>
+        </tr>
+        <tr>
+          <td>Select several siblings</td>
+          <td>Opens the plural inspector and displays shared or mixed property values.</td>
+        </tr>
+        <tr>
+          <td>Activate a row's disclosure/open action</td>
+          <td>Moves keyboard focus into its child column.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>6.1 Column sizing</h3>
+    <p>
+      Layers and Groups use compact, resizable columns. Zones receives the greatest width because it
+      contains the range visualization. Column widths and scroll positions are remembered as workspace
+      state. At narrow widths, ancestor columns collapse to named breadcrumb rails and can be temporarily
+      expanded; the active hierarchy path must never become invisible.
+    </p>
+
+    <h3>6.2 Row content</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Row type</th>
+          <th>Primary content</th>
+          <th>Secondary content</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Layer</td>
+          <td>Name, selection, visibility</td>
+          <td>Group count, zone count, aggregate key coverage, routing state</td>
+        </tr>
+        <tr>
+          <td>Group</td>
+          <td>Stable group tint, name, selection, visibility</td>
+          <td>Zone count, aggregate key coverage, round-robin state, routing state</td>
+        </tr>
+        <tr>
+          <td>Zone</td>
+          <td>Name/sample identity and aligned key-range bar</td>
+          <td>Root marker, velocity range, RR position, trigger/event badges, diagnostics</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. Zone Range Presentation</h2>
+    <p>
+      Every zone occupies its own row beneath a shared 128-note keyboard ruler. Key-range bars are aligned
+      horizontally across all rows, so identical and partially overlapping ranges can be compared without
+      one zone obscuring another. A distinct velocity track or compact numeric range accompanies each row.
+    </p>
+    <p>
+      The first release should favor legibility over miniature two-dimensional maps: a shared key ruler,
+      one key-range bar per row, a root marker, and a separate velocity range. Detailed range manipulation
+      remains available in the Zone Map and inspector.
+    </p>
+
+    <h3>7.1 Relationship and overlap classification</h3>
+    <p>The viewer may classify related zones using conservative, descriptive labels:</p>
+    <ul>
+      <li><strong>Velocity stack:</strong> matching key ranges with differentiated velocity ranges.</li>
+      <li><strong>Round-robin stack:</strong> compatible ranges assigned to a common RR pool.</li>
+      <li><strong>Potential collision:</strong> overlapping key and velocity ranges without an obvious RR, crossfade, or trigger distinction.</li>
+      <li><strong>Exact duplicate:</strong> zones whose relevant mapping and trigger conditions appear indistinguishable.</li>
+    </ul>
+    <p>
+      These are navigation aids, not validation errors. Trigger events, articulations, controllers, choke
+      behavior, and intentional layering can make overlapping zones valid. Diagnostic details must explain
+      which fields were compared and allow the user to dismiss or ignore nothing in project data.
+    </p>
+
+    <h3>7.2 Search, sort, and filters</h3>
+    <ul>
+      <li>Search by layer, group, zone, or sample display name.</li>
+      <li>Show overlaps only.</li>
+      <li>Show potential collisions only.</li>
+      <li>Show exact key-range stacks.</li>
+      <li>Filter to the current articulation or performance event.</li>
+      <li>Show visible/audible objects only.</li>
+      <li>Sort by authored order, name, key low, root key, velocity low, or diagnostic state.</li>
+    </ul>
+    <p>
+      Authored order remains the default. A temporary sort does not rewrite display order unless the user
+      invokes an explicit reorder command.
+    </p>
+
+    <h2>8. Selection Model</h2>
+    <p>
+      Structure distinguishes the <strong>primary selection</strong> from the <strong>edit selection</strong>.
+      The most recently selected object is primary and determines inspector type and hierarchy focus. All
+      selected objects of that type form the edit selection.
+    </p>
+    <ul>
+      <li>A selection contains layers, groups, or zones, never a mixture of types.</li>
+      <li>Standard Ctrl/Cmd and Shift selection conventions apply within a column.</li>
+      <li>The inspector header always states the scope, such as “7 Zones” or “3 Groups.”</li>
+      <li>Selecting a different entity type clears the previous edit selection.</li>
+      <li>When several parents are selected, the child column may show their combined children grouped beneath parent headings.</li>
+      <li>The primary parent's children remain the fallback if a combined child view is deferred from the first release.</li>
+    </ul>
+
+    <h2>9. Context-Sensitive Inspector</h2>
+    <p>
+      The inspector occupies the same right-hand location in Map and Structure modes. It has a sticky header,
+      a scrollable body of compact sections, and stable visual structure across entity types. The header shows
+      entity type, name or selection count, hierarchy path, audition action where applicable, and an overflow menu.
+    </p>
+
+    <h3>9.1 Layer inspector</h3>
+    <ul>
+      <li>Name and authored order</li>
+      <li>Workspace visibility</li>
+      <li>Gain and pan</li>
+      <li>Routing bus</li>
+      <li>Audition anchor group</li>
+      <li>Crossfade source, low/high range, direction, and curve</li>
+      <li>Group and zone counts</li>
+      <li>Read-only effective routing and mix summary</li>
+    </ul>
+
+    <h3>9.2 Group inspector</h3>
+    <ul>
+      <li>Name and authored order</li>
+      <li>Parent layer, including multi-group reassignment</li>
+      <li>Workspace visibility</li>
+      <li>Gain and pan</li>
+      <li>Routing bus</li>
+      <li>Audition anchor zone</li>
+      <li>Round-robin enablement and mode</li>
+      <li>Zone count</li>
+      <li>Read-only effective routing and mix summary</li>
+    </ul>
+
+    <h3>9.3 Zone inspector</h3>
+    <ul>
+      <li>Sample identity, group membership, and articulation</li>
+      <li>Root key, key range, velocity range, and velocity crossfade</li>
+      <li>Gain, pan, fine tuning, and velocity tracking</li>
+      <li>Release seconds, release shape, and trigger mode</li>
+      <li>Performance event and pitch behavior</li>
+      <li>Round-robin membership</li>
+      <li>Choke group and choke release</li>
+      <li>Controller conditions and damper behavior</li>
+      <li>Playback region, loop behavior, and waveform actions</li>
+      <li>Read-only effective layer/group/zone composition summary</li>
+    </ul>
+
+    <h3>9.4 Mixed values and batch edits</h3>
+    <ul>
+      <li>Identical values are displayed normally.</li>
+      <li>Different values display as <strong>Mixed</strong>; no arbitrary selected object supplies the visible value.</li>
+      <li>Entering a value sets that property absolutely on all selected objects.</li>
+      <li>Nudge controls may apply a relative delta while preserving differences.</li>
+      <li>Unsupported combinations remain visible but disabled with a concise reason.</li>
+      <li>One completed control gesture produces one document transaction and one undo step.</li>
+      <li>Validation occurs before commit; partial application is not permitted.</li>
+    </ul>
+
+    <h2>10. Editing and Organization Commands</h2>
+    <ul>
+      <li>Create, duplicate, rename, reorder, and delete at each appropriate hierarchy level.</li>
+      <li>Move groups between layers using the Group inspector's parent control.</li>
+      <li>Move zones between groups using the Zone inspector's group control.</li>
+      <li>Support drag reorder within a column after the basic command path is established.</li>
+      <li>Support drag reassignment only when the target and resulting parent are unambiguous.</li>
+      <li>Provide <strong>Reveal in Map</strong>, <strong>Open Waveform</strong>, and audition commands for zones.</li>
+      <li>Provide select-all-children and select-visible-children commands on layers and groups.</li>
+    </ul>
+
+    <p>
+      Delete commands must follow the existing document rules. For example, a non-empty group cannot be
+      deleted unless the session contract provides an explicit reassignment or cascading operation.
+    </p>
+
+    <h2>11. Map and Structure Synchronization</h2>
+    <ul>
+      <li>A zone selected in Map is selected and revealed in Structure.</li>
+      <li>A group or layer selected in Structure becomes the active authoring context used by creation and assignment commands.</li>
+      <li>Zone multi-selection is preserved when switching views.</li>
+      <li>Returning to Map emphasizes or scopes the active layer/group without silently changing workspace visibility.</li>
+      <li>Map zoom/pan and Structure column/scroll state are remembered independently.</li>
+      <li>Changes made in either view refresh the other from the same session/project state.</li>
+    </ul>
+
+    <p>
+      The Map and Structure viewers must not maintain separate authoritative selections. A shared typed
+      selection model should drive both, while each viewer may retain non-authoritative presentation state.
+    </p>
+
+    <h2>12. Keyboard and Accessibility</h2>
+    <ul>
+      <li>Up/Down moves among rows in the focused column.</li>
+      <li>Right Arrow enters the child column; Left Arrow returns to the parent column.</li>
+      <li>Home/End and Page Up/Page Down follow standard list behavior.</li>
+      <li>Shift extends selection and Ctrl/Cmd toggles selection.</li>
+      <li>Enter invokes the row's default open/reveal action; audition uses an explicit documented command.</li>
+      <li>Every visual diagnostic also has text, an accessible name, and an accessible description.</li>
+      <li>Group tint is supplementary; names, hierarchy, badges, and selection states remain authoritative.</li>
+      <li>Focus remains in a predictable column after refresh, reorder, reassignment, or view switching.</li>
+      <li>Collapsed narrow-width columns expose their full path through accessible breadcrumb controls.</li>
+    </ul>
+
+    <h2>13. Performance and Scale</h2>
+    <ul>
+      <li>Use virtualized lists and recycled row presentation for groups and zones.</li>
+      <li>Compute aggregate coverage and overlap classifications when topology or relevant fields change, not during paint.</li>
+      <li>Cache normalized key-range geometry independently from viewport pixels.</li>
+      <li>Filter and sort immutable lightweight view models rather than copying full project objects into UI rows.</li>
+      <li>Preserve selection by stable object ID across filtering, sorting, and row recycling.</li>
+      <li>Keep diagnostic analysis off the audio thread and avoid blocking preview or document transactions.</li>
+    </ul>
+
+    <h2>14. Workspace State</h2>
+    <p>The following are presentation preferences and should not alter the authored instrument:</p>
+    <ul>
+      <li>Map or Structure mode</li>
+      <li>Column widths, collapsed columns, and scroll positions</li>
+      <li>Active search, sort, and diagnostic filters</li>
+      <li>Expanded stack/relationship groups</li>
+      <li>Inspector section expansion</li>
+    </ul>
+    <p>
+      Authored selection context such as <code>selectedLayerId</code>, project visibility fields, object order,
+      parent membership, and edited property values continue to use the existing session and project contracts.
+    </p>
+
+    <h2>15. Terminology</h2>
+    <p>
+      <strong>Layer</strong> now has one precise meaning: the authored parent of a group. Existing UI that uses
+      “Layer Stack” for a set of zones divided by velocity should be renamed <strong>Velocity Stack</strong> to
+      avoid confusing a zone relationship with the Instrument → Layer → Group → Zone hierarchy.
+    </p>
+
+    <h2>16. Suggested Delivery</h2>
+    <h3>Phase 1 — Navigation foundation</h3>
+    <ul>
+      <li>Add the Map | Structure switch and workspace persistence.</li>
+      <li>Add virtualized Layers, Groups, and Zones columns.</li>
+      <li>Share typed selection with Map.</li>
+      <li>Add basic layer, group, and zone context inspectors.</li>
+      <li>Add the shared key ruler and one aligned key-range bar per zone.</li>
+    </ul>
+
+    <h3>Phase 2 — Batch editing and organization</h3>
+    <ul>
+      <li>Add mixed-value presentation and atomic multi-object edits.</li>
+      <li>Add group/layer reassignment, explicit reorder commands, and creation commands.</li>
+      <li>Add search, temporary sorting, and visibility/articulation filters.</li>
+      <li>Add Reveal in Map, Reveal in Structure, Open Waveform, and audition actions.</li>
+    </ul>
+
+    <h3>Phase 3 — Relationship diagnostics</h3>
+    <ul>
+      <li>Add velocity-stack and round-robin grouping.</li>
+      <li>Add potential-collision and exact-duplicate classification.</li>
+      <li>Add overlap-focused filters and explanatory diagnostic details.</li>
+      <li>Add combined child views for multi-selected parents if user testing supports them.</li>
+    </ul>
+
+    <h3>Phase 4 — Live playback feedback</h3>
+    <ul>
+      <li>Highlight zones matching incoming MIDI key and velocity.</li>
+      <li>Distinguish the triggered zone from zones rejected by articulation, controller, event, or RR state.</li>
+      <li>Keep live feedback observational; it must not mutate selection or project data.</li>
+    </ul>
+
+    <h2>17. Acceptance Criteria for the Initial Release</h2>
+    <ul>
+      <li>The user can switch between Map and Structure without losing zone selection.</li>
+      <li>The user can reach any zone through its layer and group without opening a modal dialog.</li>
+      <li>Zones with identical key ranges remain separately visible and selectable.</li>
+      <li>Selecting a layer, group, or zone displays the correct inspector type.</li>
+      <li>Same-type multi-selection presents shared and mixed values correctly.</li>
+      <li>A valid batch edit is atomic and produces one undo step.</li>
+      <li>Keyboard-only navigation can traverse all three hierarchy columns and enter the inspector.</li>
+      <li>Filtering or sorting does not mutate authored order or lose stable-ID selection.</li>
+      <li>The viewer remains responsive with a production-scale instrument and does no work on the audio thread.</li>
+    </ul>
+
+    <h2>18. Open Design Decisions</h2>
+    <ul>
+      <li>Whether multi-selected parents initially show combined children or only the primary parent's children.</li>
+      <li>Whether the Zone column uses one velocity track per row or a compact numeric field in the first release.</li>
+      <li>Which inspector sections remain shared between Map and Structure and which are Structure-only.</li>
+      <li>Whether drag reassignment is valuable enough to add beyond the safer explicit parent controls.</li>
+      <li>Whether overlap diagnostics should be scoped to one group, one layer, or the entire instrument by default.</li>
+      <li>Which shortcuts can be offered safely across standalone and plugin hosts.</li>
+    </ul>
+  </main>
+</body>
+</html>

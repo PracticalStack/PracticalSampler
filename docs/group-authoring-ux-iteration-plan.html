@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - Group Authoring UX Iteration Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+    a { color: var(--blue); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.025em; }
+    h1 { max-width: 1100px; margin-bottom: 18px; font-size: clamp(2.35rem, 5vw, 4.65rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code { padding: 0.12em 0.35em; border-radius: 5px; color: #26343c; background: #e9edeb; font: 0.9em "Cascadia Code", Consolas, monospace; }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero { position: relative; overflow: hidden; padding: 48px; border-radius: 27px; color: #fffaf3; background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2)); box-shadow: var(--shadow); }
+    .hero::after { content: "GROUPS"; position: absolute; right: 14px; bottom: -32px; color: rgba(255,255,255,0.045); font: 700 8rem/1 Georgia, serif; pointer-events: none; }
+    .eyebrow, .section-label { display: inline-block; margin-bottom: 10px; color: #efc39f; font-size: 0.75rem; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 1040px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+    .summary-grid, .grid-2, .grid-3, .grid-4 { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .toc, .section, .sprint, .callout { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .sprint { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.violet { border-top: 4px solid var(--violet); }
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 920px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242,238,230,0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: var(--red-soft); }
+    .status.should { color: var(--amber); background: var(--amber-soft); }
+    .status.later { color: var(--violet); background: var(--violet-soft); }
+    .sprint { overflow: hidden; padding: 0; }
+    .sprint-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .sprint-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .sprint-head h2 { margin: 0; font-size: 1.65rem; }
+    .sprint-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .sprint-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .sprint-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+    .contract { margin: 16px 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: #26343c; color: #f3f6f2; font: 0.95rem/1.7 "Cascadia Code", Consolas, monospace; overflow-x: auto; }
+    .contract .changed { color: #f5d69c; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 145px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+    @media (max-width: 1160px) { .summary-grid, .grid-3 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .flow { grid-template-columns: repeat(3, 1fr); } .flow-step:nth-child(3)::after { display: none; } .toc ol { columns: 2; } }
+    @media (max-width: 700px) { .page { width: calc(100% - 22px); padding-top: 18px; } .hero, .section { padding: 25px 22px; } .summary-grid, .grid-3, .flow { grid-template-columns: 1fr; } .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; } .toc ol { columns: 1; } .sprint-head { grid-template-columns: auto 1fr; } .sprint-focus { grid-column: 2; text-align: left; } .sprint-body { padding: 20px; } .hero::after { display: none; } }
+    @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .toc, .section, .sprint { box-shadow: none; } .sprint, .card, .callout, table { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Next Iteration 2 | Group authoring</span>
+      <h1>Make Groups Inspectable and Manageable</h1>
+      <p class="lede">Improve the Practical Sampler group workflow before adding more layer-aware authoring. A creator should be able to identify every group by a clear name and stable ID, understand its membership at a glance, select all of its zones, rename and reorder it, move zones between groups, and see group membership directly in the Map.</p>
+      <div class="meta">
+        <span class="chip">Scope: PracticalSampler only</span>
+        <span class="chip">Group UX before layer assignment</span>
+        <span class="chip">Stable IDs, editable names</span>
+        <span class="chip">Derived zone counts</span>
+        <span class="chip">Map membership visibility</span>
+        <span class="chip">No new layer behavior</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>6 / 10</strong><span>Estimated complexity</span></div>
+        <div class="summary-card"><strong>5 / 10</strong><span>Estimated implementation risk</span></div>
+        <div class="summary-card"><strong>5</strong><span>Implementation phases</span></div>
+        <div class="summary-card"><strong>1</strong><span>Authoritative membership field: zone.groupId</span></div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#goal">Goal and Scope</a></li>
+        <li><a href="#current">Current Baseline</a></li>
+        <li><a href="#contract">UX and Data Contract</a></li>
+        <li><a href="#tasks">Development Tasklist</a></li>
+        <li><a href="#validation">Validation Matrix</a></li>
+        <li><a href="#risks">Risks and Guardrails</a></li>
+        <li><a href="#release">Release Gate</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="goal">
+      <span class="section-label">01 | Product frame</span>
+      <div class="heading"><h2>Goal and scope</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Creator outcome</h3>
+          <p>The Groups workbench answers three questions without opening individual zones: What is this group called? Which zones belong to it? Where is it in the processing and authoring order?</p>
+        </article>
+        <article class="card good">
+          <h3>Engineering outcome</h3>
+          <p>Group operations become explicit transactions over the existing native model. Membership remains derived from each zone’s <code>groupId</code>; the UI does not maintain a second, competing membership list.</p>
+        </article>
+        <article class="card warn">
+          <h3>Explicit non-goals</h3>
+          <p>This iteration does not add layer assignment workflows, layer crossfade behavior, macros, new group DSP, or a new persistence schema. It prepares the group surface that those features will consume.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Scope boundary</h3>
+        <p>All implementation, tests, fixtures, and this plan belong to <code>PracticalSampler/</code>. The sibling <code>_analysis/Rhapsody/</code> tree is excluded. Existing HTML documentation is not rewritten; this file is the new planning artifact. Update active Markdown only when the authoring contract changes.</p>
+      </div>
+    </section>
+
+    <section class="section" id="current">
+      <span class="section-label">02 | Ground truth</span>
+      <div class="heading"><h2>Current baseline to extend</h2></div>
+      <p>Practical Sampler already persists authored groups with an ID, display name, display order, visibility, gain, pan, routing, and audition anchor. Zones carry the authoritative <code>groupId</code>. <code>AuthoringSession</code> already exposes group selection, creation, deletion, reorder, and zone reassignment transactions, while <code>AuthoringPanel</code> already has a Groups workbench and a Map selection bridge.</p>
+      <div class="flow">
+        <div class="flow-step"><strong>Zone model</strong><span>Each zone stores its parent <code>groupId</code>.</span></div>
+        <div class="flow-step"><strong>Group model</strong><span>Identity and display order are persisted independently from zones.</span></div>
+        <div class="flow-step"><strong>Authoring session</strong><span>Mutations are transaction-backed and support undo/redo.</span></div>
+        <div class="flow-step"><strong>Groups workbench</strong><span>Shows group rows and selected-group controls, but needs stronger inspection and membership actions.</span></div>
+        <div class="flow-step"><strong>Map</strong><span>Already supports zone selection; this iteration adds persistent group context.</span></div>
+      </div>
+      <div class="grid-2">
+        <article class="card accent">
+          <h3>Primary UX gap</h3>
+          <p>Group rows need to make name, stable ID, zone count, visibility, and selection state legible at the same time. “Selected group” must be a meaningful authoring context, not merely an index in a list.</p>
+        </article>
+        <article class="card violet">
+          <h3>Primary model guardrail</h3>
+          <p>Renaming changes <code>displayName</code> only. The stable <code>id</code> remains unchanged so routing sources, layer references, undo history, fixtures, and external project identity do not break.</p>
+        </article>
+      </div>
+      <p class="files">Reference seams: <a href="../engine_adapter/include/drs/engine/RuntimeModel.h">RuntimeModel.h</a>, <a href="../engine_adapter/include/drs/engine/AuthoringSession.h">AuthoringSession.h</a>, <a href="../engine_adapter/src/AuthoringSession.cpp">AuthoringSession.cpp</a>, <a href="../app/src/shared/AuthoringPanel.h">AuthoringPanel.h</a>, and <a href="../app/src/shared/AuthoringPanel.cpp">AuthoringPanel.cpp</a>.</p>
+    </section>
+
+    <section class="section" id="contract">
+      <span class="section-label">03 | Locked contract</span>
+      <div class="heading"><h2>Group identity, membership, and operations</h2></div>
+      <div class="contract"><span class="changed">Identity:</span><br />group.id = stable project identity<br />group.displayName = user-facing editable label<br /><br /><span class="changed">Membership:</span><br />zone.groupId = authoritative parent relationship<br />group.zoneCount = derived count of zones where zone.groupId == group.id<br /><br /><span class="changed">Selection:</span><br />select group → selectedGroupId + optional selected zone set<br />select all zones in group → replace Map selection with that group’s member zones</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Capability</th><th>Required behavior</th><th>Persistence/runtime rule</th><th>Priority</th></tr></thead>
+          <tbody>
+            <tr><td class="id">Clear names and IDs</td><td>Every group row shows display name and a secondary stable ID. Empty names fall back to the ID for display.</td><td>Name edits update <code>displayName</code> only. IDs remain unique, non-empty, and immutable through rename.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Zone count</td><td>Every group row shows the current number of member zones, including zero.</td><td>Count is derived from zones, never stored as an independently editable field.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Select group zones</td><td>A visible action selects all zones belonging to the group in the Map and updates the selection summary.</td><td>Selection is a UI/session concern; it must not rewrite project membership.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Rename group</td><td>Inline or inspector editing commits on return/focus loss with validation feedback.</td><td>Transaction label, undo/redo, dirty state, and reload all reflect the change.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Reorder groups</td><td>Move up/down controls and keyboard-accessible reorder actions change visible authoring order.</td><td>Normalize <code>displayOrder</code> after every reorder; runtime group route order follows the persisted order where order is meaningful.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Move zones between groups</td><td>Selected Map zones can be assigned to the selected group; the group inspector exposes the same action.</td><td>Each moved zone receives the destination <code>groupId</code>. Counts, anchors, round-robin compatibility, selection, and undo state reconcile.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Map membership</td><td>Map zones visibly communicate group membership through a consistent color/outline/label treatment and a group-aware legend or filter.</td><td>Visual grouping is derived from current group membership and refreshes after every transaction.</td><td><span class="priority">P0</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warning">
+        <h3>Empty groups are valid</h3>
+        <p>Do not silently delete a group when its last zone moves away. Empty groups remain inspectable and reorderable until the existing explicit Delete Group action is used. Deleting a group must use an explicit, documented policy for its zones; the preferred safe behavior is to require reassignment or offer a destination-group choice before commit.</p>
+      </div>
+    </section>
+
+    <section class="section" id="tasks">
+      <span class="section-label">04 | Execution plan</span>
+      <div class="heading"><h2>Development tasklist</h2></div>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">0</div><h2>Baseline and interaction contract</h2><span class="sprint-focus">Lock behavior before UI expansion</span></div>
+        <p class="sprint-intent">Capture the current group seams and define the exact selection, identity, ordering, and membership behavior that the workbench and Map must share.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">GUX0.1</span> Inventory current group persistence, transaction helpers, selection state, Map selection synchronization, and existing group-related tests.</li>
+            <li><span class="task-id">GUX0.2</span> Define the group row/read-model fields: display name, stable ID, derived zone count, visibility, display order, selected state, and empty-group state.</li>
+            <li><span class="task-id">GUX0.3</span> Define the selection contract for “Select Group” versus “Select All Zones”: selecting a row selects the authoring group; the explicit action replaces the Map zone selection with all members.</li>
+            <li><span class="task-id">GUX0.4</span> Define validation and transaction rules for blank names, duplicate IDs in imported/malformed content, empty groups, group deletion, and reorder boundaries.</li>
+            <li><span class="task-id">GUX0.5</span> Add fixture cases covering named groups, stable IDs, an empty group, two groups with movable zones, and zones spread across the Map.</li>
+          </ul>
+          <div class="exit"><h3>Gate 0</h3><p>The contract is written in tests or fixture assertions, and no behavior depends on a stored zone count or a mutable group ID.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">1</div><h2>Inspectable group read model</h2><span class="sprint-focus">Make the hierarchy legible</span></div>
+        <p class="sprint-intent">Give every group consumer one consistent summary so the Groups workbench, selection summary, accessibility text, and Map legend cannot disagree.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">GUX1.1</span> Add or strengthen an <code>AuthoringGroupSummary</code> view model containing stable ID, display name, display order, zone count, visibility, selected state, and empty-state metadata.</li>
+            <li><span class="task-id">GUX1.2</span> Centralize derived member collection and zone counting so every caller uses the same group membership definition.</li>
+            <li><span class="task-id">GUX1.3</span> Update the Groups list rows to show name as the primary label, ID as secondary metadata, and “N zones” as a persistent count.</li>
+            <li><span class="task-id">GUX1.4</span> Add accessible names/descriptions and keyboard focus order for group rows, group actions, and empty groups.</li>
+            <li><span class="task-id">GUX1.5</span> Ensure selection and refresh preserve the selected group by ID rather than by stale list index.</li>
+          </ul>
+          <div class="exit"><h3>Gate 1</h3><p>A user can identify every group and its membership size without opening a zone editor, and the same values survive save/reload.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">2</div><h2>Group management actions</h2><span class="sprint-focus">Rename, reorder, and move membership</span></div>
+        <p class="sprint-intent">Turn the existing group transactions into a coherent authoring workflow with clear feedback, predictable selection, and safe membership changes.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">GUX2.1</span> Implement stable group rename editing with trim/blank validation, transaction labels, undo/redo, dirty-state updates, and immediate list/inspector refresh.</li>
+            <li><span class="task-id">GUX2.2</span> Add group reorder controls that normalize display order, preserve group identity, and retain selection on the moved group.</li>
+            <li><span class="task-id">GUX2.3</span> Add “Select All Zones” to the selected-group controls and make it operate through the existing Map selection bridge.</li>
+            <li><span class="task-id">GUX2.4</span> Add a destination-group action for selected zones, including no-selection, no-destination, and mixed-source-group feedback.</li>
+            <li><span class="task-id">GUX2.5</span> Reconcile audition anchors when zones move; if an anchor leaves its group, select a deterministic remaining member or clear the anchor.</li>
+            <li><span class="task-id">GUX2.6</span> Re-run group-scoped Round Robin validation/reconciliation after membership changes and surface any resulting status in the group inspector.</li>
+            <li><span class="task-id">GUX2.7</span> Define the explicit Delete Group behavior for non-empty groups and ensure accidental deletion cannot orphan zones.</li>
+          </ul>
+          <div class="exit"><h3>Gate 2</h3><p>Rename, reorder, select-all, and zone reassignment are undoable, persist correctly, and leave no zone with an invalid group reference.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">3</div><h2>Map group membership presentation</h2><span class="sprint-focus">Make membership visible where zones are edited</span></div>
+        <p class="sprint-intent">Expose group membership directly in the Map without replacing the existing zone-range visualization or making color the only source of truth.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">GUX3.1</span> Add a deterministic group color/visual token derived from group identity or display order, with sufficient contrast and a non-color fallback.</li>
+            <li><span class="task-id">GUX3.2</span> Render group membership in Map zones through an outline, badge, lane tint, or label treatment that remains legible for overlapping ranges.</li>
+            <li><span class="task-id">GUX3.3</span> Add a group legend or filter showing group name, ID, zone count, and visibility state; selecting a legend entry selects the group context.</li>
+            <li><span class="task-id">GUX3.4</span> Make Map selection and Groups selection synchronize in both directions without clearing unrelated selection state unexpectedly.</li>
+            <li><span class="task-id">GUX3.5</span> Refresh visual membership after rename, reorder, move, import materialization, undo, redo, and project reload.</li>
+            <li><span class="task-id">GUX3.6</span> Add tooltips/accessibility text that state the group name, stable ID, and zone membership for each Map item.</li>
+          </ul>
+          <div class="exit"><h3>Gate 3</h3><p>While editing the Map, a user can tell which group each visible zone belongs to and can move from a visual member to the corresponding group controls.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">4</div><h2>Tests, documentation, and release hygiene</h2><span class="sprint-focus">Prove the contract end to end</span></div>
+        <p class="sprint-intent">Protect the group contract across persistence, authoring transactions, Map view models, and application builds before the layer-assignment iteration begins.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li><span class="task-id">GUX4.1</span> Add contract tests for stable IDs, rename persistence, derived zone counts, empty groups, display-order normalization, and invalid membership references.</li>
+            <li><span class="task-id">GUX4.2</span> Add authoring transaction tests for select-all, move selected zones, multi-zone reassignment, undo/redo, anchor repair, deletion safety, and selection retention.</li>
+            <li><span class="task-id">GUX4.3</span> Add Map view-model/render tests for group visual tokens, legend contents, group/zone selection synchronization, and refresh after edits.</li>
+            <li><span class="task-id">GUX4.4</span> Add regression coverage for import-created default groups and for existing group-scoped Round Robin and routing behavior.</li>
+            <li><span class="task-id">GUX4.5</span> Update active Markdown policy or authoring guidance to describe stable group IDs, derived counts, and the group-before-layer workflow. Do not retrofit old HTML documentation.</li>
+            <li><span class="task-id">GUX4.6</span> Run the focused group test matrix, plugin and standalone builds, <code>git diff --check</code>, and clean-checkout verification for tracked-path and fixture completeness.</li>
+          </ul>
+          <div class="exit"><h3>Gate 4</h3><p>The focused group matrix passes, both application targets build, and the next layer-assignment iteration can rely on groups as inspectable, stable containers.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section" id="validation">
+      <span class="section-label">05 | Evidence</span>
+      <div class="heading"><h2>Validation matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Required evidence</th><th>Failure to prevent</th></tr></thead>
+          <tbody>
+            <tr><td class="id">Persistence</td><td>Save/reload preserves group ID, edited name, order, visibility, and all zone <code>groupId</code> values.</td><td>Renames break references or counts drift after reload.</td></tr>
+            <tr><td class="id">Authoring transactions</td><td>Rename, reorder, select-all, move zones, undo, redo, and deletion safety pass with deterministic selection and anchors.</td><td>UI appears correct but leaves stale selection, orphaned zones, or invalid anchors.</td></tr>
+            <tr><td class="id">Map presentation</td><td>View-model and rendering tests prove group labels, IDs, counts, visual tokens, legend state, and bidirectional selection.</td><td>Membership is technically present but not discoverable or is misleading for overlapping zones.</td></tr>
+            <tr><td class="id">Runtime preservation</td><td>Existing group route, gain/pan, routing, visibility, Round Robin, and layer membership behavior remain unchanged.</td><td>UX work accidentally changes audio behavior or layer relationships.</td></tr>
+            <tr><td class="id">Application targets</td><td>Practical Sampler plugin and standalone builds complete from a clean configured build tree.</td><td>Feature works in unit tests but is not reachable in shipped surfaces.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <span class="section-label">06 | Guardrails</span>
+      <div class="heading"><h2>Risks and decisions</h2></div>
+      <div class="grid-2">
+        <article class="card warn">
+          <h3>Selection ambiguity</h3>
+          <p>“Select group” and “select all zones” are related but different actions. Keep the group context selected independently from the Map’s zone selection and label the all-zone action explicitly.</p>
+        </article>
+        <article class="card problem">
+          <h3>Identity breakage</h3>
+          <p>Never use a display name as a foreign key. Group IDs are stable and remain unchanged by rename, reorder, layer assignment, routing, or Map color changes.</p>
+        </article>
+        <article class="card accent">
+          <h3>Visual overload</h3>
+          <p>Group membership must supplement key-range, velocity-range, and selection visuals. Use labels, outlines, or patterns so users do not depend on color alone.</p>
+        </article>
+        <article class="card violet">
+          <h3>Cross-feature coupling</h3>
+          <p>Moving zones can affect audition anchors and Round Robin validity. Route the operation through one transaction boundary and refresh all derived summaries afterward.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Implementation order</h3>
+        <p>Build the shared summary and transaction contract first, then add the workbench actions, then add Map presentation. This keeps the Map as a consumer of authoritative membership rather than a second place where grouping rules are implemented.</p>
+      </div>
+    </section>
+
+    <section class="section" id="release">
+      <span class="section-label">07 | Completion criteria</span>
+      <div class="heading"><h2>Release gate</h2></div>
+      <div class="callout decision">
+        <h3>Iteration 2 is complete when</h3>
+        <ul>
+          <li>Every group row exposes a clear name, stable ID, and derived zone count.</li>
+          <li>Users can select all zones in a group, rename groups, reorder groups, and move selected zones between groups.</li>
+          <li>Group IDs remain stable and all mutations are undoable, persisted, and validated.</li>
+          <li>The Map visibly communicates membership and synchronizes group and zone selection.</li>
+          <li>Existing group, layer, routing, Round Robin, import, and runtime behavior remains green.</li>
+          <li>Focused tests, plugin/standalone builds, clean-checkout checks, and release hygiene checks pass.</li>
+        </ul>
+      </div>
+      <p class="files">Planned implementation surfaces include <a href="../engine_adapter/include/drs/engine/AuthoringSession.h">AuthoringSession.h</a>, <a href="../engine_adapter/src/AuthoringSession.cpp">AuthoringSession.cpp</a>, <a href="../app/src/shared/AuthoringPanel.h">AuthoringPanel.h</a>, <a href="../app/src/shared/AuthoringPanel.cpp">AuthoringPanel.cpp</a>, and the existing <a href="../app/src/shared/authoring/ZoneMapCanvas.h">ZoneMapCanvas.h</a> / Map view-model seams.</p>
+    </section>
+
+    <footer>Practical Sampler internal engineering plan · Iteration 2 · Group authoring UX · Scope excludes <code>_analysis/Rhapsody/</code></footer>
+  </main>
+</body>
+</html>

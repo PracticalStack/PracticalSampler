@@ -90,6 +90,8 @@ private:
     CompactInspectorMessage performanceHintMessage;
     CompactInspectorActionRow previewZoneRow;
     CompactInspectorActionRow restoreRootKeyRow;
+    CompactInspectorActionRow revealStructureRow;
+    CompactInspectorActionRow openWaveformRow;
     CompactInspectorMessage validationMessage;
 };
 } // namespace drs::app::authoring

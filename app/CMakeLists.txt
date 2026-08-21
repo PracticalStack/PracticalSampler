@@ -40,6 +40,19 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/WavImportWorkflow.cpp
     src/shared/WavImportWorkflow.h
     src/shared/authoring/AuthoringViewModels.h
+    src/shared/authoring/AuthoringStructureSelection.cpp
+    src/shared/authoring/AuthoringStructureSelection.h
+    src/shared/authoring/StructureViewModels.cpp
+    src/shared/authoring/StructureViewModels.h
+    src/shared/authoring/StructureViewState.h
+    src/shared/authoring/StructureOverlapPolicy.cpp
+    src/shared/authoring/StructureOverlapPolicy.h
+    src/shared/authoring/StructureInspector.cpp
+    src/shared/authoring/StructureInspector.h
+    src/shared/authoring/StructureInspectorHost.h
+    src/shared/authoring/StructureZoneList.h
+    src/shared/authoring/StructureViewer.cpp
+    src/shared/authoring/StructureViewer.h
     src/shared/authoring/AuthoringWorkspaceLayout.h
     src/shared/authoring/OpenWorkbenchVisualSystem.h
     src/shared/authoring/MacroWorkbenchView.cpp

@@ -167,6 +167,8 @@ struct ZoneFieldCallbacks
     std::function<void(const std::vector<int>&)> onAuditionVelocityCrossfadeRequested;
     std::function<void()> onCreateChokeGroupRequested;
     std::function<void()> onRestoreRootKeyRequested;
+    std::function<void()> onRevealInStructureRequested;
+    std::function<void()> onOpenWaveformRequested;
     std::function<void()> onPreviewRequested;
     std::function<void()> onCreateRoundRobinPoolRequested;
     std::function<void()> onAddCompatibleZonesToRoundRobinPoolRequested;

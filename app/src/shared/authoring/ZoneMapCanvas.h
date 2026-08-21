@@ -59,6 +59,9 @@ public:
                            int overlapHigh)> nextCallback);
     void setOnZoneAuditionRequested(
         std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback);
+    void setOnShowInStructureRequested(
+        std::function<void(const std::vector<std::string>& zoneIds,
+                           const std::string& primaryZoneId)> nextCallback);
     void setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback);
     void setOnDeleteSelectedSampleRequested(std::function<void()> nextCallback);
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
@@ -202,6 +205,8 @@ private:
                        int overlapLow,
                        int overlapHigh)> onVelocityCrossfadeCommitRequested;
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> onZoneAuditionRequested;
+    std::function<void(const std::vector<std::string>& zoneIds,
+                       const std::string& primaryZoneId)> onShowInStructureRequested;
     std::function<void(std::vector<juce::File>)> onSampleFilesDropped;
     std::function<void()> onDeleteSelectedSampleRequested;
     std::optional<RangeGesture> activeGesture;

@@ -77,6 +77,37 @@ struct AuthoringMixerTaperUpgradePreview
     std::vector<std::string> affectedTargetPaths;
 };
 
+enum class AuthoringStructureEntityKind
+{
+    layer,
+    group,
+    zone
+};
+
+// Optional fields form an all-or-nothing patch for a same-kind stable-ID
+// selection. The session validates every target before committing one
+// document snapshot, so mixed edits cannot partially apply.
+struct AuthoringStructureBatchPatch
+{
+    std::optional<std::string> displayName;
+    std::optional<std::string> layerId;
+    std::optional<std::string> groupId;
+    std::optional<std::string> routingBusId;
+    std::optional<std::string> auditionAnchorId;
+    std::optional<std::string> articulationId;
+    std::optional<bool> workspaceVisible;
+    std::optional<double> gainDb;
+    std::optional<double> pan;
+    std::optional<double> gainDelta;
+    std::optional<double> panDelta;
+    std::optional<double> releaseSeconds;
+    std::optional<int> rootKey;
+    std::optional<int> keyLow;
+    std::optional<int> keyHigh;
+    std::optional<int> velocityLow;
+    std::optional<int> velocityHigh;
+};
+
 class AuthoringSession
 {
 public:
@@ -187,6 +218,11 @@ public:
     RuntimeProjectDocumentActionResult reassignGroupsToLayer(const std::vector<std::string>& groupIds,
                                                              const std::string& layerId,
                                                              const std::string& label);
+    RuntimeProjectDocumentActionResult applyStructureBatchPatch(
+        AuthoringStructureEntityKind kind,
+        const std::vector<std::string>& entityIds,
+        const AuthoringStructureBatchPatch& patch,
+        const std::string& label);
     RuntimeProjectDocumentActionResult createRoundRobinPoolForSelectedZone(const std::string& label);
     RuntimeProjectDocumentActionResult addCompatibleZonesToSelectedRoundRobinPool(const std::string& label);
     RuntimeProjectDocumentActionResult normalizeSelectedRoundRobinPool(const std::string& label);

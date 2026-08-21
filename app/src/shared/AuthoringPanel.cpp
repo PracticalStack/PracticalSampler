@@ -1279,6 +1279,38 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     previewEnabledToggle.setToggleState(true, juce::dontSendNotification);
     previewStopButton.setButtonText("Stop");
     zoneMap.setComponentID("authoringZoneMap");
+    mappingMapViewButton.setComponentID("authoringMappingMapViewButton");
+    mappingMapViewButton.setButtonText("Map");
+    mappingStructureViewButton.setComponentID("authoringMappingStructureViewButton");
+    mappingStructureViewButton.setButtonText("Structure");
+    mappingMapViewButton.setClickingTogglesState(false);
+    mappingStructureViewButton.setClickingTogglesState(false);
+    structureSearchLabel.setText("Find", juce::dontSendNotification);
+    structureSearchLabel.setComponentID("authoringStructureSearchLabel");
+    structureSearchEditor.setComponentID("authoringStructureSearchEditor");
+    structureSearchEditor.setTextToShowWhenEmpty("Search layers, groups, zones", authoringPanelMuted);
+    structureSortSelector.setComponentID("authoringStructureSortSelector");
+    structureSortSelector.addItem("Authored order", 1);
+    structureSortSelector.addItem("Name", 2);
+    structureSortSelector.addItem("Key low", 3);
+    structureSortSelector.addItem("Root key", 4);
+    structureSortSelector.addItem("Velocity low", 5);
+    structureSortSelector.addItem("Diagnostics", 6);
+    structureSortSelector.setSelectedId(1, juce::dontSendNotification);
+    structureDiagnosticFilterSelector.setComponentID("authoringStructureDiagnosticFilterSelector");
+    structureDiagnosticFilterSelector.addItem("All diagnostics", 1);
+    structureDiagnosticFilterSelector.addItem("Overlaps", 2);
+    structureDiagnosticFilterSelector.addItem("Potential collisions", 3);
+    structureDiagnosticFilterSelector.addItem("Exact stacks", 4);
+    structureDiagnosticFilterSelector.addItem("Visible only", 5);
+    structureDiagnosticFilterSelector.setSelectedId(1, juce::dontSendNotification);
+    structureContextFilterSelector.setComponentID("authoringStructureContextFilterSelector");
+    structureContextFilterSelector.addItem("All context", 1);
+    structureContextFilterSelector.addItem("Current articulation", 2);
+    structureContextFilterSelector.addItem("Note-on", 3);
+    structureContextFilterSelector.addItem("Note-off", 4);
+    structureContextFilterSelector.addItem("Release", 5);
+    structureContextFilterSelector.setSelectedId(1, juce::dontSendNotification);
     groupSectionLabel.setComponentID("authoringGroupSectionLabel");
     groupNameLabel.setComponentID("authoringGroupNameLabel");
     groupNameEditor.setComponentID("authoringGroupNameEditor");
@@ -1691,6 +1723,25 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (onRestoreRootKeyRequested)
             onRestoreRootKeyRequested();
     };
+    zoneCallbacks.onRevealInStructureRequested = [this]
+    {
+        auto ids = zoneMapSelectedZoneIds;
+        if (ids.empty())
+        {
+            if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
+                ids.push_back(zone->id);
+        }
+        if (ids.empty())
+            return;
+        const auto primary = authoringSession.getSelectedZone();
+        showStructureForSelection(std::move(ids), primary.has_value() ? primary->id : std::string {});
+    };
+    zoneCallbacks.onOpenWaveformRequested = [this]
+    {
+        setWorkbenchOpen(true);
+        setActiveWorkbenchTab(authoring::WorkbenchTab::waveform);
+        requestWaveformPreviewLoad(true);
+    };
     zoneCallbacks.onPreviewRequested = [this]
     {
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector);
@@ -1717,6 +1768,11 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     {
         previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::zoneMap,
                             midiNote, velocity, zoneId);
+    });
+    zoneMap.setOnShowInStructureRequested([this](std::vector<std::string> zoneIds,
+                                                  std::string primaryZoneId)
+    {
+        showStructureForSelection(std::move(zoneIds), std::move(primaryZoneId));
     });
     zoneMap.setOnSampleFilesDropped([this](std::vector<juce::File> files)
     {
@@ -1753,6 +1809,181 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (result.applied)
             refreshFromSession();
     });
+    mappingMapViewButton.onClick = [this]
+    {
+        setMappingView(authoring::StructureViewMode::map);
+    };
+    mappingStructureViewButton.onClick = [this]
+    {
+        setMappingView(authoring::StructureViewMode::structure);
+    };
+    structureSearchEditor.onTextChange = [this]
+    {
+        structureViewState.setSearchText(structureSearchEditor.getText().toStdString());
+        refreshStructureViewer();
+    };
+    structureSortSelector.onChange = [this]
+    {
+        const auto sortId = structureSortSelector.getSelectedId();
+        structureViewState.setSortMode(sortId == 2 ? authoring::StructureSortMode::name
+                                           : sortId == 3 ? authoring::StructureSortMode::keyLow
+                                           : sortId == 4 ? authoring::StructureSortMode::rootKey
+                                           : sortId == 5 ? authoring::StructureSortMode::velocityLow
+                                           : sortId == 6 ? authoring::StructureSortMode::diagnostic
+                                                         : authoring::StructureSortMode::authoredOrder);
+        refreshStructureViewer();
+    };
+    structureDiagnosticFilterSelector.onChange = [this]
+    {
+        const auto filterId = structureDiagnosticFilterSelector.getSelectedId();
+        structureViewState.setShowOverlapsOnly(filterId == 2 || filterId == 3 || filterId == 4);
+        structureViewState.setShowPotentialCollisionsOnly(filterId == 3);
+        structureViewState.setShowExactStacksOnly(filterId == 4);
+        structureViewState.setVisibleOnly(filterId == 5);
+        refreshStructureViewer();
+    };
+    structureContextFilterSelector.onChange = [this]
+    {
+        const auto filterId = structureContextFilterSelector.getSelectedId();
+        structureViewState.setArticulationFilter({});
+        if (filterId == 2)
+        {
+            if (const auto zone = authoringSession.getSelectedZone(); zone.has_value())
+                structureViewState.setArticulationFilter(zone->articulationId);
+        }
+        if (filterId == 3)
+            structureViewState.setPerformanceEventFilter(drs::engine::PerformanceEventKind::noteOn);
+        else if (filterId == 4)
+            structureViewState.setPerformanceEventFilter(drs::engine::PerformanceEventKind::noteOff);
+        else if (filterId == 5)
+            structureViewState.setPerformanceEventFilter(drs::engine::PerformanceEventKind::release);
+        else
+            structureViewState.setPerformanceEventFilter(std::nullopt);
+        refreshStructureViewer();
+    };
+    structureViewer.setOnSelectionChanged([this](const authoring::StructureSelectionKind kind,
+                                                  std::vector<std::string> ids,
+                                                  std::string primaryId)
+    {
+        applyStructureSelection(kind, std::move(ids), std::move(primaryId));
+    });
+    structureViewer.setOnRevealInMapRequested([this](const std::string& zoneId)
+    {
+        setMappingView(authoring::StructureViewMode::map);
+        if (authoringSession.selectZone(zoneId).applied)
+            refreshFromSession();
+    });
+    structureViewer.setOnColumnWidthsChanged([this](const int layerWidth,
+                                                    const int groupWidth,
+                                                    const int zoneWidth)
+    {
+        structureViewState.setLayerColumnWidth(layerWidth);
+        structureViewState.setGroupColumnWidth(groupWidth);
+        structureViewState.setZoneColumnWidth(zoneWidth);
+    });
+    structureInspector.setOnPatchRequested([this](const authoring::StructureSelectionKind kind,
+                                                  drs::engine::AuthoringStructureBatchPatch patch)
+    {
+        const auto entityKind = kind == authoring::StructureSelectionKind::layer
+            ? drs::engine::AuthoringStructureEntityKind::layer
+            : kind == authoring::StructureSelectionKind::group
+                ? drs::engine::AuthoringStructureEntityKind::group
+                : drs::engine::AuthoringStructureEntityKind::zone;
+        const auto result = authoringSession.applyStructureBatchPatch(
+            entityKind, structureSelection.getIds(), patch, "Edit structure selection");
+        if (result.applied)
+            refreshFromSession();
+    });
+    structureInspector.setOnActionRequested([this](const authoring::StructureInspectorAction action)
+    {
+        if (structureSelection.getKind() == authoring::StructureSelectionKind::none)
+            return;
+
+        if (action == authoring::StructureInspectorAction::revealInMap)
+        {
+            if (structureSelection.getKind() == authoring::StructureSelectionKind::zone
+                && authoringSession.selectZone(structureSelection.getPrimaryId()).applied)
+            {
+                setMappingView(authoring::StructureViewMode::map);
+                refreshFromSession();
+            }
+            return;
+        }
+
+        if (action == authoring::StructureInspectorAction::openWaveform)
+        {
+            setWorkbenchOpen(true);
+            setActiveWorkbenchTab(authoring::WorkbenchTab::waveform);
+            requestWaveformPreviewLoad(true);
+            return;
+        }
+
+        if (action == authoring::StructureInspectorAction::audition)
+        {
+            if (structureSelection.getKind() == authoring::StructureSelectionKind::zone)
+                previewSelectedZone(drs::engine::AuthoringPreviewAuditionSource::inspector,
+                                    -1, 0, structureSelection.getPrimaryId());
+            else if (structureSelection.getKind() == authoring::StructureSelectionKind::group)
+                previewSelectedGroupAnchor();
+            else if (const auto layer = authoringSession.getSelectedLayer(); layer.has_value()
+                     && !layer->auditionAnchorGroupId.empty()
+                     && authoringSession.selectGroup(layer->auditionAnchorGroupId).applied)
+            {
+                refreshSelectionFromSession();
+                previewSelectedGroupAnchor();
+            }
+            return;
+        }
+
+        const auto selectVisible = action == authoring::StructureInspectorAction::selectVisibleChildren;
+        std::vector<std::string> childIds;
+        const auto& project = authoringSession.getProject();
+        if (structureSelection.getKind() == authoring::StructureSelectionKind::layer)
+        {
+            for (const auto& group : project.authoring.groups)
+                if (structureSelection.contains(group.layerId)
+                    && (!selectVisible || group.workspaceVisible))
+                    childIds.push_back(group.id);
+        }
+        else if (structureSelection.getKind() == authoring::StructureSelectionKind::group)
+        {
+            for (const auto& zone : project.authoring.zones)
+            {
+                if (!structureSelection.contains(zone.groupId))
+                    continue;
+                if (selectVisible)
+                {
+                    const auto group = std::find_if(project.authoring.groups.begin(), project.authoring.groups.end(),
+                                                   [&](const auto& candidate) { return candidate.id == zone.groupId; });
+                    const auto layer = group == project.authoring.groups.end()
+                        ? project.authoring.layers.end()
+                        : std::find_if(project.authoring.layers.begin(), project.authoring.layers.end(),
+                                       [&](const auto& candidate) { return candidate.id == group->layerId; });
+                    if (group == project.authoring.groups.end()
+                        || layer == project.authoring.layers.end()
+                        || !group->workspaceVisible || !layer->workspaceVisible)
+                        continue;
+                }
+                childIds.push_back(zone.id);
+            }
+        }
+        if (childIds.empty())
+            return;
+        structureSelection.replace(structureSelection.getKind() == authoring::StructureSelectionKind::layer
+                                       ? authoring::StructureSelectionKind::group
+                                       : authoring::StructureSelectionKind::zone,
+                                   childIds,
+                                   childIds.front());
+        if (structureSelection.getKind() == authoring::StructureSelectionKind::zone)
+        {
+            zoneMapSelectedZoneIds = structureSelection.getIds();
+            authoringSession.selectZone(structureSelection.getPrimaryId());
+        }
+        else
+            authoringSession.selectGroup(structureSelection.getPrimaryId());
+        refreshFromSession();
+        refreshStructureViewer();
+    });
     groupList.setOnSelectionChanged([this](int nextIndex)
     {
         const ScopedMessageThreadSpan timing(MessageThreadSpanKind::zoneSelection);
@@ -1767,6 +1998,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         const auto result = authoringSession.selectGroup(groups[static_cast<std::size_t>(nextIndex)].id);
         if (!result.applied)
             return;
+
+        structureSelection.replace(authoring::StructureSelectionKind::group,
+                                   { groups[static_cast<std::size_t>(nextIndex)].id },
+                                   groups[static_cast<std::size_t>(nextIndex)].id);
 
         setActiveWorkbenchTab(authoring::WorkbenchTab::groups);
         requestWaveformPreviewLoad(workbenchState.activeTab == authoring::WorkbenchTab::waveform);
@@ -1827,7 +2062,12 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
         selectedLayerIndex = nextIndex;
         if (authoringSession.selectLayer(layers[static_cast<std::size_t>(nextIndex)].id).applied)
+        {
+            structureSelection.replace(authoring::StructureSelectionKind::layer,
+                                       { layers[static_cast<std::size_t>(nextIndex)].id },
+                                       layers[static_cast<std::size_t>(nextIndex)].id);
             refreshSelectionFromSession();
+        }
     });
 
     groupNameEditor.setMultiLine(false);
@@ -1924,6 +2164,9 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
             return;
 
         authoringSession.selectZone(zones[static_cast<std::size_t>(zoneIndex)].id);
+        structureSelection.replace(authoring::StructureSelectionKind::zone,
+                                   { zones[static_cast<std::size_t>(zoneIndex)].id },
+                                   zones[static_cast<std::size_t>(zoneIndex)].id);
         requestWaveformPreviewLoad(workbenchState.activeTab == authoring::WorkbenchTab::waveform);
         refreshSelectionFromSession();
     };
@@ -2339,7 +2582,16 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&zoneSelector),
              static_cast<juce::Component*>(&previewEnabledToggle),
              static_cast<juce::Component*>(&previewStopButton),
+             static_cast<juce::Component*>(&mappingMapViewButton),
+             static_cast<juce::Component*>(&mappingStructureViewButton),
              static_cast<juce::Component*>(&zoneMap),
+             static_cast<juce::Component*>(&structureViewer),
+             static_cast<juce::Component*>(&structureInspector),
+             static_cast<juce::Component*>(&structureSearchLabel),
+             static_cast<juce::Component*>(&structureSearchEditor),
+             static_cast<juce::Component*>(&structureSortSelector),
+             static_cast<juce::Component*>(&structureDiagnosticFilterSelector),
+             static_cast<juce::Component*>(&structureContextFilterSelector),
              static_cast<juce::Component*>(&layerSectionLabel),
              static_cast<juce::Component*>(&layerList),
              static_cast<juce::Component*>(&layerCreateButton),
@@ -2735,6 +2987,74 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Displays project zones across key and velocity ranges.",
                                 "Use the mouse wheel or Control-scroll to zoom around the pointer. Use a smooth trackpad gesture to pan, Shift-scroll to pan horizontally, or middle-drag to pan. Hold Space while dragging for the temporary hand. Use Fit All or Fit Selected in the map toolbar, arrow keys to move the primary selection, Control to toggle extra zones, or drag a box to multi-select.");
     zoneMap.setExplicitFocusOrder(30);
+    configureAccessibleMetadata(mappingMapViewButton,
+                                "Map mapping view",
+                                "Shows the existing key and velocity Zone Map.",
+                                "Press to switch the main mapping surface to Map.");
+    configureAccessibleMetadata(mappingStructureViewButton,
+                                "Structure mapping view",
+                                "Shows the hierarchical layer, group, and zone browser.",
+                                "Press to switch the main mapping surface to Structure.");
+    configureAccessibleMetadata(structureViewer,
+                                "Structure viewer",
+                                "Shows layers, groups, and zones in aligned hierarchy columns.",
+                                "Use the arrow keys to move through rows and Control or Command to add to a same-type selection.");
+    configureAccessibleMetadata(structureInspector,
+                                "Structure inspector",
+                                "Shows context-sensitive values for the active layer, group, or zone selection.",
+                                "Review the selected object's shared attributes. Mixed values indicate that the multi-selection contains different values.");
+    if (auto* parentEditor = structureInspector.findChildWithID("authoringStructureInspectorParentEditor"))
+        configureAccessibleMetadata(*parentEditor,
+                                    "Structure parent ID",
+                                    "Changes the parent layer for groups or parent group for zones.",
+                                    "Enter a valid stable parent ID and apply the edit atomically to the selection.");
+    for (const auto& action : {
+             std::pair<const char*, const char*> { "authoringStructureInspectorPrimaryAction", "Primary structure action" },
+             std::pair<const char*, const char*> { "authoringStructureInspectorSecondaryAction", "Secondary structure action" },
+             std::pair<const char*, const char*> { "authoringStructureInspectorTertiaryAction", "Tertiary structure action" }
+         })
+    {
+        if (auto* actionComponent = structureInspector.findChildWithID(action.first))
+            configureAccessibleMetadata(*actionComponent,
+                                        action.second,
+                                        "Runs the context-sensitive structure inspector command.",
+                                        "The command text identifies whether it selects children, reveals, opens waveform, or auditions.");
+    }
+    configureAccessibleMetadata(structureInspector.findChildWithID("authoringStructureInspectorApplyButton") != nullptr
+                                    ? *structureInspector.findChildWithID("authoringStructureInspectorApplyButton")
+                                    : structureInspector,
+                                "Apply structure edit",
+                                "Applies the entered shared inspector values to every selected entity.",
+                                "Press to commit one atomic structure-selection edit.");
+    if (auto* breadcrumb = structureViewer.findChildWithID("authoringStructureBreadcrumb"))
+        configureAccessibleMetadata(*breadcrumb,
+                                    "Structure path",
+                                    "Shows the current Instrument, Layer, Group, and Zone hierarchy path.",
+                                    "Use the path to keep parent context visible in compact layouts.");
+    mappingMapViewButton.setExplicitFocusOrder(34);
+    mappingStructureViewButton.setExplicitFocusOrder(35);
+    structureViewer.setExplicitFocusOrder(36);
+    structureInspector.setExplicitFocusOrder(37);
+    configureAccessibleMetadata(structureSearchEditor,
+                                "Structure search",
+                                "Filters layer, group, and zone rows by name.",
+                                "Type text to narrow the hierarchy to matching rows.");
+    configureAccessibleMetadata(structureSortSelector,
+                                "Structure sort",
+                                "Chooses the ordering for structure rows.",
+                                "Open the list and choose authored order, name, key, root, velocity, or diagnostics.");
+    structureSearchEditor.setExplicitFocusOrder(38);
+    structureSortSelector.setExplicitFocusOrder(39);
+    configureAccessibleMetadata(structureDiagnosticFilterSelector,
+                                "Structure diagnostic filter",
+                                "Filters overlap and visibility diagnostics without changing authored data.",
+                                "Choose all diagnostics, overlaps, potential collisions, exact stacks, or visible objects.");
+    configureAccessibleMetadata(structureContextFilterSelector,
+                                "Structure context filter",
+                                "Filters zones by current articulation or performance event.",
+                                "Choose an articulation or event context to narrow the zone rows.");
+    structureDiagnosticFilterSelector.setExplicitFocusOrder(40);
+    structureContextFilterSelector.setExplicitFocusOrder(41);
 
     configureAccessibleMetadata(workbenchRegion,
                                 "Authoring workbench",
@@ -3246,6 +3566,31 @@ void AuthoringPanel::resized()
     previewEnabledToggle.setBounds(previewControls);
     toolbarRow.removeFromRight(std::min(8, toolbarRow.getWidth()));
     zoneSelector.setBounds(toolbarRow.removeFromLeft(std::min(360, toolbarRow.getWidth())));
+    toolbarRow.removeFromLeft(std::min(8, toolbarRow.getWidth()));
+    const auto mappingButtonWidth = toolbarRow.getWidth() < 150 ? 52 : 68;
+    mappingMapViewButton.setBounds(toolbarRow.removeFromLeft(mappingButtonWidth));
+    toolbarRow.removeFromLeft(4);
+    mappingStructureViewButton.setBounds(toolbarRow.removeFromLeft(
+        toolbarRow.getWidth() < 90 ? 0 : (isExpandedLayout(layoutMode) ? 88 : 78)));
+    const auto showStructureControls = structureViewState.getMode() == authoring::StructureViewMode::structure;
+    structureSearchLabel.setVisible(showStructureControls);
+    structureSearchEditor.setVisible(showStructureControls);
+    structureSortSelector.setVisible(showStructureControls);
+    structureDiagnosticFilterSelector.setVisible(showStructureControls);
+    structureContextFilterSelector.setVisible(showStructureControls);
+    if (showStructureControls)
+    {
+        toolbarRow.removeFromLeft(8);
+        structureSearchLabel.setBounds(toolbarRow.removeFromLeft(34));
+        toolbarRow.removeFromLeft(4);
+        structureSearchEditor.setBounds(toolbarRow.removeFromLeft(std::min(190, toolbarRow.getWidth())));
+        toolbarRow.removeFromLeft(6);
+        structureSortSelector.setBounds(toolbarRow.removeFromLeft(std::min(132, toolbarRow.getWidth())));
+        toolbarRow.removeFromLeft(6);
+        structureDiagnosticFilterSelector.setBounds(toolbarRow.removeFromLeft(std::min(132, toolbarRow.getWidth())));
+        toolbarRow.removeFromLeft(6);
+        structureContextFilterSelector.setBounds(toolbarRow.removeFromLeft(std::min(132, toolbarRow.getWidth())));
+    }
 
     const auto showPlaybackBannerInLayout = playbackBanner.isVisible() && !shortHeightLayout;
     if (showPlaybackBannerInLayout)
@@ -3733,6 +4078,7 @@ void AuthoringPanel::resized()
 
     auto layoutGroupManager = [&](juce::Rectangle<int> groupManagerArea)
     {
+        const auto groupManagerOrigin = groupManagerArea;
         layerSectionLabel.setBounds(groupManagerArea.removeFromTop(20));
         groupManagerArea.removeFromTop(2);
         auto layerRow = groupManagerArea.removeFromTop(34);
@@ -3816,6 +4162,40 @@ void AuthoringPanel::resized()
         groupMoveUpButton.setBounds(managerButtonColumn.removeFromTop(20));
         managerButtonColumn.removeFromTop(8);
         groupMoveDownButton.setBounds(managerButtonColumn.removeFromTop(20));
+
+        // In a narrow, short host the layer editor can consume the entire
+        // vertical budget before the group action row is reached. Keep the
+        // primary group actions reachable rather than allowing zero-sized
+        // controls to disappear from the authoring surface.
+        if (groupCreateButton.getBounds().isEmpty() && !groupManagerOrigin.isEmpty())
+        {
+            auto rescueArea = groupManagerOrigin;
+            auto rescueRow = rescueArea.removeFromTop(std::min(28, rescueArea.getHeight()));
+            auto rescueButtons = rescueRow;
+            const auto rescueWidth = std::max(1, (rescueButtons.getWidth() - 8) / 2);
+            groupCreateButton.setBounds(rescueButtons.removeFromLeft(rescueWidth));
+            rescueButtons.removeFromLeft(std::min(8, rescueButtons.getWidth()));
+            groupPreviewAnchorButton.setBounds(rescueButtons);
+        }
+        if (groupList.getBounds().isEmpty() && !groupManagerOrigin.isEmpty())
+        {
+            auto rescueArea = groupManagerOrigin;
+            rescueArea.removeFromTop(std::min(32, rescueArea.getHeight()));
+            auto rescueList = rescueArea.removeFromTop(std::min(64, rescueArea.getHeight()));
+            groupList.setBounds(rescueList);
+            auto rescueControls = rescueArea;
+            groupVisibilityButton.setBounds(rescueControls.removeFromTop(std::min(20, rescueControls.getHeight())));
+            rescueControls.removeFromTop(std::min(8, rescueControls.getHeight()));
+            groupMoveUpButton.setBounds(rescueControls.removeFromTop(std::min(20, rescueControls.getHeight())));
+            rescueControls.removeFromTop(std::min(8, rescueControls.getHeight()));
+            groupMoveDownButton.setBounds(rescueControls.removeFromTop(std::min(20, rescueControls.getHeight())));
+        }
+        if (groupAssignZonesButton.getBounds().isEmpty() && !groupManagerOrigin.isEmpty())
+        {
+            auto rescueArea = groupManagerOrigin;
+            rescueArea.removeFromTop(std::min(28, rescueArea.getHeight()));
+            groupAssignZonesButton.setBounds(rescueArea.removeFromTop(std::min(28, rescueArea.getHeight())));
+        }
     };
 
     const auto desiredGroupManagerHeight = expanded ? 252 : 264;
@@ -3835,7 +4215,19 @@ void AuthoringPanel::resized()
     }
 
     zoneMap.setBounds(shellArea);
-    zoneMappingEditor.setBounds(inspector);
+    structureViewer.setBounds(shellArea);
+    const auto showingStructure = structureViewState.getMode() == authoring::StructureViewMode::structure;
+    if (showingStructure && structureSelection.getKind() == authoring::StructureSelectionKind::zone)
+    {
+        auto structureSummaryArea = inspector.removeFromTop(std::min(300, std::max(220, inspector.getHeight() / 2)));
+        structureInspector.setBounds(structureSummaryArea);
+        zoneMappingEditor.setBounds(inspector);
+    }
+    else
+    {
+        structureInspector.setBounds(inspector);
+        zoneMappingEditor.setBounds(showingStructure ? juce::Rectangle<int> {} : inspector);
+    }
 }
 
 void AuthoringPanel::reloadFromSession()
@@ -5589,8 +5981,16 @@ void AuthoringPanel::refreshContextualAccessibility()
 
 void AuthoringPanel::refreshInspectorVisibility()
 {
-    zoneMap.setVisible(true);
-    zoneMappingEditor.setVisible(true);
+    const auto showingStructure = structureViewState.getMode() == authoring::StructureViewMode::structure;
+    zoneMap.setVisible(!showingStructure);
+    structureViewer.setVisible(showingStructure);
+    const auto showingZoneInspector = showingStructure
+        && structureSelection.getKind() == authoring::StructureSelectionKind::zone;
+    zoneMappingEditor.setVisible(!showingStructure || showingZoneInspector);
+    structureInspector.setVisible(showingStructure);
+
+    mappingMapViewButton.setToggleState(!showingStructure, juce::dontSendNotification);
+    mappingStructureViewButton.setToggleState(showingStructure, juce::dontSendNotification);
 
     refreshWorkbenchVisibility();
 }
@@ -6309,6 +6709,167 @@ void AuthoringPanel::updateSourceValidationAction()
     }
 }
 
+void AuthoringPanel::setMappingView(const authoring::StructureViewMode mode)
+{
+    if (structureViewState.getMode() == mode)
+        return;
+
+    structureViewState.setMode(mode);
+    refreshInspectorVisibility();
+    resized();
+    if (mode == authoring::StructureViewMode::structure)
+    {
+        refreshStructureViewer();
+        if (structureSelection.getKind() == authoring::StructureSelectionKind::zone)
+            structureViewer.revealZone(structureSelection.getPrimaryId());
+    }
+}
+
+void AuthoringPanel::showStructureForSelection(std::vector<std::string> zoneIds,
+                                               std::string primaryZoneId)
+{
+    if (zoneIds.empty())
+        return;
+
+    structureSelection.replace(authoring::StructureSelectionKind::zone,
+                               std::move(zoneIds),
+                               std::move(primaryZoneId));
+    if (structureSelection.getPrimaryId().empty())
+        return;
+
+    authoringSession.selectZone(structureSelection.getPrimaryId());
+    setMappingView(authoring::StructureViewMode::structure);
+    refreshSelectionFromSession();
+    refreshStructureViewer();
+    structureViewer.revealZone(structureSelection.getPrimaryId());
+}
+
+void AuthoringPanel::applyStructureSelection(const authoring::StructureSelectionKind kind,
+                                             std::vector<std::string> ids,
+                                             std::string primaryId)
+{
+    if (isRefreshing || ids.empty() || kind == authoring::StructureSelectionKind::none)
+        return;
+
+    structureSelection.replace(kind, std::move(ids), std::move(primaryId));
+    const auto& idsForSession = structureSelection.getIds();
+    if (idsForSession.empty())
+        return;
+
+    const auto& primary = structureSelection.getPrimaryId();
+    drs::engine::RuntimeProjectDocumentActionResult result;
+    switch (kind)
+    {
+        case authoring::StructureSelectionKind::layer:
+            result = authoringSession.selectLayer(primary);
+            break;
+        case authoring::StructureSelectionKind::group:
+            result = authoringSession.selectGroup(primary);
+            break;
+        case authoring::StructureSelectionKind::zone:
+            zoneMapSelectedZoneIds = idsForSession;
+            result = authoringSession.selectZone(primary);
+            break;
+        case authoring::StructureSelectionKind::none:
+            return;
+    }
+
+    if (result.applied)
+        refreshFromSession();
+}
+
+void AuthoringPanel::refreshStructureViewer()
+{
+    const auto& project = authoringSession.getProject();
+    structureOverlapCache.refreshIfNeeded(project);
+    const auto selectedZone = authoringSession.getSelectedZone();
+    const auto selectedGroup = authoringSession.getSelectedGroup();
+    const auto selectedLayer = authoringSession.getSelectedLayer();
+
+    std::vector<std::string> validSelectionIds;
+    if (structureSelection.getKind() == authoring::StructureSelectionKind::layer)
+        for (const auto& layer : project.authoring.layers) validSelectionIds.push_back(layer.id);
+    else if (structureSelection.getKind() == authoring::StructureSelectionKind::group)
+        for (const auto& group : project.authoring.groups) validSelectionIds.push_back(group.id);
+    else if (structureSelection.getKind() == authoring::StructureSelectionKind::zone)
+        for (const auto& zone : project.authoring.zones) validSelectionIds.push_back(zone.id);
+    if (structureSelection.getKind() != authoring::StructureSelectionKind::none)
+        structureSelection.reconcile(validSelectionIds);
+
+    if (structureSelection.isEmpty())
+    {
+        if (!zoneMapSelectedZoneIds.empty() && selectedZone.has_value())
+        {
+            structureSelection.replace(authoring::StructureSelectionKind::zone,
+                                       zoneMapSelectedZoneIds,
+                                       selectedZone->id);
+        }
+        else if (selectedGroup.has_value())
+        {
+            structureSelection.replace(authoring::StructureSelectionKind::group,
+                                       { selectedGroup->id },
+                                       selectedGroup->id);
+        }
+        else if (selectedLayer.has_value())
+        {
+            structureSelection.replace(authoring::StructureSelectionKind::layer,
+                                       { selectedLayer->id },
+                                       selectedLayer->id);
+        }
+    }
+
+    std::string primaryLayerId;
+    std::string primaryGroupId;
+    if (structureSelection.getKind() == authoring::StructureSelectionKind::layer)
+    {
+        primaryLayerId = structureSelection.getPrimaryId();
+    }
+    else if (structureSelection.getKind() == authoring::StructureSelectionKind::group)
+    {
+        primaryGroupId = structureSelection.getPrimaryId();
+        const auto group = std::find_if(project.authoring.groups.begin(), project.authoring.groups.end(),
+                                        [&](const auto& candidate) { return candidate.id == primaryGroupId; });
+        if (group != project.authoring.groups.end())
+            primaryLayerId = group->layerId;
+    }
+    else if (structureSelection.getKind() == authoring::StructureSelectionKind::zone)
+    {
+        primaryGroupId = selectedZone.has_value() ? selectedZone->groupId : std::string {};
+        const auto group = std::find_if(project.authoring.groups.begin(), project.authoring.groups.end(),
+                                        [&](const auto& candidate) { return candidate.id == primaryGroupId; });
+        if (group != project.authoring.groups.end())
+            primaryLayerId = group->layerId;
+    }
+
+    authoring::StructureViewProjectionOptions projectionOptions;
+    projectionOptions.searchText = structureViewState.getSearchText();
+    projectionOptions.sortMode = structureViewState.getSortMode();
+    projectionOptions.showOverlapsOnly = structureViewState.getShowOverlapsOnly();
+    projectionOptions.showPotentialCollisionsOnly = structureViewState.getShowPotentialCollisionsOnly();
+    projectionOptions.showExactStacksOnly = structureViewState.getShowExactStacksOnly();
+    projectionOptions.visibleOnly = structureViewState.getVisibleOnly();
+    projectionOptions.includeDiagnostics = true;
+    projectionOptions.articulationFilter = structureViewState.getArticulationFilter();
+    projectionOptions.performanceEventFilter = structureViewState.getPerformanceEventFilter();
+    structureViewer.setViewModel(authoring::buildStructureHierarchyViewModel(
+        project, structureSelection, primaryLayerId, primaryGroupId, projectionOptions, &structureOverlapCache));
+    structureViewer.setColumnWidths(structureViewState.getLayerColumnWidth(),
+                                    structureViewState.getGroupColumnWidth(),
+                                    structureViewState.getZoneColumnWidth());
+    structureViewer.setSelection(structureSelection);
+    refreshStructureInspector();
+    mappingMapViewButton.setToggleState(structureViewState.getMode() == authoring::StructureViewMode::map,
+                                        juce::dontSendNotification);
+    mappingStructureViewButton.setToggleState(structureViewState.getMode() == authoring::StructureViewMode::structure,
+                                               juce::dontSendNotification);
+}
+
+void AuthoringPanel::refreshStructureInspector()
+{
+    structureInspector.setSnapshot(authoring::buildStructureInspectorSnapshot(
+        authoringSession.getProject(), structureSelection));
+}
+
 void AuthoringPanel::refreshFromSession()
 {
     const ScopedMessageThreadSpan timing(MessageThreadSpanKind::authoringRefresh);
@@ -6326,6 +6887,7 @@ void AuthoringPanel::refreshFromSession()
     rebuildTriggerSlotSelector();
     rebuildArticulationList();
     syncZoneMapSelectionState();
+    refreshStructureViewer();
     zoneMap.setZoneSummaries(buildVisibleZoneSummaries());
     zoneMap.setSelectionState({ zoneMapSelectedZoneIds,
                                 authoringSession.getSelectedZone().has_value()
@@ -7077,6 +7639,8 @@ void AuthoringPanel::refreshSelectionFromSession()
     const juce::ScopedValueSetter<bool> refreshGuard(isRefreshing, true);
     const auto& project = authoringSession.getProject();
     const auto selectedZone = authoringSession.getSelectedZone();
+    const auto previousSelectedGroupIndex = selectedGroupIndex;
+    const auto previousSelectedLayerIndex = selectedLayerIndex;
     auto selectedZoneIndex = -1;
     if (selectedZone.has_value())
     {
@@ -7089,7 +7653,8 @@ void AuthoringPanel::refreshSelectionFromSession()
             }
         }
     }
-    zoneSelector.setSelectedId(selectedZoneIndex + 1, juce::dontSendNotification);
+    if (zoneSelector.getSelectedId() != selectedZoneIndex + 1)
+        zoneSelector.setSelectedId(selectedZoneIndex + 1, juce::dontSendNotification);
 
     const auto selectedGroup = authoringSession.getSelectedGroup();
     selectedGroupIndex = -1;
@@ -7104,7 +7669,8 @@ void AuthoringPanel::refreshSelectionFromSession()
             }
         }
     }
-    if (selectedGroupIndex >= 0)
+    const auto groupSelectionChanged = previousSelectedGroupIndex != selectedGroupIndex;
+    if (groupSelectionChanged && selectedGroupIndex >= 0)
         groupList.setSelectedIndex(selectedGroupIndex);
 
     const auto selectedLayer = authoringSession.getSelectedLayer();
@@ -7120,9 +7686,10 @@ void AuthoringPanel::refreshSelectionFromSession()
             }
         }
     }
-    if (selectedLayerIndex >= 0)
+    const auto layerSelectionChanged = previousSelectedLayerIndex != selectedLayerIndex;
+    if (layerSelectionChanged && selectedLayerIndex >= 0)
         layerList.setSelectedIndex(selectedLayerIndex);
-    if (selectedLayer.has_value())
+    if (selectedLayer.has_value() && layerSelectionChanged)
     {
         layerNameEditor.setText(juce::String::fromUTF8(selectedLayer->displayName.c_str()),
                                 juce::dontSendNotification);
@@ -7181,6 +7748,14 @@ void AuthoringPanel::refreshSelectionFromSession()
     }
 
     syncZoneMapSelectionState();
+    if (const auto selectedZone = authoringSession.getSelectedZone(); selectedZone.has_value()
+        && (structureViewState.getMode() == authoring::StructureViewMode::map
+            || structureSelection.getKind() == authoring::StructureSelectionKind::zone))
+    {
+        structureSelection.replace(authoring::StructureSelectionKind::zone,
+                                   zoneMapSelectedZoneIds,
+                                   selectedZone->id);
+    }
     zoneMap.setSelectionState({ zoneMapSelectedZoneIds,
                                 selectedZone.has_value() ? selectedZone->id : std::string {} });
 
@@ -7189,7 +7764,7 @@ void AuthoringPanel::refreshSelectionFromSession()
     summaryStrip.setViewModel(selectionSummaryViewModel);
     zoneMappingEditor.setViewModel(zoneFieldValuesViewModel);
 
-    if (selectedGroup.has_value())
+    if (selectedGroup.has_value() && groupSelectionChanged)
     {
         groupNameEditor.setText(juce::String::fromUTF8(selectedGroup->displayName.c_str()),
                                 juce::dontSendNotification);
@@ -7872,6 +8447,10 @@ bool AuthoringPanel::applyZoneMapSelectionState(const authoring::ZoneMapCanvas::
         if (!result.applied)
             return selectionChanged;
     }
+
+    structureSelection.replace(authoring::StructureSelectionKind::zone,
+                               normalizedSelectionIds,
+                               primaryZoneId);
 
     return selectionChanged || primaryChanged;
 }

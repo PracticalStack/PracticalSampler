@@ -7,6 +7,9 @@
 #include "shared/authoring/RoutingWorkbenchView.h"
 #include "shared/authoring/ZoneMappingEditor.h"
 #include "shared/authoring/ZoneMapCanvas.h"
+#include "shared/authoring/StructureViewer.h"
+#include "shared/authoring/StructureViewState.h"
+#include "shared/authoring/StructureInspector.h"
 #include "shared/authoring/WaveformDetailView.h"
 #include "shared/authoring/WorkbenchLayoutState.h"
 #include "shared/authoring/WorkbenchSplitter.h"
@@ -152,6 +155,14 @@ private:
                                                         double sampleRate) const;
     void refreshDraftPlaybackBanner();
     void refreshFromSession();
+    void refreshStructureViewer();
+    void refreshStructureInspector();
+    void setMappingView(authoring::StructureViewMode mode);
+    void showStructureForSelection(std::vector<std::string> zoneIds,
+                                   std::string primaryZoneId);
+    void applyStructureSelection(authoring::StructureSelectionKind kind,
+                                 std::vector<std::string> ids,
+                                 std::string primaryId);
     void refreshSelectionFromSession();
     void applySelectedZoneEdit(const authoring::ZoneFieldValuesViewModel& values, const juce::String& label);
     void applyProjectMasterGainEdit(const juce::String& label);
@@ -343,6 +354,18 @@ private:
     juce::ToggleButton previewEnabledToggle;
     juce::TextButton previewStopButton;
     authoring::ZoneMapCanvas zoneMap;
+    authoring::StructureViewer structureViewer;
+    authoring::StructureInspector structureInspector;
+    juce::Label structureSearchLabel;
+    juce::TextEditor structureSearchEditor;
+    juce::ComboBox structureSortSelector;
+    juce::ComboBox structureDiagnosticFilterSelector;
+    juce::ComboBox structureContextFilterSelector;
+    authoring::StructureViewState structureViewState;
+    authoring::StructureOverlapCache structureOverlapCache;
+    authoring::AuthoringStructureSelection structureSelection;
+    juce::TextButton mappingMapViewButton;
+    juce::TextButton mappingStructureViewButton;
     authoring::ZoneMappingEditor zoneMappingEditor;
     authoring::WaveformDetailView waveformPreview;
     juce::Label groupSectionLabel;

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - Structure Viewer Iteration Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+    a { color: var(--blue); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.025em; }
+    h1 { max-width: 1100px; margin-bottom: 18px; font-size: clamp(2.35rem, 5vw, 4.65rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code { padding: 0.12em 0.35em; border-radius: 5px; color: #26343c; background: #e9edeb; font: 0.9em "Cascadia Code", Consolas, monospace; }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero { position: relative; overflow: hidden; padding: 48px; border-radius: 27px; color: #fffaf3; background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2)); box-shadow: var(--shadow); }
+    .hero::after { content: "STRUCTURE"; position: absolute; right: 14px; bottom: -32px; color: rgba(255,255,255,0.045); font: 700 7rem/1 Georgia, serif; pointer-events: none; }
+    .eyebrow, .section-label { display: inline-block; margin-bottom: 10px; color: #efc39f; font-size: 0.75rem; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 1040px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+    .hero a { color: #cceaf2; }
+    .summary-grid, .grid-2, .grid-3 { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .toc, .section, .sprint, .callout { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .sprint { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.problem { border-top: 4px solid var(--red); }
+    .card.violet { border-top: 4px solid var(--violet); }
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 920px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242,238,230,0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; text-transform: uppercase; }
+    .status.must { color: var(--red); background: var(--red-soft); }
+    .status.should { color: var(--amber); background: var(--amber-soft); }
+    .status.later { color: var(--violet); background: var(--violet-soft); }
+    .sprint { overflow: hidden; padding: 0; }
+    .sprint-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .sprint-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .sprint-head h2 { margin: 0; font-size: 1.65rem; }
+    .sprint-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .sprint-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .sprint-body { padding: 23px 25px 26px; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-list li.complete::before { content: "[x]"; }
+    .task-list li.complete { color: var(--muted); }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .exit { margin-top: 18px; padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+    .contract { margin: 16px 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: #26343c; color: #f3f6f2; font: 0.95rem/1.7 "Cascadia Code", Consolas, monospace; overflow-x: auto; }
+    .contract .changed { color: #f5d69c; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 145px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+    @media (max-width: 1160px) { .summary-grid, .grid-3 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .flow { grid-template-columns: repeat(3, 1fr); } .flow-step:nth-child(3)::after { display: none; } .toc ol { columns: 2; } }
+    @media (max-width: 700px) { .page { width: calc(100% - 22px); padding-top: 18px; } .hero, .section { padding: 25px 22px; } .summary-grid, .grid-3, .flow { grid-template-columns: 1fr; } .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; } .toc ol { columns: 1; } .sprint-head { grid-template-columns: auto 1fr; } .sprint-focus { grid-column: 2; text-align: left; } .sprint-body { padding: 20px; } .hero::after { display: none; } }
+    @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .toc, .section, .sprint { box-shadow: none; } .sprint, .card, .callout, table { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Next Iteration | August 20, 2026</span>
+      <h1>Build the Structure Viewer</h1>
+      <p class="lede">Add a hierarchy-first authoring surface for Instrument → Layer → Group → Zone. The Structure Viewer will sit beside the existing Map, expose overlapping zones as independent aligned rows, provide typed context inspectors and atomic same-type batch edits, and preserve one shared authoring selection across both views.</p>
+      <div class="meta">
+        <span class="chip">Scope: PracticalSampler only</span>
+        <span class="chip">Map and Structure are peer views</span>
+        <span class="chip">Typed stable-ID selection</span>
+        <span class="chip">Virtualized hierarchy columns</span>
+        <span class="chip">Atomic mixed-value editing</span>
+        <span class="chip"><a href="structure-viewer-high-level-design.html">High-level design</a></span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>8 / 10</strong><span>Estimated complexity</span></div>
+        <div class="summary-card"><strong>7 / 10</strong><span>Estimated implementation risk</span></div>
+        <div class="summary-card"><strong>6</strong><span>Sprints including contract and hardening</span></div>
+        <div class="summary-card"><strong>1</strong><span>Shared authoritative typed selection</span></div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#goal">Goal and Scope</a></li>
+        <li><a href="#baseline">Current Baseline</a></li>
+        <li><a href="#contract">Locked Product Contract</a></li>
+        <li><a href="#architecture">Implementation Architecture</a></li>
+        <li><a href="#tasks">Sprint Tasklist</a></li>
+        <li><a href="#execution-status">Execution Status</a></li>
+        <li><a href="#validation">Validation Matrix</a></li>
+        <li><a href="#risks">Risks and Guardrails</a></li>
+        <li><a href="#release">Release Gate</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="goal">
+      <span class="section-label">01 | Product frame</span>
+      <div class="heading"><h2>Goal and scope</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Creator outcome</h3>
+          <p>A creator can move through layers, groups, and zones without losing the hierarchy path; compare zones that occupy the same ranges; select one or many peers; and edit all compatible attributes from one stable inspector.</p>
+        </article>
+        <article class="card good">
+          <h3>Engineering outcome</h3>
+          <p>Map and Structure consume one typed stable-ID selection, one hierarchy projection, and existing document transactions. Presentation state remains outside authored project data, and no UI component invents a second parent-membership model.</p>
+        </article>
+        <article class="card warn">
+          <h3>Explicit non-goals</h3>
+          <p>This iteration does not change project schema, runtime routing or audio behavior, replace the Zone Map, add live MIDI rejection diagnostics, or make overlap classifications authoritative validation errors.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Design source</h3>
+        <p>The product behavior is defined by <a href="structure-viewer-high-level-design.html">Structure Viewer — High-Level Design</a>. This plan converts that design into implementation seams, sprint tasks, evidence, and release gates. If the documents conflict, resolve the design decision explicitly before implementing divergent behavior.</p>
+      </div>
+    </section>
+
+    <section class="section" id="baseline">
+      <span class="section-label">02 | Ground truth</span>
+      <div class="heading"><h2>Current baseline to extend</h2></div>
+      <p>Practical Sampler already has the complete authored hierarchy and most required transactions. Layers and groups are first-class objects; groups carry <code>layerId</code>; zones carry <code>groupId</code>. <code>AuthoringSession</code> exposes stable-ID selection and hierarchy mutations, while <code>AuthoringPanel</code> currently coordinates separate layer/group lists, <code>ZoneMapCanvas</code>, <code>ZoneMappingEditor</code>, selection summaries, and lower workbench tabs.</p>
+      <div class="flow">
+        <div class="flow-step"><strong>Runtime project</strong><span>Stores layers, child-side group membership, child-side zone membership, and object-local properties.</span></div>
+        <div class="flow-step"><strong>Authoring session</strong><span>Owns validated document transactions, selected layer/group/zone context, undo, and redo.</span></div>
+        <div class="flow-step"><strong>Authoring panel</strong><span>Coordinates Map selection, hierarchy lists, inspector values, preview, and workbench visibility.</span></div>
+        <div class="flow-step"><strong>Reusable controls</strong><span><code>RepeatedStructureList</code> and compact inspector primitives establish list and field conventions.</span></div>
+        <div class="flow-step"><strong>Map</strong><span>Already supports dense rendering, stable group tint, multi-zone selection, range editing, zoom, and minimap navigation.</span></div>
+      </div>
+      <div class="grid-2">
+        <article class="card problem">
+          <h3>Primary architecture gap</h3>
+          <p>Selection is distributed across selected session objects, list indices, and <code>zoneMapSelectedZoneIds</code>. A second viewer cannot safely synchronize by adding more component-local state; the iteration needs a typed selection coordinator with stable-ID reconciliation.</p>
+        </article>
+        <article class="card violet">
+          <h3>Primary presentation gap</h3>
+          <p>The Map deliberately overlays equal geometry. Structure needs a virtualized row projection with a shared pitch ruler so equal key ranges are comparable without changing Map rendering or authoring geometry.</p>
+        </article>
+      </div>
+      <p class="files">Existing seams: <a href="../engine_adapter/include/drs/engine/RuntimeModel.h">RuntimeModel.h</a>, <a href="../engine_adapter/include/drs/engine/AuthoringSession.h">AuthoringSession.h</a>, <a href="../engine_adapter/src/AuthoringSession.cpp">AuthoringSession.cpp</a>, <a href="../app/src/shared/AuthoringPanel.h">AuthoringPanel.h</a>, <a href="../app/src/shared/AuthoringPanel.cpp">AuthoringPanel.cpp</a>, <a href="../app/src/shared/authoring/ZoneMapCanvas.h">ZoneMapCanvas.h</a>, <a href="../app/src/shared/authoring/ZoneMappingEditor.h">ZoneMappingEditor.h</a>, <a href="../app/src/shared/authoring/RepeatedStructureList.h">RepeatedStructureList.h</a>, and <a href="../app/src/shared/authoring/WorkbenchLayoutState.h">WorkbenchLayoutState.h</a>.</p>
+    </section>
+
+    <section class="section" id="contract">
+      <span class="section-label">03 | Locked product contract</span>
+      <div class="heading"><h2>Behavior this iteration must preserve</h2></div>
+      <div class="contract"><span class="changed">Hierarchy:</span><br />instrument → layer → group → zone<br />group membership = group.layerId<br />zone membership = zone.groupId<br /><br /><span class="changed">Selection:</span><br />selection.kind = none | layer | group | zone<br />selection.ids = stable IDs of one kind only<br />selection.primaryId ∈ selection.ids<br /><br /><span class="changed">View state:</span><br />Map | Structure mode, filters, widths, and scroll positions = workspace state<br />visibility, order, membership, mix, routing, and mapping values = authored document state</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Capability</th><th>Required first-release behavior</th><th>Deferred behavior</th><th>Priority</th></tr></thead>
+          <tbody>
+            <tr><td class="id">Map | Structure</td><td>A persistent segmented control swaps the main mapping surface while preserving lower workbenches and the right inspector slot.</td><td>Additional mapping-view modes.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Three-column browser</td><td>Layer selection populates Groups; Group selection populates Zones; the complete path remains visible.</td><td>Arbitrary-depth or user-defined hierarchy.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Typed selection</td><td>One stable-ID selection kind is active. The primary object drives inspector type and child scope; selected peers drive edit scope.</td><td>Mixed entity-type selections.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Multiple parents</td><td>When several layers or groups are selected, the primary parent's children are displayed and the inspector edits the selected parents.</td><td>Combined child unions grouped by parent.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Zone rows</td><td>Each zone has an independent row aligned to a shared key ruler, with key range, root, velocity range, RR, event, and diagnostic metadata.</td><td>Direct miniature two-dimensional range editing in each row.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Inspector</td><td>Layer, Group, Zone, and plural same-type contexts show compatible fields. Mixed values are explicit; edits are atomic.</td><td>Cross-type property intersections.</td><td><span class="priority">P0</span></td></tr>
+            <tr><td class="id">Diagnostics</td><td>Search, overlaps, potential collisions, exact key stacks, authored sort, and selected articulation/event filters operate as non-authoritative projections.</td><td>Live MIDI trigger/rejection feedback.</td><td><span class="priority">P1</span></td></tr>
+            <tr><td class="id">Organization</td><td>Explicit parent selectors, create/duplicate/rename/reorder/delete commands, and Reveal in Map/Structure are transaction-backed.</td><td>Cross-column drag reassignment.</td><td><span class="priority">P1</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warning">
+        <h3>First-release multi-parent decision</h3>
+        <p>Do not build a combined child union in this iteration. Multi-selected parents remain editable, but Groups or Zones shows only the primary parent's children and states that scope in its column header. This avoids ambiguous navigation while leaving the typed selection model compatible with a future combined view.</p>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <span class="section-label">04 | Implementation architecture</span>
+      <div class="heading"><h2>Components, ownership, and transaction seams</h2></div>
+      <div class="grid-3">
+        <article class="card accent">
+          <h3>Pure projection layer</h3>
+          <p><code>StructureViewModels</code> builds lightweight layer, group, and zone rows from the current project and selection. Counts, coverage, diagnostic flags, and parent relationships are derived; no row owns model data.</p>
+        </article>
+        <article class="card good">
+          <h3>Selection coordinator</h3>
+          <p><code>AuthoringStructureSelection</code> owns entity kind, selected IDs, primary ID, and stable-ID reconciliation. <code>AuthoringPanel</code> adapts it to existing session selection and Map zone selection.</p>
+        </article>
+        <article class="card violet">
+          <h3>View components</h3>
+          <p><code>StructureViewer</code> coordinates two compact virtualized hierarchy lists and a custom virtualized <code>StructureZoneList</code> with shared key ruler, filtering, and keyboard column traversal.</p>
+        </article>
+        <article class="card accent">
+          <h3>Inspector host</h3>
+          <p><code>StructureInspectorHost</code> switches Layer, Group, and existing Zone inspector content without duplicating field logic. Layer/group editors move toward reusable components instead of expanding <code>AuthoringPanel</code>.</p>
+        </article>
+        <article class="card good">
+          <h3>Document mutations</h3>
+          <p>All property changes, reorder, membership moves, and object lifecycle actions call <code>AuthoringSession</code>. New multi-object methods validate the complete edit before one commit and one undo record.</p>
+        </article>
+        <article class="card warn">
+          <h3>Workspace state</h3>
+          <p><code>WorkbenchLayoutState</code> or a sibling structure-view state stores view mode, column widths, filters, sorts, and scroll anchors. These values never enter <code>RuntimeProjectModel</code>.</p>
+        </article>
+      </div>
+      <div class="table-wrap" style="margin-top: 18px;">
+        <table>
+          <thead><tr><th>Planned seam</th><th>Responsibility</th><th>Dependency rule</th></tr></thead>
+          <tbody>
+            <tr><td class="id">AuthoringStructureSelection</td><td>Typed selected IDs, primary ID, selection gestures, reconciliation after topology changes.</td><td>May know stable IDs and hierarchy kind; must not retain project object pointers.</td></tr>
+            <tr><td class="id">StructureViewModels</td><td>Pure project-to-row projection, derived counts/coverage, sort/filter keys, accessibility strings.</td><td>May depend on engine model types; no JUCE components and no mutation callbacks.</td></tr>
+            <tr><td class="id">StructureOverlapPolicy</td><td>Deterministic exact-stack, overlap, and potential-collision classification with explainable reasons.</td><td>Pure and testable; no rendering, audio-thread, or project mutation dependency.</td></tr>
+            <tr><td class="id">StructureViewer</td><td>Column layout, headers, selection gestures, narrow-width collapse, search/filter controls.</td><td>Consumes view models and callbacks; does not call engine transactions directly.</td></tr>
+            <tr><td class="id">StructureZoneList</td><td>Virtual rows, shared ruler, range/root/velocity rendering, hit testing, focus, and accessibility.</td><td>Rendering consumes cached row geometry and stable group tint.</td></tr>
+            <tr><td class="id">StructureInspectorHost</td><td>Context dispatch and plural inspector header; reuses compact inspector primitives and Zone mapping fields.</td><td>Emits typed edit intents; AuthoringPanel/session own commits.</td></tr>
+            <tr><td class="id">AuthoringPanel integration</td><td>Map/Structure switching, session refresh, preview/workbench routing, selection adaptation, workspace persistence.</td><td>Remains composition root; new detailed behavior belongs in focused components.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="files">Planned new files: <code>app/src/shared/authoring/AuthoringStructureSelection.{h,cpp}</code>, <code>StructureViewModels.{h,cpp}</code>, <code>StructureOverlapPolicy.{h,cpp}</code>, <code>StructureViewer.{h,cpp}</code>, <code>StructureZoneList.{h,cpp}</code>, and <code>StructureInspectorHost.{h,cpp}</code>. Add only the files justified by the sprint implementation; naming may be adjusted to established repository conventions.</p>
+    </section>
+
+    <section class="section" id="tasks">
+      <span class="section-label">05 | Execution plan</span>
+      <div class="heading"><h2>Sprint tasklist</h2></div>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">0</div><h2>Contract, fixtures, and characterization</h2><span class="sprint-focus">Lock ownership before components</span></div>
+        <p class="sprint-intent">Turn the high-level design into executable selection, hierarchy, state, and layout contracts before adding a second large Authoring surface.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">SV0.1</span> Record the typed selection invariants: one entity kind, unique stable IDs, primary ID included in the set, deterministic fallback after deletion or filtering, and no project-object pointers.</li>
+            <li class="complete"><span class="task-id">SV0.2</span> Characterize current <code>AuthoringSession</code> layer/group/zone selection, <code>zoneMapSelectedZoneIds</code>, list-index refresh behavior, undo/redo refresh, and preview context in focused tests.</li>
+            <li class="complete"><span class="task-id">SV0.3</span> Lock view-state ownership for Map/Structure mode, column widths, collapse state, filters, sort, and scroll anchors; prove no workspace field enters serialized project JSON.</li>
+            <li class="complete"><span class="task-id">SV0.4</span> Define component IDs, accessible roles/names, keyboard traversal, default focus, and narrow-width behavior for the switch and all three columns.</li>
+            <li class="complete"><span class="task-id">SV0.5</span> Add a deterministic Structure fixture with at least three layers, multiple groups per layer, empty containers, identical key ranges, partial overlaps, velocity stacks, RR siblings, distinct articulations/events, and 1,000-zone scale generation.</li>
+            <li class="complete"><span class="task-id">SV0.6</span> Add test targets <code>drs.structure_viewer.contract</code> and <code>drs.structure_viewer.qualification</code> to the CMake test inventory with stable fixture paths and folder organization.</li>
+            <li class="complete"><span class="task-id">SV0.7</span> Capture a baseline screenshot/geometry artifact and message-thread refresh timing for the current Map workspace at compact and expanded host sizes.</li>
+          </ul>
+          <div class="exit"><h3>Gate 0</h3><p>Selection ownership, view-state ownership, accessibility IDs, fixture topology, test targets, and baseline measurements are executable and reviewed. No new UI behavior depends on unresolved local-index selection.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">1</div><h2>Typed selection and hierarchy read models</h2><span class="sprint-focus">Create one source for both viewers</span></div>
+        <p class="sprint-intent">Build the non-visual foundation that makes Map and Structure agree about what is selected, what is primary, and which children belong in each column.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">SV1.1</span> Implement <code>AuthoringStructureSelection</code> with replace, toggle, range-extension input, set-primary, clear, and stable-ID reconciliation operations.</li>
+            <li class="complete"><span class="task-id">SV1.2</span> Adapt Map selection state to typed zone selection and adapt primary layer/group/zone changes back to the existing <code>AuthoringSession</code> context without feedback loops.</li>
+            <li class="complete"><span class="task-id">SV1.3</span> Define immutable layer, group, and zone row view models containing stable ID, parent ID, display order, primary/secondary selection, visibility, counts, range data, routing/RR/event metadata, and accessibility text.</li>
+            <li class="complete"><span class="task-id">SV1.4</span> Implement pure hierarchy projection using <code>group.layerId</code> and <code>zone.groupId</code>; derive counts and aggregate key coverage without stored reverse-membership lists.</li>
+            <li class="complete"><span class="task-id">SV1.5</span> Preserve authored order by default and provide stable temporary sort keys that never rewrite <code>displayOrder</code>.</li>
+            <li class="complete"><span class="task-id">SV1.6</span> Reconcile selection after create, delete, reassignment, filter changes, undo, redo, and project reload; retain the primary object whenever its stable ID remains valid.</li>
+            <li class="complete"><span class="task-id">SV1.7</span> Add unit coverage for mixed entity rejection, duplicate-ID removal, primary fallback, parent-child scoping, empty layers/groups, hidden objects, temporary sorts, and Map adaptation.</li>
+          </ul>
+          <div class="exit"><h3>Gate 1</h3><p>Given any valid project and selection gesture, tests produce one deterministic typed selection and three deterministic hierarchy projections. Map adaptation is bidirectional and cannot recursively churn refresh state.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">2</div><h2>Structure shell and column navigation</h2><span class="sprint-focus">Make the hierarchy usable end to end</span></div>
+        <p class="sprint-intent">Deliver the Map | Structure switch and a functional, accessible hierarchy browser before adding rich diagnostics or batch mutation.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">SV2.1</span> Add the <strong>Map | Structure</strong> segmented control to the mapping header and persist its mode through workspace layout state, not project serialization.</li>
+            <li class="complete"><span class="task-id">SV2.2</span> Implement <code>StructureViewer</code> with Layers, Groups, and Zones columns, explicit column headers/counts, empty states, loading/refresh behavior, and callbacks to the selection coordinator.</li>
+            <li class="complete"><span class="task-id">SV2.3</span> Reuse or extend <code>RepeatedStructureList</code> for virtualized layer/group rows while preserving selected rows by stable ID rather than list index.</li>
+            <li class="complete"><span class="task-id">SV2.4</span> Implement the first virtualized <code>StructureZoneList</code> with names and basic metadata; row components must be recycled and selection must survive row recycling.</li>
+            <li class="complete"><span class="task-id">SV2.5</span> Implement Up/Down, Home/End, Page navigation, Left/Right parent-child traversal, Shift range selection, Ctrl/Cmd toggle selection, and deterministic focus after view switching.</li>
+            <li class="complete"><span class="task-id">SV2.6</span> Add resizable columns, minimum useful widths, compact-host breadcrumb rails, and independent scroll anchors. Preserve the complete hierarchy path at every supported layout size.</li>
+            <li class="complete"><span class="task-id">SV2.7</span> Keep the lower Waveform/Groups/Macros/Routing/Performance/Articulations workbench strip available and preserve its active tab while switching Map and Structure.</li>
+            <li class="complete"><span class="task-id">SV2.8</span> Add <strong>Show in Structure</strong> and <strong>Reveal in Map</strong> commands with stable-ID reveal, scroll, selection, and focus behavior.</li>
+            <li class="complete"><span class="task-id">SV2.9</span> Add component-level tests for column population, empty states, primary-parent scope, keyboard traversal, narrow layout, view persistence, and lower-workbench preservation.</li>
+          </ul>
+          <div class="exit"><h3>Gate 2</h3><p>A keyboard or pointer user can switch views, select any layer/group/zone, traverse the hierarchy, reveal the same zone in Map, and return without losing selection or lower-workbench context.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">3</div><h2>Range presentation, search, and diagnostics</h2><span class="sprint-focus">Make equal geometry independently visible</span></div>
+        <p class="sprint-intent">Turn the Zones column into the comparison surface that the Map cannot be, while keeping diagnostic classification pure, conservative, and explainable.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">SV3.1</span> Add a shared 128-note ruler and normalized cached key-range geometry to <code>StructureZoneList</code>; show root markers and retain stable group tint as supplementary identity.</li>
+            <li class="complete"><span class="task-id">SV3.2</span> Add a separate velocity-range track or compact range field per row plus RR position, articulation, performance event, trigger mode, and crossfade badges.</li>
+            <li class="complete"><span class="task-id">SV3.3</span> Implement <code>StructureOverlapPolicy</code> for exact key-range stacks, key overlap, key+velocity overlap, velocity-stack candidates, RR siblings, and conservative potential collisions.</li>
+            <li class="complete"><span class="task-id">SV3.4</span> Produce a structured reason for every diagnostic classification, including which mapping, articulation, event, RR, controller, or crossfade fields distinguish the zones.</li>
+            <li class="complete"><span class="task-id">SV3.5</span> Add search and filters for overlaps, potential collisions, exact key stacks, current articulation, performance event, and visible objects. Filtering must not mutate selection or authored visibility.</li>
+            <li class="complete"><span class="task-id">SV3.6</span> Add temporary sorts for authored order, name, key low, root, velocity low, and diagnostic state with an explicit indicator when authored order is not displayed.</li>
+            <li class="complete"><span class="task-id">SV3.7</span> Add tooltips and accessible descriptions for key/velocity ranges, root, badges, diagnostic state, and hidden/filtered results; color alone is never authoritative.</li>
+            <li class="complete"><span class="task-id">SV3.8</span> Add unit/render tests for normalized geometry, ruler alignment, equal-range row independence, diagnostic false-positive guardrails, filter composition, sort stability, and high-contrast selection.</li>
+          </ul>
+          <div class="exit"><h3>Gate 3</h3><p>All zones remain separately visible even when geometry is identical. Search, filters, sorting, and diagnostics are deterministic, explainable, accessible, and do not alter project state.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">4</div><h2>Context inspectors and atomic editing</h2><span class="sprint-focus">Complete the authoring workflow</span></div>
+        <p class="sprint-intent">Move from navigation to production editing: one inspector slot, typed plural contexts, clear mixed values, explicit parent changes, and document-safe batch transactions.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">SV4.1</span> Implement <code>StructureInspectorHost</code> with sticky type/count/path header and Layer, Group, Zone, and same-type plural context dispatch.</li>
+            <li class="complete"><span class="task-id">SV4.2</span> Extract or wrap the existing layer controls into a reusable Layer inspector covering name, order, visibility, gain, pan, routing, audition anchor, crossfade, counts, and effective summary.</li>
+            <li class="complete"><span class="task-id">SV4.3</span> Extract or wrap the existing group controls into a reusable Group inspector covering name, parent layer, order, visibility, gain, pan, routing, audition anchor, RR, counts, and effective summary.</li>
+            <li class="complete"><span class="task-id">SV4.4</span> Reuse <code>ZoneMappingEditor</code> and compact inspector primitives for the Zone inspector; expose every field that already has safe multi-zone transaction semantics.</li>
+            <li class="complete"><span class="task-id">SV4.5</span> Add explicit mixed-value state to text, numeric, range, toggle, and combo controls. Absolute entry sets all; nudge actions apply documented relative deltas; controls never display a random selected object's value as shared.</li>
+            <li class="complete"><span class="task-id">SV4.6</span> Add or consolidate <code>AuthoringSession</code> batch methods for compatible layer, group, and zone edits. Validate the complete target set before one commit; reject partial application.</li>
+            <li class="complete"><span class="task-id">SV4.7</span> Add parent-layer reassignment for selected groups and parent-group reassignment for selected zones, including anchor/RR reconciliation and deterministic post-commit selection.</li>
+            <li class="complete"><span class="task-id">SV4.8</span> Connect create, duplicate, rename, reorder, delete, select-all-children, audition, Open Waveform, Reveal in Map, and Reveal in Structure commands to existing or new session transactions.</li>
+            <li class="complete"><span class="task-id">SV4.9</span> Rename zone-level “Layer Stack” UI copy to <strong>Velocity Stack</strong> without changing stored data, transaction semantics, or velocity-crossfade behavior.</li>
+            <li class="complete"><span class="task-id">SV4.10</span> Add transaction/UI tests for shared values, mixed values, absolute edits, relative nudges, invalid batch rejection, one-step undo/redo, parent moves, anchor repair, RR reconciliation, and inspector switching.</li>
+          </ul>
+          <div class="exit"><h3>Gate 4</h3><p>A creator can inspect and edit one or many layers, groups, or zones; every successful gesture is atomic, undoable, persisted, and synchronized with Map. Invalid batch edits make no project change.</p></div>
+        </div>
+      </article>
+
+      <article class="sprint">
+        <div class="sprint-head"><div class="sprint-number">5</div><h2>Scale, accessibility, and release hardening</h2><span class="sprint-focus">Prove production readiness</span></div>
+        <p class="sprint-intent">Qualify the complete viewer across production topology, compact plugin hosts, undo/reload paths, existing Map workflows, and both application targets.</p>
+        <div class="sprint-body">
+          <ul class="task-list">
+            <li class="complete"><span class="task-id">SV5.1</span> Run 1,000-zone and large-layer/group fixtures through projection, filtering, diagnostic analysis, resize, scroll, view switching, and repeated refresh; record average and p95 UI timings.</li>
+            <li class="complete"><span class="task-id">SV5.2</span> Ensure projection and diagnostic analysis run only when relevant topology/fields change, use cached lightweight rows, perform no audio-thread work, and avoid per-paint text/geometry rebuilding.</li>
+            <li class="complete"><span class="task-id">SV5.3</span> Complete keyboard-only, screen-reader metadata, high-contrast, focus retention, non-color diagnostics, tooltip, and compact breadcrumb qualification.</li>
+            <li class="complete"><span class="task-id">SV5.4</span> Add integration coverage for import materialization, project reload, host-state recall, undo/redo, deletion, reassignment, visibility changes, active articulation, audition, and lower-workbench actions.</li>
+            <li class="complete"><span class="task-id">SV5.5</span> Run existing <code>drs.layer_contract.authoring</code>, <code>drs.phase2.authoring_ui</code>, <code>drs.phase2.mapping_workspace</code>, <code>drs.phase2.repeated_structure_density</code>, <code>drs.open_workbench.phase2</code>, velocity-crossfade, group transaction, and responsiveness regressions.</li>
+            <li class="complete"><span class="task-id">SV5.6</span> Build plugin and standalone Debug targets, then perform a Release visual/performance qualification at representative compact and expanded host sizes.</li>
+            <li class="complete"><span class="task-id">SV5.7</span> Update active Markdown authoring guidance, component accessibility inventory, test README, and release evidence. Keep this plan and the high-level design linked as historical intent artifacts.</li>
+            <li class="complete"><span class="task-id">SV5.8</span> Run <code>git diff --check</code>, verify CMake/tracked-path completeness from a clean checkout, and confirm no new generated artifacts or local workspace state are committed.</li>
+          </ul>
+          <div class="exit"><h3>Gate 5</h3><p>The focused and regression matrices pass, both application targets build, compact and expanded layouts qualify visually, production-scale refresh remains within the agreed responsiveness budget, and release evidence is complete.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section" id="execution-status">
+      <span class="section-label">06 | Execution status</span>
+      <div class="heading"><h2>Implementation evidence to date</h2></div>
+      <div class="grid-3">
+        <article class="card good">
+          <h3>Completed seams</h3>
+          <p><code>AuthoringStructureSelection</code>, hierarchy row projections, workspace-only <code>StructureViewState</code>, deterministic fixtures, cached overlap classification, filter/sort options, the Map | Structure switch, the three-column <code>StructureViewer</code> with stable-ID reveal, Map context-menu entry, atomic batch transactions, and a context-sensitive <code>StructureInspector</code> are implemented in the shared authoring surface.</p>
+        </article>
+        <article class="card accent">
+          <h3>Executable evidence</h3>
+          <p><code>drs.structure_viewer.contract</code>, <code>drs.structure_viewer.ui</code>, and <code>drs.structure_viewer.qualification</code> pass in both Debug and Release. The layer contract suite, Map/Structure UI regressions, workbench, density, crossfade authoring, group transaction, and performance-responsiveness tests are also green in Debug. The 1,000-zone qualification records average/p95 timings and writes compact/expanded screenshot evidence. See the <a href="structure-viewer-authoring-guidance.md">authoring guidance</a>.</p>
+        </article>
+        <article class="card good">
+          <h3>Qualification guardrail</h3>
+          <p>The legacy <code>drs.ui.responsiveness_baseline</code> initially exposed a narrow selection-path budget miss on the 1,700-zone fixture. The refresh path now skips unchanged layer/group control work; the isolated baseline passes at 9.2&nbsp;ms for zone selection, and the dedicated performance-responsiveness test also passes. Keep the measured value in release evidence so future inspector changes do not regress the one-60&nbsp;Hz-frame budget.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="validation">
+      <span class="section-label">07 | Evidence</span>
+      <div class="heading"><h2>Validation matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Required evidence</th><th>Failure to prevent</th></tr></thead>
+          <tbody>
+            <tr><td class="id">Hierarchy projection</td><td>Layers, groups, and zones appear under the parent named by <code>layerId</code>/<code>groupId</code>; empty and hidden containers are handled explicitly.</td><td>A UI-only membership cache disagrees with the project.</td></tr>
+            <tr><td class="id">Typed selection</td><td>Pointer, keyboard, Map, Structure, filter, sort, undo, delete, and reload paths preserve valid IDs and deterministic primary selection.</td><td>Stale indices select the wrong object or Map/Structure enter a feedback loop.</td></tr>
+            <tr><td class="id">Workspace state</td><td>Mode, widths, collapse, filters, sort, and scroll restore without entering serialized project data.</td><td>Opening Structure dirties or changes the authored instrument.</td></tr>
+            <tr><td class="id">Zone presentation</td><td>Equal and overlapping ranges occupy separate aligned rows; key, root, velocity, RR, event, and articulation metadata remain readable.</td><td>Structure reproduces the Map's occlusion problem.</td></tr>
+            <tr><td class="id">Diagnostics</td><td>Classification tests cover intentional velocity stacks, RR siblings, articulation/event distinctions, controller distinctions, exact duplicates, and ambiguous overlap reasons.</td><td>Intentional layering is presented as a definitive error.</td></tr>
+            <tr><td class="id">Inspector</td><td>Every context shows correct shared/mixed values; absolute and relative edits behave as documented; invalid batches are atomic no-ops.</td><td>Batch editing silently flattens differences or partially applies.</td></tr>
+            <tr><td class="id">Document transactions</td><td>Create, duplicate, rename, reorder, reparent, delete, and property edits persist and round-trip through one-step undo/redo.</td><td>UI state looks correct while anchors, RR, dirty state, or references become invalid.</td></tr>
+            <tr><td class="id">Accessibility</td><td>Keyboard traversal, focus retention, accessible names/descriptions, non-color cues, compact breadcrumbs, and screen-reader order are qualified.</td><td>Hierarchy or diagnostics are usable only by pointer or color perception.</td></tr>
+            <tr><td class="id">Performance</td><td>1,000-zone projection/filter/scroll/refresh timings and paint counts are recorded in Debug and representative Release qualification.</td><td>The second viewer degrades message-thread responsiveness.</td></tr>
+            <tr><td class="id">Regression</td><td>Map range editing, velocity crossfades, grouping, layers, preview, waveform, workbench tabs, routing, plugin, and standalone behavior remain green.</td><td>Structure destabilizes mature Authoring workflows or audio behavior.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout decision">
+        <h3>Proposed focused CTest names</h3>
+        <p><code>drs.structure_viewer.contract</code>, <code>drs.structure_viewer.navigation</code>, <code>drs.structure_viewer.inspector</code>, <code>drs.structure_viewer.diagnostics</code>, <code>drs.structure_viewer.integration</code>, and <code>drs.structure_viewer.qualification</code>. Keep pure policy tests separate from JUCE component tests so selection and diagnostics can run quickly during implementation.</p>
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <span class="section-label">08 | Guardrails</span>
+      <div class="heading"><h2>Risks and decisions</h2></div>
+      <div class="grid-2">
+        <article class="card problem">
+          <h3>Competing selection authorities</h3>
+          <p>Do not synchronize component-local selections after the fact. All lists and Map adapters consume the typed stable-ID selection, and refresh reconciliation happens in one coordinator.</p>
+        </article>
+        <article class="card warn">
+          <h3>AuthoringPanel growth</h3>
+          <p><code>AuthoringPanel</code> is already a large composition root. New range rendering, diagnostic policy, selection gestures, and inspector layout belong in focused components or pure helpers, not additional monolithic branches.</p>
+        </article>
+        <article class="card violet">
+          <h3>Mixed-value ambiguity</h3>
+          <p>Never seed a plural field from the primary object and imply it is shared. Every control type needs an explicit mixed state and documented absolute versus relative edit behavior before batch commit is enabled.</p>
+        </article>
+        <article class="card accent">
+          <h3>Diagnostic overclaiming</h3>
+          <p>Overlap analysis is descriptive and conservative. It must account for articulation, event, controller, RR, and crossfade distinctions and expose its reasoning rather than label every overlap a conflict.</p>
+        </article>
+        <article class="card warn">
+          <h3>Compact host pressure</h3>
+          <p>Do not solve narrow layouts by hiding the parent path or inspector identity. Collapse ancestor columns to accessible breadcrumb rails and test the minimum supported plugin dimensions.</p>
+        </article>
+        <article class="card problem">
+          <h3>UI-driven model shortcuts</h3>
+          <p>Counts, coverage, selection, and overlap flags are derived. Parent reassignment and batch edits must use session transactions; no view component writes directly into <code>RuntimeProjectModel</code>.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <h3>Implementation order</h3>
+        <p>Land contract tests and typed selection first, then the navigable shell, then range presentation and diagnostics, then inspectors and mutations. This order keeps every later sprint a consumer of stable selection and view models rather than forcing UI behavior to define the contract accidentally.</p>
+      </div>
+    </section>
+
+    <section class="section" id="release">
+      <span class="section-label">09 | Completion criteria</span>
+      <div class="heading"><h2>Release gate</h2></div>
+      <div class="callout decision">
+        <h3>The Structure Viewer iteration is complete when</h3>
+        <ul>
+          <li>Map and Structure are peer mapping views with workspace-persisted mode and independent presentation state.</li>
+          <li>The three-column browser exposes the complete Instrument → Layer → Group → Zone hierarchy and remains usable at supported compact sizes.</li>
+          <li>Zones with identical or overlapping geometry remain independently visible, selectable, searchable, and explainable.</li>
+          <li>One typed stable-ID selection drives Map, Structure, hierarchy path, and inspector type without stale indices or feedback loops.</li>
+          <li>Layer, Group, Zone, and plural same-type inspectors present correct shared/mixed values and commit valid batch edits atomically.</li>
+          <li>Creation, lifecycle, reorder, parent reassignment, reveal, preview, and workbench interactions use validated session transactions and preserve undo/redo.</li>
+          <li>Focused selection, navigation, inspector, diagnostics, integration, accessibility, and production-scale qualification evidence passes.</li>
+          <li>Existing layer, group, Zone Map, velocity-crossfade, preview, waveform, routing, plugin, standalone, and responsiveness regressions remain green.</li>
+        </ul>
+      </div>
+      <p class="files">Primary implementation surfaces include <a href="../engine_adapter/include/drs/engine/AuthoringSession.h">AuthoringSession.h</a>, <a href="../engine_adapter/src/AuthoringSession.cpp">AuthoringSession.cpp</a>, <a href="../app/src/shared/AuthoringPanel.h">AuthoringPanel.h</a>, <a href="../app/src/shared/AuthoringPanel.cpp">AuthoringPanel.cpp</a>, <a href="../app/src/shared/authoring/AuthoringViewModels.h">AuthoringViewModels.h</a>, <a href="../app/src/shared/authoring/ZoneMappingEditor.h">ZoneMappingEditor.h</a>, <a href="../app/src/shared/authoring/RepeatedStructureList.h">RepeatedStructureList.h</a>, <a href="../app/src/shared/authoring/WorkbenchLayoutState.h">WorkbenchLayoutState.h</a>, <code>app/CMakeLists.txt</code>, <code>tests/CMakeLists.txt</code>, and the new focused Structure components and tests.</p>
+    </section>
+
+    <footer>Practical Sampler internal engineering plan · Structure Viewer iteration · Source design: <a href="structure-viewer-high-level-design.html">Structure Viewer — High-Level Design</a> · Scope excludes <code>_analysis/Rhapsody/</code></footer>
+  </main>
+</body>
+</html>

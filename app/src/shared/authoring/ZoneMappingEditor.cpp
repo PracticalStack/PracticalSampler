@@ -48,8 +48,8 @@ ZoneMappingEditor::ZoneMappingEditor()
       createCrossfadeRow("Relationship", "authoringCreateCrossfadeRow", "Create Crossfade"),
       updateCrossfadeRow("Overlap", "authoringUpdateCrossfadeRow", "Apply Overlap"),
       removeCrossfadeRow("Relationship", "authoringRemoveCrossfadeRow", "Remove Crossfade"),
-      createCrossfadeStackRow("Layer Stack", "authoringCreateCrossfadeStackRow", "Create Stack Crossfades"),
-      removeCrossfadeStackRow("Layer Stack", "authoringRemoveCrossfadeStackRow", "Remove Stack Crossfades"),
+      createCrossfadeStackRow("Velocity Stack", "authoringCreateCrossfadeStackRow", "Create Stack Crossfades"),
+      removeCrossfadeStackRow("Velocity Stack", "authoringRemoveCrossfadeStackRow", "Remove Stack Crossfades"),
       auditionCrossfadeRow("Audition", "authoringCrossfadeAuditionRow", "Audition 5 Steps"),
       crossfadeAuditionMessage("authoringCrossfadeAuditionStatus", juce::Justification::centredLeft),
       crossfadeGuidanceMessage("authoringCrossfadeGuidance", juce::Justification::centredLeft),
@@ -77,6 +77,8 @@ ZoneMappingEditor::ZoneMappingEditor()
       performanceHintMessage("authoringPerformanceHintMessage", juce::Justification::centredLeft),
       previewZoneRow("Audition", "authoringInspectorPreviewRow", "Preview Zone"),
       restoreRootKeyRow("Reference", "authoringRestoreRootKeyRow", "Restore Root Key"),
+      revealStructureRow("Navigation", "authoringRevealInStructureRow", "Reveal in Structure"),
+      openWaveformRow("Navigation", "authoringOpenWaveformRow", "Open Waveform"),
       validationMessage("authoringZoneValidationMessage", juce::Justification::centredLeft)
 {
     setComponentID("authoringZoneFieldEditor");
@@ -133,6 +135,8 @@ ZoneMappingEditor::ZoneMappingEditor()
     removeRoundRobinPoolRow.getButton().setComponentID("authoringRemoveRoundRobinPoolButton");
     previewZoneRow.getButton().setComponentID("authoringInspectorPreviewButton");
     restoreRootKeyRow.getButton().setComponentID("authoringRestoreRootKeyButton");
+    revealStructureRow.getButton().setComponentID("authoringRevealInStructureButton");
+    openWaveformRow.getButton().setComponentID("authoringOpenWaveformButton");
     mapSection.getDisclosureButton().setExplicitFocusOrder(40);
     rootKeyRow.getSlider().setExplicitFocusOrder(41);
     keyRangeRow.getLowSlider().setExplicitFocusOrder(42);
@@ -163,14 +167,16 @@ ZoneMappingEditor::ZoneMappingEditor()
     triggerModeRow.getComboBox().setExplicitFocusOrder(67);
     previewZoneRow.getButton().setExplicitFocusOrder(68);
     restoreRootKeyRow.getButton().setExplicitFocusOrder(69);
-    performanceSection.getDisclosureButton().setExplicitFocusOrder(70);
-    performanceEventRow.getComboBox().setExplicitFocusOrder(71);
-    sustainConditionRow.getComboBox().setExplicitFocusOrder(72);
-    pitchSourceRow.getComboBox().setExplicitFocusOrder(73);
-    chokeGroupRow.getComboBox().setExplicitFocusOrder(74);
-    chokeTargetRow.getComboBox().setExplicitFocusOrder(75);
-    chokeFadeRow.getSlider().setExplicitFocusOrder(76);
-    createChokeGroupRow.getButton().setExplicitFocusOrder(77);
+    revealStructureRow.getButton().setExplicitFocusOrder(70);
+    openWaveformRow.getButton().setExplicitFocusOrder(71);
+    performanceSection.getDisclosureButton().setExplicitFocusOrder(72);
+    performanceEventRow.getComboBox().setExplicitFocusOrder(73);
+    sustainConditionRow.getComboBox().setExplicitFocusOrder(74);
+    pitchSourceRow.getComboBox().setExplicitFocusOrder(75);
+    chokeGroupRow.getComboBox().setExplicitFocusOrder(76);
+    chokeTargetRow.getComboBox().setExplicitFocusOrder(77);
+    chokeFadeRow.getSlider().setExplicitFocusOrder(78);
+    createChokeGroupRow.getButton().setExplicitFocusOrder(79);
     releaseRow.getSlider().setHelpText(
         "Sets the selected zone's amplitude release time after note-off, in seconds.");
     releaseCurveRow.getComboBox().addItem("Natural / SFZ", 1);
@@ -186,6 +192,10 @@ ZoneMappingEditor::ZoneMappingEditor()
     previewZoneRow.getButton().setHelpText("Auditions the selected zone from the mapping inspector.");
     restoreRootKeyRow.getButton().setHelpText(
         "Restores the selected zone root key from the imported sample reference pitch.");
+    revealStructureRow.getButton().setHelpText(
+        "Opens Structure and reveals the selected zone in its parent layer and group.");
+    openWaveformRow.getButton().setHelpText(
+        "Opens the Waveform workbench for the selected zone's sample source.");
     createRoundRobinPoolRow.getButton().setHelpText(
         "Creates a dedicated sequential Round Robin pool for the selected zone.");
     addCompatibleZonesRow.getButton().setHelpText(
@@ -205,7 +215,7 @@ ZoneMappingEditor::ZoneMappingEditor()
     removeCrossfadeRow.getButton().setHelpText(
         "Removes both sides of the selected crossfade relationship without changing other ranges.");
     createCrossfadeStackRow.getButton().setHelpText(
-        "Creates all adjacent crossfades for the selected compatible velocity-layer stack in one undo step.");
+        "Creates all adjacent crossfades for the selected compatible velocity stack in one undo step.");
     removeCrossfadeStackRow.getButton().setHelpText(
         "Removes crossfade descriptors across the selected stack without restoring or changing velocity ranges.");
     auditionCrossfadeRow.getButton().setHelpText(
@@ -244,9 +254,11 @@ ZoneMappingEditor::ZoneMappingEditor()
     addOwnedRow(advancedSectionContent, triggerModeRow, comboRowHeight);
     addOwnedRow(advancedSectionContent, previewZoneRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, restoreRootKeyRow, actionRowHeight);
+    addOwnedRow(advancedSectionContent, revealStructureRow, actionRowHeight);
+    addOwnedRow(advancedSectionContent, openWaveformRow, actionRowHeight);
     addOwnedRow(advancedSectionContent, validationMessage, messageRowHeight);
     advancedSectionContent.setSize(0, toggleRowHeight + sliderRowHeight * 2 + comboRowHeight * 2
-                                      + actionRowHeight * 2 + messageRowHeight + 7 * 6);
+                                      + actionRowHeight * 4 + messageRowHeight + 9 * 6);
     addOwnedRow(performanceSectionContent, performanceEventRow, comboRowHeight);
     addOwnedRow(performanceSectionContent, sustainConditionRow, comboRowHeight);
     addOwnedRow(performanceSectionContent, pitchSourceRow, comboRowHeight);
@@ -354,6 +366,16 @@ ZoneMappingEditor::ZoneMappingEditor()
         if (callbacks.onPreviewRequested)
             callbacks.onPreviewRequested();
     };
+    revealStructureRow.getButton().onClick = [this]
+    {
+        if (callbacks.onRevealInStructureRequested && viewModel.hasSelection)
+            callbacks.onRevealInStructureRequested();
+    };
+    openWaveformRow.getButton().onClick = [this]
+    {
+        if (callbacks.onOpenWaveformRequested && viewModel.hasSelection)
+            callbacks.onOpenWaveformRequested();
+    };
     for (auto* component : {
              static_cast<juce::Component*>(&emptyStateMessage),
              static_cast<juce::Component*>(&mapSection),
@@ -440,6 +462,10 @@ void ZoneMappingEditor::resized()
     advancedArea.removeFromTop(6);
     restoreRootKeyRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
     advancedArea.removeFromTop(6);
+    revealStructureRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
+    advancedArea.removeFromTop(6);
+    openWaveformRow.setBounds(advancedArea.removeFromTop(actionRowHeight));
+    advancedArea.removeFromTop(6);
     validationMessage.setBounds(advancedArea.removeFromTop(messageRowHeight));
 
     auto performanceArea = performanceSectionContent.getLocalBounds();
@@ -508,6 +534,8 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&performanceHintMessage),
              static_cast<juce::Component*>(&previewZoneRow),
              static_cast<juce::Component*>(&restoreRootKeyRow),
+             static_cast<juce::Component*>(&revealStructureRow),
+             static_cast<juce::Component*>(&openWaveformRow),
              static_cast<juce::Component*>(&validationMessage),
              static_cast<juce::Component*>(&rootKeyRow.getSlider()),
              static_cast<juce::Component*>(&keyRangeRow.getLowSlider()),
@@ -538,7 +566,9 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
              static_cast<juce::Component*>(&chokeFadeRow.getSlider()),
              static_cast<juce::Component*>(&createChokeGroupRow.getButton()),
              static_cast<juce::Component*>(&previewZoneRow.getButton()),
-             static_cast<juce::Component*>(&restoreRootKeyRow.getButton())
+             static_cast<juce::Component*>(&restoreRootKeyRow.getButton()),
+             static_cast<juce::Component*>(&revealStructureRow.getButton()),
+             static_cast<juce::Component*>(&openWaveformRow.getButton())
          })
     {
         setVisibleAndAccessible(*component, hasSelection);
@@ -546,6 +576,8 @@ void ZoneMappingEditor::setViewModel(ZoneFieldValuesViewModel nextViewModel)
 
     restoreRootKeyRow.getButton().setEnabled(viewModel.hasSelection);
     previewZoneRow.getButton().setEnabled(viewModel.hasSelection);
+    revealStructureRow.getButton().setEnabled(viewModel.hasSelection);
+    openWaveformRow.getButton().setEnabled(viewModel.hasSelection);
     previewZoneRow.getButton().setButtonText(viewModel.previewAdvancesRoundRobin
                                                  ? "Preview / Advance"
                                                  : "Preview Zone");

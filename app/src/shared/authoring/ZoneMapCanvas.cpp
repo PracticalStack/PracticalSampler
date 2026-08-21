@@ -32,6 +32,7 @@ constexpr int hoverDelayMilliseconds = 300;
 constexpr float velocityAxisWidth = 36.0f;
 constexpr float pitchAxisHeight = 24.0f;
 constexpr int deleteSelectedSampleMenuItemId = 1;
+constexpr int showInStructureMenuItemId = 2;
 
 bool isSupportedSampleFile(const juce::String& path)
 {
@@ -176,6 +177,13 @@ void ZoneMapCanvas::setOnZoneAuditionRequested(
     std::function<void(const std::string& zoneId, int midiNote, int velocity)> nextCallback)
 {
     onZoneAuditionRequested = std::move(nextCallback);
+}
+
+void ZoneMapCanvas::setOnShowInStructureRequested(
+    std::function<void(const std::vector<std::string>& zoneIds,
+                       const std::string& primaryZoneId)> nextCallback)
+{
+    onShowInStructureRequested = std::move(nextCallback);
 }
 
 void ZoneMapCanvas::setOnSampleFilesDropped(std::function<void(std::vector<juce::File>)> nextCallback)
@@ -799,14 +807,23 @@ void ZoneMapCanvas::showContextMenuAt(juce::Point<int> screenPosition)
     menu.addItem(deleteSelectedSampleMenuItemId,
                  selectionCount > 1 ? "Delete Selected Zones" : "Delete Selected Sample",
                  selectionCount > 0 && onDeleteSelectedSampleRequested != nullptr);
+    menu.addItem(showInStructureMenuItemId,
+                 "Show in Structure",
+                 selectionCount > 0 && onShowInStructureRequested != nullptr);
 
     auto safeThis = juce::Component::SafePointer<ZoneMapCanvas>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
                            {screenPosition.x, screenPosition.y, 1, 1}),
                        [safeThis](int menuItemId)
                        {
-                           if (safeThis != nullptr && menuItemId == deleteSelectedSampleMenuItemId)
+                           if (safeThis == nullptr)
+                               return;
+                           if (menuItemId == deleteSelectedSampleMenuItemId)
                                safeThis->requestDeleteSelectedSample();
+                           else if (menuItemId == showInStructureMenuItemId
+                                    && safeThis->onShowInStructureRequested != nullptr)
+                               safeThis->onShowInStructureRequested(safeThis->selectionState.zoneIds,
+                                                                    safeThis->selectionState.primaryZoneId);
                        });
 }
 

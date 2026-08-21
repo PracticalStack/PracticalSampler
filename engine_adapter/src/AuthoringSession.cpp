@@ -2728,6 +2728,173 @@ RuntimeProjectDocumentActionResult AuthoringSession::reassignGroupsToLayer(
     return result;
 }
 
+RuntimeProjectDocumentActionResult AuthoringSession::applyStructureBatchPatch(
+    const AuthoringStructureEntityKind kind,
+    const std::vector<std::string>& entityIds,
+    const AuthoringStructureBatchPatch& patch,
+    const std::string& label)
+{
+    if (entityIds.empty())
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "At least one same-type entity must be selected.");
+
+    auto project = getProject();
+    std::unordered_set<std::string> uniqueIds;
+    for (const auto& id : entityIds)
+    {
+        if (id.empty() || !uniqueIds.insert(id).second)
+            return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                      "Entity IDs must be non-empty and unique.");
+        const bool exists = kind == AuthoringStructureEntityKind::layer
+            ? findLayerIndexById(project, id).has_value()
+            : kind == AuthoringStructureEntityKind::group
+                ? findGroupIndexById(project, id).has_value()
+                : findZoneIndexById(project, id).has_value();
+        if (!exists)
+            return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                      "Entity '" + id + "' no longer exists.");
+    }
+
+    if (patch.displayName.has_value() && patch.displayName->empty())
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Display name cannot be empty.");
+    if (patch.releaseSeconds.has_value()
+        && (!std::isfinite(*patch.releaseSeconds) || *patch.releaseSeconds < 0.0))
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Release seconds must be finite and non-negative.");
+    if ((patch.gainDelta.has_value() && !std::isfinite(*patch.gainDelta))
+        || (patch.panDelta.has_value() && !std::isfinite(*patch.panDelta)))
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Relative mixer changes must be finite numbers.");
+    if (kind == AuthoringStructureEntityKind::group && patch.layerId.has_value()
+        && !findLayerIndexById(project, *patch.layerId).has_value())
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Destination layer does not exist.");
+    if (kind == AuthoringStructureEntityKind::group && patch.auditionAnchorId.has_value()
+        && !patch.auditionAnchorId->empty())
+    {
+        const auto anchor = findZoneIndexById(project, *patch.auditionAnchorId);
+        if (!anchor.has_value())
+            return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                      "Group audition anchor zone does not exist.");
+        const auto groupId = entityIds.empty() ? std::string {} : entityIds.front();
+        if (project.authoring.zones[*anchor].groupId != groupId)
+            return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                      "Group audition anchor must belong to the selected group.");
+    }
+    if (kind == AuthoringStructureEntityKind::zone && patch.groupId.has_value()
+        && !findGroupIndexById(project, *patch.groupId).has_value())
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Destination group does not exist.");
+    if (kind == AuthoringStructureEntityKind::layer && patch.auditionAnchorId.has_value()
+        && !patch.auditionAnchorId->empty())
+    {
+        const auto anchor = findGroupIndexById(project, *patch.auditionAnchorId);
+        if (!anchor.has_value())
+            return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                      "Layer audition anchor group does not exist.");
+        const auto layerId = entityIds.empty() ? std::string {} : entityIds.front();
+        if (project.authoring.groups[*anchor].layerId != layerId)
+            return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                      "Layer audition anchor must belong to the selected layer.");
+    }
+    if (kind == AuthoringStructureEntityKind::zone && patch.workspaceVisible.has_value())
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Zones do not have independent workspace visibility.");
+    if (patch.rootKey.has_value() && (*patch.rootKey < 0 || *patch.rootKey > 127))
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Root key must be between 0 and 127.");
+    if (patch.keyLow.has_value() && (*patch.keyLow < 0 || *patch.keyLow > 127)
+        || patch.keyHigh.has_value() && (*patch.keyHigh < 0 || *patch.keyHigh > 127)
+        || patch.keyLow.has_value() && patch.keyHigh.has_value() && *patch.keyLow > *patch.keyHigh)
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Key range must remain within 0–127 and low must not exceed high.");
+    if (patch.velocityLow.has_value() && (*patch.velocityLow < 1 || *patch.velocityLow > 127)
+        || patch.velocityHigh.has_value() && (*patch.velocityHigh < 1 || *patch.velocityHigh > 127)
+        || patch.velocityLow.has_value() && patch.velocityHigh.has_value() && *patch.velocityLow > *patch.velocityHigh)
+        return makeRejectedResult(getDocumentState(), "Structure batch edit rejected",
+                                  "Velocity range must remain within 1–127 and low must not exceed high.");
+
+    std::vector<std::string> changedPaths;
+    const auto appendPath = [&](const std::string& path)
+    {
+        if (std::find(changedPaths.begin(), changedPaths.end(), path) == changedPaths.end())
+            changedPaths.push_back(path);
+    };
+    std::vector<std::pair<std::string, RoundRobinMode>> enabledGroups;
+    const auto rememberEnabledGroup = [&](const std::string& groupId)
+    {
+        if (groupId.empty()) return;
+        if (std::find_if(enabledGroups.begin(), enabledGroups.end(),
+                         [&](const auto& entry) { return entry.first == groupId; }) != enabledGroups.end())
+            return;
+        const auto status = assessGroupRoundRobin(project, groupId);
+        if (status.enabled) enabledGroups.emplace_back(groupId, status.mode);
+    };
+    for (const auto& id : entityIds)
+    {
+        if (kind == AuthoringStructureEntityKind::layer)
+        {
+            const auto index = *findLayerIndexById(project, id);
+            auto& value = project.authoring.layers[index];
+            if (patch.displayName) value.displayName = *patch.displayName;
+            if (patch.workspaceVisible) value.workspaceVisible = *patch.workspaceVisible;
+            if (patch.gainDb) value.gainDb = *patch.gainDb;
+            if (patch.pan) value.pan = *patch.pan;
+            if (patch.gainDelta) value.gainDb += *patch.gainDelta;
+            if (patch.panDelta) value.pan += *patch.panDelta;
+            if (patch.routingBusId) value.routingBusId = *patch.routingBusId;
+            if (patch.auditionAnchorId) value.auditionAnchorGroupId = *patch.auditionAnchorId;
+            appendPath("authoring.layers[" + std::to_string(index) + "]");
+        }
+        else if (kind == AuthoringStructureEntityKind::group)
+        {
+            const auto index = *findGroupIndexById(project, id);
+            auto& value = project.authoring.groups[index];
+            if (patch.displayName) value.displayName = *patch.displayName;
+            if (patch.layerId) value.layerId = *patch.layerId;
+            if (patch.workspaceVisible) value.workspaceVisible = *patch.workspaceVisible;
+            if (patch.gainDb) value.gainDb = *patch.gainDb;
+            if (patch.pan) value.pan = *patch.pan;
+            if (patch.gainDelta) value.gainDb += *patch.gainDelta;
+            if (patch.panDelta) value.pan += *patch.panDelta;
+            if (patch.routingBusId) value.routingBusId = *patch.routingBusId;
+            if (patch.auditionAnchorId) value.auditionAnchorZoneId = *patch.auditionAnchorId;
+            appendPath("authoring.groups[" + std::to_string(index) + "]");
+        }
+        else
+        {
+            const auto index = *findZoneIndexById(project, id);
+            auto& value = project.authoring.zones[index];
+            rememberEnabledGroup(value.groupId);
+            if (patch.groupId) rememberEnabledGroup(*patch.groupId);
+            if (patch.displayName) value.displayName = *patch.displayName;
+            if (patch.groupId) value.groupId = *patch.groupId;
+            if (patch.articulationId) value.articulationId = *patch.articulationId;
+            if (patch.workspaceVisible) { /* zones have no authored visibility */ }
+            if (patch.gainDb) value.gainDb = *patch.gainDb;
+            if (patch.pan) value.pan = *patch.pan;
+            if (patch.gainDelta) value.gainDb += *patch.gainDelta;
+            if (patch.panDelta) value.pan += *patch.panDelta;
+            if (patch.releaseSeconds) value.releaseSeconds = *patch.releaseSeconds;
+            if (patch.rootKey) value.rootKey = *patch.rootKey;
+            if (patch.keyLow) value.keyLow = *patch.keyLow;
+            if (patch.keyHigh) value.keyHigh = *patch.keyHigh;
+            if (patch.velocityLow) value.velocityLow = *patch.velocityLow;
+            if (patch.velocityHigh) value.velocityHigh = *patch.velocityHigh;
+            appendPath("authoring.zones[" + std::to_string(index) + "]");
+        }
+    }
+
+    for (const auto& [groupId, mode] : enabledGroups)
+        reconcilePreviouslyEnabledGroup(project, groupId, mode);
+
+    if (changedPaths.empty())
+        return makeRejectedResult(getDocumentState(), "Structure batch edit unchanged",
+                                  "The requested values already match the selected entities.");
+    return documentController.commitSnapshot(project, label, changedPaths);
+}
+
 RuntimeProjectDocumentActionResult AuthoringSession::createRoundRobinPoolForSelectedZone(const std::string& label)
 {
     const auto selectedZoneIndex = findSelectedZoneIndex(getProject(), selectedZoneId);

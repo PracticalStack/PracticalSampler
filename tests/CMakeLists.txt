@@ -3213,6 +3213,97 @@ add_test(
     COMMAND drs_phase2_authoring_foundation_tests
 )
 
+juce_add_console_app(drs_structure_viewer_contract_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Structure Viewer Contract Tests"
+)
+
+target_sources(drs_structure_viewer_contract_tests
+    PRIVATE
+        src/StructureViewerContractTests.cpp
+)
+
+target_link_libraries(drs_structure_viewer_contract_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_structure_viewer_contract_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_structure_viewer_contract_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_test(
+    NAME drs.structure_viewer.contract
+    COMMAND drs_structure_viewer_contract_tests
+)
+
+set_target_properties(drs_structure_viewer_contract_tests PROPERTIES FOLDER "Tests")
+
+juce_add_console_app(drs_structure_viewer_ui_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Structure Viewer UI Tests"
+)
+
+target_sources(drs_structure_viewer_ui_tests
+    PRIVATE
+        src/StructureViewerUiTests.cpp
+)
+
+target_link_libraries(drs_structure_viewer_ui_tests
+    PRIVATE
+        drs_app_shared
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_structure_viewer_ui_tests PRIVATE cxx_std_17)
+target_include_directories(drs_structure_viewer_ui_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME drs.structure_viewer.ui COMMAND drs_structure_viewer_ui_tests)
+set_target_properties(drs_structure_viewer_ui_tests PROPERTIES FOLDER "Tests")
+
+juce_add_console_app(drs_structure_viewer_qualification_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Structure Viewer Qualification Tests"
+)
+
+target_sources(drs_structure_viewer_qualification_tests
+    PRIVATE
+        src/StructureViewerQualificationTests.cpp
+)
+
+target_link_libraries(drs_structure_viewer_qualification_tests
+    PRIVATE
+        drs_app_shared
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_structure_viewer_qualification_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_structure_viewer_qualification_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_test(
+    NAME drs.structure_viewer.qualification
+    COMMAND drs_structure_viewer_qualification_tests
+)
+
+set_target_properties(drs_structure_viewer_qualification_tests PROPERTIES FOLDER "Tests")
+
 juce_add_console_app(drs_phase2_authoring_import_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 2 Authoring Import Tests"
 )
