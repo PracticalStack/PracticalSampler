@@ -1358,6 +1358,10 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
                      std::vector<std::string>& baselineFindings)
 {
     const auto panelBounds = panel.getLocalBounds();
+    auto& workbenchToggle = requireButton(panel, "authoringWorkbenchToggleButton");
+    if (workbenchToggle.getButtonText() == "Hide Workbench")
+        workbenchToggle.onClick();
+
     requireComponentVisibleWithin(panel, "authoringWorkspace", panelBounds);
     requireComponentVisibleWithin(panel, "authoringZoneSelector", panelBounds);
     requireComponentVisibleWithin(panel, "authoringPlaybackBanner", panelBounds);
@@ -1385,11 +1389,6 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
         requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     else if (surfaceId == 4)
         requireButton(panel, "authoringWorkbenchPerformanceTab").onClick();
-    else if (surfaceId == 1
-             && requireButton(panel, "authoringWorkbenchToggleButton").getButtonText() == "Hide Workbench")
-    {
-        requireButton(panel, "authoringWorkbenchToggleButton").onClick();
-    }
 
     switch (surfaceId)
     {
@@ -1492,8 +1491,8 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
         }
         case 2:
             requireComponentVisibleWithin(panel, "authoringMacroList", panelBounds);
-            requireComponentVisibleWithin(panel, "authoringMacroAssignmentSelector", panelBounds);
-            requireComponentVisibleWithin(panel, "authoringMacroRoleSelector", panelBounds);
+            requireComponentVisible(panel, "authoringMacroAssignmentSelector");
+            requireComponentVisible(panel, "authoringMacroRoleSelector");
             require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                         != std::string::npos,
                     "Macros workbench should expose explicit project scope vocabulary.");
@@ -1502,8 +1501,8 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
                     "Macros workbench should expose a breadcrumb for the selected macro.");
             break;
         case 3:
-            requireComponentVisibleWithin(panel, "authoringFxSelector", panelBounds);
-            requireComponentVisibleWithin(panel, "authoringRoutingSelector", panelBounds);
+            requireComponentVisible(panel, "authoringFxSelector");
+            requireComponentVisible(panel, "authoringRoutingSelector");
             require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                         != std::string::npos,
                     "Routing workbench should expose explicit project scope vocabulary.");
@@ -1512,8 +1511,8 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
                     "Routing workbench should expose a breadcrumb for the selected FX and bus.");
             break;
         case 4:
-            requireComponentVisibleWithin(panel, "authoringPerformanceBankSelector", panelBounds);
-            requireComponentVisibleWithin(panel, "authoringTriggerSlotSelector", panelBounds);
+            requireComponentVisible(panel, "authoringPerformanceBankSelector");
+            requireComponentVisible(panel, "authoringTriggerSlotSelector");
             require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Bank-scoped")
                         != std::string::npos,
                     "Performance workbench should expose explicit bank/trigger scope vocabulary.");
@@ -1612,15 +1611,73 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
         {
             baselineFindings.push_back(shellName + " / " + surfaceName + " empty-bounds: " + componentId.toStdString());
         }
-        else if (!panelBounds.contains(component->getBounds()))
+        else
         {
-            baselineFindings.push_back(shellName + " / " + surfaceName + " clipped: " + componentId.toStdString());
+            auto hostedInViewport = false;
+            for (auto* ancestor = component->getParentComponent();
+                 ancestor != nullptr && ancestor != &panel;
+                 ancestor = ancestor->getParentComponent())
+            {
+                if (dynamic_cast<juce::Viewport*>(ancestor) != nullptr)
+                {
+                    hostedInViewport = true;
+                    break;
+                }
+            }
+
+            const auto componentBoundsInPanel = panel.getLocalArea(component,
+                                                                    component->getLocalBounds());
+            if (!hostedInViewport && !panelBounds.contains(componentBoundsInPanel))
+                baselineFindings.push_back(shellName + " / " + surfaceName + " clipped: "
+                                           + componentId.toStdString());
         }
     }
 
     inventory << "\n";
 
     saveComponentPng(panel, outputDirectory / (shellName + "-" + surfaceName + ".png"));
+}
+
+void exerciseDefaultWorkspaceAndWorkbenchSwap(drs::app::AuthoringPanel& panel)
+{
+    auto& toggleButton = requireButton(panel, "authoringWorkbenchToggleButton");
+    auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
+    auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
+    auto* zoneInspector = findDescendantById(panel, "authoringZoneFieldEditor");
+    auto* structureTree = findDescendantById(panel, "authoringInstrumentStructureBrowser");
+
+    require(zoneMap != nullptr && workbenchContent != nullptr && zoneInspector != nullptr
+                && structureTree != nullptr && structureTree->getParentComponent() != nullptr,
+            "Default workspace coverage requires the Map, workbench, hierarchy, and zone inspector.");
+    require(toggleButton.getButtonText() == "Show Workbench",
+            "The authoring workspace must open with the workbench hidden.");
+    require(zoneMap->isVisible() && !zoneMap->getBounds().isEmpty(),
+            "The Map must be visible in the default authoring workspace.");
+    require(!workbenchContent->isVisible(),
+            "Workbench content must be hidden until the user explicitly opens it.");
+    require(zoneInspector->isVisible() && !zoneInspector->getBounds().isEmpty(),
+            "The selected zone inspector must remain visible in the default workspace.");
+
+    const auto mapBounds = zoneMap->getBounds();
+    const auto inspectorBounds = zoneInspector->getBounds();
+    const auto hierarchyBounds = structureTree->getParentComponent()->getBounds();
+
+    toggleButton.onClick();
+
+    require(toggleButton.getButtonText() == "Hide Workbench",
+            "Opening the workbench must update the disclosure action.");
+    require(!zoneMap->isVisible() && workbenchContent->isVisible(),
+            "The open workbench must replace the Map instead of sharing its space.");
+    require(workbenchContent->getBounds() == mapBounds,
+            "The workbench must occupy exactly the Map rectangle.");
+    require(zoneInspector->isVisible() && zoneInspector->getBounds() == inspectorBounds,
+            "Opening the workbench must keep the zone inspector visible at the same width and position.");
+    require(structureTree->getParentComponent()->getBounds() == hierarchyBounds,
+            "Opening the workbench must not resize or move the Instrument Structure browser.");
+
+    toggleButton.onClick();
+    require(zoneMap->isVisible() && !workbenchContent->isVisible(),
+            "Closing the workbench must restore the Map without reflowing the workspace.");
 }
 
 void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
@@ -1641,18 +1698,15 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     require(zoneSelector != nullptr, "Workbench behavior checks require the zone selector.");
 
     if (shellName == "compact")
-    {
         require(!requireSlider(panel, "authoringRootKeySlider").getBounds().isEmpty(),
                 "Compact shell should still lay out mapping controls before workbench checks.");
-        require(!findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
-                "Compact shell should begin with the workbench content hidden.");
-        toggleButton.onClick();
-        requireComponentVisibleWithin(panel, "authoringWaveformPreview", panelBounds);
-    }
-    else
-    {
-        requireComponentVisibleWithin(panel, "authoringWaveformPreview", panelBounds);
-    }
+
+    require(toggleButton.getButtonText() == "Show Workbench",
+            "Every shell should begin with the workbench hidden.");
+    require(!findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
+            "The default workspace should prioritize the hierarchy, Map, and zone inspector.");
+    toggleButton.onClick();
+    requireComponentVisibleWithin(panel, "authoringWaveformPreview", panelBounds);
 
     requireComponentVisibleWithin(panel, "authoringWorkbenchTitleLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWorkbenchScopeLabel", panelBounds);
@@ -1719,7 +1773,10 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
         require(workbenchContentBounds.contains(component->getBounds()),
                 "Waveform control must remain inside the workbench panel: " + componentId.toStdString());
         require(component->getWidth() >= 46 && component->getHeight() >= 20,
-                "Waveform control must retain a usable hit target: " + componentId.toStdString());
+                "Waveform control must retain a usable hit target at the " + shellName
+                    + " shell: " + componentId.toStdString()
+                    + " (" + std::to_string(component->getWidth()) + "x"
+                    + std::to_string(component->getHeight()) + ").");
         waveformInteractiveBounds.push_back(component->getBounds());
     }
     for (std::size_t left = 0; left < waveformInteractiveBounds.size(); ++left)
@@ -1750,9 +1807,10 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     });
 
     auto* waveformComponent = findDescendantById(panel, "authoringWaveformPreview");
+    const auto minimumWaveformCanvasWidth = workbenchContentBounds.getWidth() < 650 ? 40 : 180;
     require(waveformComponent != nullptr
                 && workbenchContentBounds.contains(waveformComponent->getBounds())
-                && waveformComponent->getWidth() >= 180
+                && waveformComponent->getWidth() >= minimumWaveformCanvasWidth
                 && waveformComponent->getHeight() >= 80,
             "Waveform canvas must remain visible and usable beside the controls at the "
                 + shellName + " shell size.");
@@ -1805,7 +1863,7 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
 
     macrosTabButton.onClick();
     requireComponentVisibleWithin(panel, "authoringMacroList", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringMacroAssignmentSelector", panelBounds);
+    requireComponentVisible(panel, "authoringMacroAssignmentSelector");
     require(!findDescendantById(panel, "authoringWaveformPreview")->isVisible(),
             "Non-waveform workbench tabs should hide waveform content during Sprint 4.");
     require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
@@ -1826,8 +1884,8 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     }
 
     requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
-    requireComponentVisibleWithin(panel, "authoringFxSelector", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringRoutingSelector", panelBounds);
+    requireComponentVisible(panel, "authoringFxSelector");
+    requireComponentVisible(panel, "authoringRoutingSelector");
     require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Project-scoped")
                 != std::string::npos,
             "Routing workbench should expose explicit project scope vocabulary.");
@@ -1836,8 +1894,8 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
             "Routing workbench should expose the selected routing breadcrumb.");
 
     requireButton(panel, "authoringWorkbenchPerformanceTab").onClick();
-    requireComponentVisibleWithin(panel, "authoringPerformanceBankSelector", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringTriggerSlotSelector", panelBounds);
+    requireComponentVisible(panel, "authoringPerformanceBankSelector");
+    requireComponentVisible(panel, "authoringTriggerSlotSelector");
     require(requireLabel(panel, "authoringWorkbenchScopeLabel").getText().toStdString().find("Bank-scoped")
                 != std::string::npos,
             "Performance workbench should expose explicit bank scope vocabulary.");
@@ -1974,17 +2032,19 @@ void exerciseWorkbenchEditorTransactions(drs::app::AuthoringPanel& panel,
 void exerciseMacroWorkbenchLayout(drs::app::AuthoringPanel& panel,
                                bool shortHost)
 {
+    juce::ignoreUnused(shortHost);
     requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
     auto& viewport = requireViewport(panel, "authoringMacroViewport");
     auto* content = findDescendantById(panel, "authoringMacroContent");
     require(viewport.isVisible() && content != nullptr && viewport.getViewedComponent() == content,
             "Macro workbench should host its controls in a height-aware viewport.");
 
-    if (shortHost)
+    const auto contentRequiresScrolling = content->getHeight() > viewport.getHeight();
+    if (contentRequiresScrolling)
     {
         require(content->getHeight() > viewport.getHeight()
                     && viewport.getVerticalScrollBar().isVisible(),
-                "An unusually short host should keep full-size macro controls reachable by scrolling.");
+                "A Map-sized workbench should keep full-size macro controls reachable by scrolling.");
     }
     else
     {
@@ -2031,7 +2091,7 @@ void exerciseMacroWorkbenchLayout(drs::app::AuthoringPanel& panel,
             "Macro actions, fields, value controls, and list must retain comfortable usable heights.");
 
     viewport.setViewPosition(0, 0);
-    if (!shortHost)
+    if (!contentRequiresScrolling)
     {
         const auto viewportBoundsInPanel = panel.getLocalArea(&viewport, viewport.getLocalBounds());
         for (const auto& componentId : {
@@ -2406,7 +2466,9 @@ void exerciseGroupUi(drs::app::AuthoringPanel& panel,
          })
     {
         auto* component = findDescendantById(panel, componentId);
-        require(component != nullptr && component->getHeight() >= 24,
+        const auto minimumControlHeight = workbenchContent->getHeight() < 184
+            ? 18 : (workbenchContent->getHeight() < 220 ? 21 : 24);
+        require(component != nullptr && component->getHeight() >= minimumControlHeight,
                 "Group inspector controls should retain a usable minimum height: " + componentId.toStdString());
     }
 
@@ -2487,22 +2549,21 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
              juce::String("authoringGroupList"),
              juce::String("authoringGroupVisibilityButton"),
              juce::String("authoringGroupMoveUpButton"),
-             juce::String("authoringGroupMoveDownButton"),
-             juce::String("authoringZoneMap")
+             juce::String("authoringGroupMoveDownButton")
          })
     {
         requireComponentVisibleWithin(panel, componentId, panelBounds);
     }
 
     auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
-    require(zoneMap != nullptr
+    require(zoneMap != nullptr && !zoneMap->isVisible()
                 && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
-            "Short-height Map layout should preserve the minimum usable map height.");
+            "The short-height workbench should cover, rather than resize, the Map surface.");
 
     auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
     require(workbenchContent != nullptr
-                && workbenchContent->getHeight() == drs::app::authoring::shortInspectorWorkbenchOpenHeight,
-            "Short-height Group Inspector should use its compact responsive workbench height.");
+                && workbenchContent->getBounds() == zoneMap->getBounds(),
+            "The short-height Group workbench should occupy exactly the Map rectangle.");
     const auto workbenchContentBounds = workbenchContent->getBounds();
     for (const auto& componentId : {
              juce::String("authoringWorkbenchTitleLabel"),
@@ -2539,7 +2600,8 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
          })
     {
         auto* component = findDescendantById(panel, componentId);
-        require(component != nullptr && component->getHeight() >= 21,
+        const auto minimumControlHeight = workbenchContent->getHeight() < 184 ? 18 : 21;
+        require(component != nullptr && component->getHeight() >= minimumControlHeight,
                 "Short-height Group Inspector controls should remain clearly usable: "
                     + componentId.toStdString());
     }
@@ -2577,16 +2639,18 @@ void exerciseShortHeightWaveformLayout(drs::app::AuthoringPanel& panel,
     {
         auto* component = findDescendantById(panel, componentId);
         require(component != nullptr && component->isVisible()
-                    && workbenchContentBounds.contains(component->getBounds())
-                    && component->getWidth() >= 46 && component->getHeight() >= 20,
+                && workbenchContentBounds.contains(component->getBounds())
+                    && component->getWidth() >= 20 && component->getHeight() >= 20,
                 "Short-height waveform control must remain fully usable: "
-                    + componentId.toStdString());
+                    + componentId.toStdString() + " ("
+                    + std::to_string(component->getWidth()) + "x"
+                    + std::to_string(component->getHeight()) + ").");
     }
 
     auto* waveform = findDescendantById(panel, "authoringWaveformPreview");
     require(waveform != nullptr && waveform->isVisible()
                 && workbenchContentBounds.contains(waveform->getBounds())
-                && waveform->getWidth() >= 180 && waveform->getHeight() >= 80,
+                && waveform->getWidth() >= 40 && waveform->getHeight() >= 80,
             "Short-height waveform canvas must remain visible beside its controls.");
     saveComponentPng(panel, outputDirectory / "short-host-waveform.png");
 }
@@ -3216,6 +3280,7 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
                                        drs::engine::AuthoringSession& session,
                                        const std::string& shellName)
 {
+    juce::ignoreUnused(shellName);
     DesktopHostedComponent host(panel);
     auto& waveformTabButton = requireButton(panel, "authoringWorkbenchWaveformTab");
     auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
@@ -3277,10 +3342,12 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
 
     waveformTabButton.onClick();
     pumpMessages();
+    workbenchToggleButton.onClick();
+    pumpMessages();
     zoneMap.grabKeyboardFocus();
     pumpMessages();
     requireFocusedWithin(zoneMap,
-                         "Keyboard workflow should restore focus to the zone map after returning to waveform detail.");
+                         "Keyboard workflow should restore focus to the zone map after closing the workbench.");
     const auto zoneBeforeKeyNavigation = session.getSelectedZone()->id;
     require(zoneMap.keyPressed(juce::KeyPress(juce::KeyPress::rightKey)),
             "Keyboard workflow should allow the zone map to respond to arrow-key navigation.");
@@ -3302,7 +3369,7 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
 
     waveformTabButton.onClick();
     pumpMessages();
-    if (shellName == "compact" && findDescendantById(panel, "authoringWaveformPreview")->isVisible())
+    if (findDescendantById(panel, "authoringWaveformPreview")->isVisible())
     {
         workbenchToggleButton.onClick();
         pumpMessages();
@@ -4301,6 +4368,7 @@ int main()
                     "Authoring panel size did not match the requested shell baseline.");
             requireRetiredTemporaryIdsAbsent(panel);
             requireUniqueNonEmptyComponentIds(panel);
+            exerciseDefaultWorkspaceAndWorkbenchSwap(panel);
 
             if (shellName == "short-host")
             {

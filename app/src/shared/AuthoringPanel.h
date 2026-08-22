@@ -180,7 +180,8 @@ private:
     void moveSelectedGroup(int direction);
     void toggleSelectedGroupVisibility();
     void previewSelectedGroupAnchor();
-    void applySelectedMacroEdit(const juce::String& label);
+    enum class MacroEditField { name, exposure, defaultValue, range, assignment, role };
+    void applySelectedMacroEdit(const juce::String& label, MacroEditField field);
     void createMacro();
     void duplicateSelectedMacro();
     void deleteSelectedMacro();

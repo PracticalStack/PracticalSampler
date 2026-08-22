@@ -200,6 +200,70 @@ void prepareAuthoredPreview(drs::plugin::Processor& processor,
     crossBlock(processor, buffer, midi);
 }
 
+void verifyReleaseEditRebuildsProjectPreview(
+    const drs::engine::RuntimeProjectModel& sourceProject)
+{
+    using namespace drs::engine;
+    auto project = sourceProject;
+    const auto authoredZone = std::find_if(project.authoring.zones.begin(),
+                                           project.authoring.zones.end(),
+                                           [](const auto& zone) { return zone.id == "pad-a3-high"; });
+    require(authoredZone != project.authoring.zones.end(),
+            "Release invalidation coverage requires the looping pad zone.");
+    authoredZone->releaseSeconds = 1.0;
+    authoredZone->releaseShape = sfzDefaultReleaseShape;
+
+    drs::plugin::Processor processor;
+    prepareAuthoredPreview(processor, project);
+    const auto initialController = processor.getAuthoringPreviewControllerSnapshot();
+    require(initialController.hasRequest && !initialController.currentRequest.requestSignature.empty(),
+            "Release invalidation coverage requires an initial selected-zone Preview signature.");
+    const auto initialSignature = initialController.currentRequest.requestSignature;
+
+    auto editedZone = processor.getAuthoringSession().getSelectedZone();
+    require(editedZone.has_value(),
+            "Release invalidation coverage requires the selected authored zone.");
+    editedZone->releaseSeconds = 0.005;
+    editedZone->releaseShape = 0.0;
+    const auto edit = processor.getAuthoringSession().updateSelectedZone(
+        *editedZone, "Update zone release");
+    require(edit.applied, "The project-mode release edit must commit before Preview refresh.");
+    const auto editedRevision = processor.getAuthoringSession().getDocumentState().revision;
+
+    juce::AudioBuffer<float> buffer(2, 256);
+    juce::MidiBuffer midi;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    auto activatedEditedRelease = false;
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        crossBlock(processor, buffer, midi);
+        const auto controller = processor.getAuthoringPreviewControllerSnapshot();
+        if (controller.hasActiveRequest
+            && controller.activeRequestIdentity.draftRevision == editedRevision
+            && controller.currentRequest.requestSignature != initialSignature)
+        {
+            require(controller.currentRequest.invalidationCategory
+                        == AuthoringPreviewInvalidationCategory::release,
+                    "A release edit must be classified as a release-law invalidation.");
+            activatedEditedRelease = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    require(activatedEditedRelease,
+            "Project-mode Preview reused a stale prepared model after release seconds/shape changed.");
+
+    processor.queueAuthoringPreviewNoteOn(57, 0.8f);
+    crossBlock(processor, buffer, midi);
+    require(processor.getRealtimeSafetySnapshot().authoringPreviewActiveVoiceCount == 1,
+            "The rebuilt project Preview must start the edited zone.");
+    processor.queueAuthoringPreviewNoteOff(57);
+    crossBlock(processor, buffer, midi);
+    require(processor.getRealtimeSafetySnapshot().authoringPreviewActiveVoiceCount == 0,
+            "The rebuilt project Preview must use the edited 5 ms Linear release law.");
+}
+
 void runProcessorTimingAndIsolation(const drs::engine::RuntimeProjectModel& project)
 {
     using namespace drs::engine;
@@ -386,6 +450,7 @@ int main()
         const auto loaded = drs::engine::loadPhase2ReferenceProjectManifest();
         require(loaded.loaded, "Mini Sprint 5.5 requires the authored reference project.");
         runCommandOwnershipContract();
+        verifyReleaseEditRebuildsProjectPreview(loaded.project);
         runProcessorTimingAndIsolation(loaded.project);
         runUiSourceAndEditorCloseCoverage(loaded.project);
         std::cout << "Mini Sprint 5.5 audition command and Preview-only routing matrix passed."

@@ -1185,7 +1185,10 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
 {
     setLookAndFeel(&authoringLookAndFeel);
     setComponentID("authoringWorkspace");
-    workbenchState.open = isExpandedLayout(layoutMode);
+    // The primary authoring surface opens on the hierarchy and Map. The
+    // workbench is an explicit, temporary replacement for the Map rather than
+    // a second surface that consumes workspace height by default.
+    workbenchState.open = false;
     workbenchState.activeTab = authoring::WorkbenchTab::waveform;
     workbenchLayoutState.setOpen(workbenchState.open);
     workbenchLayoutState.suggestHeightForTab(workbenchState.activeTab);
@@ -1980,6 +1983,21 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     structureInspector.setOnPatchRequested([this](const authoring::StructureSelectionKind kind,
                                                   drs::engine::AuthoringStructureBatchPatch patch)
     {
+        if (kind == authoring::StructureSelectionKind::instrument)
+        {
+            if (!patch.releaseSeconds.has_value())
+                return;
+            std::vector<std::string> zoneIds;
+            zoneIds.reserve(authoringSession.getProject().authoring.zones.size());
+            for (const auto& zone : authoringSession.getProject().authoring.zones)
+                zoneIds.push_back(zone.id);
+            const auto result = authoringSession.applyStructureBatchPatch(
+                drs::engine::AuthoringStructureEntityKind::zone,
+                zoneIds, patch, "Edit instrument descendant zones");
+            if (result.applied)
+                refreshFromSession();
+            return;
+        }
         const auto entityKind = kind == authoring::StructureSelectionKind::layer
             ? drs::engine::AuthoringStructureEntityKind::layer
             : kind == authoring::StructureSelectionKind::group
@@ -2347,15 +2365,15 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroAssignmentRemoveButton.onClick = [this] { removeSelectedMacroAssignment(); };
     macroNameEditor.setMultiLine(false);
     macroNameEditor.setReturnKeyStartsNewLine(false);
-    macroNameEditor.onReturnKey = [this] { applySelectedMacroEdit("Rename macro"); };
-    macroNameEditor.onFocusLost = [this] { applySelectedMacroEdit("Rename macro"); };
+    macroNameEditor.onReturnKey = [this] { applySelectedMacroEdit("Rename macro", MacroEditField::name); };
+    macroNameEditor.onFocusLost = [this] { applySelectedMacroEdit("Rename macro", MacroEditField::name); };
     macroExposeToggle.setButtonText("Expose In Perform");
     macroExposeToggle.onClick = [this]
     {
         if (isRefreshing)
             return;
 
-        applySelectedMacroEdit("Toggle macro exposure");
+        applySelectedMacroEdit("Toggle macro exposure", MacroEditField::exposure);
     };
 
     fxSelector.onChange = [this]
@@ -2431,16 +2449,16 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         };
     };
 
-    bindCommitOnDragEnd(macroDefaultSlider, "Update macro default", [this](const juce::String& label) { applySelectedMacroEdit(label); });
-    bindCommitOnDragEnd(macroMinSlider, "Update macro range", [this](const juce::String& label) { applySelectedMacroEdit(label); });
-    bindCommitOnDragEnd(macroMaxSlider, "Update macro range", [this](const juce::String& label) { applySelectedMacroEdit(label); });
+    bindCommitOnDragEnd(macroDefaultSlider, "Update macro default", [this](const juce::String& label) { applySelectedMacroEdit(label, MacroEditField::defaultValue); });
+    bindCommitOnDragEnd(macroMinSlider, "Update macro range", [this](const juce::String& label) { applySelectedMacroEdit(label, MacroEditField::range); });
+    bindCommitOnDragEnd(macroMaxSlider, "Update macro range", [this](const juce::String& label) { applySelectedMacroEdit(label, MacroEditField::range); });
 
     macroAssignmentSelector.onChange = [this]
     {
         if (isRefreshing)
             return;
 
-        applySelectedMacroEdit("Update macro assignment");
+        applySelectedMacroEdit("Update macro assignment", MacroEditField::assignment);
     };
 
     macroRoleSelector.onChange = [this]
@@ -2448,7 +2466,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
         if (isRefreshing)
             return;
 
-        applySelectedMacroEdit("Update macro role");
+        applySelectedMacroEdit("Update macro role", MacroEditField::role);
     };
 
     macroMoveUpButton.setButtonText("Move Up");
@@ -3111,6 +3129,11 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                     "Structure parent ID",
                                     "Changes the parent layer for groups or parent group for zones.",
                                     "Enter a valid stable parent ID and apply the edit atomically to the selection.");
+    if (auto* releaseEditor = structureInspector.findChildWithID("authoringStructureInspectorZoneReleaseEditor"))
+        configureAccessibleMetadata(*releaseEditor,
+                                    "Zone release seconds",
+                                    "Edits release seconds for selected zones or every descendant zone of the selected instrument, layers, and groups.",
+                                    "Enter a non-negative duration in seconds. The complete hierarchy edit is committed as one undoable transaction.");
     for (const auto& action : {
              std::pair<const char*, const char*> { "authoringStructureInspectorPrimaryAction", "Primary structure action" },
              std::pair<const char*, const char*> { "authoringStructureInspectorSecondaryAction", "Secondary structure action" },
@@ -3127,8 +3150,8 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                     ? *structureInspector.findChildWithID("authoringStructureInspectorApplyButton")
                                     : structureInspector,
                                 "Apply structure edit",
-                                "Applies the entered shared inspector values to every selected entity.",
-                                "Press to commit one atomic structure-selection edit.");
+                                "Applies shared values to every selected entity; release seconds also applies to descendant zones of the instrument, layers, and groups.",
+                                "Press to commit one atomic hierarchy edit.");
     showMapButton.setExplicitFocusOrder(34);
     structureBrowser.setExplicitFocusOrder(35);
     structureInspector.setExplicitFocusOrder(36);
@@ -3770,28 +3793,65 @@ void AuthoringPanel::resized()
         && workbenchState.activeTab == authoring::WorkbenchTab::routing;
     const auto inspectorWorkbenchInShortLayout = groupWorkbenchInShortLayout || routingWorkbenchInShortLayout;
     const auto mapGap = inspectorWorkbenchInShortLayout ? 4 : 8;
-    auto workbenchHeight = workbenchLayoutState.resolveHeight(
-        area.getHeight(), authoring::minimumMapVisibleHeight, mapGap);
-    if (inspectorWorkbenchInShortLayout && !workbenchLayoutState.hasUserHeight())
-        workbenchHeight = std::min(workbenchHeight,
-                                authoring::workbenchTabStripHeight
-                                    + authoring::shortInspectorWorkbenchOpenHeight);
-    auto workbenchArea = area.removeFromBottom(std::min(workbenchHeight, area.getHeight()));
-    workbenchRegion.setBounds(workbenchArea);
-    if (workbenchState.open)
+
+    // The tab strip is persistent chrome. Opening the workbench must not
+    // reflow the hierarchy or inspector; its content uses the exact rectangle
+    // that otherwise belongs to the Map.
+    auto workbenchTabArea = area.removeFromBottom(
+        std::min(authoring::workbenchTabStripHeight, area.getHeight()));
+    workbenchTabStrip.setBounds(workbenchTabArea);
+
+    area.removeFromTop(std::min(mapGap, area.getHeight()));
+    auto shellArea = area;
+    const auto desiredInspectorWidth = expanded ? authoring::expandedInspectorPreferredWidth
+                                                : authoring::compactInspectorPreferredWidth;
+    const auto minimumInspectorWidth = expanded ? authoring::expandedInspectorMinWidth
+                                                : authoring::compactInspectorMinWidth;
+    const auto maximumInspectorWidth = expanded ? authoring::expandedInspectorMaxWidth
+                                                : authoring::compactInspectorMaxWidth;
+    const auto inspectorWidth = juce::jlimit(minimumInspectorWidth,
+                                             std::min(maximumInspectorWidth,
+                                                      std::max(minimumInspectorWidth,
+                                                               shellArea.getWidth() / 2)),
+                                             desiredInspectorWidth);
+
+    auto inspector = shellArea.removeFromRight(inspectorWidth);
+    shellArea.removeFromRight(std::min(14, shellArea.getWidth()));
+    juce::Rectangle<int> structureBrowserArea;
+    const auto desiredGroupManagerHeight = expanded ? 252 : 264;
+    constexpr auto minimumStackedStructureHeight = 180;
+    const auto availableStackedStructureHeight = shellArea.getHeight()
+        - authoring::minimumMapVisibleHeight - 8;
+    const auto canStackGroupManager = availableStackedStructureHeight
+        >= minimumStackedStructureHeight;
+    if (canStackGroupManager)
     {
-        workbenchSplitter.setBounds(workbenchArea.getX(),
-                                    workbenchArea.getY() - authoring::WorkbenchLayoutState::splitterHeight / 2,
-                                    workbenchArea.getWidth(),
-                                    authoring::WorkbenchLayoutState::splitterHeight);
-        workbenchSplitter.setCurrentHeight(workbenchHeight);
+        structureBrowserArea = shellArea.removeFromTop(
+            std::min(desiredGroupManagerHeight, availableStackedStructureHeight));
     }
     else
     {
-        workbenchSplitter.setBounds({});
+        const auto groupManagerWidth = shortHeightLayout
+            ? std::min(200, std::max(188, shellArea.getWidth() - 280))
+            : std::min(expanded ? 248 : 224,
+                       std::max(188, shellArea.getWidth() / 3));
+        structureBrowserArea = shellArea.removeFromLeft(groupManagerWidth);
+        shellArea.removeFromLeft(std::min(10, shellArea.getWidth()));
     }
-    workbenchTabStrip.setBounds(workbenchArea.removeFromTop(authoring::workbenchTabStripHeight));
-    workbenchContentHost.setBounds(workbenchArea);
+
+    const auto mapSurfaceArea = shellArea;
+    workbenchRegion.setBounds(mapSurfaceArea);
+    workbenchContentHost.setBounds(mapSurfaceArea);
+    workbenchSplitter.setBounds({});
+
+    const auto groupWorkbenchInCompactSurface = workbenchState.activeTab
+            == authoring::WorkbenchTab::groups
+        && (shortHeightLayout || workbenchContentHost.getHeight() < 220);
+    const auto groupWorkbenchInVeryCompactSurface = groupWorkbenchInCompactSurface
+        && workbenchContentHost.getHeight() < 184;
+    const auto performanceWorkbenchInCompactSurface = workbenchState.activeTab
+            == authoring::WorkbenchTab::performance
+        && workbenchContentHost.getHeight() < 220;
 
     auto toggleArea = workbenchTabStrip.getBounds().reduced(0, 4);
     workbenchToggleButton.setBounds(toggleArea.removeFromRight(110));
@@ -3815,10 +3875,12 @@ void AuthoringPanel::resized()
     tabArea.removeFromLeft(tabGap);
     workbenchArticulationsTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
 
-    const auto waveformWorkbenchInShortLayout = shortHeightLayout
-        && workbenchState.activeTab == authoring::WorkbenchTab::waveform;
+    const auto waveformWorkbenchInShortLayout = workbenchState.activeTab
+            == authoring::WorkbenchTab::waveform
+        && (shortHeightLayout || workbenchContentHost.getHeight() < 220);
     auto workbenchEditorArea = workbenchContentHost.getBounds().reduced(
-        12, (inspectorWorkbenchInShortLayout || waveformWorkbenchInShortLayout) ? 6 : 10);
+        12, (inspectorWorkbenchInShortLayout || groupWorkbenchInCompactSurface
+             || waveformWorkbenchInShortLayout || performanceWorkbenchInCompactSurface) ? 6 : 10);
     if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
     {
         auto headingRow = workbenchEditorArea.removeFromTop(22);
@@ -3831,12 +3893,18 @@ void AuthoringPanel::resized()
     }
     else if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
     {
-        auto headingRow = workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 20 : 22);
+        auto headingRow = workbenchEditorArea.removeFromTop(groupWorkbenchInCompactSurface ? 20 : 22);
         waveformLabel.setBounds(headingRow.removeFromLeft(std::min(160, headingRow.getWidth())));
         waveformScopeLabel.setBounds(headingRow);
-        workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 0 : 1);
+        workbenchEditorArea.removeFromTop(groupWorkbenchInCompactSurface ? 0 : 1);
         workbenchBreadcrumbLabel.setBounds(workbenchEditorArea.removeFromTop(14));
-        workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 2 : 3);
+        workbenchEditorArea.removeFromTop(groupWorkbenchInCompactSurface ? 2 : 3);
+    }
+    else if (performanceWorkbenchInCompactSurface)
+    {
+        waveformLabel.setBounds(workbenchEditorArea.removeFromTop(20));
+        waveformScopeLabel.setBounds(workbenchEditorArea.removeFromTop(12));
+        workbenchBreadcrumbLabel.setBounds(workbenchEditorArea.removeFromTop(12));
     }
     else
     {
@@ -3852,17 +3920,20 @@ void AuthoringPanel::resized()
     {
         constexpr auto paneGap = 10;
         constexpr auto rowGap = 3;
-        constexpr auto footerHeight = 34;
+        const auto footerHeight = waveformWorkbenchInShortLayout ? 20 : 34;
 
         auto footer = workbenchEditorArea.removeFromBottom(
             std::min(footerHeight, workbenchEditorArea.getHeight()));
-        workbenchEditorArea.removeFromBottom(std::min(4, workbenchEditorArea.getHeight()));
+        workbenchEditorArea.removeFromBottom(std::min(waveformWorkbenchInShortLayout ? 2 : 4,
+                                                      workbenchEditorArea.getHeight()));
         auto body = workbenchEditorArea;
 
-        const auto minimumWaveformWidth = body.getWidth() >= 650 ? 200 : 140;
+        const auto minimumWaveformWidth = body.getWidth() >= 650 ? 200 : 40;
+        const auto maximumControlPaneWidth = std::max(
+            0, body.getWidth() - minimumWaveformWidth - paneGap);
         const auto controlPaneWidth = std::min(
-            body.getWidth(),
-            std::min(560, std::max(360, body.getWidth() - minimumWaveformWidth - paneGap)));
+            maximumControlPaneWidth,
+            std::min(560, std::max(360, maximumControlPaneWidth)));
         auto controlPane = body.removeFromRight(controlPaneWidth);
         body.removeFromRight(std::min(paneGap, body.getWidth()));
         waveformPreview.setBounds(body);
@@ -3909,15 +3980,30 @@ void AuthoringPanel::resized()
             return row;
         };
 
-        layoutWeightedRow(takeControlRow(true),
+        if (waveformWorkbenchInShortLayout)
         {
-            { &waveformPlaybackStartLabel, 70 },
-            { &waveformPlaybackStartEditor, 76 },
-            { &waveformPlaybackEndLabel, 28 },
-            { &waveformPlaybackEndEditor, 76 },
-            { &waveformPlaybackApplyButton, 96 },
-            { &waveformPlaybackResetButton, 96 }
-        });
+            layoutWeightedRow(takeControlRow(true),
+            {
+                { &waveformPlaybackStartLabel, 20 },
+                { &waveformPlaybackStartEditor, 55 },
+                { &waveformPlaybackEndLabel, 20 },
+                { &waveformPlaybackEndEditor, 55 },
+                { &waveformPlaybackApplyButton, 65 },
+                { &waveformPlaybackResetButton, 65 }
+            });
+        }
+        else
+        {
+            layoutWeightedRow(takeControlRow(true),
+            {
+                { &waveformPlaybackStartLabel, 70 },
+                { &waveformPlaybackStartEditor, 76 },
+                { &waveformPlaybackEndLabel, 28 },
+                { &waveformPlaybackEndEditor, 76 },
+                { &waveformPlaybackApplyButton, 96 },
+                { &waveformPlaybackResetButton, 96 }
+            });
+        }
         layoutWeightedRow(takeControlRow(true),
         {
             { &waveformSetPlaybackSelectionButton, 156 },
@@ -3925,17 +4011,34 @@ void AuthoringPanel::resized()
             { &waveformSelectLoopButton, 96 },
             { &waveformPlaybackAuditionButton, 120 }
         });
-        layoutWeightedRow(takeControlRow(true),
+        if (waveformWorkbenchInShortLayout)
         {
-            { &waveformLoopModeSelector, 112 },
-            { &waveformLoopStartLabel, 64 },
-            { &waveformLoopStartEditor, 64 },
-            { &waveformLoopEndLabel, 28 },
-            { &waveformLoopEndEditor, 64 },
-            { &waveformLoopCrossfadeLabel, 42 },
-            { &waveformLoopCrossfadeEditor, 64 },
-            { &waveformLoopApplyButton, 58 }
-        });
+            layoutWeightedRow(takeControlRow(true),
+            {
+                { &waveformLoopModeSelector, 58 },
+                { &waveformLoopStartLabel, 20 },
+                { &waveformLoopStartEditor, 50 },
+                { &waveformLoopEndLabel, 20 },
+                { &waveformLoopEndEditor, 50 },
+                { &waveformLoopCrossfadeLabel, 20 },
+                { &waveformLoopCrossfadeEditor, 50 },
+                { &waveformLoopApplyButton, 50 }
+            });
+        }
+        else
+        {
+            layoutWeightedRow(takeControlRow(true),
+            {
+                { &waveformLoopModeSelector, 112 },
+                { &waveformLoopStartLabel, 64 },
+                { &waveformLoopStartEditor, 64 },
+                { &waveformLoopEndLabel, 28 },
+                { &waveformLoopEndEditor, 64 },
+                { &waveformLoopCrossfadeLabel, 42 },
+                { &waveformLoopCrossfadeEditor, 64 },
+                { &waveformLoopApplyButton, 58 }
+            });
+        }
         layoutWeightedRow(takeControlRow(false),
         {
             { &waveformSetLoopSelectionButton, 156 },
@@ -3966,13 +4069,17 @@ void AuthoringPanel::resized()
 
     if (workbenchState.activeTab == authoring::WorkbenchTab::groups)
     {
-        const auto fieldRowHeight = groupWorkbenchInShortLayout ? 21 : (expanded ? 26 : 24);
-        const auto summaryRowHeight = groupWorkbenchInShortLayout ? 16 : (expanded ? 20 : 18);
-        const auto actionRowHeight = groupWorkbenchInShortLayout ? 24 : (expanded ? 30 : 28);
+        const auto fieldRowHeight = groupWorkbenchInVeryCompactSurface
+            ? 18 : (groupWorkbenchInCompactSurface ? 21 : (expanded ? 26 : 24));
+        const auto summaryRowHeight = groupWorkbenchInVeryCompactSurface
+            ? 12 : (groupWorkbenchInCompactSurface ? 16 : (expanded ? 20 : 18));
+        const auto actionRowHeight = groupWorkbenchInVeryCompactSurface
+            ? 20 : (groupWorkbenchInCompactSurface ? 24 : (expanded ? 30 : 28));
+        const auto fieldGap = groupWorkbenchInVeryCompactSurface ? 1 : 2;
 
         auto row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutLabelAndField(row, groupNameLabel, groupNameEditor, 92);
-        workbenchEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(fieldGap);
 
         row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
@@ -3982,7 +4089,7 @@ void AuthoringPanel::resized()
                                    groupVisibilityLabel,
                                    groupVisibilityToggle,
                                    74);
-        workbenchEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(fieldGap);
 
         row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
@@ -3992,7 +4099,7 @@ void AuthoringPanel::resized()
                                    groupPanLabel,
                                    groupPanSlider,
                                    36);
-        workbenchEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(fieldGap);
 
         row = workbenchEditorArea.removeFromTop(fieldRowHeight);
         layoutDualLabelAndFieldRow(row,
@@ -4002,14 +4109,16 @@ void AuthoringPanel::resized()
                                    groupAnchorLabel,
                                    groupAnchorSelector,
                                    96);
-        workbenchEditorArea.removeFromTop(2);
+        workbenchEditorArea.removeFromTop(fieldGap);
         auto summaryRow = workbenchEditorArea.removeFromTop(summaryRowHeight);
         auto groupSummaryArea = summaryRow.removeFromLeft((summaryRow.getWidth() - 12) / 2);
         summaryRow.removeFromLeft(12);
         groupSummaryLabel.setBounds(groupSummaryArea);
         groupRoundRobinLabel.setBounds(summaryRow);
         groupRoundRobinHintLabel.setBounds({});
-        workbenchEditorArea.removeFromTop(groupWorkbenchInShortLayout ? 3 : (expanded ? 6 : 4));
+        workbenchEditorArea.removeFromTop(groupWorkbenchInVeryCompactSurface
+                                              ? 2
+                                              : (groupWorkbenchInCompactSurface ? 3 : (expanded ? 6 : 4)));
 
         auto actionRow = workbenchEditorArea.removeFromTop(actionRowHeight);
         constexpr auto actionGap = 8;
@@ -4160,22 +4269,6 @@ void AuthoringPanel::resized()
         }
     }
 
-    area.removeFromTop(mapGap);
-    auto shellArea = area;
-    const auto desiredInspectorWidth = expanded ? authoring::expandedInspectorPreferredWidth
-                                                : authoring::compactInspectorPreferredWidth;
-    const auto minimumInspectorWidth = expanded ? authoring::expandedInspectorMinWidth
-                                                : authoring::compactInspectorMinWidth;
-    const auto maximumInspectorWidth = expanded ? authoring::expandedInspectorMaxWidth
-                                                : authoring::compactInspectorMaxWidth;
-    const auto inspectorWidth = juce::jlimit(minimumInspectorWidth,
-                                             std::min(maximumInspectorWidth, std::max(minimumInspectorWidth, shellArea.getWidth() / 2)),
-                                             desiredInspectorWidth);
-
-    auto inspector = shellArea.removeFromRight(inspectorWidth);
-    shellArea.removeFromRight(14);
-    juce::Rectangle<int> structureBrowserArea;
-
     auto layoutGroupManager = [&](juce::Rectangle<int> groupManagerArea)
     {
         const auto groupManagerOrigin = groupManagerArea;
@@ -4298,25 +4391,9 @@ void AuthoringPanel::resized()
         }
     };
 
-    const auto desiredGroupManagerHeight = expanded ? 252 : 264;
-    const auto canStackGroupManager = shellArea.getHeight() >= authoring::minimumMapVisibleHeight + desiredGroupManagerHeight + 8;
-    if (canStackGroupManager)
-    {
-        structureBrowserArea = shellArea.removeFromTop(desiredGroupManagerHeight);
-        layoutGroupManager(structureBrowserArea);
-    }
-    else
-    {
-        const auto groupManagerWidth = shortHeightLayout
-            ? std::min(280, std::max(240, shellArea.getWidth() - 200))
-            : std::min(expanded ? 248 : 224,
-                       std::max(188, shellArea.getWidth() / 3));
-        structureBrowserArea = shellArea.removeFromLeft(groupManagerWidth);
-        layoutGroupManager(structureBrowserArea);
-        shellArea.removeFromLeft(std::min(10, shellArea.getWidth()));
-    }
+    layoutGroupManager(structureBrowserArea);
 
-    zoneMap.setBounds(shellArea);
+    zoneMap.setBounds(mapSurfaceArea);
     structureBrowser.setBounds(structureBrowserArea);
     const auto showingMap = structureViewState.isMapPaneVisible();
     if (!showingMap)
@@ -4324,7 +4401,7 @@ void AuthoringPanel::resized()
         // When Show Map is off, reclaim the Map rectangle instead of leaving
         // an empty placeholder. The inspector becomes the wide authoring
         // surface while the hierarchy remains visible for navigation.
-        structureInspector.setBounds(shellArea.getUnion(inspector));
+        structureInspector.setBounds(mapSurfaceArea.getUnion(inspector));
         zoneMap.setBounds({});
     }
     else
@@ -5209,7 +5286,7 @@ void AuthoringPanel::setWorkbenchOpen(bool shouldOpen)
 
     workbenchState.open = shouldOpen;
     workbenchLayoutState.setOpen(shouldOpen);
-    refreshWorkbenchVisibility();
+    refreshInspectorVisibility();
     resized();
 }
 
@@ -5219,7 +5296,7 @@ void AuthoringPanel::setActiveWorkbenchTab(authoring::WorkbenchTab nextTab)
     workbenchState.open = true;
     workbenchLayoutState.suggestHeightForTab(nextTab);
     workbenchLayoutState.setOpen(true);
-    refreshWorkbenchVisibility();
+    refreshInspectorVisibility();
     resized();
     if (workbenchState.activeTab == authoring::WorkbenchTab::waveform)
         requestWaveformPreviewLoad(true);
@@ -6087,7 +6164,9 @@ void AuthoringPanel::refreshContextualAccessibility()
 void AuthoringPanel::refreshInspectorVisibility()
 {
     const auto showingMap = structureViewState.isMapPaneVisible();
-    zoneMap.setVisible(showingMap);
+    // The workbench replaces only the Map surface. The hierarchy and the
+    // context-sensitive inspector remain visible and keep the same bounds.
+    zoneMap.setVisible(showingMap && !workbenchState.open);
     structureBrowser.setVisible(true);
     // Layer/group contexts use the unified structure inspector. Zone context
     // keeps the mature Zone Mapping editor because it exposes the complete
@@ -8597,27 +8676,41 @@ std::vector<std::string> AuthoringPanel::collectSelectedZoneIdsForGrouping() con
     return zoneIds;
 }
 
-void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
+void AuthoringPanel::applySelectedMacroEdit(const juce::String& label,
+                                            const MacroEditField field)
 {
     const auto& macros = authoringSession.getProject().authoring.macros;
     if (selectedMacroIndex < 0 || static_cast<std::size_t>(selectedMacroIndex) >= macros.size())
         return;
 
     auto editedMacro = macros[static_cast<std::size_t>(selectedMacroIndex)];
-    editedMacro.name = macroNameEditor.getText().trim().toStdString();
-    editedMacro.exposedInPerformance = macroExposeToggle.getToggleState();
-    auto minValue = macroMinSlider.getValue();
-    auto maxValue = macroMaxSlider.getValue();
-    if (minValue > maxValue)
-        std::swap(minValue, maxValue);
-
-    editedMacro.minValue = minValue;
-    editedMacro.maxValue = maxValue;
-    editedMacro.defaultValue = std::clamp(macroDefaultSlider.getValue(), editedMacro.minValue, editedMacro.maxValue);
+    if (field == MacroEditField::name)
+        editedMacro.name = macroNameEditor.getText().trim().toStdString();
+    else if (field == MacroEditField::exposure)
+        editedMacro.exposedInPerformance = macroExposeToggle.getToggleState();
+    else if (field == MacroEditField::defaultValue)
+        editedMacro.defaultValue = std::clamp(macroDefaultSlider.getValue(),
+                                              editedMacro.minValue,
+                                              editedMacro.maxValue);
+    else if (field == MacroEditField::range)
+    {
+        auto minValue = macroMinSlider.getValue();
+        auto maxValue = macroMaxSlider.getValue();
+        if (minValue > maxValue)
+            std::swap(minValue, maxValue);
+        editedMacro.minValue = minValue;
+        editedMacro.maxValue = maxValue;
+        editedMacro.defaultValue = std::clamp(macroDefaultSlider.getValue(), minValue, maxValue);
+        for (auto& target : editedMacro.targets)
+        {
+            target.sourceMinimum = minValue;
+            target.sourceMaximum = maxValue;
+        }
+    }
 
     const auto assignmentId = macroAssignmentSelector.getSelectedId();
     auto editableTargetIndex = selectedMacroTargetIndex;
-    if (assignmentId == unassignedMacroAssignmentId)
+    if (field == MacroEditField::assignment && assignmentId == unassignedMacroAssignmentId)
     {
         if (editableTargetIndex >= 0
             && static_cast<std::size_t>(editableTargetIndex) < editedMacro.targets.size())
@@ -8628,7 +8721,8 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
                                 static_cast<int>(editedMacro.targets.size()) - 1);
         }
     }
-    else if (assignmentId >= curatedMacroAssignmentBase
+    else if (field == MacroEditField::assignment
+             && assignmentId >= curatedMacroAssignmentBase
              && assignmentId < curatedMacroAssignmentBase + static_cast<int>(curatedMacroAssignments.size()))
     {
         if (editableTargetIndex < 0
@@ -8653,7 +8747,8 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
         if (target.role.empty())
             target.role = assignment.defaultRole;
     }
-    else if (assignmentId >= curatedDspMacroAssignmentBase)
+    else if (field == MacroEditField::assignment
+             && assignmentId >= curatedDspMacroAssignmentBase)
     {
         const auto dspAssignments = buildCuratedDspMacroAssignments(authoringSession.getProject(),
                                                                     selectedDspScopeRoutingBusId(),
@@ -8685,7 +8780,8 @@ void AuthoringPanel::applySelectedMacroEdit(const juce::String& label)
         }
     }
 
-    if (editableTargetIndex >= 0
+    if (field == MacroEditField::role
+        && editableTargetIndex >= 0
         && static_cast<std::size_t>(editableTargetIndex) < editedMacro.targets.size())
     {
         auto selectedRoleText = macroRoleSelector.getText().toStdString();

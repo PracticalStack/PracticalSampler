@@ -78,7 +78,8 @@ enum class AuthoringPreviewInvalidationCategory : std::uint8_t
     sourceAssignment,
     selection,
     previewScope,
-    authoredTopology
+    authoredTopology,
+    release
 };
 
 enum class AuthoringPreviewNotePolicyEvent : std::uint8_t

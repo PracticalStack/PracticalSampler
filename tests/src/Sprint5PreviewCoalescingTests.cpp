@@ -32,6 +32,7 @@ int main()
             AuthoringPreviewInvalidationCategory::velocityRange,
             AuthoringPreviewInvalidationCategory::sampleStartOffset,
             AuthoringPreviewInvalidationCategory::loop,
+            AuthoringPreviewInvalidationCategory::release,
             AuthoringPreviewInvalidationCategory::sourceAssignment,
             AuthoringPreviewInvalidationCategory::selection,
             AuthoringPreviewInvalidationCategory::previewScope

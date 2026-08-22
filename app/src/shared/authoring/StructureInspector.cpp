@@ -35,6 +35,35 @@ std::string kindName(const StructureSelectionKind kind)
     if (kind == StructureSelectionKind::zone) return "Zone";
     return "Selection";
 }
+
+std::vector<const drs::engine::RuntimeProjectZoneDefinition*> collectDescendantZones(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::vector<const drs::engine::RuntimeProjectLayerDefinition*>& layers)
+{
+    std::vector<const drs::engine::RuntimeProjectZoneDefinition*> zones;
+    for (const auto& zone : project.authoring.zones)
+    {
+        const auto group = std::find_if(project.authoring.groups.begin(), project.authoring.groups.end(),
+                                        [&](const auto& candidate) { return candidate.id == zone.groupId; });
+        if (group != project.authoring.groups.end()
+            && std::any_of(layers.begin(), layers.end(),
+                           [&](const auto* layer) { return group->layerId == layer->id; }))
+            zones.push_back(&zone);
+    }
+    return zones;
+}
+
+std::vector<const drs::engine::RuntimeProjectZoneDefinition*> collectDescendantZones(
+    const drs::engine::RuntimeProjectModel& project,
+    const std::vector<const drs::engine::RuntimeProjectGroupDefinition*>& groups)
+{
+    std::vector<const drs::engine::RuntimeProjectZoneDefinition*> zones;
+    for (const auto& zone : project.authoring.zones)
+        if (std::any_of(groups.begin(), groups.end(),
+                        [&](const auto* group) { return zone.groupId == group->id; }))
+            zones.push_back(&zone);
+    return zones;
+}
 } // namespace
 
 StructureInspectorSnapshot buildStructureInspectorSnapshot(
@@ -49,11 +78,16 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
 
     if (selection.getKind() == StructureSelectionKind::instrument)
     {
+        std::vector<const drs::engine::RuntimeProjectZoneDefinition*> zones;
+        zones.reserve(project.authoring.zones.size());
+        for (const auto& zone : project.authoring.zones)
+            zones.push_back(&zone);
         result.title = "Instrument";
         result.fields = {
             { "Layers", std::to_string(project.authoring.layers.size()) },
             { "Groups", std::to_string(project.authoring.groups.size()) },
             { "Zones", std::to_string(project.authoring.zones.size()) },
+            { "Zone release", collectField(zones, [](const auto& value) { return std::to_string(value.releaseSeconds) + " s"; }) },
             { "Map scope", "Instrument" }
         };
     }
@@ -64,6 +98,7 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
             if (selection.contains(layer.id)) layers.push_back(&layer);
         if (!layers.empty())
         {
+            const auto zones = collectDescendantZones(project, layers);
             result.title = kindName(result.kind) + ": " + (selection.getPrimaryId().empty()
                 ? layers.front()->displayName : std::string { [&]() { for (const auto* l : layers) if (l->id == selection.getPrimaryId()) return l->displayName; return layers.front()->displayName; }() });
             result.fields = {
@@ -79,6 +114,7 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
                     {
                         return std::to_string(value.crossfade.low) + "–" + std::to_string(value.crossfade.high);
                     }) },
+                { "Zone release", collectField(zones, [](const auto& value) { return std::to_string(value.releaseSeconds) + " s"; }) },
                 { "Effective summary", std::to_string(std::count_if(project.authoring.groups.begin(), project.authoring.groups.end(), [&](const auto& group) { return std::any_of(layers.begin(), layers.end(), [&](const auto* layer) { return group.layerId == layer->id; }); })) + " groups" }
             };
         }
@@ -90,6 +126,7 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
             if (selection.contains(group.id)) groups.push_back(&group);
         if (!groups.empty())
         {
+            const auto zones = collectDescendantZones(project, groups);
             result.title = kindName(result.kind) + ": " + groups.front()->displayName;
             result.fields = {
                 { "Selected", std::to_string(groups.size()) },
@@ -106,6 +143,7 @@ StructureInspectorSnapshot buildStructureInspectorSnapshot(
                         return std::any_of(groups.begin(), groups.end(), [&](const auto* group) { return zone.groupId == group->id; })
                             && zone.roundRobinLength > 0;
                     })) + " zones" },
+                { "Zone release", collectField(zones, [](const auto& value) { return std::to_string(value.releaseSeconds) + " s"; }) },
                 { "Effective summary", std::to_string(std::count_if(project.authoring.zones.begin(), project.authoring.zones.end(), [&](const auto& zone) { return std::any_of(groups.begin(), groups.end(), [&](const auto* group) { return zone.groupId == group->id; }); })) + " zones" }
             };
         }
@@ -163,6 +201,8 @@ StructureInspector::StructureInspector()
     parentEditor.setColour(juce::TextEditor::textColourId, visual::text);
     parentEditor.setComponentID("authoringStructureInspectorParentEditor");
     parentEditor.setTextToShowWhenEmpty("parent stable ID", visual::textMuted);
+    releaseEditor.setComponentID("authoringStructureInspectorZoneReleaseEditor");
+    releaseEditor.setTextToShowWhenEmpty("zone release seconds", visual::textMuted);
     visibilityToggle.setButtonText("Visible");
     visibilityToggle.setComponentID("authoringStructureInspectorVisibility");
     gainMinusButton.setButtonText("Gain −1");
@@ -212,7 +252,8 @@ StructureInspector::StructureInspector()
         if (onPatchRequested == nullptr || snapshot.kind == StructureSelectionKind::none)
             return;
         drs::engine::AuthoringStructureBatchPatch patch;
-        if (nameEditor.getText().isNotEmpty()) patch.displayName = nameEditor.getText().toStdString();
+        if (nameEditor.isVisible() && nameEditor.getText().isNotEmpty())
+            patch.displayName = nameEditor.getText().toStdString();
         if (parentEditor.isVisible() && parentEditor.getText().isNotEmpty())
         {
             if (snapshot.kind == StructureSelectionKind::group)
@@ -220,8 +261,10 @@ StructureInspector::StructureInspector()
             else if (snapshot.kind == StructureSelectionKind::zone)
                 patch.groupId = parentEditor.getText().toStdString();
         }
-        if (gainEditor.getText().isNotEmpty()) patch.gainDb = gainEditor.getText().getDoubleValue();
-        if (panEditor.getText().isNotEmpty()) patch.pan = panEditor.getText().getDoubleValue();
+        if (gainEditor.isVisible() && gainEditor.getText().isNotEmpty())
+            patch.gainDb = gainEditor.getText().getDoubleValue();
+        if (panEditor.isVisible() && panEditor.getText().isNotEmpty())
+            patch.pan = panEditor.getText().getDoubleValue();
         if (releaseEditor.isVisible() && releaseEditor.getText().isNotEmpty())
             patch.releaseSeconds = releaseEditor.getText().getDoubleValue();
         if (visibilityTouched)
@@ -265,7 +308,7 @@ void StructureInspector::setSnapshot(StructureInspectorSnapshot nextSnapshot)
     const auto valueOrBlank = [&](const std::string& key)
     {
         const auto value = fieldValues[key];
-        return value == "Mixed" ? std::string {} : value;
+        return value == "Mixed" || value == "—" ? std::string {} : value;
     };
     const auto stripSuffix = [&](const std::string& value, const char suffix)
     {
@@ -278,24 +321,36 @@ void StructureInspector::setSnapshot(StructureInspectorSnapshot nextSnapshot)
     parentEditor.setText(parentValue, juce::dontSendNotification);
     gainEditor.setText(stripSuffix(valueOrBlank("Gain"), ' '), juce::dontSendNotification);
     panEditor.setText(stripSuffix(valueOrBlank("Pan"), '%'), juce::dontSendNotification);
-    releaseEditor.setText(stripSuffix(valueOrBlank("Release"), ' '), juce::dontSendNotification);
+    const auto releaseField = snapshot.kind == StructureSelectionKind::zone ? "Release" : "Zone release";
+    releaseEditor.setText(stripSuffix(valueOrBlank(releaseField), ' '), juce::dontSendNotification);
     const auto editable = snapshot.kind == StructureSelectionKind::layer
         || snapshot.kind == StructureSelectionKind::group
         || snapshot.kind == StructureSelectionKind::zone;
+    const auto releaseEditable = editable || snapshot.kind == StructureSelectionKind::instrument;
     const auto actionable = snapshot.kind != StructureSelectionKind::none;
     visibilityTouched = false;
     const auto visibilityValue = fieldValues["Visibility"];
     visibilityToggle.setButtonText(visibilityValue == "Mixed" ? "Visibility: Mixed" : "Visible");
     visibilityToggle.setToggleState(visibilityValue == "Visible", juce::dontSendNotification);
-    editHint.setText(editable ? "Edit shared values" : "Instrument actions", juce::dontSendNotification);
+    editHint.setText(releaseEditable && snapshot.kind != StructureSelectionKind::zone
+                         ? "Edit shared values · Release applies to descendant zones"
+                         : editable ? "Edit shared values" : "Instrument actions",
+                     juce::dontSendNotification);
     editHint.setVisible(actionable);
     nameEditor.setVisible(editable);
     parentEditor.setVisible(editable && snapshot.kind != StructureSelectionKind::layer);
     gainEditor.setVisible(editable);
     panEditor.setVisible(editable);
-    releaseEditor.setVisible(snapshot.kind == StructureSelectionKind::zone);
+    releaseEditor.setVisible(releaseEditable);
     visibilityToggle.setVisible(snapshot.kind != StructureSelectionKind::zone && editable);
-    applyButton.setVisible(editable);
+    applyButton.setButtonText(snapshot.kind == StructureSelectionKind::instrument
+                                  ? "Apply to all zones"
+                                  : snapshot.kind == StructureSelectionKind::layer
+                                  ? "Apply to layer + zones"
+                                  : snapshot.kind == StructureSelectionKind::group
+                                      ? "Apply to group + zones"
+                                      : "Apply to selection");
+    applyButton.setVisible(releaseEditable);
     gainMinusButton.setVisible(editable);
     gainPlusButton.setVisible(editable);
     panMinusButton.setVisible(editable);

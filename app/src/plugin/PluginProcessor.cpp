@@ -647,6 +647,8 @@ drs::engine::AuthoringPreviewInvalidationCategory classifyPreviewInvalidation(
         return Category::sampleStartOffset;
     if (normalized.find("loop") != std::string::npos)
         return Category::loop;
+    if (normalized.find("release") != std::string::npos)
+        return Category::release;
     if (normalized.find("source") != std::string::npos
         || normalized.find("sample") != std::string::npos)
         return Category::sourceAssignment;
@@ -702,7 +704,10 @@ std::string buildSelectedZonePreviewFingerprint(
         + "|" + std::to_string(static_cast<int>(zone.loopMode))
         + "|" + std::to_string(static_cast<int>(zone.triggerMode))
         + "|" + std::to_string(zone.loopStartFrame)
-        + "|" + std::to_string(zone.loopEndFrame);
+        + "|" + std::to_string(zone.loopEndFrame)
+        + "|" + std::to_string(zone.loopCrossfadeFrames)
+        + "|" + std::to_string(zone.releaseSeconds)
+        + "|" + std::to_string(zone.releaseShape);
 }
 
 std::string buildCurrentDraftPreviewFingerprint(const drs::engine::RuntimeProjectModel& project)

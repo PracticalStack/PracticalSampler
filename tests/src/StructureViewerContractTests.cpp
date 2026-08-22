@@ -1,6 +1,7 @@
 #include "shared/authoring/AuthoringStructureSelection.h"
 #include "shared/authoring/StructureViewModels.h"
 #include "shared/authoring/StructureViewState.h"
+#include "shared/authoring/StructureScope.h"
 #include "shared/authoring/StructureOverlapPolicy.h"
 #include "shared/authoring/StructureInspector.h"
 #include "drs/engine/AuthoringSession.h"
@@ -98,6 +99,25 @@ int main()
                                                 [](const auto& field) { return field.first == "Velocity"; });
         require(velocityField != zoneInspector.fields.end() && velocityField->second == "Mixed",
                 "Multi-selection inspector should expose mixed compatible attributes.");
+
+        const auto layerInspector = drs::app::authoring::buildStructureInspectorSnapshot(project, layerSelection);
+        const auto layerReleaseField = std::find_if(layerInspector.fields.begin(), layerInspector.fields.end(),
+                                                    [](const auto& field) { return field.first == "Zone release"; });
+        require(layerReleaseField != layerInspector.fields.end()
+                    && layerReleaseField->second == std::to_string(drs::engine::nativeDefaultReleaseSeconds) + " s",
+                "Layer inspector should expose the aggregate release of all descendant zones.");
+
+        AuthoringStructureSelection instrumentSelection;
+        instrumentSelection.replace(StructureSelectionKind::instrument,
+                                    { drs::app::authoring::kInstrumentStructureId },
+                                    drs::app::authoring::kInstrumentStructureId);
+        const auto instrumentInspector = drs::app::authoring::buildStructureInspectorSnapshot(
+            project, instrumentSelection);
+        const auto instrumentReleaseField = std::find_if(
+            instrumentInspector.fields.begin(), instrumentInspector.fields.end(),
+            [](const auto& field) { return field.first == "Zone release"; });
+        require(instrumentReleaseField != instrumentInspector.fields.end(),
+                "Instrument inspector should expose one aggregate release for all authored zones.");
 
         drs::app::authoring::StructureViewProjectionOptions filterOptions;
         filterOptions.searchText = "high";
@@ -204,6 +224,15 @@ int main()
                     && session.getProject().authoring.groups[0].layerId == "layer-strings"
                     && session.getProject().authoring.groups[1].layerId == "layer-strings",
                 "Group parent reassignment should apply atomically to every selected group.");
+        drs::engine::AuthoringStructureBatchPatch groupReleasePatch;
+        groupReleasePatch.releaseSeconds = 0.0;
+        const auto groupReleaseResult = session.applyStructureBatchPatch(
+            drs::engine::AuthoringStructureEntityKind::group,
+            { "group-strings-sustain" }, groupReleasePatch, "Set descendant zone release");
+        require(groupReleaseResult.applied
+                    && session.getProject().authoring.zones[3].releaseSeconds == 0.0
+                    && session.getProject().authoring.zones[4].releaseSeconds == 0.0,
+                "Group release edits should update every descendant zone in one transaction.");
         drs::engine::AuthoringStructureBatchPatch layerPatch;
         layerPatch.gainDb = -2.0;
         const auto layerPatchResult = session.applyStructureBatchPatch(
@@ -213,6 +242,15 @@ int main()
                     && session.getProject().authoring.layers[0].gainDb == -2.0
                     && session.getProject().authoring.layers[1].gainDb == -2.0,
                 "Layer inspector edits should apply atomically to every selected layer.");
+        drs::engine::AuthoringStructureBatchPatch layerReleasePatch;
+        layerReleasePatch.releaseSeconds = 0.125;
+        const auto layerReleaseResult = session.applyStructureBatchPatch(
+            drs::engine::AuthoringStructureEntityKind::layer,
+            { "layer-strings" }, layerReleasePatch, "Set layer descendant release");
+        require(layerReleaseResult.applied
+                    && session.getProject().authoring.zones[0].releaseSeconds == 0.125
+                    && session.getProject().authoring.zones[4].releaseSeconds == 0.125,
+                "Layer release edits should follow all groups currently parented by the selected layer.");
         drs::engine::AuthoringStructureBatchPatch nudgePatch;
         nudgePatch.gainDelta = 0.5;
         const auto nudgeResult = session.applyStructureBatchPatch(

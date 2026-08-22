@@ -13,7 +13,7 @@
 
 namespace
 {
-void require(bool value, const char* message)
+void require(bool value, const std::string& message)
 {
     if (!value) throw std::runtime_error(message);
 }
@@ -95,6 +95,71 @@ int main()
         tree->selectRow(static_cast<int>(std::distance(panelRows.begin(), panelGroup)), false, true);
         require(session.getSelectedGroup().has_value() && session.getSelectedGroup()->id == selectedGroupId,
                 "Selecting a hierarchy group must update session selection without aborting.");
+
+        auto macroProject = project;
+        drs::engine::RuntimeProjectFxSlotDefinition gainSlot;
+        gainSlot.id = "instrument-gain";
+        gainSlot.displayName = "Instrument Gain";
+        gainSlot.effectType = "drs.gain";
+        gainSlot.effectVersion = 1;
+        gainSlot.parameters.push_back({ "gainDb", 0.0 });
+        macroProject.authoring.fxSlots.push_back(std::move(gainSlot));
+        drs::engine::RuntimeProjectRoutingBusDefinition instrumentBus;
+        instrumentBus.id = "instrument-bus";
+        instrumentBus.displayName = "Instrument Bus";
+        instrumentBus.inputSourceId = "master";
+        instrumentBus.fxSlotIds.push_back("instrument-gain");
+        macroProject.authoring.routingBuses.push_back(std::move(instrumentBus));
+        drs::engine::RuntimeProjectMacroDefinition instrumentMacro;
+        instrumentMacro.id = "instrument";
+        instrumentMacro.name = "Instrument";
+        instrumentMacro.defaultValue = 0.5;
+        instrumentMacro.minValue = 0.0;
+        instrumentMacro.maxValue = 1.0;
+        drs::engine::RuntimeProjectMacroTargetDefinition gainTarget;
+        gainTarget.parameterId = "dsp.instrument-gain.gainDb";
+        gainTarget.parameterPath = "curatedDsp.instrument-gain.gainDb";
+        gainTarget.role = "mix";
+        gainTarget.dspSlotId = "instrument-gain";
+        gainTarget.dspParameterId = "gainDb";
+        gainTarget.sourceMinimum = 0.0;
+        gainTarget.sourceMaximum = 1.0;
+        gainTarget.destinationMinimum = -96.0;
+        gainTarget.destinationMaximum = 6.0;
+        gainTarget.controlLaw.id = "drs.mixerGain.v1";
+        gainTarget.controlLaw.version = 1;
+        instrumentMacro.targets.push_back(std::move(gainTarget));
+        macroProject.authoring.macros.push_back(std::move(instrumentMacro));
+
+        drs::engine::AuthoringSession macroValidationSession(macroProject);
+        auto directlyEditedMacro = macroValidationSession.getProject().authoring.macros.front();
+        directlyEditedMacro.defaultValue = 0.6;
+        const auto directMacroEdit = macroValidationSession.updateMacro(
+            0, directlyEditedMacro, "Validate structured macro fixture");
+        require(directMacroEdit.applied,
+                "Structured macro fixture must accept a direct Default-only transaction: "
+                    + (directMacroEdit.issues.empty() ? std::string("unknown rejection")
+                                                       : directMacroEdit.issues.front()));
+
+        drs::engine::AuthoringSession macroSession(macroProject);
+        drs::app::AuthoringPanel macroPanel(macroSession);
+        macroPanel.setBounds(0, 0, 1120, 800);
+        macroPanel.setVisible(true);
+        macroPanel.reloadFromSession();
+        auto* defaultSlider = dynamic_cast<juce::Slider*>(
+            findDescendantById(macroPanel, "authoringMacroDefaultSlider"));
+        require(defaultSlider != nullptr, "Macro workbench must expose its Default slider.");
+        defaultSlider->setValue(0.75, juce::dontSendNotification);
+        require(static_cast<bool>(defaultSlider->onDragEnd),
+                "Macro Default slider must expose its commit callback.");
+        defaultSlider->onDragEnd();
+        const auto& updatedMacro = macroSession.getProject().authoring.macros.front();
+        require(updatedMacro.defaultValue == 0.75,
+                "Changing a macro Default must commit without retargeting its structured DSP assignment.");
+        require(updatedMacro.targets.front().destinationMinimum == -96.0
+                    && updatedMacro.targets.front().destinationMaximum == 6.0
+                    && updatedMacro.targets.front().controlLaw.id == "drs.mixerGain.v1",
+                "Changing Default must preserve the target's role-specific control-law range.");
         std::cout << "Unified workspace UI tests passed.\n";
         return 0;
     }

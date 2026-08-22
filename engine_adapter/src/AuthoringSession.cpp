@@ -2886,6 +2886,32 @@ RuntimeProjectDocumentActionResult AuthoringSession::applyStructureBatchPatch(
         }
     }
 
+    // Release is authored by zones, but layer and group inspectors expose the
+    // aggregate value so users can edit a complete hierarchy branch without
+    // first converting their structural selection into hundreds of zones.
+    // Keep the container edit and every descendant-zone edit in one document
+    // snapshot so undo, Preview, save, and package export all observe the same
+    // atomic change.
+    if (patch.releaseSeconds.has_value() && kind != AuthoringStructureEntityKind::zone)
+    {
+        std::unordered_set<std::string> selectedGroupIds;
+        if (kind == AuthoringStructureEntityKind::group)
+            selectedGroupIds = uniqueIds;
+        else
+            for (const auto& group : project.authoring.groups)
+                if (uniqueIds.find(group.layerId) != uniqueIds.end())
+                    selectedGroupIds.insert(group.id);
+
+        for (std::size_t index = 0; index < project.authoring.zones.size(); ++index)
+        {
+            auto& zone = project.authoring.zones[index];
+            if (selectedGroupIds.find(zone.groupId) == selectedGroupIds.end())
+                continue;
+            zone.releaseSeconds = *patch.releaseSeconds;
+            appendPath("authoring.zones[" + std::to_string(index) + "]");
+        }
+    }
+
     for (const auto& [groupId, mode] : enabledGroups)
         reconcilePreviouslyEnabledGroup(project, groupId, mode);
 

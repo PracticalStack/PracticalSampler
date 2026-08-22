@@ -420,6 +420,18 @@ void runReleaseLawMatrix()
     natural.sourceSampleRate = 8.0;
     natural.releaseSeconds = 1.0;
     natural.releaseShape = drs::engine::sfzDefaultReleaseShape;
+    ModelOptions linear = natural;
+    linear.releaseShape = 0.0;
+    const auto linearModel = buildModel(std::vector<float>(16, 1.0f), linear);
+    drs::engine::SamplerVoice linearVoice;
+    require(linearVoice.start(*linearModel, startRequest(60, 8.0))
+                && linearVoice.beginRelease(),
+            "Linear release voice should start.");
+    StereoOutput linearOutput(5);
+    linearVoice.render(linearOutput.view(), 0, 5);
+    requireNear(linearOutput.left[4], 0.5f,
+                "A zero release shape must retain the authored linear envelope.");
+
     const auto naturalModel = buildModel(std::vector<float>(16, 1.0f), natural);
     drs::engine::SamplerVoice naturalVoice;
     require(naturalVoice.start(*naturalModel, startRequest(60, 8.0))
