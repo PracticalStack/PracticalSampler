@@ -282,6 +282,34 @@ void renderOne(drs::engine::SamplerPlaybackContext& context,
 void runCapacityAndRapidCutoverMatrix()
 {
     using namespace drs::engine;
+    SamplerPlaybackContext sameGeneration(PlaybackActivationLane::performance);
+    require(sameGeneration.prepare(48000.0),
+            "Same-generation capacity context must prepare.");
+    auto sameGenerationModel = buildModel(PlaybackActivationLane::performance,
+                                          9, 60, 0, 127, 0.0, true, 1.0f);
+    require(sameGeneration.stageActivation(sameGenerationModel.model),
+            "Same-generation capacity model must stage.");
+    SamplerEventBlock sameGenerationFill;
+    for (std::size_t index = 0; index < SamplerVoicePool::capacity; ++index)
+        require(sameGenerationFill.push(noteOn(0, 36 + static_cast<int>(index))),
+                "Same-generation pool fill event must remain bounded.");
+    StereoOutput sameGenerationFillOutput(1);
+    require(sameGeneration.renderBlock(sameGenerationFillOutput.view(),
+                                       sameGenerationFill.view()).voicePool.activeVoiceCount
+                == SamplerVoicePool::capacity,
+            "Same-generation fixture must fill the Performance pool.");
+    renderOne(sameGeneration, noteOff(0, 36));
+    const std::array sameGenerationReplacement { noteOn(0, 35) };
+    StereoOutput sameGenerationReplacementOutput(1);
+    const auto sameGenerationResult = sameGeneration.renderBlock(
+        sameGenerationReplacementOutput.view(), view(sameGenerationReplacement));
+    require(sameGenerationResult.voicePool.render.stolenVoiceCount == 1
+                && sameGenerationResult.voicePool.render.releasingVoiceStealCount == 1
+                && !containsVoiceId(sameGeneration.getVoicePool(), 1)
+                && containsVoiceId(sameGeneration.getVoicePool(), 2),
+            "Current Performance attacks must replace a same-generation release tail, "
+            "not another held attack.");
+
     SamplerPlaybackContext context(PlaybackActivationLane::performance);
     require(context.prepare(48000.0), "Capacity context must prepare.");
     auto generationA = buildModel(PlaybackActivationLane::performance, 10, 60, 0, 127,

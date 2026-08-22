@@ -1392,10 +1392,13 @@ std::size_t SamplerVoicePool::acquireSlot(bool& stolen,
             continue;
         const auto retiredGeneration
             = slot.voice.getActivationGeneration() != activeGeneration;
+        // During a live Performance generation, preserve current attacks ahead of
+        // release tails. Otherwise a full piano pool steals notes from the chord
+        // being played while retaining older pedal-caught tails.
         const auto rank = performancePolicy
-            ? (slot.state == SamplerVoiceSlotState::active
-                   ? (retiredGeneration ? 0 : 1)
-                   : (retiredGeneration ? 2 : 3))
+            ? (retiredGeneration
+                   ? (slot.state == SamplerVoiceSlotState::active ? 0 : 1)
+                   : (slot.state == SamplerVoiceSlotState::releasing ? 2 : 3))
             : (slot.state == SamplerVoiceSlotState::releasing ? 0 : 1);
         const auto generation = slot.voice.getActivationGeneration();
         const auto voiceId = slot.voice.getVoiceId();

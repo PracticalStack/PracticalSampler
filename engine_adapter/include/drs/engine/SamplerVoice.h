@@ -59,7 +59,9 @@ class SamplerVoice final
 {
 public:
     static constexpr std::uint32_t compatibilityReleaseSampleCount = 2048;
-    static constexpr std::uint64_t pageLookAheadFrames = 4096;
+    // Match the default stereo resident-head boundary so page zero is requested
+    // immediately instead of waiting until half of the head has already elapsed.
+    static constexpr std::uint64_t pageLookAheadFrames = 8192;
     static constexpr std::uint64_t pageIntentCadenceFrames = 256;
 
     bool start(const SamplerRenderModel& model, const SamplerVoiceStartRequest& request) noexcept;

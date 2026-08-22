@@ -205,9 +205,9 @@ void qualifyMetadataPackage(const RuntimeProjectModel& project, const fs::path& 
     const auto projectPath = scratchRoot / "accurate-salamander-live.drsproj";
     const auto instrument = drs::app::buildInstrumentManifestForProject(
         project, juce::File(projectPath.generic_string()));
-    require(instrument.schemaVersion == continuousDamperInstrumentSchemaVersion
+    require(instrument.schemaVersion >= continuousDamperInstrumentSchemaVersion
                 && instrument.zones.size() == 1700,
-            "The live-preset project must emit a complete instrument-schema-5 manifest");
+            "The live-preset project must emit a complete continuous-damper-compatible instrument manifest");
     const auto instrumentPath = scratchRoot / "accurate-salamander-live.drinst";
     const auto serialized = serializeRuntimeInstrumentManifest(
         instrument, instrumentPath.generic_string());

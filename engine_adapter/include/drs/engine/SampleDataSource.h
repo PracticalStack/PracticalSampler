@@ -14,7 +14,9 @@
 namespace drs::engine
 {
 inline constexpr std::uint32_t sampleDataSourceDescriptorVersion = 1;
-inline constexpr std::uint64_t defaultSampleHeadBytes = 16ull * 1024ull;
+// Keep enough decoded stereo PCM resident to cover background page-service jitter.
+// At 48 kHz this is roughly 170 ms, including the first multi-file piano chord.
+inline constexpr std::uint64_t defaultSampleHeadBytes = 64ull * 1024ull;
 inline constexpr std::uint64_t defaultSamplePageBytes = 64ull * 1024ull;
 
 enum class SampleDataSourceKind : std::uint8_t

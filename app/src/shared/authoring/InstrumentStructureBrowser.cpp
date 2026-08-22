@@ -245,7 +245,7 @@ InstrumentStructureBrowser::InstrumentStructureBrowser()
     list.setModel(this);
     list.setRowHeight(30);
     list.setMultipleSelectionEnabled(true);
-    list.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xff1a2025));
+    list.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xff1e272d));
     list.setColour(juce::ListBox::outlineColourId, juce::Colour(0xff39434b));
     list.setComponentID("authoringInstrumentStructureBrowser");
     addAndMakeVisible(list);
@@ -307,7 +307,7 @@ void InstrumentStructureBrowser::paintListBoxItem(const int rowNumber, juce::Gra
 {
     if (rowNumber < 0 || rowNumber >= static_cast<int>(rows.size())) return;
     const auto& row = rows[static_cast<std::size_t>(rowNumber)];
-    g.fillAll(rowIsSelected || row.primary ? juce::Colour(0xff304e63) : juce::Colour(0xff1a2025));
+    g.fillAll(rowIsSelected || row.primary ? juce::Colour(0xff304e63) : juce::Colour(0xff1e272d));
     g.setColour(row.kind == InstrumentStructureRowKind::layer ? juce::Colour(0xffe9b35e)
                  : row.kind == InstrumentStructureRowKind::group ? juce::Colour(0xff70c681)
                  : row.kind == InstrumentStructureRowKind::zone ? juce::Colour(0xffa99bdd)

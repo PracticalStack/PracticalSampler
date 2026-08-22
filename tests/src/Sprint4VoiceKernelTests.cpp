@@ -746,6 +746,14 @@ int main()
 {
     try
     {
+        constexpr std::uint64_t stereoFloatBytesPerFrame = 2 * sizeof(float);
+        constexpr auto stereoHeadFrames = drs::engine::defaultSampleHeadBytes
+            / stereoFloatBytesPerFrame;
+        require(stereoHeadFrames >= 8192
+                    && drs::engine::SamplerVoice::pageLookAheadFrames >= stereoHeadFrames,
+                "Multi-file piano playback must retain at least 8192 stereo frames and request "
+                "the first streamed page before the resident head is consumed.");
+
         runStartAndFormulaContract();
         runLegacyCenterReferenceVectors();
         runSilenceAndImpulseMatrix();
