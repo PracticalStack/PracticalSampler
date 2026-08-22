@@ -6312,8 +6312,20 @@ void AuthoringPanel::refreshWorkbenchContextLabels()
 void AuthoringPanel::refreshWaveformWorkbenchContent()
 {
     AuthoringWaveformPreview preview;
-    if (waveformPreviewProvider)
+    const auto structureKind = structureSelection.getKind();
+    const auto hasZoneScopedSelection = structureKind == authoring::StructureSelectionKind::zone
+        || structureKind == authoring::StructureSelectionKind::none;
+    if (hasZoneScopedSelection && waveformPreviewProvider)
         preview = waveformPreviewProvider();
+    else if (!hasZoneScopedSelection)
+    {
+        // Group and layer selections do not identify one sample source. Clear
+        // the previous zone waveform instead of leaving stale peaks visible.
+        waveformAuditionCueActive = false;
+        waveformAuditionRegion = {};
+        preview.presentationState = AuthoringWaveformPresentationState::idle;
+        preview.state = "Select a zone to view waveform";
+    }
 
     AuthoringPreviewStatusSnapshot previewStatus;
     if (authoringPreviewStatusProvider)
@@ -6974,7 +6986,14 @@ void AuthoringPanel::applyStructureSelection(const authoring::StructureSelection
     }
 
     if (result.applied)
+    {
+        // Instrument Structure Browser selection bypasses the zone selector
+        // callback. Keep waveform preview authorization in sync with that
+        // navigation path while the Waveform workbench is already open.
+        if (kind == authoring::StructureSelectionKind::zone)
+            requestWaveformPreviewLoad(workbenchState.activeTab == authoring::WorkbenchTab::waveform);
         refreshFromSession();
+    }
 }
 
 void AuthoringPanel::refreshStructureBrowser()
