@@ -609,6 +609,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
     appSettingsOptions.commonToAllUsers = false;
     appProperties.setStorageParameters(appSettingsOptions);
 
+    commandManager.setFirstCommandTarget(this);
+    setApplicationCommandManagerToWatch(&commandManager);
     menuBar.setComponentID("mainMenuBar");
     addAndMakeVisible(menuBar);
 
@@ -678,6 +680,7 @@ MainComponent::~MainComponent()
         sfzImportClient->waitForTerminal(std::chrono::seconds(10));
     }
     menuBar.setModel(nullptr);
+    commandManager.setFirstCommandTarget(nullptr);
     appProperties.saveIfNeeded();
     shutdownAudioOutput();
 }
@@ -758,7 +761,7 @@ void MainComponent::handleCloseRequest(std::function<void(bool)> completion)
 
 juce::StringArray MainComponent::getMenuBarNames()
 {
-    return { "File", "Settings" };
+    return { "File", "Edit", "Settings" };
 }
 
 juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce::String&)
@@ -797,12 +800,77 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
     }
     else if (topLevelMenuIndex == 1)
     {
+        menu.addCommandItem(&commandManager, undoCommandId);
+        menu.addCommandItem(&commandManager, redoCommandId);
+    }
+    else if (topLevelMenuIndex == 2)
+    {
         menu.addItem(audioDeviceSettingsCommandId, "Audio & MIDI Device Settings...");
         menu.addSeparator();
         menu.addItem(preferencesCommandId, "Preferences...");
     }
 
     return menu;
+}
+
+juce::ApplicationCommandTarget* MainComponent::getNextCommandTarget()
+{
+    return nullptr;
+}
+
+void MainComponent::getAllCommands(juce::Array<juce::CommandID>& commands)
+{
+    commands.add(undoCommandId);
+    commands.add(redoCommandId);
+}
+
+void MainComponent::getCommandInfo(juce::CommandID commandID, juce::ApplicationCommandInfo& result)
+{
+    const auto authoringAvailable = processor.getWorkspaceDocumentState().authoringAvailable;
+    const auto& documentState = processor.getAuthoringSession().getDocumentState();
+
+    switch (commandID)
+    {
+        case undoCommandId:
+            result.setInfo("Undo", "Undo the most recent authoring change", "Edit", 0);
+            result.addDefaultKeypress('z', juce::ModifierKeys::commandModifier);
+            result.setActive(authoringAvailable && documentState.undoDepth > 0);
+            break;
+        case redoCommandId:
+            result.setInfo("Redo", "Redo the most recently undone authoring change", "Edit", 0);
+            result.addDefaultKeypress('z',
+                                       juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier);
+            result.setActive(authoringAvailable && documentState.redoDepth > 0);
+            break;
+        default:
+            break;
+    }
+}
+
+bool MainComponent::perform(const juce::ApplicationCommandTarget::InvocationInfo& info)
+{
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return false;
+
+    switch (info.commandID)
+    {
+        case undoCommandId:
+            if (processor.getAuthoringSession().getDocumentState().undoDepth == 0)
+                return false;
+            processor.getAuthoringSession().undo();
+            refreshProjectViews();
+            commandManager.commandStatusChanged();
+            return true;
+        case redoCommandId:
+            if (processor.getAuthoringSession().getDocumentState().redoDepth == 0)
+                return false;
+            processor.getAuthoringSession().redo();
+            refreshProjectViews();
+            commandManager.commandStatusChanged();
+            return true;
+        default:
+            return false;
+    }
 }
 
 void MainComponent::menuItemSelected(int menuItemID, int)

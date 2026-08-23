@@ -44,7 +44,7 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
     setComponentID("authoringSummaryStrip");
     configureAccessibleMetadata(*this,
                                 "Selection summary strip",
-                                "Summarizes the current zone selection and exposes preview, undo, redo, and save actions.");
+                                "Summarizes the current zone selection and exposes preview and save actions.");
 
     titleLabel.setFont(juce::FontOptions(visual::titleTypeSize, juce::Font::bold));
     titleLabel.setColour(juce::Label::textColourId, visual::text);
@@ -111,32 +111,6 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
             callbacks.onPublishDraftPlaybackRequested();
     };
 
-    undoButton.setButtonText("Undo");
-    undoButton.setComponentID("authoringUndoButton");
-    configureAccessibleMetadata(undoButton,
-                                "Undo",
-                                "Reverts the most recent authoring change.",
-                                "Press to undo the last change.");
-    undoButton.setExplicitFocusOrder(10);
-    undoButton.onClick = [this]
-    {
-        if (callbacks.onUndoRequested)
-            callbacks.onUndoRequested();
-    };
-
-    redoButton.setButtonText("Redo");
-    redoButton.setComponentID("authoringRedoButton");
-    configureAccessibleMetadata(redoButton,
-                                "Redo",
-                                "Reapplies the most recently undone authoring change.",
-                                "Press to redo the last undone change.");
-    redoButton.setExplicitFocusOrder(11);
-    redoButton.onClick = [this]
-    {
-        if (callbacks.onRedoRequested)
-            callbacks.onRedoRequested();
-    };
-
     saveCheckpointButton.setButtonText("Mark Saved");
     saveCheckpointButton.setComponentID("authoringSaveButton");
     configureAccessibleMetadata(saveCheckpointButton,
@@ -159,8 +133,6 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
              static_cast<juce::Component*>(&previewButton),
              static_cast<juce::Component*>(&prepareDraftButton),
              static_cast<juce::Component*>(&publishDraftButton),
-             static_cast<juce::Component*>(&undoButton),
-             static_cast<juce::Component*>(&redoButton),
              static_cast<juce::Component*>(&saveCheckpointButton)
          })
     {
@@ -187,10 +159,6 @@ void AuthoringSummaryStrip::resized()
 
     auto heroButtons = hero.removeFromRight(350);
     auto topRow = heroButtons.removeFromTop(28);
-    undoButton.setBounds(topRow.removeFromLeft(92));
-    topRow.removeFromLeft(8);
-    redoButton.setBounds(topRow.removeFromLeft(92));
-    topRow.removeFromLeft(8);
     saveCheckpointButton.setBounds(topRow.removeFromLeft(120));
     heroButtons.removeFromTop(10);
     auto actionRow = heroButtons.removeFromTop(30);
@@ -218,8 +186,6 @@ void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel
     previewButton.setEnabled(viewModel.canPreview);
     prepareDraftButton.setEnabled(viewModel.canPrepareDraftPlayback);
     publishDraftButton.setEnabled(viewModel.canPublishDraftPlayback);
-    undoButton.setEnabled(viewModel.canUndo);
-    redoButton.setEnabled(viewModel.canRedo);
     updateActionAccessibilityState(previewButton,
                                    viewModel.canPreview,
                                    "Previews the selected zone.",
@@ -238,18 +204,6 @@ void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel
                                    "Unavailable because the latest draft is not ready to publish yet.",
                                    "Press to publish the latest prepared draft to the performance path.",
                                    "Prepare the latest draft before publishing it to the performance path.");
-    updateActionAccessibilityState(undoButton,
-                                   viewModel.canUndo,
-                                   "Reverts the most recent authoring change.",
-                                   "Unavailable because there is no change to undo.",
-                                   "Press to undo the last change.",
-                                   "Make a change to enable undo.");
-    updateActionAccessibilityState(redoButton,
-                                   viewModel.canRedo,
-                                   "Reapplies the most recently undone authoring change.",
-                                   "Unavailable because there is no change to redo.",
-                                   "Press to redo the last undone change.",
-                                   "Undo a change to enable redo.");
     saveCheckpointButton.setDescription(viewModel.dirty
                                             ? "Marks the current authoring state as saved."
                                             : "Project is already marked saved.");

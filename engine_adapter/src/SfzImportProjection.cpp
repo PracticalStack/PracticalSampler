@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -597,6 +598,20 @@ std::string buildRoundRobinPoolSignature(const RuntimeProjectZoneDefinition& zon
     return slugify(stream.str());
 }
 
+std::string buildRoundRobinPoolSignature(const SfzNormalizedSection& section)
+{
+    const auto rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
+    const auto keyLow = parseEffectiveKeyValue(section, "lokey", rootKey);
+    const auto keyHigh = parseEffectiveKeyValue(section, "hikey", rootKey);
+
+    std::ostringstream stream;
+    stream << buildArticulationId(section)
+           << "|" << rootKey
+           << "|" << keyLow
+           << "|" << keyHigh;
+    return slugify(stream.str());
+}
+
 std::optional<RoundRobinDescriptor> buildSequentialRoundRobinDescriptor(
     const RuntimeProjectZoneDefinition& zone,
     std::set<std::string>& usedPoolIds,
@@ -623,6 +638,182 @@ std::optional<RoundRobinDescriptor> buildSequentialRoundRobinDescriptor(
         zone.roundRobinPosition,
         RoundRobinMode::sequential
     };
+}
+
+struct RandomRoundRobinRange
+{
+    double low = 0.0;
+    double high = 1.0;
+};
+
+struct RandomRoundRobinRangeEntry
+{
+    std::size_t documentOrder = 0;
+    RandomRoundRobinRange range;
+};
+
+struct RandomRoundRobinAssignment
+{
+    std::string poolId;
+    int slotCount = 0;
+    int slotIndex = 0;
+};
+
+std::optional<RandomRoundRobinRange> parseRandomRoundRobinRange(
+    const SfzNormalizedSection& section)
+{
+    const auto* lowOpcode = findEffectiveOpcode(section, "lorand");
+    const auto* highOpcode = findEffectiveOpcode(section, "hirand");
+    if (lowOpcode == nullptr && highOpcode == nullptr)
+        return std::nullopt;
+
+    const auto low = lowOpcode == nullptr
+        ? std::optional<double>(0.0)
+        : parseDoubleValue(lowOpcode->value);
+    const auto high = highOpcode == nullptr
+        ? std::optional<double>(1.0)
+        : parseDoubleValue(highOpcode->value);
+    if (!low.has_value() || !high.has_value()
+        || !std::isfinite(*low) || !std::isfinite(*high)
+        || *low < 0.0 || *high > 1.0 || *low >= *high)
+    {
+        return std::nullopt;
+    }
+
+    return RandomRoundRobinRange { *low, *high };
+}
+
+bool nearlyEqualRandomBoundary(const double left, const double right) noexcept
+{
+    // A number of real-world SFZ files round equal random windows to three decimal places
+    // (for example 0.166, 0.333, 0.500, ...). Keep the tolerance tight enough to reject
+    // meaningful gaps/overlaps while accepting those authored boundaries.
+    constexpr auto boundaryTolerance = 0.0025;
+    return std::abs(left - right) <= boundaryTolerance;
+}
+
+bool hasEffectiveOpcodePrefix(const SfzNormalizedSection& section,
+                              const std::string& prefix)
+{
+    return std::any_of(section.effectiveOpcodes.begin(),
+                       section.effectiveOpcodes.end(),
+                       [&](const auto& opcode)
+                       {
+                           return opcode.name.rfind(prefix, 0) == 0;
+                       });
+}
+
+std::map<std::size_t, RandomRoundRobinAssignment> buildRandomRoundRobinAssignments(
+    const SfzNormalizedDocument& document,
+    std::set<std::string>& usedPoolIds)
+{
+    std::map<std::string, std::vector<RandomRoundRobinRangeEntry>> regionsByPoolSignature;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+
+        const auto range = parseRandomRoundRobinRange(section);
+        if (!range.has_value()
+            || hasEffectiveOpcodePrefix(section, "on_locc")
+            || hasEffectiveOpcodePrefix(section, "on_hicc"))
+            continue;
+
+        regionsByPoolSignature[buildRoundRobinPoolSignature(section)].push_back({
+            section.documentOrder,
+            *range
+        });
+    }
+
+    std::map<std::size_t, RandomRoundRobinAssignment> assignments;
+    for (auto& [poolSignature, entries] : regionsByPoolSignature)
+    {
+        std::sort(entries.begin(),
+                  entries.end(),
+                  [](const auto& left, const auto& right)
+                  {
+                      if (left.range.low != right.range.low)
+                          return left.range.low < right.range.low;
+                      if (left.range.high != right.range.high)
+                          return left.range.high < right.range.high;
+                      return left.documentOrder < right.documentOrder;
+                  });
+
+        std::vector<RandomRoundRobinRange> slots;
+        for (const auto& entry : entries)
+        {
+            const auto existingSlot = std::find_if(
+                slots.begin(),
+                slots.end(),
+                [&](const auto& slot)
+                {
+                    return nearlyEqualRandomBoundary(slot.low, entry.range.low)
+                        && nearlyEqualRandomBoundary(slot.high, entry.range.high);
+                });
+            if (existingSlot == slots.end())
+                slots.push_back(entry.range);
+        }
+
+        // Native random round robins select uniformly from slots. Convert only the common
+        // SFZ round-robin form: distinct windows partition [0, 1], with equal widths up to
+        // the rounding used by the source file. Invalid or weighted policies remain imported
+        // as ordinary zones instead of being assigned an incorrect random pool.
+        bool valid = slots.size() >= 2;
+        if (valid)
+        {
+            std::sort(slots.begin(),
+                      slots.end(),
+                      [](const auto& left, const auto& right)
+                      {
+                          if (left.low != right.low)
+                              return left.low < right.low;
+                          return left.high < right.high;
+                      });
+
+            const auto expectedWidth = slots.front().high - slots.front().low;
+            auto expectedLow = 0.0;
+            for (const auto& slot : slots)
+            {
+                const auto width = slot.high - slot.low;
+                if (!nearlyEqualRandomBoundary(slot.low, expectedLow)
+                    || !nearlyEqualRandomBoundary(width, expectedWidth))
+                {
+                    valid = false;
+                    break;
+                }
+                expectedLow = slot.high;
+            }
+            valid = valid && nearlyEqualRandomBoundary(expectedLow, 1.0);
+        }
+
+        if (!valid)
+            continue;
+
+        const auto poolId = makeUniqueId(usedPoolIds, "sfz-rr-random-" + poolSignature);
+        const auto slotCount = static_cast<int>(slots.size());
+        for (const auto& entry : entries)
+        {
+            const auto slot = std::find_if(
+                slots.begin(),
+                slots.end(),
+                [&](const auto& candidate)
+                {
+                    return nearlyEqualRandomBoundary(candidate.low, entry.range.low)
+                        && nearlyEqualRandomBoundary(candidate.high, entry.range.high);
+                });
+            if (slot == slots.end())
+                continue;
+
+            assignments.emplace(entry.documentOrder,
+                                RandomRoundRobinAssignment {
+                                    poolId,
+                                    slotCount,
+                                    static_cast<int>(std::distance(slots.begin(), slot)) + 1
+                                });
+        }
+    }
+
+    return assignments;
 }
 
 bool isVelocityCrossfadeOpcode(const std::string& opcodeName)
@@ -1269,6 +1460,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     std::map<std::string, ProjectedGroupState> projectedGroupStates;
     std::map<std::string, std::optional<SfzImportSourceRegionMetadata>> sourceMetadataByPath;
     ScopedGainState scopedGainState;
+    const auto randomRoundRobinAssignments = buildRandomRoundRobinAssignments(
+        analysis.normalizeResult.document,
+        usedRoundRobinPoolIds);
 
     std::map<int, int> importedControllerDefaults;
     for (const auto& section : analysis.normalizeResult.document.sections)
@@ -1571,9 +1765,24 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             zone.groupId = makeUniqueId(usedGroupIds, groupIdCandidate);
             projectedGroupIdsByCandidate.emplace(groupIdCandidate, zone.groupId);
         }
-        zone.roundRobin = buildSequentialRoundRobinDescriptor(zone,
-                                                              usedRoundRobinPoolIds,
-                                                              roundRobinPoolIdsBySignature);
+        const auto randomRoundRobin = randomRoundRobinAssignments.find(section.documentOrder);
+        if (randomRoundRobin != randomRoundRobinAssignments.end())
+        {
+            zone.roundRobinLength = randomRoundRobin->second.slotCount;
+            zone.roundRobinPosition = randomRoundRobin->second.slotIndex;
+            zone.roundRobin = RoundRobinDescriptor {
+                randomRoundRobin->second.poolId,
+                randomRoundRobin->second.slotCount,
+                randomRoundRobin->second.slotIndex,
+                RoundRobinMode::random
+            };
+        }
+        else
+        {
+            zone.roundRobin = buildSequentialRoundRobinDescriptor(zone,
+                                                                  usedRoundRobinPoolIds,
+                                                                  roundRobinPoolIdsBySignature);
+        }
 
         bool hasControllerTrigger = false;
         int triggerControllerNumber = -1;

@@ -254,6 +254,21 @@ int main()
         require(smDrumsProjection.projected && smDrumsProjection.playable,
                 "The Sforzando SM Drums kit should project omitted seq_position values using the SFZ default of 1. Issues: "
                     + joinIssues(smDrumsProjection.issues));
+        require(smDrumsProjection.zones.size() == 3358,
+                "The Sforzando SM Drums kit should retain all 3,358 sample regions after random round-robin projection.");
+        require(smDrumsProjection.omittedUnsafeRegionCount == 0
+                    && smDrumsProjection.omittedRegionSummaries.empty(),
+                "Random round-robin policies should no longer cause SM Drums regions to be omitted.");
+        const auto smDrumsRandomRoundRobinZoneCount = std::count_if(
+            smDrumsProjection.zones.begin(),
+            smDrumsProjection.zones.end(),
+            [](const RuntimeProjectZoneDefinition& zone)
+            {
+                return zone.roundRobin.has_value()
+                    && zone.roundRobin->mode == RoundRobinMode::random;
+            });
+        require(smDrumsRandomRoundRobinZoneCount == 2974,
+                "The Sforzando SM Drums kit should project its 2,974 lorand/hirand regions as random round-robin zones.");
         require(std::all_of(smDrumsProjection.zones.begin(),
                             smDrumsProjection.zones.end(),
                             [](const RuntimeProjectZoneDefinition& zone)

@@ -684,15 +684,11 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     int previewRequests = 0;
     int prepareDraftRequests = 0;
     int publishDraftRequests = 0;
-    int undoRequests = 0;
-    int redoRequests = 0;
     int saveRequests = 0;
     drs::app::authoring::SelectionSummaryCallbacks callbacks;
     callbacks.onPreviewRequested = [&previewRequests] { ++previewRequests; };
     callbacks.onPrepareDraftPlaybackRequested = [&prepareDraftRequests] { ++prepareDraftRequests; };
     callbacks.onPublishDraftPlaybackRequested = [&publishDraftRequests] { ++publishDraftRequests; };
-    callbacks.onUndoRequested = [&undoRequests] { ++undoRequests; };
-    callbacks.onRedoRequested = [&redoRequests] { ++redoRequests; };
     callbacks.onMarkSavedRequested = [&saveRequests] { ++saveRequests; };
     strip.setCallbacks(std::move(callbacks));
 
@@ -720,8 +716,6 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireComponentVisibleWithin(strip, "authoringPreviewButton", bounds);
     requireComponentVisibleWithin(strip, "authoringPrepareDraftButton", bounds);
     requireComponentVisibleWithin(strip, "authoringPublishDraftButton", bounds);
-    requireComponentVisibleWithin(strip, "authoringUndoButton", bounds);
-    requireComponentVisibleWithin(strip, "authoringRedoButton", bounds);
     requireComponentVisibleWithin(strip, "authoringSaveButton", bounds);
     requireComponentVisibleWithin(strip, "authoringSummaryTitleLabel", bounds);
     requireComponentVisibleWithin(strip, "authoringSummaryStatusLabel", bounds);
@@ -753,14 +747,10 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireAccessibilityDescriptionContains(strip, "authoringPreviewButton", "Previews the selected zone.");
     requireAccessibilityDescriptionContains(strip, "authoringPrepareDraftButton", "Builds the latest draft for playback preview.");
     requireAccessibilityDescriptionContains(strip, "authoringPublishDraftButton", "Unavailable because the latest draft is not ready to publish yet.");
-    requireAccessibilityDescriptionContains(strip, "authoringUndoButton", "Reverts the most recent authoring change.");
-    requireAccessibilityDescriptionContains(strip, "authoringRedoButton", "Reapplies the most recently undone authoring change.");
     requireAccessibilityDescriptionContains(strip, "authoringSaveButton", "Marks the current authoring state as saved.");
     requireNonEmptyAccessibilityHelpText(strip, "authoringPreviewButton");
     requireNonEmptyAccessibilityHelpText(strip, "authoringPrepareDraftButton");
     requireNonEmptyAccessibilityHelpText(strip, "authoringPublishDraftButton");
-    requireNonEmptyAccessibilityHelpText(strip, "authoringUndoButton");
-    requireNonEmptyAccessibilityHelpText(strip, "authoringRedoButton");
     requireNonEmptyAccessibilityHelpText(strip, "authoringSaveButton");
     require(requireButton(strip, "authoringPreviewButton").isEnabled(),
             "Summary strip preview button should reflect the fixture view model.");
@@ -768,24 +758,16 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
             "Summary strip prepare-draft button should reflect the fixture view model.");
     require(!requireButton(strip, "authoringPublishDraftButton").isEnabled(),
             "Summary strip publish-draft button should reflect the fixture view model.");
-    require(requireButton(strip, "authoringUndoButton").isEnabled(),
-            "Summary strip undo button should reflect the fixture view model.");
-    require(requireButton(strip, "authoringRedoButton").isEnabled(),
-            "Summary strip redo button should reflect the fixture view model.");
 
     require(static_cast<bool>(requireButton(strip, "authoringPreviewButton").onClick),
             "Summary strip preview button should expose an onClick callback.");
     requireButton(strip, "authoringPreviewButton").onClick();
     requireButton(strip, "authoringPrepareDraftButton").onClick();
-    requireButton(strip, "authoringUndoButton").onClick();
-    requireButton(strip, "authoringRedoButton").onClick();
     requireButton(strip, "authoringSaveButton").onClick();
 
     require(previewRequests == 1, "Summary strip should emit exactly one preview callback.");
     require(prepareDraftRequests == 1, "Summary strip should emit exactly one prepare-draft callback.");
     require(publishDraftRequests == 0, "Summary strip should not emit publish-draft callbacks while disabled.");
-    require(undoRequests == 1, "Summary strip should emit exactly one undo callback.");
-    require(redoRequests == 1, "Summary strip should emit exactly one redo callback.");
     require(saveRequests == 1, "Summary strip should emit exactly one save callback.");
 
     viewModel.canPreview = false;
@@ -801,10 +783,6 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
             "Summary strip prepare-draft button should disable when preparation is unavailable.");
     require(requireButton(strip, "authoringPublishDraftButton").isEnabled(),
             "Summary strip publish-draft button should enable when the latest draft is ready to publish.");
-    require(!requireButton(strip, "authoringUndoButton").isEnabled(),
-            "Summary strip undo button should disable when undo is unavailable.");
-    require(!requireButton(strip, "authoringRedoButton").isEnabled(),
-            "Summary strip redo button should disable when redo is unavailable.");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringPreviewButton",
                                             "Unavailable because no zone preview is available.");
@@ -814,12 +792,6 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireAccessibilityDescriptionContains(strip,
                                             "authoringPublishDraftButton",
                                             "Publishes the latest prepared draft to the performance path.");
-    requireAccessibilityDescriptionContains(strip,
-                                            "authoringUndoButton",
-                                            "Unavailable because there is no change to undo.");
-    requireAccessibilityDescriptionContains(strip,
-                                            "authoringRedoButton",
-                                            "Unavailable because there is no change to redo.");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringSaveButton",
                                             "Project is already marked saved.");
@@ -1285,7 +1257,7 @@ void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
 void writeReachabilityChecklist(std::ostream& inventory)
 {
     inventory << "Reachability checklist\n";
-    inventory << "- Summary strip: authoringSummaryStrip, authoringPreviewButton, authoringPrepareDraftButton, authoringPublishDraftButton, authoringUndoButton, authoringRedoButton, authoringSaveButton\n";
+    inventory << "- Summary strip: authoringSummaryStrip, authoringPreviewButton, authoringPrepareDraftButton, authoringPublishDraftButton, authoringSaveButton\n";
     inventory << "- Playback banner: authoringPlaybackBanner, authoringPlaybackBannerLabel, authoringPlaybackBannerPrepareButton, authoringPlaybackBannerPublishButton\n";
     inventory << "- Toolbar row: authoringZoneSelector\n";
     inventory << "- Persistent map: authoringZoneMap\n";
@@ -1376,8 +1348,6 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWorkbenchRoutingTab", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWorkbenchPerformanceTab", panelBounds);
     requireComponentVisibleWithin(panel, "authoringPreviewButton", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringUndoButton", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringRedoButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringSaveButton", panelBounds);
     require(findDescendantById(panel, "authoringZoneMap")->getBounds().getHeight()
                 >= drs::app::authoring::minimumMapVisibleHeight,
@@ -1932,10 +1902,10 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
                 && session.getSelectedZone()->loopEnabled
                 && session.getDocumentState().undoDepth == loopModeUndoDepth + 1,
             "Changing the SFZ loop mode should create exactly one enabled, undoable zone transaction.");
-    requireButton(panel, "authoringUndoButton").onClick();
+    session.undo();
     require(session.getSelectedZone()->loopMode == previousLoopMode,
             "Undo should restore the prior typed SFZ loop mode.");
-    requireButton(panel, "authoringRedoButton").onClick();
+    session.redo();
     require(session.getSelectedZone()->loopMode == drs::engine::RegionLoopMode::loopSustain,
             "Redo should restore the typed SFZ loop mode transaction.");
 
@@ -1966,10 +1936,10 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
                 && session.getSelectedZone()->sampleEndFrame == 100000
                 && session.getDocumentState().undoDepth == playbackUndoDepth + 1,
             "Numeric playback offset/end entry should commit one non-destructive zone transaction.");
-    requireButton(panel, "authoringUndoButton").onClick();
+    session.undo();
     require(session.getSelectedZone()->sampleStartFrame != 6000,
             "Playback-region numeric entry must participate in normal undo.");
-    requireButton(panel, "authoringRedoButton").onClick();
+    session.redo();
     require(session.getSelectedZone()->sampleStartFrame == 6000
                 && session.getSelectedZone()->sampleEndFrame == 100000,
             "Playback-region numeric entry must participate in normal redo.");
@@ -2698,8 +2668,6 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
              juce::String("authoringPlaybackBanner"),
              juce::String("authoringPlaybackBannerLabel"),
              juce::String("authoringPlaybackBannerPrepareButton"),
-             juce::String("authoringUndoButton"),
-             juce::String("authoringRedoButton"),
              juce::String("authoringSaveButton"),
              juce::String("authoringZoneSelector"),
              juce::String("authoringZoneMap"),
@@ -2734,8 +2702,6 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     requireIncreasingFocusOrder(panel,
                                 {
-                                    "authoringUndoButton",
-                                    "authoringRedoButton",
                                     "authoringSaveButton",
                                     "authoringPreviewButton",
                                     "authoringPlaybackBannerPrepareButton",
@@ -3284,8 +3250,6 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
     DesktopHostedComponent host(panel);
     auto& waveformTabButton = requireButton(panel, "authoringWorkbenchWaveformTab");
     auto& macrosTabButton = requireButton(panel, "authoringWorkbenchMacrosTab");
-    auto& undoButton = requireButton(panel, "authoringUndoButton");
-    auto& redoButton = requireButton(panel, "authoringRedoButton");
     auto& saveButton = requireButton(panel, "authoringSaveButton");
     auto& previewButton = requireButton(panel, "authoringPreviewButton");
     auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
@@ -3355,8 +3319,6 @@ void exerciseKeyboardOnlyWorkflowSmoke(drs::app::AuthoringPanel& panel,
             "Keyboard workflow should change the selected zone after zone-map keyboard navigation.");
 
     requireAccessibilityAction(previewButton, juce::AccessibilityActionType::press, "Preview button");
-    requireAccessibilityAction(undoButton, juce::AccessibilityActionType::press, "Undo button");
-    requireAccessibilityAction(redoButton, juce::AccessibilityActionType::press, "Redo button");
     requireAccessibilityAction(saveButton, juce::AccessibilityActionType::press, "Mark saved button");
     requireAccessibilityAction(restoreRootKeyButton,
                                juce::AccessibilityActionType::press,
@@ -3680,8 +3642,6 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
     auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
     auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
     auto& previewButton = requireButton(panel, "authoringPreviewButton");
-    auto& undoButton = requireButton(panel, "authoringUndoButton");
-    auto& redoButton = requireButton(panel, "authoringRedoButton");
     auto& saveButton = requireButton(panel, "authoringSaveButton");
 
     zoneSelector.setSelectedId(2, juce::sendNotificationSync);
@@ -3788,10 +3748,10 @@ void exerciseGateAWorkflow(drs::app::AuthoringPanel& panel,
     require(session.getDocumentState().undoDepth == undoDepthBeforeRestore + 1,
             "Gate A workflow restore-root-key action should create one undo transaction.");
 
-    undoButton.onClick();
+    session.undo();
     require(session.getSelectedZone()->rootKey == 64,
             "Gate A workflow undo should restore the pre-restore root key.");
-    redoButton.onClick();
+    session.redo();
     require(session.getSelectedZone()->rootKey == originalRootKey,
             "Gate A workflow redo should reapply the restored root key.");
 

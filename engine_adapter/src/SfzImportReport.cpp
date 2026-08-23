@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <limits>
 #include <map>
@@ -252,7 +253,9 @@ std::optional<SfzImportSemanticDependency> classifySemanticDependency(
 std::string findEffectiveSampleReference(const SfzNormalizedSection& section);
 std::optional<int> parseIntValue(const std::string& text);
 
-SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSection& section)
+SfzImportRegionSemanticAnalysis analyzeRegionSemantics(
+    const SfzNormalizedSection& section,
+    const std::set<std::size_t>& nativeRandomRegionOrders)
 {
     SfzImportRegionSemanticAnalysis analysis;
     analysis.documentOrder = section.documentOrder;
@@ -278,6 +281,11 @@ SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSectio
         if (hasNativeDamperReleaseBlock
             && (dependencyOpcode == "ampeg_releasecc64"
                 || dependencyOpcode == "ampeg_release_curvecc64"))
+        {
+            dependency->support = SfzImportSemanticSupport::native;
+        }
+        if (dependency->kind == SfzImportSemanticDependencyKind::randomPolicy
+            && nativeRandomRegionOrders.count(section.documentOrder) > 0)
         {
             dependency->support = SfzImportSemanticSupport::native;
         }
@@ -311,14 +319,15 @@ SfzImportRegionSemanticAnalysis analyzeRegionSemantics(const SfzNormalizedSectio
 }
 
 void publishRegionSemanticAnalysis(SfzImportReport& report,
-                                   const SfzNormalizedDocument& document)
+                                   const SfzNormalizedDocument& document,
+                                   const std::set<std::size_t>& nativeRandomRegionOrders)
 {
     for (const auto& section : document.sections)
     {
         if (section.scope != SfzOpcodeScope::region)
             continue;
 
-        auto analysis = analyzeRegionSemantics(section);
+        auto analysis = analyzeRegionSemantics(section, nativeRandomRegionOrders);
         ++report.summary.semanticAnalyzedRegionCount;
         if (!analysis.safeToProjectUnconditionally)
             ++report.summary.unsafeUnconditionalRegionCount;
@@ -344,6 +353,18 @@ std::optional<int> parseIntValue(const std::string& text)
     try
     {
         return std::stoi(text);
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+}
+
+std::optional<double> parseDoubleValue(const std::string& text)
+{
+    try
+    {
+        return std::stod(text);
     }
     catch (...)
     {
@@ -539,6 +560,157 @@ std::string buildRoundRobinPoolSignature(const SfzNormalizedSection& section,
     return stream.str();
 }
 
+std::string buildRandomRoundRobinPoolSignature(const SfzNormalizedSection& section)
+{
+    const auto rootKey = parseEffectiveKeyValue(section, "pitch_keycenter", 60);
+    const auto keyLow = parseEffectiveKeyValue(section, "lokey", rootKey);
+    const auto keyHigh = parseEffectiveKeyValue(section, "hikey", rootKey);
+
+    std::ostringstream stream;
+    stream << buildArticulationId(section)
+           << "|" << rootKey
+           << "|" << keyLow
+           << "|" << keyHigh;
+    return stream.str();
+}
+
+struct RandomRoundRobinRange
+{
+    double low = 0.0;
+    double high = 1.0;
+};
+
+struct RandomRoundRobinRangeEntry
+{
+    std::size_t documentOrder = 0;
+    RandomRoundRobinRange range;
+};
+
+std::optional<RandomRoundRobinRange> parseRandomRoundRobinRange(
+    const SfzNormalizedSection& section)
+{
+    const auto* lowOpcode = findEffectiveOpcode(section, "lorand");
+    const auto* highOpcode = findEffectiveOpcode(section, "hirand");
+    if (lowOpcode == nullptr && highOpcode == nullptr)
+        return std::nullopt;
+
+    const auto low = lowOpcode == nullptr
+        ? std::optional<double>(0.0)
+        : parseDoubleValue(lowOpcode->value);
+    const auto high = highOpcode == nullptr
+        ? std::optional<double>(1.0)
+        : parseDoubleValue(highOpcode->value);
+    if (!low.has_value() || !high.has_value()
+        || !std::isfinite(*low) || !std::isfinite(*high)
+        || *low < 0.0 || *high > 1.0 || *low >= *high)
+    {
+        return std::nullopt;
+    }
+
+    return RandomRoundRobinRange { *low, *high };
+}
+
+bool nearlyEqualRandomBoundary(const double left, const double right) noexcept
+{
+    constexpr auto boundaryTolerance = 0.0025;
+    return std::abs(left - right) <= boundaryTolerance;
+}
+
+bool hasEffectiveOpcodePrefix(const SfzNormalizedSection& section,
+                              const std::string& prefix)
+{
+    return std::any_of(section.effectiveOpcodes.begin(),
+                       section.effectiveOpcodes.end(),
+                       [&](const auto& opcode)
+                       {
+                           return opcode.name.rfind(prefix, 0) == 0;
+                       });
+}
+
+std::set<std::size_t> buildNativeRandomRoundRobinRegionOrders(
+    const SfzNormalizedDocument& document)
+{
+    std::map<std::string, std::vector<RandomRoundRobinRangeEntry>> regionsByPoolSignature;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region)
+            continue;
+
+        const auto range = parseRandomRoundRobinRange(section);
+        if (!range.has_value()
+            || hasEffectiveOpcodePrefix(section, "on_locc")
+            || hasEffectiveOpcodePrefix(section, "on_hicc"))
+            continue;
+
+        const auto poolSignature = buildRandomRoundRobinPoolSignature(section);
+        regionsByPoolSignature[poolSignature].push_back({ section.documentOrder, *range });
+    }
+
+    std::set<std::size_t> nativeRegionOrders;
+    for (auto& [_, entries] : regionsByPoolSignature)
+    {
+        std::sort(entries.begin(),
+                  entries.end(),
+                  [](const auto& left, const auto& right)
+                  {
+                      if (left.range.low != right.range.low)
+                          return left.range.low < right.range.low;
+                      if (left.range.high != right.range.high)
+                          return left.range.high < right.range.high;
+                      return left.documentOrder < right.documentOrder;
+                  });
+
+        std::vector<RandomRoundRobinRange> slots;
+        for (const auto& entry : entries)
+        {
+            const auto existingSlot = std::find_if(
+                slots.begin(),
+                slots.end(),
+                [&](const auto& slot)
+                {
+                    return nearlyEqualRandomBoundary(slot.low, entry.range.low)
+                        && nearlyEqualRandomBoundary(slot.high, entry.range.high);
+                });
+            if (existingSlot == slots.end())
+                slots.push_back(entry.range);
+        }
+
+        if (slots.size() < 2)
+            continue;
+
+        std::sort(slots.begin(),
+                  slots.end(),
+                  [](const auto& left, const auto& right)
+                  {
+                      if (left.low != right.low)
+                          return left.low < right.low;
+                      return left.high < right.high;
+                  });
+
+        const auto expectedWidth = slots.front().high - slots.front().low;
+        auto expectedLow = 0.0;
+        auto valid = true;
+        for (const auto& slot : slots)
+        {
+            const auto width = slot.high - slot.low;
+            if (!nearlyEqualRandomBoundary(slot.low, expectedLow)
+                || !nearlyEqualRandomBoundary(width, expectedWidth))
+            {
+                valid = false;
+                break;
+            }
+            expectedLow = slot.high;
+        }
+        if (!valid || !nearlyEqualRandomBoundary(expectedLow, 1.0))
+            continue;
+
+        for (const auto& entry : entries)
+            nativeRegionOrders.insert(entry.documentOrder);
+    }
+
+    return nativeRegionOrders;
+}
+
 std::string buildCrossfadeRoundRobinPoolSignature(const SfzNormalizedSection& section,
                                                   int rootKey,
                                                   int keyLow,
@@ -657,6 +829,35 @@ CrossfadeOpcodeKey makeCrossfadeOpcodeKey(const SfzResolvedOpcode& opcode)
         opcode.location.scope,
         opcode.name
     };
+}
+
+std::map<CrossfadeOpcodeKey, OpcodeClassification> buildRandomRoundRobinOpcodeClassifications(
+    const SfzNormalizedDocument& document,
+    const std::set<std::size_t>& nativeRandomRegionOrders)
+{
+    std::map<CrossfadeOpcodeKey, OpcodeClassification> classifications;
+    for (const auto& section : document.sections)
+    {
+        if (section.scope != SfzOpcodeScope::region
+            || nativeRandomRegionOrders.count(section.documentOrder) == 0)
+        {
+            continue;
+        }
+
+        for (const auto& opcode : section.effectiveOpcodes)
+        {
+            const auto opcodeName = toLowerAscii(opcode.name);
+            if (opcodeName != "lorand" && opcodeName != "hirand")
+                continue;
+
+            classifications[makeCrossfadeOpcodeKey(opcode)] = {
+                SfzImportSupportDisposition::converted,
+                "zone.roundRobin.random",
+                "Equal-probability SFZ random-selection windows convert into native random Round Robin pool metadata."
+            };
+        }
+    }
+    return classifications;
 }
 
 std::vector<CrossfadeOpcodeKey> collectCrossfadeOwnerKeys(const SfzNormalizedSection& section)
@@ -1462,10 +1663,10 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
     {
         return { SfzImportSupportDisposition::reportedOnly,
                  "report.roundRobin.randomPolicy",
-                 "Randomized region-selection policies remain review-only because the native Round Robin contract is currently deterministic and sequential.",
+                 "Randomized region-selection policies are converted when their windows form an equal-probability native random Round Robin pool; other policies remain review-only.",
                  "sfz.round_robin.random_policy.reported",
                  "Random round-robin policy will be reported",
-                 "The importer recognizes SFZ random round-robin policy opcodes, but does not convert them into the native sequential Round Robin behavior." };
+                 "The importer could not prove that these SFZ random-selection windows form an equal-probability native Round Robin pool." };
     }
 
     if (opcodeName == "sw_last"
@@ -1764,6 +1965,11 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                 buildVelocityCrossfadeOpcodeClassifications(result.normalizeResult.document);
             const auto roundRobinClassifications =
                 buildSequentialRoundRobinOpcodeClassifications(result.normalizeResult.document);
+            const auto nativeRandomRegionOrders =
+                buildNativeRandomRoundRobinRegionOrders(result.normalizeResult.document);
+            const auto randomRoundRobinClassifications =
+                buildRandomRoundRobinOpcodeClassifications(result.normalizeResult.document,
+                                                           nativeRandomRegionOrders);
             const auto continuousDamperCurveClassifications =
                 buildContinuousDamperCurveClassifications(result.normalizeResult.document);
             const auto continuousDamperOpcodeClassifications =
@@ -1827,6 +2033,16 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                             classification = classificationIterator->second;
                         }
                     }
+                    else if (toLowerAscii(opcode.name) == "lorand"
+                             || toLowerAscii(opcode.name) == "hirand")
+                    {
+                        if (const auto classificationIterator =
+                                randomRoundRobinClassifications.find(makeCrossfadeOpcodeKey(opcode));
+                            classificationIterator != randomRoundRobinClassifications.end())
+                        {
+                            classification = classificationIterator->second;
+                        }
+                    }
                     if (const auto classificationIterator =
                             continuousDamperCurveClassifications.find(makeCrossfadeOpcodeKey(opcode));
                         classificationIterator != continuousDamperCurveClassifications.end())
@@ -1870,6 +2086,11 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                                                      == SfzImportSupportDisposition::converted)
                             ? SfzImportSemanticSupport::native
                             : semantic->support;
+                        if (semantic->kind == SfzImportSemanticDependencyKind::randomPolicy
+                            && classification.disposition == SfzImportSupportDisposition::converted)
+                        {
+                            trace.semanticSupport = SfzImportSemanticSupport::native;
+                        }
                         trace.affectsRegionEligibility = semantic->affectsRegionEligibility;
                         if (semantic->impact == SfzImportSemanticImpact::presentationOnly)
                         {
@@ -1886,7 +2107,8 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
                 result.report.opcodeSupport.push_back(summary);
 
             publishRegionSemanticAnalysis(result.report,
-                                          result.normalizeResult.document);
+                                          result.normalizeResult.document,
+                                          nativeRandomRegionOrders);
         }
     }
 

@@ -17,6 +17,7 @@
 namespace drs::standalone
 {
 class MainComponent final : public juce::Component,
+                            private juce::ApplicationCommandTarget,
                             private juce::MenuBarModel,
                             private juce::Timer,
                             private juce::ChangeListener
@@ -55,6 +56,8 @@ private:
         importBackgroundImageCommandId,
         importLicenseFileCommandId,
         viewLicenseCommandId,
+        undoCommandId,
+        redoCommandId,
         audioDeviceSettingsCommandId,
         preferencesCommandId,
         exitApplicationCommandId
@@ -63,6 +66,10 @@ private:
     juce::StringArray getMenuBarNames() override;
     juce::PopupMenu getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) override;
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
+    juce::ApplicationCommandTarget* getNextCommandTarget() override;
+    void getAllCommands(juce::Array<juce::CommandID>& commands) override;
+    void getCommandInfo(juce::CommandID commandID, juce::ApplicationCommandInfo& result) override;
+    bool perform(const juce::ApplicationCommandTarget::InvocationInfo& info) override;
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
@@ -144,6 +151,7 @@ private:
     };
 
     drs::plugin::Processor processor;
+    juce::ApplicationCommandManager commandManager;
     juce::MenuBarComponent menuBar { this };
     juce::Label sessionStatusLabel;
     juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };

@@ -27,8 +27,6 @@ private:
     juce::TextButton previewButton;
     juce::TextButton prepareDraftButton;
     juce::TextButton publishDraftButton;
-    juce::TextButton undoButton;
-    juce::TextButton redoButton;
     juce::TextButton saveCheckpointButton;
 };
 } // namespace drs::app::authoring
