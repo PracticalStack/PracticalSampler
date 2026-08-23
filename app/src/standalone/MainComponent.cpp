@@ -797,7 +797,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
     }
     else if (topLevelMenuIndex == 1)
     {
-        menu.addItem(audioDeviceSettingsCommandId, "Audio Device Settings...");
+        menu.addItem(audioDeviceSettingsCommandId, "Audio & MIDI Device Settings...");
         menu.addSeparator();
         menu.addItem(preferencesCommandId, "Preferences...");
     }
@@ -942,6 +942,7 @@ void MainComponent::initializeAudioOutput()
 {
     audioDeviceManager.addChangeListener(this);
     audioProcessorPlayer.setProcessor(&processor);
+    audioDeviceManager.addMidiInputDeviceCallback({}, &audioProcessorPlayer);
 
     auto savedAudioDeviceState = loadSavedAudioDeviceState();
     audioDeviceError = audioDeviceManager.initialise(0, 2, savedAudioDeviceState.get(), true);
@@ -975,6 +976,7 @@ void MainComponent::shutdownAudioOutput()
     if (audioOutputEnabled)
         audioDeviceManager.removeAudioCallback(&audioProcessorPlayer);
 
+    audioDeviceManager.removeMidiInputDeviceCallback({}, &audioProcessorPlayer);
     audioDeviceManager.removeChangeListener(this);
     audioDeviceManager.closeAudioDevice();
     audioProcessorPlayer.setProcessor(nullptr);
@@ -1835,14 +1837,14 @@ void MainComponent::showAudioDeviceSettingsDialog()
                                                             0,
                                                             0,
                                                             2,
-                                                            false,
+                                                            true,
                                                             false,
                                                             true,
                                                             false);
     selector->setSize(560, 460);
 
     juce::DialogWindow::LaunchOptions options;
-    options.dialogTitle = "Audio Device Settings";
+    options.dialogTitle = "Audio & MIDI Device Settings";
     options.dialogBackgroundColour = juce::Colour::fromRGB(244, 240, 232);
     options.content.setOwned(selector);
     options.componentToCentreAround = this;
