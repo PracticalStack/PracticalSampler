@@ -4025,6 +4025,8 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
             }
             if (const auto gainDb = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "gainDb", context.c_str()))
                 zone.gainDb = *gainDb;
+            if (const auto pan = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "pan", context.c_str()))
+                zone.pan = *pan;
             if (const auto sampleStartFrame =
                     readOptional<RuntimeManifestLoadResult, std::uint64_t>(zoneObject, result, "sampleStartFrame", context.c_str()))
             {
@@ -4631,6 +4633,7 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         if (hasAnyVelocityCrossfadeRuntimeValue(zone.velocityCrossfadeRuntime))
             zoneObject["velocityCrossfadeRuntime"] = serializeVelocityCrossfadeRuntime(zone.velocityCrossfadeRuntime);
         zoneObject["gainDb"] = zone.gainDb;
+        zoneObject["pan"] = zone.pan;
         zoneObject["sampleStartFrame"] = zone.sampleStartFrame;
         if (instrument.schemaVersion >= playbackRegionInstrumentSchemaVersion)
             zoneObject["sampleEndFrame"] = zone.sampleEndFrame;

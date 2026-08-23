@@ -31,6 +31,7 @@ struct RuntimeCompileZoneDefinition
     int velocityHigh = 127;
     VelocityCrossfadeDescriptor velocityCrossfade;
     double gainDb = 0.0;
+    double pan = 0.0;
     std::uint64_t sampleStartFrame = 0;
     double releaseSeconds = 0.0;
     double releaseShape = 0.0;
@@ -53,6 +54,8 @@ struct RuntimeCompileZoneDefinition
     std::uint64_t loopEndFrame = 0;
     std::uint64_t sampleEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation amplitudeModulation;
+    RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
 
 struct RuntimeCompilePlan

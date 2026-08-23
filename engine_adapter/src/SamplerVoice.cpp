@@ -26,6 +26,27 @@ float computeReleaseEnvelope(const std::uint32_t samplesRemaining,
     const auto curvedLevel = std::expm1(-shape * linearLevel) / std::expm1(-shape);
     return static_cast<float>(std::clamp(curvedLevel, 0.0, 1.0));
 }
+
+double controllerCurveValue(const RuntimeControllerModulation& modulation,
+                            const std::array<std::uint8_t, 128>& controllerValues) noexcept
+{
+    if (!modulation.isActive())
+        return 0.0;
+    const auto value = controllerValues[static_cast<std::size_t>(modulation.controllerNumber)];
+    if (modulation.curveIndex < 0)
+        return static_cast<double>(value) / 127.0;
+    return std::clamp(modulation.curve[value], 0.0, 1.0);
+}
+
+double amplitudeControllerScale(const RuntimeControllerModulation& modulation,
+                                const std::array<std::uint8_t, 128>& controllerValues) noexcept
+{
+    if (!modulation.isActive())
+        return 1.0;
+    return std::clamp(modulation.amount / 100.0
+                          * controllerCurveValue(modulation, controllerValues),
+                      0.0, 1.0);
+}
 } // namespace
 
 SamplerPanGains computeSamplerPanGains(double normalizedPan) noexcept
@@ -102,8 +123,25 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     nextLookAheadPublicationFrame = playbackStart;
     incrementFrames = increment;
     outputSampleRate = request.outputSampleRate;
-    baseGain = static_cast<float>(gain);
+    unmodulatedGain = static_cast<float>(gain);
+    baseGain = unmodulatedGain * static_cast<float>(amplitudeControllerScale(
+        selectedRoute.amplitudeModulation, request.controllerValues));
     panGains = computeSamplerPanGains(selectedRoute.pan);
+    const auto& authoredEnvelope = selectedRoute.amplitudeEnvelope;
+    const auto holdCurveValue = controllerCurveValue(authoredEnvelope.holdModulation,
+                                                      request.controllerValues);
+    const auto decayCurveValue = controllerCurveValue(authoredEnvelope.decayModulation,
+                                                       request.controllerValues);
+    const auto sustainCurveValue = controllerCurveValue(authoredEnvelope.sustainModulation,
+                                                        request.controllerValues);
+    envelopeHoldSeconds = std::max(0.0, authoredEnvelope.holdSeconds
+        + authoredEnvelope.holdModulation.amount * holdCurveValue);
+    envelopeDecaySeconds = std::max(0.0, authoredEnvelope.decaySeconds
+        + authoredEnvelope.decayModulation.amount * decayCurveValue);
+    envelopeSustainLevel = std::clamp(authoredEnvelope.sustainLevel
+        + (authoredEnvelope.sustainModulation.amount / 100.0) * sustainCurveValue,
+        0.0, 1.0);
+    envelopeElapsedFrames = 0.0;
     const auto effectiveLoopMode = effectiveRegionLoopMode(selectedRoute.loopMode,
                                                             selectedRoute.loopEnabled);
     loopStartFrame = request.hasPlaybackRegionOverride
@@ -135,7 +173,8 @@ bool SamplerVoice::beginRelease(const double overrideReleaseSeconds) noexcept
         ? overrideReleaseSeconds : (route != nullptr ? route->releaseSeconds : 0.0);
     const auto usesAuthoredRelease = overrideReleaseSeconds <= 0.0
         && route != nullptr && route->releaseSeconds > 0.0;
-    return configureRelease(releaseSeconds, usesAuthoredRelease, 1.0f, false, 0);
+    return configureRelease(releaseSeconds, usesAuthoredRelease,
+                            static_cast<float>(amplitudeEnvelopeLevel()), false, 0);
 }
 
 bool SamplerVoice::beginReleaseForControllerValue(const std::uint8_t controllerValue) noexcept
@@ -146,7 +185,8 @@ bool SamplerVoice::beginReleaseForControllerValue(const std::uint8_t controllerV
         loopActive = false;
     if (route == nullptr || !route->damper.dynamicRelease)
         return beginRelease();
-    return configureRelease(dynamicReleaseSeconds(controllerValue), true, 1.0f,
+    return configureRelease(dynamicReleaseSeconds(controllerValue), true,
+                            static_cast<float>(amplitudeEnvelopeLevel()),
                             true, controllerValue);
 }
 
@@ -216,6 +256,38 @@ bool SamplerVoice::updateDynamicRelease(const std::uint8_t controllerNumber,
     ++dynamicReleaseUpdateCount;
     repedalCatchCount += isRepedalCatch ? 1u : 0u;
     return true;
+}
+
+bool SamplerVoice::updateControllerModulation(const std::uint8_t controllerNumber,
+                                              const std::uint8_t controllerValue) noexcept
+{
+    if (!isActive() || route == nullptr
+        || !route->amplitudeModulation.isActive()
+        || route->amplitudeModulation.controllerNumber != controllerNumber)
+        return false;
+
+    std::array<std::uint8_t, 128> values {};
+    values[controllerNumber] = controllerValue;
+    baseGain = unmodulatedGain * static_cast<float>(amplitudeControllerScale(
+        route->amplitudeModulation, values));
+    return true;
+}
+
+double SamplerVoice::amplitudeEnvelopeLevel() const noexcept
+{
+    if (envelopeHoldSeconds > 0.0
+        && envelopeElapsedFrames < envelopeHoldSeconds * outputSampleRate)
+        return 1.0;
+
+    const auto decayFrames = envelopeDecaySeconds * outputSampleRate;
+    const auto decayStart = envelopeHoldSeconds * outputSampleRate;
+    if (decayFrames > 0.0 && envelopeElapsedFrames < decayStart + decayFrames)
+    {
+        const auto progress = std::clamp((envelopeElapsedFrames - decayStart) / decayFrames,
+                                         0.0, 1.0);
+        return 1.0 + (envelopeSustainLevel - 1.0) * progress;
+    }
+    return envelopeSustainLevel;
 }
 
 bool SamplerVoice::isSustainDown(
@@ -311,6 +383,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
                 sample->dataSource->publishPageIntent(
                     crossfadeNextFrameIndex, SamplePageRequestPriority::lookAhead, voiceId);
             positionFrames += incrementFrames;
+            envelopeElapsedFrames += 1.0;
             if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
             {
                 const auto loopStart = static_cast<double>(loopStartFrame);
@@ -381,7 +454,8 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             return tail * tailGain + readCrossfadeInterpolated(channelIndex) * headGain;
         };
 
-        const auto envelope = isReleasing() ? getReleaseEnvelopeLevel() : 1.0f;
+        const auto envelope = static_cast<float>(amplitudeEnvelopeLevel())
+            * (isReleasing() ? getReleaseEnvelopeLevel() : 1.0f);
         const auto leftSample = applyLoopCrossfade(readInterpolated(0), 0)
             * baseGain * panGains.left * envelope;
         const auto rightChannel = sourceChannelCount > 1 ? std::size_t { 1 } : std::size_t { 0 };
@@ -392,6 +466,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             output.channels[1][outputStartFrame + outputFrame] += rightSample;
 
         positionFrames += incrementFrames;
+        envelopeElapsedFrames += 1.0;
         if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
         {
             const auto loopStart = static_cast<double>(loopStartFrame);
@@ -441,6 +516,7 @@ void SamplerVoice::reset() noexcept
     incrementFrames = 1.0;
     outputSampleRate = 48000.0;
     baseGain = 0.0f;
+    unmodulatedGain = 0.0f;
     panGains = {};
     loopActive = false;
     releaseSamplesRemaining = 0;
@@ -451,6 +527,10 @@ void SamplerVoice::reset() noexcept
     releaseControllerValue = 0;
     dynamicReleaseUpdateCount = 0;
     repedalCatchCount = 0;
+    envelopeHoldSeconds = 0.0;
+    envelopeDecaySeconds = 0.0;
+    envelopeSustainLevel = 1.0;
+    envelopeElapsedFrames = 0.0;
     underrunning = false;
     nextLookAheadPublicationFrame = 0;
 }

@@ -682,6 +682,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.velocityHigh = zonePlan.velocityHigh;
         zone.velocityCrossfade = zonePlan.velocityCrossfade;
         zone.gainDb = zonePlan.gainDb;
+        zone.pan = zonePlan.pan;
         zone.sampleStartFrame = zonePlan.sampleStartFrame;
         zone.sampleEndFrame = zonePlan.sampleEndFrame;
         zone.releaseSeconds = zonePlan.releaseSeconds;
@@ -705,6 +706,8 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.loopStartFrame = zonePlan.loopStartFrame;
         zone.loopEndFrame = zonePlan.loopEndFrame;
         zone.loopCrossfadeFrames = zonePlan.loopCrossfadeFrames;
+        zone.amplitudeModulation = zonePlan.amplitudeModulation;
+        zone.amplitudeEnvelope = zonePlan.amplitudeEnvelope;
         result.instrument.zones.push_back(std::move(zone));
     }
 

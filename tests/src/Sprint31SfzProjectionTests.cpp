@@ -312,6 +312,19 @@ int main()
                     && smDrumsFirstSlot->keyHigh == 52,
                 "SM Drums RR1/RR2 groups should project as sequential slots 1 and 2 on their authored drum key.");
 
+        const auto smDrumsCrash13 = findSmDrumsZone("Crash_13in");
+        require(smDrumsCrash13 != smDrumsProjection.zones.end()
+                    && std::abs(smDrumsCrash13->pan - (-1.0)) < 1.0e-12
+                    && smDrumsCrash13->amplitudeModulation.controllerNumber == 93
+                    && std::abs(smDrumsCrash13->amplitudeModulation.amount - 100.0) < 1.0e-12
+                    && smDrumsCrash13->amplitudeEnvelope.holdModulation.controllerNumber == 27
+                    && smDrumsCrash13->amplitudeEnvelope.decayModulation.controllerNumber == 27
+                    && smDrumsCrash13->amplitudeEnvelope.sustainModulation.controllerNumber == 27
+                    && smDrumsCrash13->amplitudeEnvelope.holdModulation.curveIndex == 8
+                    && smDrumsCrash13->amplitudeEnvelope.decayModulation.curveIndex == 8
+                    && smDrumsCrash13->amplitudeEnvelope.sustainModulation.curveIndex == 7,
+                "Crash 13 should retain its hard-left pan, CC93 amplitude gate, and CC27 envelope curves.");
+
         const auto vscoViolaPath = resolveFixturePath(
             "DemoSFVInstruments/VSCO-2-CE-1.1.0/VSCO-2-CE-1.1.0/ViolaEnsSusVib.sfz");
         const auto vscoViolaAnalysis = analyzeSfzImportDocument(vscoViolaPath.generic_string());

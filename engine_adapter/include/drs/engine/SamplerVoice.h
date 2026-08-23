@@ -2,6 +2,7 @@
 
 #include "drs/engine/SamplerRenderModel.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -23,6 +24,7 @@ struct SamplerVoiceStartRequest
     int sourceMidiNote = 60;
     int effectiveMidiNote = 60;
     int effectiveVelocity = 127;
+    std::array<std::uint8_t, 128> controllerValues {};
     double routeGainMultiplier = 1.0;
     double outputSampleRate = 48000.0;
     std::uint64_t activationGeneration = 1;
@@ -69,6 +71,8 @@ public:
     bool beginReleaseForControllerValue(std::uint8_t controllerValue) noexcept;
     bool updateDynamicRelease(std::uint8_t controllerNumber,
                               std::uint8_t controllerValue) noexcept;
+    bool updateControllerModulation(std::uint8_t controllerNumber,
+                                    std::uint8_t controllerValue) noexcept;
     bool isSustainDown(const std::array<std::uint8_t, 128>& controllerValues) const noexcept;
     SamplerVoiceRenderResult render(SamplerAudioBufferView output,
                                     std::uint32_t outputStartFrame,
@@ -128,6 +132,7 @@ private:
                           std::uint8_t controllerValue) noexcept;
     double dynamicReleaseSeconds(std::uint8_t controllerValue) const noexcept;
     void finish() noexcept;
+    double amplitudeEnvelopeLevel() const noexcept;
 
     SamplerVoiceLifecycleState lifecycleState = SamplerVoiceLifecycleState::idle;
     std::uint64_t voiceId = 0;
@@ -148,6 +153,7 @@ private:
     double incrementFrames = 1.0;
     double outputSampleRate = 48000.0;
     float baseGain = 0.0f;
+    float unmodulatedGain = 0.0f;
     SamplerPanGains panGains;
     bool loopActive = false;
     std::uint32_t releaseSamplesRemaining = 0;
@@ -158,6 +164,10 @@ private:
     std::uint8_t releaseControllerValue = 0;
     std::uint32_t dynamicReleaseUpdateCount = 0;
     std::uint32_t repedalCatchCount = 0;
+    double envelopeHoldSeconds = 0.0;
+    double envelopeDecaySeconds = 0.0;
+    double envelopeSustainLevel = 1.0;
+    double envelopeElapsedFrames = 0.0;
     bool underrunning = false;
     std::uint64_t nextLookAheadPublicationFrame = 0;
 };

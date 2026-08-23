@@ -126,6 +126,31 @@ ordered_json serializeRoundRobin(const RoundRobinDescriptor& roundRobin)
     return value;
 }
 
+ordered_json serializeControllerModulation(const RuntimeControllerModulation& modulation)
+{
+    ordered_json curve = ordered_json::array();
+    for (const auto value : modulation.curve)
+        curve.push_back(value);
+    return {
+        { "controllerNumber", modulation.controllerNumber },
+        { "amount", modulation.amount },
+        { "curveIndex", modulation.curveIndex },
+        { "curve", std::move(curve) }
+    };
+}
+
+ordered_json serializeAmplitudeEnvelope(const RuntimeAmplitudeEnvelopeDefinition& envelope)
+{
+    return {
+        { "holdSeconds", envelope.holdSeconds },
+        { "decaySeconds", envelope.decaySeconds },
+        { "sustainLevel", envelope.sustainLevel },
+        { "holdModulation", serializeControllerModulation(envelope.holdModulation) },
+        { "decayModulation", serializeControllerModulation(envelope.decayModulation) },
+        { "sustainModulation", serializeControllerModulation(envelope.sustainModulation) }
+    };
+}
+
 ordered_json serializeGroupRoute(const PreparedPlaybackGroupRoute& route, bool includeWorkspaceVisible)
 {
     ordered_json routeObject;
@@ -393,6 +418,8 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        zoneObject["amplitudeModulation"] = serializeControllerModulation(zone.amplitudeModulation);
+        zoneObject["amplitudeEnvelope"] = serializeAmplitudeEnvelope(zone.amplitudeEnvelope);
         ordered_json damperCurve = ordered_json::array();
         for (const auto value : zone.damper.releaseCurve)
             damperCurve.push_back(value);
@@ -1717,6 +1744,8 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         result.prepared.zones.back().loopMode = zone.loopMode;
         result.prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
         result.prepared.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
+        result.prepared.zones.back().amplitudeModulation = zone.amplitudeModulation;
+        result.prepared.zones.back().amplitudeEnvelope = zone.amplitudeEnvelope;
     }
 
     // Preparation already owns source I/O and page-service registration. Prime
@@ -2976,6 +3005,8 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.fineTuneCents == right.fineTuneCents
         && left.amplitudeVelocityTracking == right.amplitudeVelocityTracking
         && left.controllerConditions == right.controllerConditions
+        && left.amplitudeModulation == right.amplitudeModulation
+        && left.amplitudeEnvelope == right.amplitudeEnvelope
         && left.sampleStartFrame == right.sampleStartFrame
         && left.loopEnabled == right.loopEnabled
         && left.loopStartFrame == right.loopStartFrame

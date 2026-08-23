@@ -1125,6 +1125,8 @@ CompiledPerformanceProgramResult compilePerformancePackageProgram(
         authoringZone.chokeReleaseSeconds = zone.chokeReleaseSeconds;
         authoringZone.controllerConditions = zone.controllerConditions;
         authoringZone.damper = zone.damper;
+        authoringZone.amplitudeModulation = zone.amplitudeModulation;
+        authoringZone.amplitudeEnvelope = zone.amplitudeEnvelope;
         authoring.zones.push_back(std::move(authoringZone));
     }
     authoring.roundRobinResetRules = instrument.roundRobinResetRules;
@@ -1351,7 +1353,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.velocityCrossfade = zone.velocityCrossfade;
         snapshotZone.velocityCrossfadeRuntime = zone.velocityCrossfadeRuntime;
         snapshotZone.gainDb = zone.gainDb;
-        snapshotZone.pan = 0.0;
+        snapshotZone.pan = zone.pan;
         snapshotZone.sampleStartFrame = zone.sampleStartFrame;
         snapshotZone.sampleEndFrame = zone.sampleEndFrame;
         snapshotZone.loopEnabled = zone.loopEnabled;
@@ -1373,6 +1375,8 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.amplitudeVelocityTracking = zone.amplitudeVelocityTracking;
         snapshotZone.controllerConditions = zone.controllerConditions;
         snapshotZone.damper = zone.damper;
+        snapshotZone.amplitudeModulation = zone.amplitudeModulation;
+        snapshotZone.amplitudeEnvelope = zone.amplitudeEnvelope;
         result.snapshot.zones.push_back(std::move(snapshotZone));
 
         if (!zone.articulationId.empty())
@@ -4583,6 +4587,8 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         prepared.zones.back().loopMode = zone.loopMode;
         prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
         prepared.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
+        prepared.zones.back().amplitudeModulation = zone.amplitudeModulation;
+        prepared.zones.back().amplitudeEnvelope = zone.amplitudeEnvelope;
     }
     for (const auto& group : result.snapshotResult.snapshot.groupRoutes)
     {

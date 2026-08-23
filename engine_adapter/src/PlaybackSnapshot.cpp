@@ -352,6 +352,31 @@ ordered_json serializeRoundRobin(const RoundRobinDescriptor& roundRobin)
     return value;
 }
 
+ordered_json serializeControllerModulation(const RuntimeControllerModulation& modulation)
+{
+    ordered_json curve = ordered_json::array();
+    for (const auto value : modulation.curve)
+        curve.push_back(value);
+    return {
+        { "controllerNumber", modulation.controllerNumber },
+        { "amount", modulation.amount },
+        { "curveIndex", modulation.curveIndex },
+        { "curve", std::move(curve) }
+    };
+}
+
+ordered_json serializeAmplitudeEnvelope(const RuntimeAmplitudeEnvelopeDefinition& envelope)
+{
+    return {
+        { "holdSeconds", envelope.holdSeconds },
+        { "decaySeconds", envelope.decaySeconds },
+        { "sustainLevel", envelope.sustainLevel },
+        { "holdModulation", serializeControllerModulation(envelope.holdModulation) },
+        { "decayModulation", serializeControllerModulation(envelope.decayModulation) },
+        { "sustainModulation", serializeControllerModulation(envelope.sustainModulation) }
+    };
+}
+
 std::optional<RoundRobinDescriptor> materializeRoundRobinDescriptor(
     const RuntimeProjectZoneDefinition& zone)
 {
@@ -657,6 +682,8 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        zoneObject["amplitudeModulation"] = serializeControllerModulation(zone.amplitudeModulation);
+        zoneObject["amplitudeEnvelope"] = serializeAmplitudeEnvelope(zone.amplitudeEnvelope);
         ordered_json damperCurve = ordered_json::array();
         for (const auto value : zone.damper.releaseCurve)
             damperCurve.push_back(value);
@@ -1492,7 +1519,12 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.fineTuneCents,
             zone.amplitudeVelocityTracking,
             zone.controllerConditions,
-            zone.damper
+            zone.damper,
+            zone.loopMode,
+            zone.sampleEndFrame,
+            zone.loopCrossfadeFrames,
+            zone.amplitudeModulation,
+            zone.amplitudeEnvelope
         });
         result.snapshot.zones.back().loopMode = zone.loopMode;
         result.snapshot.zones.back().sampleEndFrame = zone.sampleEndFrame;

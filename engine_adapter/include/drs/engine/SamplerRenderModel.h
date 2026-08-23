@@ -187,6 +187,8 @@ struct SamplerRenderRoute
     std::uint64_t loopCrossfadeFrames = 0;
     std::string layerId;
     RuntimeProjectLayerCrossfadeDefinition layerCrossfade;
+    RuntimeControllerModulation amplitudeModulation;
+    RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
 
 struct SamplerRenderModelBuildResult;

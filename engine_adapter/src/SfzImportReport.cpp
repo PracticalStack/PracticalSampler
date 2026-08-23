@@ -242,7 +242,16 @@ std::optional<SfzImportSemanticDependency> classifySemanticDependency(
     {
         dependency.kind = SfzImportSemanticDependencyKind::controllerModulation;
         dependency.impact = SfzImportSemanticImpact::soundCritical;
-        dependency.support = SfzImportSemanticSupport::unsupported;
+        const auto nativeModulation = opcodeName.rfind("amplitude_oncc", 0) == 0
+            || opcodeName.rfind("amplitude_curvecc", 0) == 0
+            || opcodeName.rfind("ampeg_hold_oncc", 0) == 0
+            || opcodeName.rfind("ampeg_hold_curvecc", 0) == 0
+            || opcodeName.rfind("ampeg_decay_oncc", 0) == 0
+            || opcodeName.rfind("ampeg_decay_curvecc", 0) == 0
+            || opcodeName.rfind("ampeg_sustain_oncc", 0) == 0
+            || opcodeName.rfind("ampeg_sustain_curvecc", 0) == 0;
+        dependency.support = nativeModulation
+            ? SfzImportSemanticSupport::native : SfzImportSemanticSupport::unsupported;
         dependency.controllerNumber = *modulationController;
         return dependency;
     }
@@ -1731,6 +1740,60 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
         return { SfzImportSupportDisposition::converted,
                  "zone.fineTuneCents",
                  "Fine tuning in cents maps directly into the native route pitch ratio." };
+    }
+
+    if (opcodeName == "pan")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.pan",
+                 "SFZ pan in the -100..100 range maps into the native normalized -1..1 route pan." };
+    }
+
+    if (opcodeName == "amplitude_oncc" || opcodeName.rfind("amplitude_oncc", 0) == 0)
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.amplitudeModulation",
+                 "CC-driven amplitude maps into the native note-on gain modulation path." };
+    }
+
+    if (opcodeName == "amplitude_curvecc" || opcodeName.rfind("amplitude_curvecc", 0) == 0
+        || opcodeName.rfind("ampeg_hold_curvecc", 0) == 0
+        || opcodeName.rfind("ampeg_decay_curvecc", 0) == 0
+        || opcodeName.rfind("ampeg_sustain_curvecc", 0) == 0)
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.amplitudeEnvelope.controllerCurve",
+                 "The referenced SFZ controller curve is compiled into the native 128-point modulation table." };
+    }
+
+    if (opcodeName.rfind("ampeg_hold_oncc", 0) == 0
+        || opcodeName.rfind("ampeg_decay_oncc", 0) == 0
+        || opcodeName.rfind("ampeg_sustain_oncc", 0) == 0)
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.amplitudeEnvelope.controllerModulation",
+                 "CC-driven hold, decay, and sustain values map into the native per-voice amplitude envelope." };
+    }
+
+    if (opcodeName == "ampeg_hold")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.amplitudeEnvelope.holdSeconds",
+                 "SFZ hold time maps into the native per-voice amplitude envelope." };
+    }
+
+    if (opcodeName == "ampeg_decay")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.amplitudeEnvelope.decaySeconds",
+                 "SFZ decay time maps into the native per-voice amplitude envelope." };
+    }
+
+    if (opcodeName == "ampeg_sustain")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.amplitudeEnvelope.sustainLevel",
+                 "SFZ sustain percentage maps into the native per-voice amplitude envelope." };
     }
 
     if (opcodeName == "amp_veltrack")

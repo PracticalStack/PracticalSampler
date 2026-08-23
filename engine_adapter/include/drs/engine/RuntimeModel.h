@@ -6,6 +6,7 @@
 #include "drs/engine/VelocityCrossfade.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -181,6 +182,47 @@ struct RuntimeControllerDefault
     }
 };
 
+// A controller modulation is evaluated at note-on. The curve is stored as a
+// normalized 128-point lookup table so imported SFZ curves remain deterministic
+// and do not require parsing or allocation on the audio thread.
+struct RuntimeControllerModulation
+{
+    int controllerNumber = -1;
+    double amount = 0.0;
+    int curveIndex = -1;
+    std::array<double, 128> curve {};
+
+    bool isActive() const noexcept { return controllerNumber >= 0 && controllerNumber < 128; }
+
+    bool operator==(const RuntimeControllerModulation& other) const noexcept
+    {
+        return controllerNumber == other.controllerNumber
+            && amount == other.amount
+            && curveIndex == other.curveIndex
+            && curve == other.curve;
+    }
+};
+
+struct RuntimeAmplitudeEnvelopeDefinition
+{
+    double holdSeconds = 0.0;
+    double decaySeconds = 0.0;
+    double sustainLevel = 1.0;
+    RuntimeControllerModulation holdModulation;
+    RuntimeControllerModulation decayModulation;
+    RuntimeControllerModulation sustainModulation;
+
+    bool operator==(const RuntimeAmplitudeEnvelopeDefinition& other) const noexcept
+    {
+        return holdSeconds == other.holdSeconds
+            && decaySeconds == other.decaySeconds
+            && sustainLevel == other.sustainLevel
+            && holdModulation == other.holdModulation
+            && decayModulation == other.decayModulation
+            && sustainModulation == other.sustainModulation;
+    }
+};
+
 struct RuntimeProjectZoneDefinition
 {
     std::string id;
@@ -219,6 +261,8 @@ struct RuntimeProjectZoneDefinition
     // Native-only loop smoothing. This is deliberately separate from the
     // portable SFZ v1 region contract and never implies an SFZ writer.
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation amplitudeModulation;
+    RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
 
 // Sprint 1 stores articulation identity independently from zone membership. The
@@ -457,6 +501,7 @@ struct RuntimeZoneDefinition
     VelocityCrossfadeDescriptor velocityCrossfade;
     VelocityCrossfadeRuntimeDescriptor velocityCrossfadeRuntime;
     double gainDb = 0.0;
+    double pan = 0.0;
     std::uint64_t sampleStartFrame = 0;
     std::uint64_t streamOffsetBytes = 0;
     std::uint64_t prefetchBytes = 0;
@@ -480,6 +525,8 @@ struct RuntimeZoneDefinition
     std::uint64_t loopEndFrame = 0;
     std::uint64_t sampleEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation amplitudeModulation;
+    RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
 
 struct RuntimeInstrumentModel

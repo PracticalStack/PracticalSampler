@@ -49,6 +49,8 @@ struct ModelOptions
     double pan = 0.0;
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
+    drs::engine::RuntimeControllerModulation amplitudeModulation;
+    drs::engine::RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
     std::uint64_t sampleStartFrame = 0;
     std::uint64_t sampleEndFrame = 0;
     bool loopEnabled = false;
@@ -82,6 +84,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     snapshotZone.pan = options.pan;
     snapshotZone.fineTuneCents = options.fineTuneCents;
     snapshotZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
+    snapshotZone.amplitudeModulation = options.amplitudeModulation;
+    snapshotZone.amplitudeEnvelope = options.amplitudeEnvelope;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
     snapshotZone.sampleEndFrame = options.sampleEndFrame;
     snapshotZone.loopEnabled = options.loopEnabled;
@@ -129,6 +133,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     preparedZone.pan = options.pan;
     preparedZone.fineTuneCents = options.fineTuneCents;
     preparedZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
+    preparedZone.amplitudeModulation = options.amplitudeModulation;
+    preparedZone.amplitudeEnvelope = options.amplitudeEnvelope;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
     preparedZone.sampleEndFrame = options.sampleEndFrame;
     preparedZone.loopEnabled = options.loopEnabled;
@@ -498,6 +504,49 @@ void runPartitionInvarianceMatrix()
             "Equivalent block partition changed lifecycle state.");
 }
 
+void runControllerAmplitudeAndEnvelopeMatrix()
+{
+    const std::vector<float> constant(8, 1.0f);
+    ModelOptions amplitude;
+    amplitude.amplitudeVelocityTracking = 0.0;
+    amplitude.amplitudeModulation.controllerNumber = 93;
+    amplitude.amplitudeModulation.amount = 100.0;
+    const auto amplitudeModel = buildModel({ constant }, amplitude);
+
+    auto mutedRequest = makeStart();
+    mutedRequest.controllerValues[93] = 0;
+    drs::engine::SamplerVoice muted;
+    require(muted.start(*amplitudeModel, mutedRequest), "CC amplitude gate should start a muted voice.");
+    StereoOutput mutedOutput(1);
+    muted.render(mutedOutput.view(), 0, 1);
+    requireNear(mutedOutput.left[0], 0.0, renderTolerance,
+                "amplitude_oncc at zero must silence the route.");
+
+    auto openRequest = makeStart();
+    openRequest.controllerValues[93] = 127;
+    drs::engine::SamplerVoice open;
+    require(open.start(*amplitudeModel, openRequest), "CC amplitude gate should open at full CC.");
+    StereoOutput openOutput(1);
+    open.render(openOutput.view(), 0, 1);
+    requireNear(openOutput.left[0], 1.0, renderTolerance,
+                "amplitude_oncc=100 at full CC must preserve unity gain.");
+
+    ModelOptions envelope;
+    envelope.sourceSampleRate = 1.0;
+    envelope.amplitudeVelocityTracking = 0.0;
+    envelope.amplitudeEnvelope.holdSeconds = 1.0;
+    envelope.amplitudeEnvelope.decaySeconds = 2.0;
+    envelope.amplitudeEnvelope.sustainLevel = 0.25;
+    const auto envelopeModel = buildModel({ constant }, envelope);
+    drs::engine::SamplerVoice envelopeVoice;
+    require(envelopeVoice.start(*envelopeModel, makeStart(60, 127, 1.0)),
+            "Authored hold/decay/sustain envelope should start.");
+    StereoOutput envelopeOutput(4);
+    envelopeVoice.render(envelopeOutput.view(), 0, 4);
+    requireVector(envelopeOutput.left, { 1.0f, 1.0f, 0.625f, 0.25f },
+                  "Authored hold/decay/sustain envelope changed.");
+}
+
 void runNativeLoopCrossfadeMatrix()
 {
     const std::vector<float> discontinuousLoop { 0.0f, 0.0f, 0.0f, 0.0f,
@@ -759,6 +808,7 @@ int main()
         runSilenceAndImpulseMatrix();
         runPitchAndInterpolationMatrix();
         runGainVelocityAndPanMatrix();
+        runControllerAmplitudeAndEnvelopeMatrix();
         runOffsetAccumulationAndFinalFrameMatrix();
         runPartitionInvarianceMatrix();
         runNativeLoopCrossfadeMatrix();

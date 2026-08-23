@@ -131,6 +131,8 @@ struct PreparedPlaybackZoneHandle
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
     std::uint64_t sampleEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation amplitudeModulation;
+    RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
 
 struct PreparedPlaybackGroupRoute

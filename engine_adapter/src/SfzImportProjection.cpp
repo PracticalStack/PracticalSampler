@@ -410,31 +410,105 @@ ContinuousDamperCurveCatalog buildContinuousDamperCurveCatalog(
         catalog.curves.emplace(*curveIndex, compiled.values);
     }
     for (const auto referenced : referencedCurveIndices)
-        if (catalog.curves.count(referenced) == 0)
+        if (catalog.curves.count(referenced) == 0 && referenced > 4)
             catalog.issues.push_back("[damper.curve_reference_missing] Referenced curve_index "
                                      + std::to_string(referenced) + " was not compiled.");
     return catalog;
 }
 
-std::set<int> findNativeContinuousDamperCurveReferences(
+std::set<int> findNativeControllerCurveReferences(
     const SfzNormalizedDocument& document)
 {
     std::set<int> references;
     for (const auto& section : document.sections)
     {
-        if (section.scope != SfzOpcodeScope::region)
-            continue;
-        const auto* dynamic = findEffectiveOpcode(section, "ampeg_dynamic");
-        const auto* amount = findEffectiveOpcode(section, "ampeg_releasecc64");
-        const auto* curve = findEffectiveOpcode(section, "ampeg_release_curvecc64");
-        if (dynamic == nullptr || parseIntValue(dynamic->value).value_or(0) != 1
-            || amount == nullptr || curve == nullptr)
-            continue;
-        if (const auto index = parseIntValue(curve->value); index.has_value()
-            && *index >= 0 && *index <= 255)
-            references.insert(*index);
+        for (const auto& opcode : section.effectiveOpcodes)
+        {
+            const auto name = toLowerAscii(opcode.name);
+            const auto marker = name.find("_curvecc");
+            if (marker == std::string::npos)
+                continue;
+            const auto supportedCurve = name.rfind("amplitude_curvecc", 0) == 0
+                || name.rfind("ampeg_hold_curvecc", 0) == 0
+                || name.rfind("ampeg_decay_curvecc", 0) == 0
+                || name.rfind("ampeg_sustain_curvecc", 0) == 0
+                || name == "ampeg_release_curvecc64";
+            if (!supportedCurve)
+                continue;
+            if (const auto index = parseIntValue(opcode.value); index.has_value()
+                && *index >= 0 && *index <= 255)
+                references.insert(*index);
+        }
     }
     return references;
+}
+
+RuntimeControllerModulation projectControllerModulation(
+    const SfzNormalizedSection& section,
+    const ContinuousDamperCurveCatalog& catalog,
+    const std::string& amountPrefix,
+    const std::string& curvePrefix,
+    std::string& issue)
+{
+    RuntimeControllerModulation modulation;
+    const SfzResolvedOpcode* amountOpcode = nullptr;
+    int controllerNumber = -1;
+    for (const auto& opcode : section.effectiveOpcodes)
+    {
+        if (const auto candidate = parseControllerOpcodeNumber(opcode.name, amountPrefix);
+            candidate.has_value())
+        {
+            amountOpcode = &opcode;
+            controllerNumber = *candidate;
+            break;
+        }
+    }
+    if (amountOpcode == nullptr)
+        return modulation;
+
+    const auto amount = parseDoubleValue(amountOpcode->value);
+    if (!amount.has_value() || !std::isfinite(*amount))
+    {
+        issue = amountPrefix + " must be finite when used for controller modulation.";
+        return {};
+    }
+
+    modulation.controllerNumber = controllerNumber;
+    modulation.amount = *amount;
+    const auto curveOpcodeName = curvePrefix + std::to_string(controllerNumber);
+    if (const auto* curveOpcode = findEffectiveOpcode(section, curveOpcodeName))
+    {
+        const auto curveIndex = parseIntValue(curveOpcode->value);
+        if (!curveIndex.has_value() || *curveIndex < 0 || *curveIndex > 255)
+        {
+            issue = curveOpcodeName + " must reference a curve between 0 and 255.";
+            return {};
+        }
+        const auto curve = catalog.curves.find(*curveIndex);
+        if (curve == catalog.curves.end())
+        {
+            // SFZ reserves the low curve indices for player-defined built-ins.
+            // Their exact shapes vary between engines; linear fallback keeps the
+            // modulation audible and deterministic when no explicit table exists.
+            if (*curveIndex > 4)
+            {
+                issue = curveOpcodeName + " references a curve that could not be compiled.";
+                return {};
+            }
+            modulation.curveIndex = *curveIndex;
+            for (std::size_t index = 0; index < modulation.curve.size(); ++index)
+                modulation.curve[index] = static_cast<double>(index) / 127.0;
+            return modulation;
+        }
+        modulation.curveIndex = *curveIndex;
+        modulation.curve = curve->second;
+    }
+    else
+    {
+        for (std::size_t index = 0; index < modulation.curve.size(); ++index)
+            modulation.curve[index] = static_cast<double>(index) / 127.0;
+    }
+    return modulation;
 }
 
 bool projectContinuousDamper(const SfzNormalizedSection& section,
@@ -1403,10 +1477,10 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         return result;
     }
 
-    const auto nativeDamperCurveReferences = findNativeContinuousDamperCurveReferences(
+    const auto nativeControllerCurveReferences = findNativeControllerCurveReferences(
         analysis.normalizeResult.document);
     const auto damperCurves = buildContinuousDamperCurveCatalog(
-        analysis.parseResult.document, nativeDamperCurveReferences);
+        analysis.parseResult.document, nativeControllerCurveReferences);
     if (!damperCurves.issues.empty())
     {
         result.blocking = true;
@@ -1692,6 +1766,13 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         if (preserveVelocityCrossfade)
             zone.velocityCrossfade = crossfade;
         zone.gainDb = scopedGainContribution.hasRegionGain ? scopedGainContribution.regionGainDb : 0.0;
+        zone.pan = std::clamp(
+            parseDoubleValue(findEffectiveOpcode(section, "pan") != nullptr
+                                 ? findEffectiveOpcode(section, "pan")->value
+                                 : "0")
+                .value_or(0.0) / 100.0,
+            -1.0,
+            1.0);
         zone.fineTuneCents = parseDoubleValue(findEffectiveOpcode(section, "tune") != nullptr
                                                   ? findEffectiveOpcode(section, "tune")->value
                                                   : "0")
@@ -1716,6 +1797,41 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         zone.releaseShape = sfzDefaultReleaseShape;
         if (const auto* releaseShape = findEffectiveOpcode(section, "ampeg_release_shape"))
             zone.releaseShape = parseDoubleValue(releaseShape->value).value_or(sfzDefaultReleaseShape);
+        std::string modulationIssue;
+        zone.amplitudeModulation = projectControllerModulation(
+            section, damperCurves, "amplitude_oncc", "amplitude_curvecc", modulationIssue);
+        if (!modulationIssue.empty())
+        {
+            result.blocking = true;
+            result.issues.push_back("Region at document order "
+                                    + std::to_string(section.documentOrder) + ": " + modulationIssue);
+            continue;
+        }
+        zone.amplitudeEnvelope.holdSeconds = std::clamp(
+            parseDoubleValue(findEffectiveOpcode(section, "ampeg_hold") != nullptr
+                                 ? findEffectiveOpcode(section, "ampeg_hold")->value : "0")
+                .value_or(0.0), 0.0, 100.0);
+        zone.amplitudeEnvelope.decaySeconds = std::clamp(
+            parseDoubleValue(findEffectiveOpcode(section, "ampeg_decay") != nullptr
+                                 ? findEffectiveOpcode(section, "ampeg_decay")->value : "0")
+                .value_or(0.0), 0.0, 100.0);
+        zone.amplitudeEnvelope.sustainLevel = std::clamp(
+            parseDoubleValue(findEffectiveOpcode(section, "ampeg_sustain") != nullptr
+                                 ? findEffectiveOpcode(section, "ampeg_sustain")->value : "100")
+                .value_or(100.0) / 100.0, 0.0, 1.0);
+        zone.amplitudeEnvelope.holdModulation = projectControllerModulation(
+            section, damperCurves, "ampeg_hold_oncc", "ampeg_hold_curvecc", modulationIssue);
+        zone.amplitudeEnvelope.decayModulation = projectControllerModulation(
+            section, damperCurves, "ampeg_decay_oncc", "ampeg_decay_curvecc", modulationIssue);
+        zone.amplitudeEnvelope.sustainModulation = projectControllerModulation(
+            section, damperCurves, "ampeg_sustain_oncc", "ampeg_sustain_curvecc", modulationIssue);
+        if (!modulationIssue.empty())
+        {
+            result.blocking = true;
+            result.issues.push_back("Region at document order "
+                                    + std::to_string(section.documentOrder) + ": " + modulationIssue);
+            continue;
+        }
         std::string damperIssue;
         if (!projectContinuousDamper(section, damperCurves, zone.damper, damperIssue))
         {

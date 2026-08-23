@@ -899,6 +899,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 request.sourceMidiNote = routeSourceMidiNote;
                 request.effectiveMidiNote = routeEffectiveMidiNote;
                 request.effectiveVelocity = effectiveVelocity;
+                request.controllerValues = controllerValues;
                 request.routeGainMultiplier = routeGainMultiplier;
                 request.outputSampleRate = sampleRate;
                 request.hasPlaybackRegionOverride = event.hasPlaybackRegionOverride;
@@ -1120,6 +1121,9 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 for (std::size_t index = 0; index < slots.size(); ++index)
                 {
                     auto& slot = slots[index];
+                    if (slot.state == SamplerVoiceSlotState::active)
+                        slot.voice.updateControllerModulation(event.controllerNumber,
+                                                              event.controllerValue);
                     if (slot.state == SamplerVoiceSlotState::releasing
                         && [&]() noexcept
                         {
