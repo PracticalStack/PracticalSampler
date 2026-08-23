@@ -417,6 +417,9 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
                 || !zone.exclusiveTargetGroupIds.empty()
                 || zone.chokeReleaseSeconds.has_value()
                 || zone.fineTuneCents != 0.0
+                || zone.tuningModulation.isActive()
+                || zone.amplitudeModulation.isActive()
+                || !(zone.amplitudeEnvelope == RuntimeAmplitudeEnvelopeDefinition {})
                 || zone.amplitudeVelocityTracking != 100.0
                 || !zone.controllerConditions.empty();
         });
@@ -706,6 +709,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         zone.loopStartFrame = zonePlan.loopStartFrame;
         zone.loopEndFrame = zonePlan.loopEndFrame;
         zone.loopCrossfadeFrames = zonePlan.loopCrossfadeFrames;
+        zone.tuningModulation = zonePlan.tuningModulation;
         zone.amplitudeModulation = zonePlan.amplitudeModulation;
         zone.amplitudeEnvelope = zonePlan.amplitudeEnvelope;
         result.instrument.zones.push_back(std::move(zone));

@@ -418,6 +418,7 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
         zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        zoneObject["tuningModulation"] = serializeControllerModulation(zone.tuningModulation);
         zoneObject["amplitudeModulation"] = serializeControllerModulation(zone.amplitudeModulation);
         zoneObject["amplitudeEnvelope"] = serializeAmplitudeEnvelope(zone.amplitudeEnvelope);
         ordered_json damperCurve = ordered_json::array();
@@ -1744,6 +1745,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         result.prepared.zones.back().loopMode = zone.loopMode;
         result.prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
         result.prepared.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
+        result.prepared.zones.back().tuningModulation = zone.tuningModulation;
         result.prepared.zones.back().amplitudeModulation = zone.amplitudeModulation;
         result.prepared.zones.back().amplitudeEnvelope = zone.amplitudeEnvelope;
     }
@@ -3005,6 +3007,7 @@ bool operator==(const PreparedPlaybackZoneHandle& left, const PreparedPlaybackZo
         && left.fineTuneCents == right.fineTuneCents
         && left.amplitudeVelocityTracking == right.amplitudeVelocityTracking
         && left.controllerConditions == right.controllerConditions
+        && left.tuningModulation == right.tuningModulation
         && left.amplitudeModulation == right.amplitudeModulation
         && left.amplitudeEnvelope == right.amplitudeEnvelope
         && left.sampleStartFrame == right.sampleStartFrame

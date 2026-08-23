@@ -332,6 +332,11 @@ struct ContinuousDamperCurveCatalog
 
 std::optional<int> parseCurvePointIndex(const std::string& opcodeName)
 {
+    // A shipped SM Drums curve uses the harmless zero-padded spelling v0127
+    // for its final point. Accept it as a compatibility alias for v127 while
+    // retaining the canonical v000..v127 contract for all other names.
+    if (opcodeName == "v0127")
+        return 127;
     if (opcodeName.size() != 4 || opcodeName.front() != 'v'
         || !std::all_of(opcodeName.begin() + 1, opcodeName.end(), [](unsigned char value)
                         { return std::isdigit(value) != 0; }))
@@ -429,6 +434,7 @@ std::set<int> findNativeControllerCurveReferences(
             if (marker == std::string::npos)
                 continue;
             const auto supportedCurve = name.rfind("amplitude_curvecc", 0) == 0
+                || name.rfind("tune_curvecc", 0) == 0
                 || name.rfind("ampeg_hold_curvecc", 0) == 0
                 || name.rfind("ampeg_decay_curvecc", 0) == 0
                 || name.rfind("ampeg_sustain_curvecc", 0) == 0
@@ -1798,6 +1804,15 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         if (const auto* releaseShape = findEffectiveOpcode(section, "ampeg_release_shape"))
             zone.releaseShape = parseDoubleValue(releaseShape->value).value_or(sfzDefaultReleaseShape);
         std::string modulationIssue;
+        zone.tuningModulation = projectControllerModulation(
+            section, damperCurves, "tune_oncc", "tune_curvecc", modulationIssue);
+        if (!modulationIssue.empty())
+        {
+            result.blocking = true;
+            result.issues.push_back("Region at document order "
+                                    + std::to_string(section.documentOrder) + ": " + modulationIssue);
+            continue;
+        }
         zone.amplitudeModulation = projectControllerModulation(
             section, damperCurves, "amplitude_oncc", "amplitude_curvecc", modulationIssue);
         if (!modulationIssue.empty())

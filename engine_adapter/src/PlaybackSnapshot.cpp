@@ -682,6 +682,7 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
         zoneObject["loopCrossfadeFrames"] = zone.loopCrossfadeFrames;
         zoneObject["releaseSeconds"] = zone.releaseSeconds;
         zoneObject["releaseShape"] = zone.releaseShape;
+        zoneObject["tuningModulation"] = serializeControllerModulation(zone.tuningModulation);
         zoneObject["amplitudeModulation"] = serializeControllerModulation(zone.amplitudeModulation);
         zoneObject["amplitudeEnvelope"] = serializeAmplitudeEnvelope(zone.amplitudeEnvelope);
         ordered_json damperCurve = ordered_json::array();
@@ -1523,6 +1524,7 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
             zone.loopMode,
             zone.sampleEndFrame,
             zone.loopCrossfadeFrames,
+            zone.tuningModulation,
             zone.amplitudeModulation,
             zone.amplitudeEnvelope
         });

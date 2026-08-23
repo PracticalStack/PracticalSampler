@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -969,6 +970,129 @@ ordered_json serializeContinuousDamper(const ContinuousDamperDefinition& damper)
     };
 }
 
+ordered_json serializeControllerModulation(const RuntimeControllerModulation& modulation)
+{
+    ordered_json curve = ordered_json::array();
+    for (const auto value : modulation.curve)
+        curve.push_back(value);
+    return {
+        { "controllerNumber", modulation.controllerNumber },
+        { "amount", modulation.amount },
+        { "curveIndex", modulation.curveIndex },
+        { "curve", std::move(curve) }
+    };
+}
+
+ordered_json serializeAmplitudeEnvelope(const RuntimeAmplitudeEnvelopeDefinition& envelope)
+{
+    return {
+        { "holdSeconds", envelope.holdSeconds },
+        { "decaySeconds", envelope.decaySeconds },
+        { "sustainLevel", envelope.sustainLevel },
+        { "holdModulation", serializeControllerModulation(envelope.holdModulation) },
+        { "decayModulation", serializeControllerModulation(envelope.decayModulation) },
+        { "sustainModulation", serializeControllerModulation(envelope.sustainModulation) }
+    };
+}
+
+template <typename TResult>
+std::optional<RuntimeControllerModulation> readControllerModulation(
+    const json& object,
+    TResult& result,
+    const char* propertyName,
+    const char* context)
+{
+    const auto iterator = object.find(propertyName);
+    if (iterator == object.end())
+        return std::nullopt;
+    if (!iterator->is_object())
+    {
+        addIssue(result, std::string(context) + " field '" + propertyName + "' must be an object.");
+        return std::nullopt;
+    }
+
+    const auto modulationContext = std::string(context) + "." + propertyName;
+    RuntimeControllerModulation modulation;
+    if (const auto controller = readRequired<TResult, int>(*iterator, result,
+                                                            "controllerNumber", modulationContext.c_str()))
+        modulation.controllerNumber = *controller;
+    if (const auto amount = readRequired<TResult, double>(*iterator, result,
+                                                           "amount", modulationContext.c_str()))
+        modulation.amount = *amount;
+    if (const auto curveIndex = readRequired<TResult, int>(*iterator, result,
+                                                            "curveIndex", modulationContext.c_str()))
+        modulation.curveIndex = *curveIndex;
+
+    const auto curve = iterator->find("curve");
+    if (curve == iterator->end() || !curve->is_array()
+        || curve->size() != modulation.curve.size())
+    {
+        addIssue(result, modulationContext + " field 'curve' must contain exactly 128 numeric values.");
+    }
+    else
+    {
+        for (std::size_t index = 0; index < curve->size(); ++index)
+        {
+            try
+            {
+                modulation.curve[index] = curve->at(index).get<double>();
+            }
+            catch (const json::exception&)
+            {
+                addIssue(result, modulationContext + " field 'curve' must contain only numeric values.");
+                break;
+            }
+        }
+    }
+
+    if (modulation.controllerNumber < -1 || modulation.controllerNumber > 127)
+        addIssue(result, modulationContext + " controllerNumber must be -1 or between 0 and 127.");
+    if (!std::isfinite(modulation.amount))
+        addIssue(result, modulationContext + " amount must be finite.");
+    if (modulation.curveIndex < -1)
+        addIssue(result, modulationContext + " curveIndex must be -1 or non-negative.");
+    return modulation;
+}
+
+template <typename TResult>
+std::optional<RuntimeAmplitudeEnvelopeDefinition> readAmplitudeEnvelope(
+    const json& object,
+    TResult& result,
+    const char* propertyName,
+    const char* context)
+{
+    const auto iterator = object.find(propertyName);
+    if (iterator == object.end())
+        return std::nullopt;
+    if (!iterator->is_object())
+    {
+        addIssue(result, std::string(context) + " field '" + propertyName + "' must be an object.");
+        return std::nullopt;
+    }
+
+    const auto envelopeContext = std::string(context) + "." + propertyName;
+    RuntimeAmplitudeEnvelopeDefinition envelope;
+    if (const auto value = readRequired<TResult, double>(*iterator, result,
+                                                         "holdSeconds", envelopeContext.c_str()))
+        envelope.holdSeconds = *value;
+    if (const auto value = readRequired<TResult, double>(*iterator, result,
+                                                         "decaySeconds", envelopeContext.c_str()))
+        envelope.decaySeconds = *value;
+    if (const auto value = readRequired<TResult, double>(*iterator, result,
+                                                         "sustainLevel", envelopeContext.c_str()))
+        envelope.sustainLevel = *value;
+    if (const auto value = readControllerModulation(*iterator, result,
+                                                    "holdModulation", envelopeContext.c_str()))
+        envelope.holdModulation = *value;
+    if (const auto value = readControllerModulation(*iterator, result,
+                                                    "decayModulation", envelopeContext.c_str()))
+        envelope.decayModulation = *value;
+    if (const auto value = readControllerModulation(*iterator, result,
+                                                    "sustainModulation", envelopeContext.c_str()))
+        envelope.sustainModulation = *value;
+    return envelope;
+}
+
 ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinition>& zones,
                                    bool useExplicitRoundRobin,
                                    bool usePerformanceRules,
@@ -1021,8 +1145,14 @@ ordered_json serializeProjectZones(const std::vector<RuntimeProjectZoneDefinitio
         }
         if (zone.triggerMode == ZoneTriggerMode::oneShot)
             zoneObject["triggerMode"] = "one-shot";
+        if (zone.tuningModulation.isActive())
+            zoneObject["tuningModulation"] = serializeControllerModulation(zone.tuningModulation);
         if (usePerformanceRules)
         {
+            if (zone.amplitudeModulation.isActive())
+                zoneObject["amplitudeModulation"] = serializeControllerModulation(zone.amplitudeModulation);
+            if (!(zone.amplitudeEnvelope == RuntimeAmplitudeEnvelopeDefinition {}))
+                zoneObject["amplitudeEnvelope"] = serializeAmplitudeEnvelope(zone.amplitudeEnvelope);
             if (zone.fineTuneCents != 0.0)
                 zoneObject["fineTuneCents"] = zone.fineTuneCents;
             if (zone.amplitudeVelocityTracking != 100.0)
@@ -1590,6 +1720,15 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                             zone.damper = *damper;
                     if (const auto tune = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
                         zone.fineTuneCents = *tune;
+                    if (const auto tuningModulation = readControllerModulation(
+                            zoneObject, result, "tuningModulation", context.c_str()))
+                        zone.tuningModulation = *tuningModulation;
+                    if (const auto amplitudeModulation = readControllerModulation(
+                            zoneObject, result, "amplitudeModulation", context.c_str()))
+                        zone.amplitudeModulation = *amplitudeModulation;
+                    if (const auto amplitudeEnvelope = readAmplitudeEnvelope(
+                            zoneObject, result, "amplitudeEnvelope", context.c_str()))
+                        zone.amplitudeEnvelope = *amplitudeEnvelope;
                     if (const auto velocityTrack = readOptional<RuntimeProjectLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
                         zone.amplitudeVelocityTracking = *velocityTrack;
                     if (zoneObject.contains("controllerConditions"))
@@ -4080,6 +4219,15 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
                     zone.damper = *damper;
             if (const auto tune = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "fineTuneCents", context.c_str()))
                 zone.fineTuneCents = *tune;
+            if (const auto tuningModulation = readControllerModulation(
+                    zoneObject, result, "tuningModulation", context.c_str()))
+                zone.tuningModulation = *tuningModulation;
+            if (const auto amplitudeModulation = readControllerModulation(
+                    zoneObject, result, "amplitudeModulation", context.c_str()))
+                zone.amplitudeModulation = *amplitudeModulation;
+            if (const auto amplitudeEnvelope = readAmplitudeEnvelope(
+                    zoneObject, result, "amplitudeEnvelope", context.c_str()))
+                zone.amplitudeEnvelope = *amplitudeEnvelope;
             if (const auto velocityTrack = readOptional<RuntimeManifestLoadResult, double>(zoneObject, result, "amplitudeVelocityTracking", context.c_str()))
                 zone.amplitudeVelocityTracking = *velocityTrack;
             if (zoneObject.contains("controllerConditions"))
@@ -4668,6 +4816,12 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         if (instrument.schemaVersion >= 3)
         {
             if (zone.fineTuneCents != 0.0) zoneObject["fineTuneCents"] = zone.fineTuneCents;
+            if (zone.tuningModulation.isActive())
+                zoneObject["tuningModulation"] = serializeControllerModulation(zone.tuningModulation);
+            if (zone.amplitudeModulation.isActive())
+                zoneObject["amplitudeModulation"] = serializeControllerModulation(zone.amplitudeModulation);
+            if (!(zone.amplitudeEnvelope == RuntimeAmplitudeEnvelopeDefinition {}))
+                zoneObject["amplitudeEnvelope"] = serializeAmplitudeEnvelope(zone.amplitudeEnvelope);
             if (zone.amplitudeVelocityTracking != 100.0) zoneObject["amplitudeVelocityTracking"] = zone.amplitudeVelocityTracking;
             if (!zone.controllerConditions.empty()) zoneObject["controllerConditions"] = serializeControllerConditions(zone.controllerConditions);
             zoneObject["performance"] = {

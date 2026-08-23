@@ -1122,8 +1122,12 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 {
                     auto& slot = slots[index];
                     if (slot.state == SamplerVoiceSlotState::active)
+                    {
+                        slot.voice.updatePitchModulation(event.controllerNumber,
+                                                         event.controllerValue);
                         slot.voice.updateControllerModulation(event.controllerNumber,
                                                               event.controllerValue);
+                    }
                     if (slot.state == SamplerVoiceSlotState::releasing
                         && [&]() noexcept
                         {

@@ -130,7 +130,8 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
                                               drs::engine::ZoneTriggerMode triggerMode = drs::engine::ZoneTriggerMode::gated,
                                               bool paged = false,
                                               drs::engine::PerformancePitchSource pitchSource
-                                                  = drs::engine::PerformancePitchSource::eventNote)
+                                                  = drs::engine::PerformancePitchSource::eventNote,
+                                              drs::engine::RuntimeControllerModulation tuningModulation = {})
 {
     drs::engine::ImmutablePlaybackSnapshot snapshot;
     snapshot.draftRevision = 43;
@@ -160,6 +161,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         snapshotZone.velocityHigh = 127;
         snapshotZone.triggerMode = triggerMode;
         snapshotZone.performance.pitchSource = pitchSource;
+        snapshotZone.tuningModulation = tuningModulation;
         snapshot.zones.push_back(std::move(snapshotZone));
 
         drs::engine::PreparedPlaybackSampleHandle sample;
@@ -211,6 +213,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::size_t frameCount = 4096,
         preparedZone.velocityLow = 1;
         preparedZone.velocityHigh = 127;
         preparedZone.triggerMode = triggerMode;
+        preparedZone.tuningModulation = tuningModulation;
         prepared.zones.push_back(std::move(preparedZone));
     }
 
@@ -421,6 +424,18 @@ drs::engine::SamplerRenderEvent noteOff(std::uint32_t offset, int note = 60)
              offset,
              static_cast<std::uint8_t>(note),
              0.0f };
+}
+
+drs::engine::SamplerRenderEvent controllerChange(std::uint32_t offset,
+                                                 std::uint8_t controllerNumber,
+                                                 std::uint8_t controllerValue)
+{
+    drs::engine::SamplerRenderEvent event;
+    event.type = drs::engine::SamplerRenderEventType::controllerChange;
+    event.sampleOffset = offset;
+    event.controllerNumber = controllerNumber;
+    event.controllerValue = controllerValue;
+    return event;
 }
 
 drs::engine::SamplerRenderEvent command(drs::engine::SamplerRenderEventType type,
@@ -860,6 +875,37 @@ void runPagedPolyphonyRealtimeMatrix()
     requireNear(output.left[4], 4.0f,
                 "Two overlapping paged notes must mix identically across a page boundary.");
 }
+
+void runLivePitchControllerPoolMatrix()
+{
+    drs::engine::RuntimeControllerModulation tuning;
+    tuning.controllerNumber = 74;
+    tuning.amount = 1200.0;
+    const auto model = buildModel(128, 0, 127, 1,
+                                  drs::engine::ZoneTriggerMode::gated,
+                                  false,
+                                  drs::engine::PerformancePitchSource::eventNote,
+                                  tuning);
+    drs::engine::SamplerVoicePool pool;
+    require(pool.prepare(*model, 48000.0),
+            "Live pitch controller pool fixture should prepare.");
+
+    drs::engine::SamplerEventBlock events;
+    require(events.push(noteOn(0, 60))
+                && events.push(controllerChange(1, 74, 127)),
+            "Live pitch controller events should fit the bounded event block.");
+    StereoOutput output(40);
+    const auto result = pool.renderBlock(output.view(), events.view());
+    require(result.accepted && result.render.startedVoiceCount == 1,
+            "A live pitch controller event should leave the original voice active.");
+    require(result.activeVoiceCount == 1,
+            "A live pitch controller event must not retrigger or replace the voice.");
+    const auto snapshot = pool.getSlotSnapshot(0);
+    require(snapshot.state == drs::engine::SamplerVoiceSlotState::active,
+            "The live pitch controller voice should remain active after the event block.");
+    requireNear(static_cast<float>(snapshot.incrementFrames), 2.0f,
+                "The voice pool must apply and finish smoothing a live pitch increment update.");
+}
 } // namespace
 
 int main()
@@ -876,6 +922,7 @@ int main()
         runCapacityAndStealMatrix();
         runOverflowDropAndRealtimeMatrix();
         runPagedPolyphonyRealtimeMatrix();
+        runLivePitchControllerPoolMatrix();
         std::cout << "Sprint 4.3 fixed voice-pool and sample-accurate event matrix passed." << std::endl;
         return 0;
     }

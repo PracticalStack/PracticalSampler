@@ -313,17 +313,40 @@ int main()
                 "SM Drums RR1/RR2 groups should project as sequential slots 1 and 2 on their authored drum key.");
 
         const auto smDrumsCrash13 = findSmDrumsZone("Crash_13in");
+        const auto findSmDrumsControllerDefault = [&](const int controllerNumber)
+        {
+            return std::find_if(smDrumsProjection.controllerDefaults.begin(),
+                                smDrumsProjection.controllerDefaults.end(),
+                                [&](const RuntimeControllerDefault& value)
+                                {
+                                    return value.controllerNumber == controllerNumber;
+                                });
+        };
+        const auto crash13VolumeDefault = findSmDrumsControllerDefault(93);
         require(smDrumsCrash13 != smDrumsProjection.zones.end()
                     && std::abs(smDrumsCrash13->pan - (-1.0)) < 1.0e-12
                     && smDrumsCrash13->amplitudeModulation.controllerNumber == 93
                     && std::abs(smDrumsCrash13->amplitudeModulation.amount - 100.0) < 1.0e-12
+                    && smDrumsCrash13->tuningModulation.controllerNumber == 26
+                    && std::abs(smDrumsCrash13->tuningModulation.amount - 4800.0) < 1.0e-12
+                    && smDrumsCrash13->tuningModulation.curveIndex == 9
                     && smDrumsCrash13->amplitudeEnvelope.holdModulation.controllerNumber == 27
                     && smDrumsCrash13->amplitudeEnvelope.decayModulation.controllerNumber == 27
                     && smDrumsCrash13->amplitudeEnvelope.sustainModulation.controllerNumber == 27
                     && smDrumsCrash13->amplitudeEnvelope.holdModulation.curveIndex == 8
                     && smDrumsCrash13->amplitudeEnvelope.decayModulation.curveIndex == 8
-                    && smDrumsCrash13->amplitudeEnvelope.sustainModulation.curveIndex == 7,
-                "Crash 13 should retain its hard-left pan, CC93 amplitude gate, and CC27 envelope curves.");
+                    && smDrumsCrash13->amplitudeEnvelope.sustainModulation.curveIndex == 7
+                    && crash13VolumeDefault != smDrumsProjection.controllerDefaults.end()
+                    && crash13VolumeDefault->value == 127,
+                "Crash 13 should retain its hard-left pan, CC93=127 amplitude default, CC26 tuning, and CC27 envelope curves.");
+
+        const auto smDrumsKick = findSmDrumsZone("Kik_Stereo/RR1/01_");
+        require(smDrumsKick != smDrumsProjection.zones.end()
+                    && smDrumsKick->fineTuneCents == -1200.0
+                    && smDrumsKick->tuningModulation.controllerNumber == 20
+                    && std::abs(smDrumsKick->tuningModulation.amount - 4800.0) < 1.0e-12
+                    && smDrumsKick->tuningModulation.curveIndex == 9,
+                "The SM Drums kick should project its static octave tuning and CC20 curve-driven correction.");
 
         const auto vscoViolaPath = resolveFixturePath(
             "DemoSFVInstruments/VSCO-2-CE-1.1.0/VSCO-2-CE-1.1.0/ViolaEnsSusVib.sfz");

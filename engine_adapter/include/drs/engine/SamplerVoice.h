@@ -61,6 +61,7 @@ class SamplerVoice final
 {
 public:
     static constexpr std::uint32_t compatibilityReleaseSampleCount = 2048;
+    static constexpr std::uint32_t pitchModulationRampFrames = 32;
     // Match the default stereo resident-head boundary so page zero is requested
     // immediately instead of waiting until half of the head has already elapsed.
     static constexpr std::uint64_t pageLookAheadFrames = 8192;
@@ -73,6 +74,8 @@ public:
                               std::uint8_t controllerValue) noexcept;
     bool updateControllerModulation(std::uint8_t controllerNumber,
                                     std::uint8_t controllerValue) noexcept;
+    bool updatePitchModulation(std::uint8_t controllerNumber,
+                               std::uint8_t controllerValue) noexcept;
     bool isSustainDown(const std::array<std::uint8_t, 128>& controllerValues) const noexcept;
     SamplerVoiceRenderResult render(SamplerAudioBufferView output,
                                     std::uint32_t outputStartFrame,
@@ -91,6 +94,8 @@ public:
     int getEffectiveVelocity() const noexcept { return effectiveVelocity; }
     double getPositionFrames() const noexcept { return positionFrames; }
     double getIncrementFrames() const noexcept { return incrementFrames; }
+    double getTargetIncrementFrames() const noexcept { return targetIncrementFrames; }
+    double getEffectiveTuningCents() const noexcept { return effectiveTuningCents; }
     float getBaseGain() const noexcept { return baseGain; }
     bool isLoopActive() const noexcept { return loopActive; }
     bool ignoresNoteOff() const noexcept
@@ -131,6 +136,7 @@ private:
                           bool hasControllerValue,
                           std::uint8_t controllerValue) noexcept;
     double dynamicReleaseSeconds(std::uint8_t controllerValue) const noexcept;
+    void advancePitchIncrement() noexcept;
     void finish() noexcept;
     double amplitudeEnvelopeLevel() const noexcept;
 
@@ -151,6 +157,10 @@ private:
     std::uint64_t loopEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
     double incrementFrames = 1.0;
+    double targetIncrementFrames = 1.0;
+    double pitchIncrementRampStep = 0.0;
+    double effectiveTuningCents = 0.0;
+    std::uint32_t pitchIncrementRampRemaining = 0;
     double outputSampleRate = 48000.0;
     float baseGain = 0.0f;
     float unmodulatedGain = 0.0f;

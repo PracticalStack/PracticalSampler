@@ -49,6 +49,7 @@ struct ModelOptions
     double pan = 0.0;
     double fineTuneCents = 0.0;
     double amplitudeVelocityTracking = 100.0;
+    drs::engine::RuntimeControllerModulation tuningModulation;
     drs::engine::RuntimeControllerModulation amplitudeModulation;
     drs::engine::RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
     std::uint64_t sampleStartFrame = 0;
@@ -84,6 +85,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     snapshotZone.pan = options.pan;
     snapshotZone.fineTuneCents = options.fineTuneCents;
     snapshotZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
+    snapshotZone.tuningModulation = options.tuningModulation;
     snapshotZone.amplitudeModulation = options.amplitudeModulation;
     snapshotZone.amplitudeEnvelope = options.amplitudeEnvelope;
     snapshotZone.sampleStartFrame = options.sampleStartFrame;
@@ -133,6 +135,7 @@ drs::engine::SamplerRenderModelPtr buildModel(std::vector<std::vector<float>> ch
     preparedZone.pan = options.pan;
     preparedZone.fineTuneCents = options.fineTuneCents;
     preparedZone.amplitudeVelocityTracking = options.amplitudeVelocityTracking;
+    preparedZone.tuningModulation = options.tuningModulation;
     preparedZone.amplitudeModulation = options.amplitudeModulation;
     preparedZone.amplitudeEnvelope = options.amplitudeEnvelope;
     preparedZone.sampleStartFrame = options.sampleStartFrame;
@@ -547,6 +550,92 @@ void runControllerAmplitudeAndEnvelopeMatrix()
                   "Authored hold/decay/sustain envelope changed.");
 }
 
+void runControllerPitchModulationMatrix()
+{
+    ModelOptions tuning;
+    tuning.amplitudeVelocityTracking = 0.0;
+    tuning.tuningModulation.controllerNumber = 74;
+    tuning.tuningModulation.amount = 1200.0;
+    std::vector<float> source(128);
+    for (std::size_t index = 0; index < source.size(); ++index)
+        source[index] = static_cast<float>(index);
+    const auto model = buildModel({ source }, tuning);
+
+    auto noteOnAtMid = makeStart();
+    noteOnAtMid.controllerValues[74] = 64;
+    drs::engine::SamplerVoice noteOnVoice;
+    require(noteOnVoice.start(*model, noteOnAtMid),
+            "Pitch-modulated voice should start with its note-on controller value.");
+    requireNear(noteOnVoice.getEffectiveTuningCents(), 64.0 * 1200.0 / 127.0, 1.0e-12,
+                "Note-on pitch modulation should evaluate the controller curve.");
+    requireNear(noteOnVoice.getIncrementFrames(),
+                std::pow(2.0, (64.0 * 1200.0 / 127.0) / 1200.0), 1.0e-12,
+                "Note-on pitch modulation should affect the playback increment.");
+
+    auto noteOnAtZero = makeStart();
+    noteOnAtZero.controllerValues[74] = 0;
+    drs::engine::SamplerVoice voice;
+    require(voice.start(*model, noteOnAtZero),
+            "Live pitch-modulation voice should start at the neutral controller value.");
+    StereoOutput firstFrame(1);
+    require(voice.render(firstFrame.view(), 0, 1).mixedFrameCount == 1,
+            "Live pitch-modulation voice should render its first frame before a CC change.");
+    requireNear(voice.getPositionFrames(), 1.0, 1.0e-12,
+                "The initial pitch increment should advance the source by one frame.");
+
+    require(voice.updatePitchModulation(74, 127),
+            "An active voice should accept a pitch controller update.");
+    requireNear(voice.getEffectiveTuningCents(), 1200.0, 1.0e-12,
+                "Active pitch modulation should update effective tuning in cents.");
+    requireNear(voice.getTargetIncrementFrames(), 2.0, 1.0e-12,
+                "Active pitch modulation should update the target read increment.");
+    requireNear(voice.getIncrementFrames(), 1.0, 1.0e-12,
+                "Active pitch modulation should begin from the prior increment during smoothing.");
+    requireNear(voice.getPositionFrames(), 1.0, 1.0e-12,
+                "A live pitch change must preserve the current source position.");
+
+    StereoOutput afterChange(1);
+    require(voice.render(afterChange.view(), 0, 1).mixedFrameCount == 1,
+            "The active voice should continue rendering after a pitch change.");
+    requireNear(afterChange.left[0], 1.0, renderTolerance,
+                "A live pitch change must not restart the sample at frame zero.");
+    requireNear(voice.getPositionFrames(), 2.0, 1.0e-12,
+                "The first smoothed frame should preserve the prior read rate and source position continuity.");
+
+    StereoOutput rampOutput(drs::engine::SamplerVoice::pitchModulationRampFrames - 1);
+    require(voice.render(rampOutput.view(), 0,
+                         drs::engine::SamplerVoice::pitchModulationRampFrames - 1).mixedFrameCount
+                == drs::engine::SamplerVoice::pitchModulationRampFrames - 1,
+            "Pitch modulation smoothing should continue rendering through the complete ramp.");
+    requireNear(voice.getIncrementFrames(), 2.0, 1.0e-12,
+                "Pitch modulation smoothing should reach the target increment at the ramp boundary.");
+}
+
+void runPitchModulationSerializationMatrix()
+{
+    drs::engine::RuntimeControllerModulation modulation;
+    modulation.controllerNumber = 20;
+    modulation.amount = 4800.0;
+    modulation.curveIndex = 9;
+    modulation.curve[63] = 0.25;
+    modulation.curve[127] = 1.0;
+
+    drs::engine::ImmutablePlaybackSnapshot snapshot;
+    drs::engine::PlaybackSnapshotZone snapshotZone;
+    snapshotZone.id = "tuning-zone";
+    snapshotZone.sampleSourceId = "tuning-sample";
+    snapshotZone.tuningModulation = modulation;
+    snapshot.zones.push_back(snapshotZone);
+    const auto serializedSnapshot = drs::engine::serializeImmutablePlaybackSnapshot(snapshot);
+    require(serializedSnapshot.find("\"tuningModulation\"") != std::string::npos
+                && serializedSnapshot.find("4800") != std::string::npos,
+            "Playback snapshot serialization must retain tuning modulation metadata.");
+    snapshot.zones.front().tuningModulation.amount = 2400.0;
+    require(drs::engine::serializeImmutablePlaybackSnapshot(snapshot) != serializedSnapshot,
+            "Changing tuning modulation must change the snapshot serialization identity.");
+
+}
+
 void runNativeLoopCrossfadeMatrix()
 {
     const std::vector<float> discontinuousLoop { 0.0f, 0.0f, 0.0f, 0.0f,
@@ -809,6 +898,8 @@ int main()
         runPitchAndInterpolationMatrix();
         runGainVelocityAndPanMatrix();
         runControllerAmplitudeAndEnvelopeMatrix();
+        runControllerPitchModulationMatrix();
+        runPitchModulationSerializationMatrix();
         runOffsetAccumulationAndFinalFrameMatrix();
         runPartitionInvarianceMatrix();
         runNativeLoopCrossfadeMatrix();

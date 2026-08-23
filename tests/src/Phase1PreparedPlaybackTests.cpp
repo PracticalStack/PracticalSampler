@@ -223,8 +223,15 @@ int main()
     try
     {
         const auto scratchDirectory = getScratchDirectory();
-        const auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
+        auto phase2Project = drs::engine::loadPhase2ReferenceProjectManifest();
         require(phase2Project.loaded, "Phase 2 authoring fixture must load before prepared playback tests run.");
+        require(!phase2Project.project.authoring.zones.empty(),
+                "Phase 2 authoring fixture must expose a zone for pitch-modulation propagation coverage.");
+        phase2Project.project.authoring.zones.front().tuningModulation.controllerNumber = 20;
+        phase2Project.project.authoring.zones.front().tuningModulation.amount = 4800.0;
+        phase2Project.project.authoring.zones.front().tuningModulation.curveIndex = 9;
+        phase2Project.project.authoring.zones.front().tuningModulation.curve[63] = 0.25;
+        phase2Project.project.authoring.zones.front().tuningModulation.curve[127] = 1.0;
 
         const auto referenceManifest = drs::engine::loadPhase1ReferenceInstrumentManifest();
         require(referenceManifest.loaded, "Phase 1 reference manifest must load before prepared playback tests run.");
@@ -318,6 +325,7 @@ int main()
                 "Prepared sample handles should expose an explicit ownership token.");
         const auto firstPreparedSerialization = drs::engine::serializeImmutablePreparedPlayback(firstPrepared.prepared);
         const auto firstPreparedContentSerialization = drs::engine::serializePreparedPlaybackContent(firstPrepared.prepared);
+        const auto firstSnapshotSerialization = drs::engine::serializeImmutablePlaybackSnapshot(firstSnapshot.snapshot);
         require(firstPreparedSerialization == drs::engine::serializeImmutablePreparedPlayback(firstPrepared.prepared),
                 "Prepared playback serialization should be deterministic when repeated for the same immutable payload.");
         require(firstPreparedContentSerialization == drs::engine::serializePreparedPlaybackContent(firstPrepared.prepared),
@@ -326,6 +334,10 @@ int main()
                     && firstPreparedSerialization.find("\"routingSourceId\"") != std::string::npos
                     && firstPreparedSerialization.find("\"workspaceVisible\"") != std::string::npos,
                 "Sprint 3 prepared playback serialization must retain group route metadata.");
+        require(firstSnapshotSerialization.find("\"tuningModulation\"") != std::string::npos
+                    && firstPreparedSerialization.find("\"tuningModulation\"") != std::string::npos
+                    && firstPreparedContentSerialization.find("\"tuningModulation\"") != std::string::npos,
+                "Tuning modulation must survive snapshot, prepared, and prepared-content serialization.");
         require(firstPrepared.prepared.groupRoutes[0].groupId == firstSnapshot.snapshot.groupRoutes[0].groupId
                     && firstPrepared.prepared.groupRoutes[0].gainDb == firstSnapshot.snapshot.groupRoutes[0].gainDb
                     && firstPrepared.prepared.groupRoutes[0].pan == firstSnapshot.snapshot.groupRoutes[0].pan,

@@ -1742,6 +1742,20 @@ OpcodeClassification classifyOpcode(const SfzResolvedOpcode& opcode)
                  "Fine tuning in cents maps directly into the native route pitch ratio." };
     }
 
+    if (opcodeName == "tune_oncc" || opcodeName.rfind("tune_oncc", 0) == 0)
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.tuningModulation",
+                 "CC-driven tuning maps into the native live sampler pitch increment path." };
+    }
+
+    if (opcodeName == "tune_curvecc" || opcodeName.rfind("tune_curvecc", 0) == 0)
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "zone.tuningModulation.curve",
+                 "The referenced SFZ tuning curve is compiled into the native 128-point pitch modulation table." };
+    }
+
     if (opcodeName == "pan")
     {
         return { SfzImportSupportDisposition::converted,

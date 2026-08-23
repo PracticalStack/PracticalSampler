@@ -167,6 +167,7 @@ bool sameTopology(const PlaybackSnapshotZone& snapshotZone,
         && snapshotZone.amplitudeVelocityTracking == preparedZone.amplitudeVelocityTracking
         && snapshotZone.controllerConditions == preparedZone.controllerConditions
         && snapshotZone.damper == preparedZone.damper
+        && snapshotZone.tuningModulation == preparedZone.tuningModulation
         && snapshotZone.amplitudeModulation == preparedZone.amplitudeModulation
         && snapshotZone.amplitudeEnvelope == preparedZone.amplitudeEnvelope
         && snapshotZone.sampleStartFrame == preparedZone.sampleStartFrame
@@ -723,6 +724,7 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         model->routes.back().loopMode = zone.loopMode;
         model->routes.back().sampleEndFrame = zone.sampleEndFrame;
         model->routes.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
+        model->routes.back().tuningModulation = zone.tuningModulation;
         model->routes.back().amplitudeModulation = zone.amplitudeModulation;
         model->routes.back().amplitudeEnvelope = zone.amplitudeEnvelope;
         model->routes.back().layerId = snapshotLayerRoute == nullptr ? std::string {} : snapshotLayerRoute->layerId;

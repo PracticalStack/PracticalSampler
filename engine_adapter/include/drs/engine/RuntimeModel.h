@@ -182,9 +182,10 @@ struct RuntimeControllerDefault
     }
 };
 
-// A controller modulation is evaluated at note-on. The curve is stored as a
-// normalized 128-point lookup table so imported SFZ curves remain deterministic
-// and do not require parsing or allocation on the audio thread.
+// A controller modulation is represented as a normalized 128-point lookup
+// table so imported SFZ curves remain deterministic and do not require
+// parsing or allocation on the audio thread. Consumers decide whether the
+// modulation is evaluated only at note-on or also applied to active voices.
 struct RuntimeControllerModulation
 {
     int controllerNumber = -1;
@@ -261,6 +262,7 @@ struct RuntimeProjectZoneDefinition
     // Native-only loop smoothing. This is deliberately separate from the
     // portable SFZ v1 region contract and never implies an SFZ writer.
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation tuningModulation;
     RuntimeControllerModulation amplitudeModulation;
     RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
@@ -525,6 +527,7 @@ struct RuntimeZoneDefinition
     std::uint64_t loopEndFrame = 0;
     std::uint64_t sampleEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation tuningModulation;
     RuntimeControllerModulation amplitudeModulation;
     RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };

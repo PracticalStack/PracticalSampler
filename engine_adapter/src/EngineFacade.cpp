@@ -1125,6 +1125,7 @@ CompiledPerformanceProgramResult compilePerformancePackageProgram(
         authoringZone.chokeReleaseSeconds = zone.chokeReleaseSeconds;
         authoringZone.controllerConditions = zone.controllerConditions;
         authoringZone.damper = zone.damper;
+        authoringZone.tuningModulation = zone.tuningModulation;
         authoringZone.amplitudeModulation = zone.amplitudeModulation;
         authoringZone.amplitudeEnvelope = zone.amplitudeEnvelope;
         authoring.zones.push_back(std::move(authoringZone));
@@ -1375,6 +1376,7 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
         snapshotZone.amplitudeVelocityTracking = zone.amplitudeVelocityTracking;
         snapshotZone.controllerConditions = zone.controllerConditions;
         snapshotZone.damper = zone.damper;
+        snapshotZone.tuningModulation = zone.tuningModulation;
         snapshotZone.amplitudeModulation = zone.amplitudeModulation;
         snapshotZone.amplitudeEnvelope = zone.amplitudeEnvelope;
         result.snapshot.zones.push_back(std::move(snapshotZone));
@@ -4587,6 +4589,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         prepared.zones.back().loopMode = zone.loopMode;
         prepared.zones.back().sampleEndFrame = zone.sampleEndFrame;
         prepared.zones.back().loopCrossfadeFrames = zone.loopCrossfadeFrames;
+        prepared.zones.back().tuningModulation = zone.tuningModulation;
         prepared.zones.back().amplitudeModulation = zone.amplitudeModulation;
         prepared.zones.back().amplitudeEnvelope = zone.amplitudeEnvelope;
     }

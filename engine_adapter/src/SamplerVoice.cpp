@@ -47,6 +47,26 @@ double amplitudeControllerScale(const RuntimeControllerModulation& modulation,
                           * controllerCurveValue(modulation, controllerValues),
                       0.0, 1.0);
 }
+
+double tuningControllerCents(const RuntimeControllerModulation& modulation,
+                             const std::array<std::uint8_t, 128>& controllerValues) noexcept
+{
+    if (!modulation.isActive())
+        return 0.0;
+    return modulation.amount * controllerCurveValue(modulation, controllerValues);
+}
+
+double pitchIncrementFor(const SamplerRenderRoute& route,
+                         const SamplerRenderSample& sample,
+                         const int effectiveMidiNote,
+                         const double outputSampleRate,
+                         const double tuningCents) noexcept
+{
+    const auto pitchRatio = std::pow(
+        2.0,
+        ((static_cast<double>(effectiveMidiNote - route.rootKey) * 100.0) + tuningCents) / 1200.0);
+    return pitchRatio * (sample.sampleRate / outputSampleRate);
+}
 } // namespace
 
 SamplerPanGains computeSamplerPanGains(double normalizedPan) noexcept
@@ -92,11 +112,12 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         return false;
     }
 
-    const auto pitchRatio = std::pow(
-        2.0,
-        ((static_cast<double>(request.effectiveMidiNote - selectedRoute.rootKey) * 100.0)
-         + selectedRoute.fineTuneCents) / 1200.0);
-    const auto increment = pitchRatio * (selectedSample.sampleRate / request.outputSampleRate);
+    const auto effectiveTuning = selectedRoute.fineTuneCents
+        + tuningControllerCents(selectedRoute.tuningModulation, request.controllerValues);
+    const auto increment = pitchIncrementFor(selectedRoute, selectedSample,
+                                             request.effectiveMidiNote,
+                                             request.outputSampleRate,
+                                             effectiveTuning);
     // Native amp_veltrack law: 0% is velocity-independent, 100% retains the
     // historical linear velocity gain, and intermediate values use a smooth power curve.
     const auto normalizedVelocity = static_cast<double>(request.effectiveVelocity) / 127.0;
@@ -122,6 +143,8 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     playbackEndFrame = playbackEnd;
     nextLookAheadPublicationFrame = playbackStart;
     incrementFrames = increment;
+    targetIncrementFrames = increment;
+    effectiveTuningCents = effectiveTuning;
     outputSampleRate = request.outputSampleRate;
     unmodulatedGain = static_cast<float>(gain);
     baseGain = unmodulatedGain * static_cast<float>(amplitudeControllerScale(
@@ -273,6 +296,55 @@ bool SamplerVoice::updateControllerModulation(const std::uint8_t controllerNumbe
     return true;
 }
 
+bool SamplerVoice::updatePitchModulation(const std::uint8_t controllerNumber,
+                                         const std::uint8_t controllerValue) noexcept
+{
+    if (!isActive() || route == nullptr || sample == nullptr
+        || !route->tuningModulation.isActive()
+        || route->tuningModulation.controllerNumber != controllerNumber
+        || !std::isfinite(outputSampleRate) || outputSampleRate <= 0.0)
+        return false;
+
+    std::array<std::uint8_t, 128> values {};
+    values[controllerNumber] = controllerValue;
+    const auto tuning = route->fineTuneCents
+        + tuningControllerCents(route->tuningModulation, values);
+    const auto increment = pitchIncrementFor(*route, *sample, effectiveMidiNote,
+                                             outputSampleRate, tuning);
+    if (!std::isfinite(increment) || increment <= 0.0)
+        return false;
+
+    effectiveTuningCents = tuning;
+    targetIncrementFrames = increment;
+    if (pitchModulationRampFrames == 0)
+    {
+        incrementFrames = increment;
+        pitchIncrementRampStep = 0.0;
+        pitchIncrementRampRemaining = 0;
+    }
+    else
+    {
+        pitchIncrementRampRemaining = pitchModulationRampFrames;
+        pitchIncrementRampStep = (targetIncrementFrames - incrementFrames)
+            / static_cast<double>(pitchIncrementRampRemaining);
+    }
+    return true;
+}
+
+void SamplerVoice::advancePitchIncrement() noexcept
+{
+    positionFrames += incrementFrames;
+    if (pitchIncrementRampRemaining == 0)
+        return;
+
+    incrementFrames += pitchIncrementRampStep;
+    if (--pitchIncrementRampRemaining == 0)
+    {
+        incrementFrames = targetIncrementFrames;
+        pitchIncrementRampStep = 0.0;
+    }
+}
+
 double SamplerVoice::amplitudeEnvelopeLevel() const noexcept
 {
     if (envelopeHoldSeconds > 0.0
@@ -382,7 +454,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
             if (crossfading && crossfadeNextView.status == SampleFrameViewStatus::pageMissing)
                 sample->dataSource->publishPageIntent(
                     crossfadeNextFrameIndex, SamplePageRequestPriority::lookAhead, voiceId);
-            positionFrames += incrementFrames;
+            advancePitchIncrement();
             envelopeElapsedFrames += 1.0;
             if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
             {
@@ -465,7 +537,7 @@ SamplerVoiceRenderResult SamplerVoice::render(SamplerAudioBufferView output,
         if (output.channelCount > 1)
             output.channels[1][outputStartFrame + outputFrame] += rightSample;
 
-        positionFrames += incrementFrames;
+        advancePitchIncrement();
         envelopeElapsedFrames += 1.0;
         if (loopActive && positionFrames >= static_cast<double>(loopEndFrame))
         {
@@ -509,6 +581,10 @@ void SamplerVoice::reset() noexcept
     route = nullptr;
     sample = nullptr;
     positionFrames = 0.0;
+    targetIncrementFrames = 1.0;
+    pitchIncrementRampStep = 0.0;
+    effectiveTuningCents = 0.0;
+    pitchIncrementRampRemaining = 0;
     playbackEndFrame = 0;
     loopStartFrame = 0;
     loopEndFrame = 0;

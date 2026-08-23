@@ -150,6 +150,11 @@ drs::engine::RuntimeProjectModel buildCrossfadeReadyProject()
     lowerZone.velocityCrossfade = {};
     lowerZone.velocityCrossfade.fadeOutLowVelocity = 25;
     lowerZone.velocityCrossfade.fadeOutHighVelocity = 60;
+    lowerZone.tuningModulation.controllerNumber = 20;
+    lowerZone.tuningModulation.amount = 4800.0;
+    lowerZone.tuningModulation.curveIndex = 9;
+    lowerZone.tuningModulation.curve[63] = 0.25f;
+    lowerZone.tuningModulation.curve[127] = 1.0f;
 
     upperZone.rootKey = lowerZone.rootKey;
     upperZone.keyLow = lowerZone.keyLow;
@@ -186,6 +191,7 @@ drs::engine::RuntimeCompilePlan buildCrossfadeCompilePlan(const fs::path& output
     plan.instrumentDisplayName = "DRS Phase 3 Crossfade Compile";
     plan.defaultLoadProfile = "balanced";
     plan.pageSizeBytes = 65536;
+    plan.controllerDefaults = { { 20, 63 }, { 93, 127 } };
 
     drs::engine::RuntimeCompileSourceDefinition source;
     source.id = "sine-a3";
@@ -220,6 +226,27 @@ drs::engine::RuntimeCompilePlan buildCrossfadeCompilePlan(const fs::path& output
     lowerZone.roundRobinPosition = 1;
     lowerZone.velocityCrossfade.fadeOutLowVelocity = 25;
     lowerZone.velocityCrossfade.fadeOutHighVelocity = 60;
+    lowerZone.tuningModulation.controllerNumber = 20;
+    lowerZone.tuningModulation.amount = 4800.0;
+    lowerZone.tuningModulation.curveIndex = 9;
+    lowerZone.tuningModulation.curve[63] = 0.25;
+    lowerZone.tuningModulation.curve[127] = 1.0;
+    lowerZone.amplitudeModulation.controllerNumber = 93;
+    lowerZone.amplitudeModulation.amount = 100.0;
+    lowerZone.amplitudeEnvelope.holdSeconds = 0.4;
+    lowerZone.amplitudeEnvelope.decaySeconds = 2.0;
+    lowerZone.amplitudeEnvelope.holdModulation.controllerNumber = 27;
+    lowerZone.amplitudeEnvelope.holdModulation.amount = -0.4;
+    lowerZone.amplitudeEnvelope.holdModulation.curveIndex = 8;
+    lowerZone.amplitudeEnvelope.holdModulation.curve[127] = 1.0;
+    lowerZone.amplitudeEnvelope.decayModulation.controllerNumber = 27;
+    lowerZone.amplitudeEnvelope.decayModulation.amount = -1.9;
+    lowerZone.amplitudeEnvelope.decayModulation.curveIndex = 8;
+    lowerZone.amplitudeEnvelope.decayModulation.curve[127] = 1.0;
+    lowerZone.amplitudeEnvelope.sustainModulation.controllerNumber = 27;
+    lowerZone.amplitudeEnvelope.sustainModulation.amount = -100.0;
+    lowerZone.amplitudeEnvelope.sustainModulation.curveIndex = 7;
+    lowerZone.amplitudeEnvelope.sustainModulation.curve[127] = 1.0;
     plan.zones.push_back(std::move(lowerZone));
 
     drs::engine::RuntimeCompileZoneDefinition upperZone;
@@ -298,10 +325,17 @@ int main()
                                       0,
                                       0,
                                       "Snapshot upper-zone runtime crossfade metadata");
+        require(lowerSnapshotZone.tuningModulation.controllerNumber == 20
+                    && lowerSnapshotZone.tuningModulation.amount == 4800.0
+                    && lowerSnapshotZone.tuningModulation.curveIndex == 9
+                    && lowerSnapshotZone.tuningModulation.curve[127] == 1.0f,
+                "Snapshot should preserve tuning modulation metadata.");
 
         const auto serializedSnapshot = serializeImmutablePlaybackSnapshot(snapshotResult.snapshot);
         require(serializedSnapshot.find("\"velocityCrossfadeRuntime\"") != std::string::npos,
                 "Snapshot serialization should emit runtime-ready crossfade metadata.");
+        require(serializedSnapshot.find("\"tuningModulation\"") != std::string::npos,
+                "Snapshot serialization should emit tuning modulation metadata.");
 
         PreparedPlaybackService preparedService;
         const auto preparedRequest = preparedService.requestBuild(snapshotResult, referenceStream);
@@ -349,10 +383,17 @@ int main()
                                       0,
                                       0,
                                       "Prepared upper-zone runtime crossfade metadata");
+        require(lowerPreparedZone.tuningModulation.controllerNumber == 20
+                    && lowerPreparedZone.tuningModulation.amount == 4800.0
+                    && lowerPreparedZone.tuningModulation.curveIndex == 9
+                    && lowerPreparedZone.tuningModulation.curve[127] == 1.0f,
+                "Prepared playback should preserve tuning modulation metadata.");
 
         const auto serializedPrepared = serializeImmutablePreparedPlayback(preparedResult.prepared);
         require(serializedPrepared.find("\"velocityCrossfadeRuntime\"") != std::string::npos,
                 "Prepared playback serialization should emit runtime-ready crossfade metadata.");
+        require(serializedPrepared.find("\"tuningModulation\"") != std::string::npos,
+                "Prepared playback serialization should emit tuning modulation metadata.");
 
         const auto tempDirectory = fs::temp_directory_path() / "drs-phase3-crossfade-prepared-playback-tests";
         const auto compilePlan = buildCrossfadeCompilePlan(tempDirectory);
@@ -399,14 +440,33 @@ int main()
                                       0,
                                       0,
                                       "Compiled upper-zone runtime crossfade metadata");
+        require(lowerInstrumentZone.tuningModulation.controllerNumber == 20
+                    && lowerInstrumentZone.tuningModulation.amount == 4800.0
+                    && lowerInstrumentZone.tuningModulation.curveIndex == 9
+                    && lowerInstrumentZone.tuningModulation.curve[127] == 1.0,
+                "Compiled instrument should preserve tuning modulation metadata.");
+        require(lowerInstrumentZone.amplitudeModulation.controllerNumber == 93
+                    && lowerInstrumentZone.amplitudeModulation.amount == 100.0
+                    && lowerInstrumentZone.amplitudeEnvelope.holdModulation.controllerNumber == 27
+                    && lowerInstrumentZone.amplitudeEnvelope.holdModulation.curveIndex == 8
+                    && lowerInstrumentZone.amplitudeEnvelope.decayModulation.curveIndex == 8
+                    && lowerInstrumentZone.amplitudeEnvelope.sustainModulation.curveIndex == 7,
+                "Compiled instrument should preserve Crash 13-style volume and envelope modulation metadata.");
+        require(compileResult.instrument.controllerDefaults.size() == 2
+                    && compileResult.instrument.controllerDefaults[0] == RuntimeControllerDefault { 20, 63 }
+                    && compileResult.instrument.controllerDefaults[1] == RuntimeControllerDefault { 93, 127 },
+                "Compiled instrument should preserve controller defaults used by published playback.");
 
         const auto serializedInstrument = serializeRuntimeInstrumentManifest(compileResult.instrument,
                                                                              compilePlan.outputInstrumentPath);
         require(serializedInstrument.find("\"velocityCrossfadeRuntime\"") != std::string::npos,
                 "Compiled instrument serialization should emit runtime-ready crossfade metadata.");
+        require(serializedInstrument.find("\"tuningModulation\"") != std::string::npos,
+                "Compiled instrument serialization should emit tuning modulation metadata.");
 
         writeTextFile(compilePlan.outputProjectPath,
-                      serializeRuntimeProjectManifest(compileResult.project, compilePlan.outputProjectPath));
+                      serializeRuntimeProjectManifest(compileResult.project,
+                                                     compilePlan.outputProjectPath));
         writeTextFile(compilePlan.outputStreamPath,
                       serializeCompiledStreamIndex(compileResult, compilePlan.outputStreamPath));
         writeTextFile(compilePlan.outputInstrumentPath, serializedInstrument);
@@ -435,6 +495,22 @@ int main()
                                       0,
                                       0,
                                       "Round-tripped compiled upper-zone runtime crossfade metadata");
+        require(roundTripLowerZone.tuningModulation.controllerNumber == 20
+                    && roundTripLowerZone.tuningModulation.amount == 4800.0
+                    && roundTripLowerZone.tuningModulation.curveIndex == 9
+                    && roundTripLowerZone.tuningModulation.curve[127] == 1.0,
+                "Round-tripped compiled instrument should preserve tuning modulation metadata.");
+        require(roundTripLowerZone.amplitudeModulation.controllerNumber == 93
+                    && roundTripLowerZone.amplitudeModulation.amount == 100.0
+                    && roundTripLowerZone.amplitudeEnvelope.holdModulation.controllerNumber == 27
+                    && roundTripLowerZone.amplitudeEnvelope.holdModulation.curveIndex == 8
+                    && roundTripLowerZone.amplitudeEnvelope.decayModulation.curveIndex == 8
+                    && roundTripLowerZone.amplitudeEnvelope.sustainModulation.curveIndex == 7,
+                "Round-tripped compiled instrument should preserve Crash 13-style modulation metadata.");
+        require(roundTripInstrument.instrument.controllerDefaults.size() == 2
+                    && roundTripInstrument.instrument.controllerDefaults[0] == RuntimeControllerDefault { 20, 63 }
+                    && roundTripInstrument.instrument.controllerDefaults[1] == RuntimeControllerDefault { 93, 127 },
+                "Round-tripped compiled instrument should preserve published controller defaults.");
 
         auto invalidCompilePlan = compilePlan;
         invalidCompilePlan.zones.pop_back();

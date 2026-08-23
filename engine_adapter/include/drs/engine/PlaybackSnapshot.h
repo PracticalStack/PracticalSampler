@@ -191,6 +191,7 @@ struct PlaybackSnapshotZone
     RegionLoopMode loopMode = RegionLoopMode::noLoop;
     std::uint64_t sampleEndFrame = 0;
     std::uint64_t loopCrossfadeFrames = 0;
+    RuntimeControllerModulation tuningModulation;
     RuntimeControllerModulation amplitudeModulation;
     RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
 };
