@@ -656,6 +656,8 @@ std::string buildGroupId(const SfzNormalizedSection& section,
 
     if (const auto* roundRobinLength = findEffectiveOpcode(section, "seq_length"))
         stream << "-rr" << roundRobinLength->value;
+    if (const auto* exclusiveGroup = findEffectiveOpcode(section, "group"))
+        stream << "-eg" << exclusiveGroup->value;
 
     return slugify(stream.str());
 }
@@ -674,7 +676,8 @@ std::string buildRoundRobinPoolSignature(const RuntimeProjectZoneDefinition& zon
     stream << zone.articulationId
            << "|" << zone.rootKey
            << "|" << zone.keyLow
-           << "|" << zone.keyHigh;
+           << "|" << zone.keyHigh
+           << "|" << zone.groupId;
     return slugify(stream.str());
 }
 
@@ -689,6 +692,8 @@ std::string buildRoundRobinPoolSignature(const SfzNormalizedSection& section)
            << "|" << rootKey
            << "|" << keyLow
            << "|" << keyHigh;
+    if (const auto* exclusiveGroup = findEffectiveOpcode(section, "group"))
+        stream << "|" << exclusiveGroup->value;
     return slugify(stream.str());
 }
 
@@ -1244,6 +1249,19 @@ RuntimeProjectModel buildProvisionalProject(const RuntimeProjectModel& baseProje
         else
             *existing = importedDefault;
     }
+    if (project.schemaVersion >= instrumentControlProjectSchemaVersion
+        && project.authoring.schemaVersion >= instrumentControlAuthoringSchemaVersion)
+    {
+        project.authoring.instrumentControls.insert(project.authoring.instrumentControls.end(),
+                                                    projection.instrumentControls.begin(),
+                                                    projection.instrumentControls.end());
+        project.authoring.instrumentControlTargets.insert(project.authoring.instrumentControlTargets.end(),
+                                                          projection.instrumentControlTargets.begin(),
+                                                          projection.instrumentControlTargets.end());
+        project.authoring.midiControlBindings.insert(project.authoring.midiControlBindings.end(),
+                                                     projection.midiControlBindings.begin(),
+                                                     projection.midiControlBindings.end());
+    }
     project.notes.insert(project.notes.end(),
                          projection.projectNotes.begin(),
                          projection.projectNotes.end());
@@ -1415,6 +1433,139 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                     defaultSfzImportExecutionContext());
 }
 
+void appendImportedInstrumentControlProjection(
+    const SfzNormalizedDocument& document,
+    SfzImportProjectionResult& result)
+{
+    struct ControlInfo
+    {
+        std::string label;
+        int defaultValue = 0;
+        bool hasDefault = false;
+        bool hasTarget = false;
+        std::set<RuntimeInstrumentControlTargetKind> targetKinds;
+        RuntimeInstrumentControlCategory category = RuntimeInstrumentControlCategory::hidden;
+    };
+    std::map<int, ControlInfo> controls;
+    std::set<std::tuple<int, RuntimeInstrumentControlTargetKind, std::string>> targets;
+    // The projection's controller-default catalog is built from explicit declarations.
+    // Seed controls from it rather than treating normalized/effective fallback state as
+    // authored set_cc data.
+    for (const auto& controllerDefault : result.controllerDefaults)
+    {
+        auto& info = controls[controllerDefault.controllerNumber];
+        info.defaultValue = controllerDefault.value;
+        info.hasDefault = true;
+    }
+    const auto registerControl = [&](int controller, RuntimeInstrumentControlCategory category,
+                                     const std::string& label = std::string {})
+    {
+        if (controller < 0 || controller > 127)
+            return;
+        auto& info = controls[controller];
+        info.category = info.hasTarget ? info.category : category;
+        info.hasTarget = true;
+        if (!label.empty())
+            info.label = label;
+    };
+    for (const auto& section : document.sections)
+    {
+        const auto scan = [&](const std::vector<SfzResolvedOpcode>& opcodes)
+        {
+            for (const auto& opcode : opcodes)
+            {
+                const auto name = toLowerAscii(opcode.name);
+                if (const auto controller = parseControllerOpcodeNumber(name, "label_cc"); controller.has_value())
+                {
+                    auto& info = controls[*controller];
+                    info.label = opcode.value;
+                    if (info.category == RuntimeInstrumentControlCategory::hidden)
+                        info.category = RuntimeInstrumentControlCategory::mixer;
+                }
+                const std::pair<const char*, RuntimeInstrumentControlCategory> prefixes[] {
+                    { "tune_oncc", RuntimeInstrumentControlCategory::tuning },
+                    { "amplitude_oncc", RuntimeInstrumentControlCategory::mixer },
+                    { "pan_oncc", RuntimeInstrumentControlCategory::mixer },
+                    { "ampeg_hold_oncc", RuntimeInstrumentControlCategory::envelope },
+                    { "ampeg_decay_oncc", RuntimeInstrumentControlCategory::envelope },
+                    { "ampeg_sustain_oncc", RuntimeInstrumentControlCategory::envelope }
+                };
+                for (const auto& [prefix, category] : prefixes)
+                    if (const auto controller = parseControllerOpcodeNumber(name, prefix); controller.has_value())
+                    {
+                        registerControl(*controller, category);
+                        RuntimeInstrumentControlTargetKind targetKind = RuntimeInstrumentControlTargetKind::gain;
+                        if (std::string_view { prefix } == "tune_oncc")
+                            targetKind = RuntimeInstrumentControlTargetKind::tune;
+                        else if (std::string_view { prefix } == "pan_oncc")
+                            targetKind = RuntimeInstrumentControlTargetKind::pan;
+                        else if (std::string_view { prefix } == "ampeg_hold_oncc")
+                            targetKind = RuntimeInstrumentControlTargetKind::envelopeHold;
+                        else if (std::string_view { prefix } == "ampeg_decay_oncc")
+                            targetKind = RuntimeInstrumentControlTargetKind::envelopeDecay;
+                        else if (std::string_view { prefix } == "ampeg_sustain_oncc")
+                            targetKind = RuntimeInstrumentControlTargetKind::envelopeSustain;
+                        controls[*controller].targetKinds.insert(targetKind);
+                        targets.insert({ *controller, targetKind, prefix });
+                    }
+            }
+        };
+        scan(section.localOpcodes);
+        scan(section.effectiveOpcodes);
+    }
+
+    int displayOrder = 0;
+    for (const auto& [controller, info] : controls)
+    {
+        RuntimeProjectInstrumentControlDefinition control;
+        control.id = "sfz.cc." + std::to_string(controller);
+        control.displayName = info.label.empty() ? "CC " + std::to_string(controller) : info.label;
+        control.category = info.category;
+        control.kind = RuntimeInstrumentControlKind::normalized;
+        control.unit = RuntimeInstrumentControlUnit::percent;
+        // Many SFZ mixer libraries rely on their native UI script to initialize custom
+        // amplitude CCs. Practical Sampler has no external script, so an unspecified
+        // gain control starts open. Explicit set_cc/set_hdcc values remain authoritative.
+        const auto inferredDefault = !info.hasDefault
+                && info.targetKinds.count(RuntimeInstrumentControlTargetKind::gain) != 0
+            ? 127 : info.defaultValue;
+        control.normalizedDefault = static_cast<double>(inferredDefault) / 127.0;
+        control.displayMinimum = 0.0;
+        control.displayMaximum = 100.0;
+        control.displayPrecision = 1;
+        control.displayOrder = displayOrder++;
+        control.section = "SFZ Imported Controls";
+        control.visible = !info.label.empty() || info.hasTarget;
+        control.provenance = RuntimeInstrumentControlProvenance::importedSfz;
+        control.importedSourceController = controller;
+        result.instrumentControls.push_back(control);
+
+        RuntimeProjectMidiControlBindingDefinition binding;
+        binding.id = "binding.sfz.cc." + std::to_string(controller);
+        binding.controlId = control.id;
+        binding.controllerNumber = controller;
+        binding.enabled = true;
+        binding.imported = true;
+        binding.importedSourceController = controller;
+        result.midiControlBindings.push_back(std::move(binding));
+    }
+    for (const auto& [controller, targetKind, prefix] : targets)
+    {
+        RuntimeProjectInstrumentControlTargetDefinition target;
+        target.id = "target.sfz." + std::to_string(controller) + "." + slugify(prefix);
+        target.controlId = "sfz.cc." + std::to_string(controller);
+        target.ownerKind = "instrument";
+        target.ownerId = "global";
+        target.targetKind = targetKind;
+        target.parameterId = slugify(prefix);
+        target.sourceMinimum = 0.0;
+        target.sourceMaximum = 1.0;
+        target.destinationMinimum = targetKind == RuntimeInstrumentControlTargetKind::pan ? -1.0 : 0.0;
+        target.destinationMaximum = targetKind == RuntimeInstrumentControlTargetKind::pan ? 1.0 : 1.0;
+        result.instrumentControlTargets.push_back(std::move(target));
+    }
+}
+
 SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& baseProject,
                                                    const SfzImportAnalysisResult& analysis,
                                                    const SfzImportExecutionContext& context)
@@ -1557,6 +1708,7 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
     }
     for (const auto& [controllerNumber, value] : importedControllerDefaults)
         result.controllerDefaults.push_back({ controllerNumber, value });
+    appendImportedInstrumentControlProjection(analysis.normalizeResult.document, result);
 
     result.projectNotes = buildProjectNotes(analysis.report);
     result.authoringNotes = buildAuthoringNotes(analysis.report);
@@ -1589,6 +1741,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
             result.groups.clear();
             result.zones.clear();
             result.controllerDefaults.clear();
+            result.instrumentControls.clear();
+            result.instrumentControlTargets.clear();
+            result.midiControlBindings.clear();
             result.projectNotes.clear();
             result.authoringNotes.clear();
             result.state = "SFZ projection canceled";
@@ -1639,6 +1794,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
                                     + " did not resolve a sample opcode.");
             continue;
         }
+
+        if (toLowerAscii(sampleOpcode->value) == "*silence")
+            continue;
 
         const auto samplePath = resolveSamplePath(section, *sampleOpcode);
         const auto canonicalSamplePath = samplePath.generic_string();
@@ -2005,6 +2163,9 @@ SfzImportProjectionResult projectSfzImportAnalysis(const RuntimeProjectModel& ba
         result.groups.clear();
         result.zones.clear();
         result.controllerDefaults.clear();
+        result.instrumentControls.clear();
+        result.instrumentControlTargets.clear();
+        result.midiControlBindings.clear();
         result.state = "SFZ projection blocked";
         return result;
     }
@@ -2145,6 +2306,9 @@ RuntimeProjectDocumentActionResult applySfzImportProjection(AuthoringSession& au
                                                   std::move(projection.authoringNotes),
                                                   label,
                                                   false,
-                                                  std::move(projection.controllerDefaults));
+                                                  std::move(projection.controllerDefaults),
+                                                  std::move(projection.instrumentControls),
+                                                  std::move(projection.instrumentControlTargets),
+                                                  std::move(projection.midiControlBindings));
 }
 } // namespace drs::engine

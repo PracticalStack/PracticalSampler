@@ -15,6 +15,12 @@ struct RuntimePresetMacroValue
     double value = 0.0;
 };
 
+struct RuntimePresetInstrumentControlValue
+{
+    std::string id;
+    double normalizedValue = 0.0;
+};
+
 struct RuntimePresetDspMacroTarget
 {
     std::string macroId;
@@ -33,6 +39,7 @@ struct RuntimePresetState
     std::string loadProfileId;
     std::string selectedArticulationId;
     std::vector<RuntimePresetMacroValue> macroValues;
+    std::vector<RuntimePresetInstrumentControlValue> instrumentControlValues;
     std::string dspGraphDigest;
     std::vector<RuntimePresetDspMacroTarget> dspMacroTargets;
     std::vector<std::string> notes;
@@ -56,6 +63,7 @@ struct RuntimeSessionStateSnapshot
     std::string loadProfileId;
     std::string selectedArticulationId;
     std::vector<RuntimePresetMacroValue> macroValues;
+    std::vector<RuntimePresetInstrumentControlValue> instrumentControlValues;
     std::string dspGraphDigest;
     std::vector<RuntimePresetDspMacroTarget> dspMacroTargets;
     std::vector<std::string> notes;

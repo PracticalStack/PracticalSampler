@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/ContinuousDamper.h"
+#include "drs/engine/InstrumentControlContract.h"
 #include "drs/engine/LayerContract.h"
 #include "drs/engine/PlaybackRegionContract.h"
 #include "drs/engine/VelocityCrossfade.h"
@@ -437,6 +438,9 @@ struct RuntimeProjectAuthoringState
     std::vector<RuntimeProjectArticulationDefinition> articulations;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeControllerDefault> controllerDefaults;
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls;
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets;
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectLayerDefinition> layers;
@@ -547,6 +551,9 @@ struct RuntimeInstrumentModel
     std::vector<RuntimeZoneDefinition> zones;
     std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
     std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls;
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets;
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> validationNotes;

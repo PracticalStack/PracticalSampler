@@ -1,6 +1,8 @@
 #pragma once
 
 #include "drs/engine/DraftPlaybackContract.h"
+#include "drs/engine/InstrumentControlBinding.h"
+#include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PerformanceProgram.h"
 #include "drs/engine/SampleDataSource.h"
 
@@ -148,6 +150,18 @@ struct SamplerRenderSample
 
 struct SamplerRenderRoute
 {
+    struct ControlContribution
+    {
+        std::size_t controlIndex = InstrumentControlBindingTable::invalidControlIndex;
+        RuntimeInstrumentControlTargetKind targetKind = RuntimeInstrumentControlTargetKind::gain;
+        double sourceMinimum = 0.0;
+        double sourceMaximum = 1.0;
+        double destinationMinimum = 0.0;
+        double destinationMaximum = 1.0;
+        std::string curve = "linear";
+        RuntimeInstrumentControlContributionMode contributionMode
+            = RuntimeInstrumentControlContributionMode::replace;
+    };
     std::size_t preparedZoneIndex = 0;
     std::size_t preparedSampleIndex = 0;
     std::string zoneId;
@@ -190,6 +204,7 @@ struct SamplerRenderRoute
     RuntimeControllerModulation tuningModulation;
     RuntimeControllerModulation amplitudeModulation;
     RuntimeAmplitudeEnvelopeDefinition amplitudeEnvelope;
+    std::vector<ControlContribution> controlContributions;
 };
 
 struct SamplerRenderModelBuildResult;
@@ -217,6 +232,14 @@ public:
     const std::vector<SamplerRenderSample>& getSamples() const noexcept { return samples; }
     const std::vector<SamplerRenderRoute>& getRoutes() const noexcept { return routes; }
     const CompiledPerformanceProgram& getPerformanceProgram() const noexcept { return performanceProgram; }
+    const InstrumentControlBindingTable& getInstrumentControlBindings() const noexcept
+    {
+        return instrumentControlBindings;
+    }
+    const std::vector<ImmutablePlaybackSnapshot::InstrumentControlValue>& getInstrumentControlValues() const noexcept
+    {
+        return instrumentControlValues;
+    }
     int getMidiNoteOffset() const noexcept { return midiNoteOffset; }
     int getFixedVelocity() const noexcept { return fixedVelocity; }
     bool usesContinuousDamper() const noexcept { return continuousDamperEnabled; }
@@ -242,6 +265,8 @@ private:
     std::vector<SamplerRenderSample> samples;
     std::vector<SamplerRenderRoute> routes;
     CompiledPerformanceProgram performanceProgram;
+    InstrumentControlBindingTable instrumentControlBindings;
+    std::vector<ImmutablePlaybackSnapshot::InstrumentControlValue> instrumentControlValues;
     int midiNoteOffset = 0;
     int fixedVelocity = 0;
     bool continuousDamperEnabled = false;

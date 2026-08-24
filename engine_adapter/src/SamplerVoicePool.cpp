@@ -8,6 +8,10 @@ namespace drs::engine
 {
 namespace
 {
+thread_local bool samplerRenderInstrumentationActive = false;
+thread_local std::uint32_t samplerRenderInstrumentationLockAttempts = 0;
+thread_local std::uint32_t samplerRenderInstrumentationLastLockAttempts = 0;
+
 constexpr std::size_t crossfadeRouteLimit = 2;
 
 bool hasExplicitRoundRobin(const SamplerRenderRoute& route) noexcept
@@ -316,6 +320,29 @@ SamplerRouteEligibilityResult evaluateSamplerRouteEligibility(
     return result;
 }
 
+void SamplerRenderThreadInstrumentation::begin() noexcept
+{
+    samplerRenderInstrumentationActive = true;
+    samplerRenderInstrumentationLockAttempts = 0;
+}
+
+void SamplerRenderThreadInstrumentation::end() noexcept
+{
+    samplerRenderInstrumentationLastLockAttempts = samplerRenderInstrumentationLockAttempts;
+    samplerRenderInstrumentationActive = false;
+}
+
+void SamplerRenderThreadInstrumentation::reportLockAttempt() noexcept
+{
+    if (samplerRenderInstrumentationActive)
+        ++samplerRenderInstrumentationLockAttempts;
+}
+
+std::uint32_t SamplerRenderThreadInstrumentation::lastLockAttemptCount() noexcept
+{
+    return samplerRenderInstrumentationLastLockAttempts;
+}
+
 bool SamplerEventBlock::push(SamplerRenderEvent event) noexcept
 {
     if (eventCount >= events.size())
@@ -397,6 +424,19 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
     renderModel = &model;
     sampleRate = outputSampleRate;
     activeGeneration = activationGeneration;
+    instrumentControlState.prepare(model.getInstrumentControlBindings());
+    for (const auto& value : model.getInstrumentControlValues())
+    {
+        const auto controlCount = model.getInstrumentControlBindings().controlCount();
+        for (std::size_t controlIndex = 0; controlIndex < controlCount; ++controlIndex)
+        {
+            if (model.getInstrumentControlBindings().controlId(controlIndex) == value.id)
+            {
+                instrumentControlState.setControlNormalized(controlIndex, value.normalizedValue);
+                break;
+            }
+        }
+    }
     const auto& program = model.getPerformanceProgram();
     if (!model.usesContinuousDamper() || !controllerStateInitialized)
     {
@@ -405,6 +445,24 @@ bool SamplerVoicePool::activateModel(const SamplerRenderModel& model,
             if (program.hasControllerDefault[controller])
                 controllerValues[controller] = program.controllerDefaults[controller];
         controllerStateInitialized = true;
+    }
+    // Instrument-control defaults/current preset values are normalized state,
+    // while legacy eligibility and modulation paths consume the compact MIDI
+    // byte table. Publish the compiled control values into that table at model
+    // activation so an imported control with a non-zero authored default does
+    // not render as silence before its first hardware CC arrives.
+    for (std::size_t controlIndex = 0;
+         controlIndex < model.getInstrumentControlBindings().controlCount();
+         ++controlIndex)
+    {
+        const auto destination = model.getInstrumentControlBindings()
+            .destinationController(controlIndex);
+        if (destination >= 0 && destination <= 127)
+        {
+            controllerValues[static_cast<std::size_t>(destination)] = static_cast<std::uint8_t>(
+                std::clamp(static_cast<int>(std::lround(
+                    instrumentControlState.currentValue(controlIndex) * 127.0)), 0, 127));
+        }
     }
     sustainPedalDown = static_cast<double>(controllerValues[static_cast<std::size_t>(
         model.getSustainControllerNumber())]) >= model.getSustainThreshold();
@@ -424,6 +482,7 @@ void SamplerVoicePool::clearRenderModel() noexcept
     nextGeneratedActivation = 1;
     resetRoundRobinPools();
     controllerValues.fill(0);
+    instrumentControlState.resetAll();
     controllerStateInitialized = false;
 }
 
@@ -433,6 +492,11 @@ SamplerVoicePoolRenderResult SamplerVoicePool::renderBlock(SamplerAudioBufferVie
                                                            const SamplerAudioBufferView* routeTargets,
                                                            const std::size_t routeTargetCount) noexcept
 {
+    struct RenderInstrumentationScope final
+    {
+        RenderInstrumentationScope() noexcept { SamplerRenderThreadInstrumentation::begin(); }
+        ~RenderInstrumentationScope() noexcept { SamplerRenderThreadInstrumentation::end(); }
+    } instrumentationScope;
     SamplerVoicePoolRenderResult result;
     if (renderModel == nullptr || !output.isValid() || !events.isValid() || events.size > SamplerEventBlock::capacity)
         return result;
@@ -473,6 +537,85 @@ void SamplerVoicePool::resetVoices() noexcept
         slot.sustainDeferred = false;
     }
     sustainPedalDown = false;
+}
+
+bool SamplerVoicePool::setInstrumentControlNormalized(const std::size_t controlIndex,
+                                                      const double normalized) noexcept
+{
+    if (!instrumentControlState.setControlNormalized(controlIndex, normalized))
+        return false;
+    if (renderModel != nullptr)
+    {
+        const auto destination = renderModel->getInstrumentControlBindings()
+            .destinationController(controlIndex);
+        if (destination >= 0 && destination <= 127)
+        {
+            const auto value = static_cast<std::uint8_t>(std::clamp(
+                static_cast<int>(std::lround(normalized * 127.0)), 0, 127));
+            controllerValues[static_cast<std::size_t>(destination)] = value;
+            for (auto& slot : slots)
+                if (slot.state == SamplerVoiceSlotState::active)
+                {
+                    slot.voice.updatePitchModulation(static_cast<std::uint8_t>(destination), value);
+                    slot.voice.updateControllerModulation(static_cast<std::uint8_t>(destination), value);
+                }
+        }
+    }
+    return true;
+}
+
+bool SamplerVoicePool::resetInstrumentControl(const std::size_t controlIndex) noexcept
+{
+    const auto value = instrumentControlState.defaultValue(controlIndex);
+    if (!instrumentControlState.resetControl(controlIndex))
+        return false;
+    if (renderModel != nullptr)
+    {
+        const auto destination = renderModel->getInstrumentControlBindings()
+            .destinationController(controlIndex);
+        if (destination >= 0 && destination <= 127)
+        {
+            const auto midiValue = static_cast<std::uint8_t>(
+                std::clamp(static_cast<int>(std::lround(value * 127.0)), 0, 127));
+            controllerValues[static_cast<std::size_t>(destination)] = midiValue;
+            for (auto& slot : slots)
+                if (slot.state == SamplerVoiceSlotState::active)
+                {
+                    slot.voice.updatePitchModulation(static_cast<std::uint8_t>(destination), midiValue);
+                    slot.voice.updateControllerModulation(static_cast<std::uint8_t>(destination), midiValue);
+                }
+        }
+    }
+    return true;
+}
+
+double SamplerVoicePool::instrumentControlValue(const std::size_t controlIndex) const noexcept
+{
+    return instrumentControlState.currentValue(controlIndex);
+}
+
+SamplerPanGains SamplerVoicePool::activeVoicePanGains() const noexcept
+{
+    for (const auto& slot : slots)
+        if (slot.state == SamplerVoiceSlotState::active)
+            return slot.voice.getPanGains();
+    return {};
+}
+
+double SamplerVoicePool::activeVoiceEffectiveTuningCents() const noexcept
+{
+    for (const auto& slot : slots)
+        if (slot.state == SamplerVoiceSlotState::active)
+            return slot.voice.getEffectiveTuningCents();
+    return 0.0;
+}
+
+double SamplerVoicePool::activeVoiceEnvelopeDecaySeconds() const noexcept
+{
+    for (const auto& slot : slots)
+        if (slot.state == SamplerVoiceSlotState::active)
+            return slot.voice.getEnvelopeDecaySeconds();
+    return 0.0;
 }
 
 std::size_t SamplerVoicePool::activeVoiceCount() const noexcept
@@ -1103,6 +1246,7 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
         }
 
         case SamplerRenderEventType::controllerChange:
+        {
             if (event.controllerNumber > 127 || event.controllerValue > 127)
             {
                 ++result.render.droppedEventCount;
@@ -1156,9 +1300,42 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                         slot.sustainDeferred = false;
                         ++result.render.releasedVoiceCount;
                     }
+                    }
                 }
-            }
-            return;
+
+                if (renderModel != nullptr)
+                {
+                    const auto midiChannel = event.midiChannel == 0 ? std::uint8_t { 1 } : event.midiChannel;
+                    const auto controlIndex = renderModel->getInstrumentControlBindings().resolve(
+                        midiChannel, event.controllerNumber);
+                    if (controlIndex != InstrumentControlBindingTable::invalidControlIndex)
+                    {
+                        instrumentControlState.applyMidi(midiChannel,
+                                                          event.controllerNumber,
+                                                          event.controllerValue,
+                                                          renderModel->getInstrumentControlBindings());
+                        const auto destination = renderModel->getInstrumentControlBindings()
+                            .destinationController(controlIndex);
+                        if (destination >= 0 && destination <= 127
+                            && destination != static_cast<int>(event.controllerNumber))
+                        {
+                            controllerValues[static_cast<std::size_t>(destination)] = event.controllerValue;
+                            for (auto& slot : slots)
+                                if (slot.state == SamplerVoiceSlotState::active)
+                                {
+                                    slot.voice.updatePitchModulation(
+                                        static_cast<std::uint8_t>(destination), event.controllerValue);
+                                    slot.voice.updateControllerModulation(
+                                        static_cast<std::uint8_t>(destination), event.controllerValue);
+                                }
+                        }
+                    }
+                }
+                for (auto& slot : slots)
+                    if (slot.state == SamplerVoiceSlotState::active)
+                        slot.voice.updateInstrumentControlModulation(controllerValues);
+                return;
+        }
 
         case SamplerRenderEventType::allNotesOff:
             for (auto& slot : slots)
@@ -1198,6 +1375,17 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 for (std::size_t controller = 0; controller < controllerValues.size(); ++controller)
                     if (program.hasControllerDefault[controller])
                         controllerValues[controller] = program.controllerDefaults[controller];
+                for (std::size_t controlIndex = 0;
+                     controlIndex < renderModel->getInstrumentControlBindings().controlCount();
+                     ++controlIndex)
+                {
+                    const auto destination = renderModel->getInstrumentControlBindings()
+                        .destinationController(controlIndex);
+                    if (destination >= 0 && destination <= 127)
+                        controllerValues[static_cast<std::size_t>(destination)] =
+                            static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(
+                                instrumentControlState.currentValue(controlIndex) * 127.0)), 0, 127));
+                }
                 controllerStateInitialized = true;
                 sustainPedalDown = static_cast<double>(controllerValues[static_cast<std::size_t>(
                     renderModel->getSustainControllerNumber())])

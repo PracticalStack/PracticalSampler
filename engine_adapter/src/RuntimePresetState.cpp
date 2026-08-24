@@ -6,6 +6,7 @@
 #include <json/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -134,6 +135,15 @@ ordered_json serializeMacroValues(const std::vector<RuntimePresetMacroValue>& ma
     return array;
 }
 
+ordered_json serializeInstrumentControlValues(
+    const std::vector<RuntimePresetInstrumentControlValue>& values)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& value : values)
+        array.push_back({ { "id", value.id }, { "normalizedValue", value.normalizedValue } });
+    return array;
+}
+
 ordered_json serializeDspMacroTargets(const std::vector<RuntimePresetDspMacroTarget>& targets)
 {
     ordered_json array = ordered_json::array();
@@ -248,6 +258,45 @@ std::vector<RuntimePresetMacroValue> readMacroValues(const json& object,
     return macroValues;
 }
 
+std::vector<RuntimePresetInstrumentControlValue> readInstrumentControlValues(
+    const json& object,
+    RuntimePresetStateLoadResult& result)
+{
+    std::vector<RuntimePresetInstrumentControlValue> values;
+    const auto iterator = object.find("instrumentControlValues");
+    if (iterator == object.end())
+        return values;
+    if (!iterator->is_array())
+    {
+        addIssue(result, "Preset state field 'instrumentControlValues' must be an array.");
+        return values;
+    }
+    std::unordered_set<std::string> seenIds;
+    for (std::size_t index = 0; index < iterator->size(); ++index)
+    {
+        const auto& entry = (*iterator)[index];
+        const auto context = "Preset state instrumentControlValues[" + std::to_string(index) + "]";
+        if (!entry.is_object())
+        {
+            addIssue(result, context + " must be an object.");
+            continue;
+        }
+        static const std::unordered_set<std::string> allowedFields { "id", "normalizedValue" };
+        validateAllowedFields(entry, result, allowedFields, context.c_str());
+        const auto id = readRequired<std::string>(entry, result, "id", context.c_str());
+        const auto value = readRequired<double>(entry, result, "normalizedValue", context.c_str());
+        if (!id.has_value() || !value.has_value())
+            continue;
+        if (id->empty() || !seenIds.insert(*id).second)
+        {
+            addIssue(result, context + " has an empty or duplicate control id.");
+            continue;
+        }
+        values.push_back({ *id, *value });
+    }
+    return values;
+}
+
 std::vector<RuntimePresetDspMacroTarget> readDspMacroTargets(const json& object,
                                                              RuntimePresetStateLoadResult& result)
 {
@@ -316,9 +365,12 @@ RuntimeSessionStateSnapshot buildDefaultRuntimeSessionState(const RuntimeManifes
     snapshot.loadProfileId = manifest.instrument.defaultLoadProfile;
     snapshot.selectedArticulationId = findDefaultArticulationId(manifest.instrument);
     snapshot.macroValues.reserve(manifest.instrument.macros.size());
+    snapshot.instrumentControlValues.reserve(manifest.instrument.instrumentControls.size());
 
     for (const auto& macro : manifest.instrument.macros)
         snapshot.macroValues.push_back({macro.id, macro.defaultValue});
+    for (const auto& control : manifest.instrument.instrumentControls)
+        snapshot.instrumentControlValues.push_back({ control.id, control.normalizedDefault });
 
     return snapshot;
 }
@@ -335,6 +387,7 @@ RuntimePresetState captureRuntimePresetState(const RuntimeSessionStateSnapshot& 
     preset.loadProfileId = snapshot.loadProfileId;
     preset.selectedArticulationId = snapshot.selectedArticulationId;
     preset.macroValues = snapshot.macroValues;
+    preset.instrumentControlValues = snapshot.instrumentControlValues;
     preset.dspGraphDigest = snapshot.dspGraphDigest;
     preset.dspMacroTargets = snapshot.dspMacroTargets;
     preset.notes = snapshot.notes;
@@ -374,6 +427,7 @@ RuntimePresetStateLoadResult parseRuntimePresetState(const std::string& text)
         "loadProfileId",
         "selectedArticulationId",
         "macroValues",
+        "instrumentControlValues",
         "dspGraphDigest",
         "dspMacroTargets",
         "notes"
@@ -405,6 +459,7 @@ RuntimePresetStateLoadResult parseRuntimePresetState(const std::string& text)
         result.preset.selectedArticulationId = *selectedArticulationId;
 
     result.preset.macroValues = readMacroValues(root, result);
+    result.preset.instrumentControlValues = readInstrumentControlValues(root, result);
     if (const auto digest = root.find("dspGraphDigest"); digest != root.end())
     {
         if (!digest->is_string())
@@ -532,6 +587,27 @@ RuntimePresetStateValidationResult validateRuntimePresetState(const RuntimePrese
             addIssue(result, "Preset state is missing macro id '" + macro.id + "'.");
     }
 
+    std::unordered_map<std::string, const RuntimeProjectInstrumentControlDefinition*> controlDefinitions;
+    for (const auto& control : instrument.instrumentControls)
+        controlDefinitions.emplace(control.id, &control);
+    std::unordered_set<std::string> seenControlIds;
+    for (const auto& value : preset.instrumentControlValues)
+    {
+        if (!seenControlIds.insert(value.id).second)
+        {
+            addIssue(result, "Preset state duplicates instrument control id '" + value.id + "'.");
+            continue;
+        }
+        const auto definition = controlDefinitions.find(value.id);
+        if (definition == controlDefinitions.end())
+        {
+            addIssue(result, "Preset state references unknown instrument control id '" + value.id + "'.");
+            continue;
+        }
+        if (!std::isfinite(value.normalizedValue) || value.normalizedValue < 0.0 || value.normalizedValue > 1.0)
+            addIssue(result, "Preset state instrument control '" + value.id + "' is outside the normalized range.");
+    }
+
     if (result.issues.empty())
     {
         result.valid = true;
@@ -553,6 +629,8 @@ std::string serializeRuntimePresetState(const RuntimePresetState& preset)
     root["loadProfileId"] = preset.loadProfileId;
     root["selectedArticulationId"] = preset.selectedArticulationId;
     root["macroValues"] = serializeMacroValues(preset.macroValues);
+    if (!preset.instrumentControlValues.empty())
+        root["instrumentControlValues"] = serializeInstrumentControlValues(preset.instrumentControlValues);
     if (!preset.dspGraphDigest.empty())
         root["dspGraphDigest"] = preset.dspGraphDigest;
     if (!preset.dspMacroTargets.empty())

@@ -1,0 +1,5 @@
+#define $LOW_VEL 1 #define $HIGH_VEL 32
+#define $NEXT_LOW 33 #define $NEXT_HIGH 64
+
+<region> sample=kick-low.wav lovel=$LOW_VEL hivel=$HIGH_VEL
+<region> sample=kick-mid.wav lovel=$NEXT_LOW hivel=$NEXT_HIGH

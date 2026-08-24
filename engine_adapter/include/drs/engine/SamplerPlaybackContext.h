@@ -123,6 +123,7 @@ public:
     // Callback-safe fixed-index publication for the active audio-owned generation.
     // Published macro bindings have already resolved stable identities off the audio thread.
     bool publishActiveDspControl(std::uint32_t controlIndex, double value) noexcept;
+    bool publishActiveInstrumentControl(std::size_t controlIndex, double normalizedValue) noexcept;
     bool publishDspNodeBypass(std::uint64_t generationIdentity,
                                std::uint32_t nodeIndex,
                                bool bypassed) noexcept;
@@ -180,6 +181,7 @@ private:
     bool enqueueBackgroundReclamation(ActivationSlot& slot);
     void accumulate(const SamplerVoicePoolRenderResult& result) noexcept;
     void publishRealtimeDiagnostics() noexcept;
+    void applyPendingInstrumentControls() noexcept;
 
     PlaybackActivationLane contextLane;
     SamplerVoicePool voicePool;
@@ -227,6 +229,8 @@ private:
     std::atomic<std::uint64_t> diagnosticActionOverflowCount { 0 };
     std::array<std::atomic<std::uint64_t>, kPerformanceEventKindCount> diagnosticSemanticEventCounts {};
     std::atomic<std::uint64_t> diagnosticRenderedBlockCount { 0 };
+    std::array<std::atomic<double>, maximumInstrumentControls> pendingInstrumentControlValues {};
+    std::array<std::atomic<std::uint64_t>, 2> pendingInstrumentControlMasks {};
     std::atomic<std::uint64_t> diagnosticStartedVoiceCount { 0 };
     std::atomic<std::uint64_t> diagnosticReleasedVoiceCount { 0 };
     std::atomic<std::uint64_t> diagnosticCompletedVoiceCount { 0 };

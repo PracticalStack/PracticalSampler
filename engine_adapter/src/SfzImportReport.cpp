@@ -357,6 +357,80 @@ void publishRegionSemanticAnalysis(SfzImportReport& report,
     }
 }
 
+void publishReviewSections(SfzImportReport& report)
+{
+    std::set<std::string> controls;
+    std::set<std::string> bindings;
+    std::set<std::string> targetCoverage;
+    std::set<std::string> hiddenConditional;
+    std::set<std::string> conflicts;
+    std::set<std::string> unsupportedTargets;
+
+    for (const auto& trace : report.traceEntries)
+    {
+        const auto opcode = toLowerAscii(trace.opcodeName);
+        auto controller = parseControllerNumber(opcode, "label_cc");
+        if (!controller.has_value())
+            controller = parseControllerNumber(opcode, "set_cc");
+        if (!controller.has_value())
+            controller = parseEmbeddedControllerNumber(opcode, "oncc");
+        if (!controller.has_value())
+            controller = parseEmbeddedControllerNumber(opcode, "curvecc");
+        if (controller.has_value())
+        {
+            const auto source = "CC" + std::to_string(*controller);
+            controls.insert(source);
+            if (trace.semanticDependencyKind == SfzImportSemanticDependencyKind::controllerModulation
+                || trace.semanticDependencyKind == SfzImportSemanticDependencyKind::controllerDefault)
+            {
+                bindings.insert(source);
+            }
+        }
+
+        if (!trace.nativeTarget.empty())
+            targetCoverage.insert(trace.nativeTarget);
+
+        if (trace.affectsRegionEligibility
+            || trace.semanticDependencyKind == SfzImportSemanticDependencyKind::presentationMetadata)
+        {
+            hiddenConditional.insert(trace.opcodeName);
+        }
+
+        if (trace.semanticDependencyKind == SfzImportSemanticDependencyKind::controllerModulation
+            && trace.semanticSupport == SfzImportSemanticSupport::unsupported)
+        {
+            unsupportedTargets.insert(trace.opcodeName);
+        }
+    }
+
+    for (const auto& finding : report.findings)
+    {
+        const auto code = toLowerAscii(finding.code);
+        if (code.find("conflict") != std::string::npos
+            || code.find("inconsistent") != std::string::npos)
+        {
+            conflicts.insert(finding.code);
+        }
+    }
+
+    const auto makeSection = [](const char* name, const std::set<std::string>& entries)
+    {
+        SfzImportReportSection section;
+        section.name = name;
+        section.itemCount = entries.size();
+        section.entries.assign(entries.begin(), entries.end());
+        return section;
+    };
+    report.sections.clear();
+    report.sections.reserve(6);
+    report.sections.push_back(makeSection("Controls", controls));
+    report.sections.push_back(makeSection("Bindings", bindings));
+    report.sections.push_back(makeSection("Target Coverage", targetCoverage));
+    report.sections.push_back(makeSection("Hidden/Conditional Controllers", hiddenConditional));
+    report.sections.push_back(makeSection("Conflicts", conflicts));
+    report.sections.push_back(makeSection("Unsupported Controller Targets", unsupportedTargets));
+}
+
 std::optional<int> parseIntValue(const std::string& text)
 {
     try
@@ -813,6 +887,12 @@ std::string resolveSamplePathForSection(const SfzNormalizedSection& section,
 OpcodeClassification classifySampleOpcode(const SfzNormalizedSection& section,
                                           const SfzResolvedOpcode& opcode)
 {
+    if (toLowerAscii(opcode.value) == "*silence")
+    {
+        return { SfzImportSupportDisposition::converted,
+                 "projection.omittedSilentRegion",
+                 "The SFZ *silence sentinel is preserved by omitting the silent region from audible native projection." };
+    }
     const auto resolvedSamplePath = resolveSamplePathForSection(section, opcode);
     if (!fs::exists(resolvedSamplePath))
     {
@@ -2203,6 +2283,7 @@ SfzImportAnalysisResult analyzeSfzImportDocument(const std::string& sfzPath,
         return result;
     }
 
+    publishReviewSections(result.report);
     result.report.reviewDisposition = sfzImportReviewDispositionFor(result.report.findings);
     if (!result.parseResult.parsed || result.report.summary.blockingOpcodeCount > 0)
     {

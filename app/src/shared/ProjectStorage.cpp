@@ -1,5 +1,6 @@
 #include "shared/ProjectStorage.h"
 
+#include "drs/engine/InstrumentControlContract.h"
 #include "drs/engine/PlayableInstrumentLicense.h"
 #include "drs/engine/RuntimeLoader.h"
 
@@ -263,7 +264,12 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
         {
             return zone.loopCrossfadeFrames != 0;
         });
-    instrument.schemaVersion = project.schemaVersion >= drs::engine::playbackRegionProjectSchemaVersion
+    const auto usesInstrumentControls = !project.authoring.instrumentControls.empty()
+        || !project.authoring.instrumentControlTargets.empty()
+        || !project.authoring.midiControlBindings.empty();
+    instrument.schemaVersion = usesInstrumentControls
+        ? drs::engine::instrumentControlInstrumentSchemaVersion
+        : project.schemaVersion >= drs::engine::playbackRegionProjectSchemaVersion
             && project.authoring.schemaVersion >= drs::engine::playbackRegionAuthoringSchemaVersion
         ? (usesLoopCrossfade ? drs::engine::loopCrossfadeInstrumentSchemaVersion
                              : drs::engine::sfzRegionInstrumentSchemaVersion)
@@ -411,6 +417,24 @@ drs::engine::RuntimeInstrumentModel buildInstrumentManifestForProject(
     {
         instrument.roundRobinResetRules = project.authoring.roundRobinResetRules;
         instrument.controllerDefaults = project.authoring.controllerDefaults;
+    }
+
+    if (instrument.schemaVersion >= drs::engine::instrumentControlInstrumentSchemaVersion)
+    {
+        instrument.instrumentControls = project.authoring.instrumentControls;
+        instrument.instrumentControlTargets = project.authoring.instrumentControlTargets;
+        instrument.midiControlBindings = project.authoring.midiControlBindings;
+        for (auto& control : instrument.instrumentControls)
+        {
+            const auto hasExplicitDefault = control.importedSourceController.has_value()
+                && std::any_of(instrument.controllerDefaults.begin(), instrument.controllerDefaults.end(),
+                               [&](const auto& value)
+                               {
+                                   return value.controllerNumber == *control.importedSourceController;
+                               });
+            control.normalizedDefault = drs::engine::resolveImportedSfzControlDefault(
+                control, instrument.instrumentControlTargets, hasExplicitDefault);
+        }
     }
 
     populateCrossfadeRuntimeDescriptors(instrument.zones);

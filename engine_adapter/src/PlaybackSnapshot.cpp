@@ -18,6 +18,91 @@ namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 using ordered_json = nlohmann::ordered_json;
 
+ordered_json serializeSnapshotInstrumentControls(
+    const std::vector<RuntimeProjectInstrumentControlDefinition>& controls)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& control : controls)
+    {
+        array.push_back({
+            { "id", control.id },
+            { "displayName", control.displayName },
+            { "category", runtimeInstrumentControlCategoryName(control.category) },
+            { "kind", runtimeInstrumentControlKindName(control.kind) },
+            { "unit", runtimeInstrumentControlUnitName(control.unit) },
+            { "normalizedDefault", control.normalizedDefault },
+            { "displayMinimum", control.displayMinimum },
+            { "displayMaximum", control.displayMaximum },
+            { "displayPrecision", control.displayPrecision },
+            { "displayOrder", control.displayOrder },
+            { "section", control.section },
+            { "visible", control.visible },
+            { "provenance", runtimeInstrumentControlProvenanceName(control.provenance) },
+            { "importedSourceController", control.importedSourceController.has_value()
+                ? nlohmann::ordered_json(*control.importedSourceController)
+                : nlohmann::ordered_json(nullptr) }
+        });
+    }
+    return array;
+}
+
+ordered_json serializeSnapshotInstrumentControlTargets(
+    const std::vector<RuntimeProjectInstrumentControlTargetDefinition>& targets)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& target : targets)
+    {
+        ordered_json object = {
+            { "id", target.id },
+            { "controlId", target.controlId },
+            { "ownerKind", target.ownerKind },
+            { "ownerId", target.ownerId },
+            { "targetKind", runtimeInstrumentControlTargetKindName(target.targetKind) },
+            { "parameterId", target.parameterId },
+            { "sourceMinimum", target.sourceMinimum },
+            { "sourceMaximum", target.sourceMaximum },
+            { "destinationMinimum", target.destinationMinimum },
+            { "destinationMaximum", target.destinationMaximum },
+            { "curve", target.curve },
+            { "curveIndex", target.curveIndex },
+            { "contributionMode", runtimeInstrumentControlContributionModeName(target.contributionMode) }
+        };
+        if (target.curveIndex >= 0)
+        {
+            object["curvePoints"] = ordered_json::array();
+            for (const auto point : target.curvePoints)
+                object["curvePoints"].push_back(point);
+        }
+        array.push_back(std::move(object));
+    }
+    return array;
+}
+
+ordered_json serializeSnapshotMidiControlBindings(
+    const std::vector<RuntimeProjectMidiControlBindingDefinition>& bindings)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& binding : bindings)
+    {
+        ordered_json object = {
+            { "id", binding.id },
+            { "controlId", binding.controlId },
+            { "controllerNumber", binding.controllerNumber },
+            { "channelScope", {
+                { "kind", runtimeMidiChannelScopeKindName(binding.channelScope.kind) },
+                { "channel", binding.channelScope.channel }
+            } },
+            { "enabled", binding.enabled },
+            { "imported", binding.imported },
+            { "importedSourceController", binding.importedSourceController.has_value()
+                ? nlohmann::ordered_json(*binding.importedSourceController)
+                : nlohmann::ordered_json(nullptr) }
+        };
+        array.push_back(std::move(object));
+    }
+    return array;
+}
+
 void addFinding(PlaybackSnapshotBuildResult& result,
                 const PlaybackSnapshotFindingSeverity severity,
                 const std::string& code,
@@ -724,6 +809,13 @@ ordered_json serializeSnapshot(const ImmutablePlaybackSnapshot& snapshot, bool i
     for (const auto& value : snapshot.controllerDefaults)
         controllerDefaults.push_back({ { "controllerNumber", value.controllerNumber }, { "value", value.value } });
     root["controllerDefaults"] = std::move(controllerDefaults);
+    ordered_json instrumentControlValues = ordered_json::array();
+    for (const auto& value : snapshot.instrumentControlValues)
+        instrumentControlValues.push_back({ { "id", value.id }, { "normalizedValue", value.normalizedValue } });
+    root["instrumentControlValues"] = std::move(instrumentControlValues);
+    root["instrumentControls"] = serializeSnapshotInstrumentControls(snapshot.instrumentControls);
+    root["instrumentControlTargets"] = serializeSnapshotInstrumentControlTargets(snapshot.instrumentControlTargets);
+    root["midiControlBindings"] = serializeSnapshotMidiControlBindings(snapshot.midiControlBindings);
     root["performanceProgram"] = nlohmann::ordered_json::parse(serializeCompiledPerformanceProgram(snapshot.performanceProgram));
     root["notes"] = serializeStringArray(snapshot.notes);
     return root;
@@ -819,6 +911,21 @@ PlaybackSnapshotBuildResult PlaybackSnapshotBuilder::buildSnapshot(const Playbac
                                                              articulation.activation });
     result.snapshot.roundRobinResetRules = project.authoring.roundRobinResetRules;
     result.snapshot.controllerDefaults = project.authoring.controllerDefaults;
+    result.snapshot.instrumentControls = project.authoring.instrumentControls;
+    result.snapshot.instrumentControlTargets = project.authoring.instrumentControlTargets;
+    result.snapshot.midiControlBindings = project.authoring.midiControlBindings;
+    for (auto& control : result.snapshot.instrumentControls)
+    {
+        const auto hasExplicitDefault = control.importedSourceController.has_value()
+            && std::any_of(result.snapshot.controllerDefaults.begin(),
+                           result.snapshot.controllerDefaults.end(),
+                           [&](const auto& value)
+                           {
+                               return value.controllerNumber == *control.importedSourceController;
+                           });
+        control.normalizedDefault = resolveImportedSfzControlDefault(
+            control, result.snapshot.instrumentControlTargets, hasExplicitDefault);
+    }
 
     std::unordered_map<std::string, std::size_t> sampleIndices;
     result.snapshot.sampleIdentities.reserve(project.sampleSources.size());

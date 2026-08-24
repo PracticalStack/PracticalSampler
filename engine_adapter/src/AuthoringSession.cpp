@@ -479,6 +479,30 @@ std::optional<std::string> validateMacroDefinition(const RuntimeProjectModel& pr
     return std::nullopt;
 }
 
+std::optional<std::size_t> findInstrumentControlIndexById(
+    const RuntimeProjectModel& project,
+    const std::string& controlId)
+{
+    const auto iterator = std::find_if(project.authoring.instrumentControls.begin(),
+                                       project.authoring.instrumentControls.end(),
+                                       [&](const auto& control) { return control.id == controlId; });
+    if (iterator == project.authoring.instrumentControls.end())
+        return std::nullopt;
+    return static_cast<std::size_t>(std::distance(project.authoring.instrumentControls.begin(), iterator));
+}
+
+std::optional<std::size_t> findMidiControlBindingIndexById(
+    const RuntimeProjectModel& project,
+    const std::string& bindingId)
+{
+    const auto iterator = std::find_if(project.authoring.midiControlBindings.begin(),
+                                       project.authoring.midiControlBindings.end(),
+                                       [&](const auto& binding) { return binding.id == bindingId; });
+    if (iterator == project.authoring.midiControlBindings.end())
+        return std::nullopt;
+    return static_cast<std::size_t>(std::distance(project.authoring.midiControlBindings.begin(), iterator));
+}
+
 bool resolveNewDspTargetControlLaw(const RuntimeProjectModel& project,
                                    RuntimeProjectMacroTargetDefinition& target)
 {
@@ -1542,6 +1566,24 @@ std::optional<RuntimeProjectPerformanceBankDefinition> AuthoringSession::getSele
         return std::nullopt;
 
     return getProject().authoring.performanceBanks[*selectedPerformanceBankIndex];
+}
+
+const std::vector<RuntimeProjectInstrumentControlDefinition>&
+AuthoringSession::getInstrumentControls() const
+{
+    return getProject().authoring.instrumentControls;
+}
+
+const std::vector<RuntimeProjectInstrumentControlTargetDefinition>&
+AuthoringSession::getInstrumentControlTargets() const
+{
+    return getProject().authoring.instrumentControlTargets;
+}
+
+const std::vector<RuntimeProjectMidiControlBindingDefinition>&
+AuthoringSession::getMidiControlBindings() const
+{
+    return getProject().authoring.midiControlBindings;
 }
 
 AuthoringZonePreviewRequest AuthoringSession::buildSelectedZonePreviewRequest() const
@@ -3362,7 +3404,10 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     std::vector<std::string> authoringNotes,
     const std::string& label,
     const bool reconcileInferredRoundRobin,
-    std::vector<RuntimeControllerDefault> controllerDefaults)
+    std::vector<RuntimeControllerDefault> controllerDefaults,
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls,
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets,
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings)
 {
     if (zones.empty())
         return makeRejectedResult(getDocumentState(),
@@ -3400,6 +3445,19 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
         project.schemaVersion = playbackRegionProjectSchemaVersion;
         project.authoring.schemaVersion = playbackRegionAuthoringSchemaVersion;
     }
+    // SFZ imports are one of the authored entry points for the instrument-control
+    // contract. New projects start at schema 10 (the layer contract), so promote
+    // that destination to schema 11 before committing imported controls. Without
+    // this promotion the arrays are silently discarded by the legacy-compatible
+    // append path and the import appears to succeed without its controls.
+    if ((!instrumentControls.empty() || !instrumentControlTargets.empty()
+         || !midiControlBindings.empty())
+        && project.schemaVersion == layerContractProjectSchemaVersion
+        && project.authoring.schemaVersion == layerContractAuthoringSchemaVersion)
+    {
+        project.schemaVersion = instrumentControlProjectSchemaVersion;
+        project.authoring.schemaVersion = instrumentControlAuthoringSchemaVersion;
+    }
     std::vector<std::pair<std::string, RoundRobinMode>> enabledGroups;
     for (const auto& group : project.authoring.groups)
     {
@@ -3413,6 +3471,12 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
       const auto originalGroupCount = project.authoring.groups.size();
       const auto originalMasterGainDb = project.authoring.masterGainDb;
       const auto originalControllerDefaultCount = project.authoring.controllerDefaults.size();
+      const auto originalInstrumentControlCount = project.authoring.instrumentControls.size();
+      const auto originalInstrumentControlTargetCount = project.authoring.instrumentControlTargets.size();
+      const auto originalMidiControlBindingCount = project.authoring.midiControlBindings.size();
+      const auto hasImportedInstrumentControls = !instrumentControls.empty();
+      const auto hasImportedInstrumentControlTargets = !instrumentControlTargets.empty();
+      const auto hasImportedMidiControlBindings = !midiControlBindings.empty();
 
       project.sampleSources.insert(project.sampleSources.end(),
                                    std::make_move_iterator(sampleSources.begin()),
@@ -3431,6 +3495,42 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
               project.authoring.controllerDefaults.push_back(importedDefault);
           else
               *existing = importedDefault;
+      }
+      if (project.schemaVersion >= instrumentControlProjectSchemaVersion
+          && project.authoring.schemaVersion >= instrumentControlAuthoringSchemaVersion)
+      for (auto& importedControl : instrumentControls)
+      {
+          const auto existing = std::find_if(
+              project.authoring.instrumentControls.begin(), project.authoring.instrumentControls.end(),
+              [&](const auto& value) { return value.id == importedControl.id; });
+          if (existing == project.authoring.instrumentControls.end())
+              project.authoring.instrumentControls.push_back(std::move(importedControl));
+          else
+              *existing = std::move(importedControl);
+      }
+      if (project.schemaVersion >= instrumentControlProjectSchemaVersion
+          && project.authoring.schemaVersion >= instrumentControlAuthoringSchemaVersion)
+      for (auto& importedTarget : instrumentControlTargets)
+      {
+          const auto existing = std::find_if(
+              project.authoring.instrumentControlTargets.begin(), project.authoring.instrumentControlTargets.end(),
+              [&](const auto& value) { return value.id == importedTarget.id; });
+          if (existing == project.authoring.instrumentControlTargets.end())
+              project.authoring.instrumentControlTargets.push_back(std::move(importedTarget));
+          else
+              *existing = std::move(importedTarget);
+      }
+      if (project.schemaVersion >= instrumentControlProjectSchemaVersion
+          && project.authoring.schemaVersion >= instrumentControlAuthoringSchemaVersion)
+      for (auto& importedBinding : midiControlBindings)
+      {
+          const auto existing = std::find_if(
+              project.authoring.midiControlBindings.begin(), project.authoring.midiControlBindings.end(),
+              [&](const auto& value) { return value.id == importedBinding.id; });
+          if (existing == project.authoring.midiControlBindings.end())
+              project.authoring.midiControlBindings.push_back(std::move(importedBinding));
+          else
+              *existing = std::move(importedBinding);
       }
       if (usesExplicitZoneGroupsSchema(project))
       {
@@ -3498,6 +3598,15 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
       if (!controllerDefaults.empty()
           || project.authoring.controllerDefaults.size() != originalControllerDefaultCount)
           changedPaths.push_back("authoring.controllerDefaults");
+      if (hasImportedInstrumentControls
+          || project.authoring.instrumentControls.size() != originalInstrumentControlCount)
+          changedPaths.push_back("authoring.instrumentControls");
+      if (hasImportedInstrumentControlTargets
+          || project.authoring.instrumentControlTargets.size() != originalInstrumentControlTargetCount)
+          changedPaths.push_back("authoring.instrumentControlTargets");
+      if (hasImportedMidiControlBindings
+          || project.authoring.midiControlBindings.size() != originalMidiControlBindingCount)
+          changedPaths.push_back("authoring.midiControlBindings");
       if (usesExplicitZoneGroupsSchema(project))
       {
           changedPaths.push_back("authoring.selectedGroupId");
@@ -3541,6 +3650,137 @@ RuntimeProjectDocumentActionResult AuthoringSession::createMacro(const RuntimePr
     if (result.applied)
         selectedMacroId = project.authoring.macros.back().id;
     return result;
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::createInstrumentControl(
+    const RuntimeProjectInstrumentControlDefinition& control,
+    const std::string& label)
+{
+    if (getProject().schemaVersion < instrumentControlProjectSchemaVersion
+        || getProject().authoring.schemaVersion < instrumentControlAuthoringSchemaVersion)
+        return makeRejectedResult(getDocumentState(),
+                                  "Instrument control creation rejected",
+                                  "The project must use the instrument-control schema before controls can be authored.");
+    if (control.id.empty())
+        return makeRejectedResult(getDocumentState(),
+                                  "Instrument control creation rejected",
+                                  "Instrument control ids must not be empty.");
+    if (findInstrumentControlIndexById(getProject(), control.id).has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Instrument control creation rejected",
+                                  "Instrument control '" + control.id + "' already exists.");
+
+    auto project = getProject();
+    project.authoring.instrumentControls.push_back(control);
+    const auto validation = validateInstrumentControlCatalog(
+        project.authoring.instrumentControls,
+        project.authoring.instrumentControlTargets,
+        project.authoring.midiControlBindings);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "Instrument control creation rejected", validation.issues.front());
+    return documentController.commitSnapshot(project, label, { "authoring.instrumentControls" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::updateInstrumentControl(
+    const std::string& controlId,
+    const RuntimeProjectInstrumentControlDefinition& control,
+    const std::string& label)
+{
+    const auto controlIndex = findInstrumentControlIndexById(getProject(), controlId);
+    if (!controlIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Instrument control edit rejected",
+                                  "Instrument control '" + controlId + "' does not exist.");
+    if (control.id != controlId)
+        return makeRejectedResult(getDocumentState(),
+                                  "Instrument control edit rejected",
+                                  "Instrument control ids are immutable once created.");
+
+    auto project = getProject();
+    project.authoring.instrumentControls[*controlIndex] = control;
+    const auto validation = validateInstrumentControlCatalog(
+        project.authoring.instrumentControls,
+        project.authoring.instrumentControlTargets,
+        project.authoring.midiControlBindings);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "Instrument control edit rejected", validation.issues.front());
+    return documentController.commitSnapshot(
+        project, label, { "authoring.instrumentControls[" + std::to_string(*controlIndex) + "]" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteInstrumentControl(
+    const std::string& controlId,
+    const std::string& label)
+{
+    const auto controlIndex = findInstrumentControlIndexById(getProject(), controlId);
+    if (!controlIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "Instrument control deletion rejected",
+                                  "Instrument control '" + controlId + "' does not exist.");
+
+    auto project = getProject();
+    project.authoring.instrumentControls.erase(
+        project.authoring.instrumentControls.begin() + static_cast<std::ptrdiff_t>(*controlIndex));
+    project.authoring.instrumentControlTargets.erase(
+        std::remove_if(project.authoring.instrumentControlTargets.begin(),
+                       project.authoring.instrumentControlTargets.end(),
+                       [&](const auto& target) { return target.controlId == controlId; }),
+        project.authoring.instrumentControlTargets.end());
+    project.authoring.midiControlBindings.erase(
+        std::remove_if(project.authoring.midiControlBindings.begin(),
+                       project.authoring.midiControlBindings.end(),
+                       [&](const auto& binding) { return binding.controlId == controlId; }),
+        project.authoring.midiControlBindings.end());
+    const auto validation = validateInstrumentControlCatalog(
+        project.authoring.instrumentControls,
+        project.authoring.instrumentControlTargets,
+        project.authoring.midiControlBindings);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "Instrument control deletion rejected", validation.issues.front());
+    return documentController.commitSnapshot(project, label,
+                                             { "authoring.instrumentControls",
+                                               "authoring.instrumentControlTargets",
+                                               "authoring.midiControlBindings" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::upsertMidiControlBinding(
+    const RuntimeProjectMidiControlBindingDefinition& binding,
+    const std::string& label)
+{
+    if (!findInstrumentControlIndexById(getProject(), binding.controlId).has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "MIDI control binding rejected",
+                                  "MIDI binding references unknown instrument control '" + binding.controlId + "'.");
+
+    auto project = getProject();
+    const auto existingIndex = findMidiControlBindingIndexById(project, binding.id);
+    if (existingIndex.has_value())
+        project.authoring.midiControlBindings[*existingIndex] = binding;
+    else
+        project.authoring.midiControlBindings.push_back(binding);
+
+    const auto validation = validateInstrumentControlCatalog(
+        project.authoring.instrumentControls,
+        project.authoring.instrumentControlTargets,
+        project.authoring.midiControlBindings);
+    if (!validation.valid)
+        return makeRejectedResult(getDocumentState(), "MIDI control binding rejected", validation.issues.front());
+    return documentController.commitSnapshot(project, label, { "authoring.midiControlBindings" });
+}
+
+RuntimeProjectDocumentActionResult AuthoringSession::deleteMidiControlBinding(
+    const std::string& bindingId,
+    const std::string& label)
+{
+    const auto bindingIndex = findMidiControlBindingIndexById(getProject(), bindingId);
+    if (!bindingIndex.has_value())
+        return makeRejectedResult(getDocumentState(),
+                                  "MIDI control binding deletion rejected",
+                                  "MIDI control binding '" + bindingId + "' does not exist.");
+    auto project = getProject();
+    project.authoring.midiControlBindings.erase(
+        project.authoring.midiControlBindings.begin() + static_cast<std::ptrdiff_t>(*bindingIndex));
+    return documentController.commitSnapshot(project, label, { "authoring.midiControlBindings" });
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::duplicateMacro(const std::string& macroId,

@@ -861,11 +861,10 @@ void PerformancePanel::refreshSurface()
     const auto controlsWereCollapsed = instrumentControlsCollapsed;
     if (!userInstrumentControlsExpandedChoice.has_value())
     {
-        const auto packageHasExposedControls
-            = engineFacade.getPerformancePackageActivationPayload() != nullptr
-                && macroSurface.showingPublishedMixer
-                && !macroSurface.displayedMacros.empty();
-        instrumentControlsCollapsed = !packageHasExposedControls;
+        const auto activePerformanceHasExposedControls = performanceSnapshot.loaded
+            && macroSurface.showingPublishedMixer
+            && !macroSurface.displayedMacros.empty();
+        instrumentControlsCollapsed = !activePerformanceHasExposedControls;
     }
     const auto publishPresentation = publishPresentationProvider
         ? publishPresentationProvider()

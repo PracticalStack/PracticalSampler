@@ -1,0 +1,3 @@
+<control> set_cc20=64 set_hdcc41=0.5 label_cc20="Kick In" label_cc41="DI Bus"
+<global> amplitude_oncc20=0.75 amplitude_curvecc20=1 amplitude_oncc21=0.5 pan_oncc42=0.5 pan_curvecc42=2 tune_oncc43=12 ampeg_hold_oncc44=0.1 ampeg_decay_oncc45=0.25 ampeg_sustain_oncc46=0.5
+<region> sample=kick.wav lovel=1 hivel=127

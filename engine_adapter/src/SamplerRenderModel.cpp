@@ -12,6 +12,37 @@ namespace drs::engine
 {
 namespace
 {
+void appendInstrumentControlContributions(SamplerRenderRoute& route,
+                                          const ImmutablePlaybackSnapshot& snapshot,
+                                          const InstrumentControlBindingTable& bindings)
+{
+    for (const auto& target : snapshot.instrumentControlTargets)
+    {
+        const auto appliesGlobally = target.ownerKind.empty()
+            || target.ownerKind == "instrument"
+            || target.ownerId.empty()
+            || target.ownerId == "global";
+        if (!appliesGlobally)
+            continue;
+        for (std::size_t index = 0; index < bindings.controlCount(); ++index)
+        {
+            if (bindings.controlId(index) != target.controlId)
+                continue;
+            SamplerRenderRoute::ControlContribution contribution;
+            contribution.controlIndex = index;
+            contribution.targetKind = target.targetKind;
+            contribution.sourceMinimum = target.sourceMinimum;
+            contribution.sourceMaximum = target.sourceMaximum;
+            contribution.destinationMinimum = target.destinationMinimum;
+            contribution.destinationMaximum = target.destinationMaximum;
+            contribution.curve = target.curve;
+            contribution.contributionMode = target.contributionMode;
+            route.controlContributions.push_back(std::move(contribution));
+            break;
+        }
+    }
+}
+
 std::uint64_t stableSourceGeneration(std::string_view identity) noexcept
 {
     std::uint64_t hash = 14695981039346656037ull;
@@ -598,6 +629,19 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
     model->snapshotContentDigest = payload->snapshotContentDigest;
     model->preparedContentDigest = payload->preparedContentDigest;
     model->performanceProgram = prepared.performanceProgram;
+    model->instrumentControlValues = snapshot.instrumentControlValues;
+    {
+        std::vector<RuntimeInstrumentControlBindingIssue> bindingIssues;
+        if (!model->instrumentControlBindings.compile(snapshot.instrumentControls,
+                                                     snapshot.midiControlBindings,
+                                                     bindingIssues))
+        {
+            for (const auto& issue : bindingIssues)
+                addError(result, "render-model-instrument-control-binding-invalid",
+                         "payload.snapshot.instrumentControls",
+                         issue.code + ": " + issue.detail);
+        }
+    }
     model->midiNoteOffset = options.midiNoteOffset;
     model->fixedVelocity = options.fixedVelocity;
     model->retainedActivationPayload = payload;
@@ -727,6 +771,8 @@ SamplerRenderModelBuildResult buildSamplerRenderModel(
         model->routes.back().tuningModulation = zone.tuningModulation;
         model->routes.back().amplitudeModulation = zone.amplitudeModulation;
         model->routes.back().amplitudeEnvelope = zone.amplitudeEnvelope;
+        appendInstrumentControlContributions(model->routes.back(), snapshot,
+                                             model->instrumentControlBindings);
         model->routes.back().layerId = snapshotLayerRoute == nullptr ? std::string {} : snapshotLayerRoute->layerId;
         if (snapshotLayerRoute != nullptr)
             model->routes.back().layerCrossfade = snapshotLayerRoute->crossfade;

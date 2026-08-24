@@ -79,6 +79,9 @@ struct RuntimeCompilePlan
     std::vector<RuntimeCompileZoneDefinition> zones;
     std::vector<RuntimeProjectFxSlotDefinition> fxSlots;
     std::vector<RuntimeProjectRoutingBusDefinition> routingBuses;
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls;
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets;
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     std::vector<RuntimeControllerDefault> controllerDefaults;
     std::vector<std::string> projectNotes;

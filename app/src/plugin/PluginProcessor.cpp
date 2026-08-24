@@ -140,7 +140,11 @@ drs::engine::SamplerRenderEvent normalizeHostMidiEvent(
     event.sampleOffset = sampleOffset;
     event.midiNote = static_cast<std::uint8_t>(clampMidiValue(midiNote));
     event.velocity = static_cast<float>(clampMidiValue(velocity)) / 127.0f;
-    event.midiChannel = static_cast<std::uint8_t>(std::clamp(channel, 0, 15));
+    // JUCE's raw MIDI status nibble is zero-based (0..15), while the
+    // instrument-control binding table is intentionally one-based (1..16).
+    // Normalize at the host boundary so exact-channel assignments do not
+    // shift down by one channel in plugin or standalone playback.
+    event.midiChannel = static_cast<std::uint8_t>(std::clamp(channel, 0, 15) + 1);
     event.noteOffVelocity = static_cast<float>(clampMidiValue(noteOffVelocity)) / 127.0f;
     event.controllerNumber = static_cast<std::uint8_t>(clampMidiValue(controllerNumber));
     event.controllerValue = static_cast<std::uint8_t>(clampMidiValue(controllerValue));
@@ -1110,6 +1114,12 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         }
         else if (command == 0xb0 && metadata.numBytes > 2)
         {
+            latestMidiControlObservation.store(
+                1u
+                    | (static_cast<std::uint32_t>(channel + 1) << 1u)
+                    | (static_cast<std::uint32_t>(eventData[1] & 0x7fu) << 6u)
+                    | (static_cast<std::uint32_t>(eventData[2] & 0x7fu) << 13u),
+                std::memory_order_release);
             queueHostEvent(normalizeHostMidiEvent(drs::engine::SamplerRenderEventType::controllerChange,
                                                   eventSample, 0, 0, channel, 0,
                                                   eventData[1] & 0x7fu,
@@ -1300,6 +1310,14 @@ bool Processor::retryProjectRestore()
 
 void Processor::setMacroValueFromShell(const std::string& macroId, double value)
 {
+    const auto instrumentControls = engineFacade.getInstrumentControlDescriptors();
+    if (std::any_of(instrumentControls.begin(), instrumentControls.end(),
+                    [&](const auto& control) { return control.id == macroId; }))
+    {
+        setInstrumentControlValueFromShell(macroId, value);
+        return;
+    }
+
     auto parameterId = buildMacroParameterId(macroId);
     if (parameterState.getParameter(parameterId) == nullptr)
     {
@@ -1321,6 +1339,50 @@ void Processor::setMacroValueFromShell(const std::string& macroId, double value)
     }
 
     engineFacade.setMacroValue(macroId, value);
+}
+
+bool Processor::setInstrumentControlValueFromShell(const std::string& controlId,
+                                                   const double normalizedValue)
+{
+    if (!engineFacade.setInstrumentControlValue(controlId, normalizedValue))
+        return false;
+    const auto publish = [&](drs::engine::SamplerPlaybackContext& context)
+    {
+        const auto* model = context.getActiveRenderModel();
+        if (model == nullptr)
+            return false;
+        for (std::size_t index = 0; index < model->getInstrumentControlBindings().controlCount(); ++index)
+            if (model->getInstrumentControlBindings().controlId(index) == controlId)
+                return context.publishActiveInstrumentControl(index, normalizedValue);
+        return false;
+    };
+    const auto publishedPerformance = publish(performancePlaybackContext);
+    const auto publishedPreview = publish(authoringPreviewPlaybackContext);
+    static_cast<void>(publishedPerformance);
+    static_cast<void>(publishedPreview);
+    return true;
+}
+
+bool Processor::resetInstrumentControlValueFromShell(const std::string& controlId)
+{
+    const auto descriptors = engineFacade.getInstrumentControlDescriptors();
+    const auto descriptor = std::find_if(descriptors.begin(), descriptors.end(),
+                                         [&](const auto& value) { return value.id == controlId; });
+    return descriptor != descriptors.end()
+        && setInstrumentControlValueFromShell(controlId, descriptor->normalizedDefault);
+}
+
+bool Processor::consumeLatestMidiControlObservation(std::uint8_t& channel,
+                                                     std::uint8_t& controllerNumber,
+                                                     std::uint8_t& value) noexcept
+{
+    const auto packed = latestMidiControlObservation.exchange(0, std::memory_order_acq_rel);
+    if ((packed & 1u) == 0u)
+        return false;
+    channel = static_cast<std::uint8_t>((packed >> 1u) & 0x1fu);
+    controllerNumber = static_cast<std::uint8_t>((packed >> 6u) & 0x7fu);
+    value = static_cast<std::uint8_t>((packed >> 13u) & 0x7fu);
+    return true;
 }
 
 void Processor::queueAuthoringPreviewNoteOn(int midiNoteNumber, float velocity)

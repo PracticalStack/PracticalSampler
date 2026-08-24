@@ -178,7 +178,8 @@ fs::path buildSemanticPackageV2Fixture(const fs::path& scratchDirectory)
     packagePlan.manifest.minimumReaderSchemaVersion
         = drs::engine::performancePackageFxRoutingMinimumReaderSchemaVersion;
     packagePlan.compiledRuntime.instrument.schemaVersion
-        = drs::engine::runtimeInstrumentFxRoutingSchemaVersion;
+        = std::max(drs::engine::runtimeInstrumentFxRoutingSchemaVersion,
+                   drs::engine::instrumentControlInstrumentSchemaVersion);
     for (auto& group : packagePlan.compiledRuntime.instrument.groups)
         group.routingBusId = "master";
     packagePlan.compiledRuntime.instrument.fxSlots = {
@@ -200,6 +201,44 @@ fs::path buildSemanticPackageV2Fixture(const fs::path& scratchDirectory)
     target.destinationMaximum = 0.0;
     macro.targets.push_back(std::move(target));
     packagePlan.compiledRuntime.instrument.macros = { std::move(macro) };
+    drs::engine::RuntimeProjectInstrumentControlDefinition control;
+    control.id = "package.instrument.gain";
+    control.displayName = "Package Instrument Gain";
+    control.category = drs::engine::RuntimeInstrumentControlCategory::mixer;
+    control.kind = drs::engine::RuntimeInstrumentControlKind::normalized;
+    control.unit = drs::engine::RuntimeInstrumentControlUnit::generic;
+    control.normalizedDefault = 1.0;
+    control.importedSourceController = 20;
+    packagePlan.compiledRuntime.instrument.instrumentControls.push_back(control);
+    drs::engine::RuntimeProjectInstrumentControlTargetDefinition controlTarget;
+    controlTarget.id = "target.package.instrument.gain";
+    controlTarget.controlId = control.id;
+    controlTarget.targetKind = drs::engine::RuntimeInstrumentControlTargetKind::gain;
+    controlTarget.contributionMode = drs::engine::RuntimeInstrumentControlContributionMode::multiply;
+    controlTarget.destinationMinimum = 0.0;
+    controlTarget.destinationMaximum = 1.0;
+    packagePlan.compiledRuntime.instrument.instrumentControlTargets.push_back(controlTarget);
+    drs::engine::RuntimeProjectMidiControlBindingDefinition controlBinding;
+    controlBinding.id = "binding.package.instrument.gain.cc20";
+    controlBinding.controlId = control.id;
+    controlBinding.controllerNumber = 20;
+    packagePlan.compiledRuntime.instrument.midiControlBindings.push_back(controlBinding);
+    drs::engine::RuntimeProjectInstrumentControlDefinition channelControl = control;
+    channelControl.id = "package.instrument.channel.gain";
+    channelControl.displayName = "Channel Scoped Instrument Gain";
+    channelControl.importedSourceController = 21;
+    packagePlan.compiledRuntime.instrument.instrumentControls.push_back(channelControl);
+    drs::engine::RuntimeProjectInstrumentControlTargetDefinition channelTarget = controlTarget;
+    channelTarget.id = "target.package.instrument.channel.gain";
+    channelTarget.controlId = channelControl.id;
+    packagePlan.compiledRuntime.instrument.instrumentControlTargets.push_back(channelTarget);
+    drs::engine::RuntimeProjectMidiControlBindingDefinition channelBinding = controlBinding;
+    channelBinding.id = "binding.package.instrument.channel.gain.cc21.ch2";
+    channelBinding.controlId = channelControl.id;
+    channelBinding.controllerNumber = 21;
+    channelBinding.channelScope.kind = drs::engine::RuntimeMidiChannelScopeKind::exact;
+    channelBinding.channelScope.channel = 2;
+    packagePlan.compiledRuntime.instrument.midiControlBindings.push_back(channelBinding);
     packagePlan.compiledRuntime.instrument.routingBuses = {
         { "host-master-bus", "Host Master Bus", "master",
           { "host-master-gain" }, false }
@@ -264,6 +303,12 @@ int main(int argc, char** argv)
         requireLicenseViewerContract(standaloneLicense, "Standalone host validation");
         standalone->getProcessor().prepareToPlay(44100.0, 512);
         standalone->getProcessor().serviceMessageThreadWork();
+        standalone->getProcessor().releaseResources();
+        standalone->getProcessor().prepareToPlay(48000.0, 256);
+        standalone->getProcessor().serviceMessageThreadWork();
+        standalone->getProcessor().releaseResources();
+        standalone->getProcessor().prepareToPlay(44100.0, 512);
+        standalone->getProcessor().serviceMessageThreadWork();
         const auto standalonePayload
             = standalone->getEngineFacade().getPerformancePackageActivationPayload();
         require(standalonePayload != nullptr && standalonePayload->snapshot != nullptr,
@@ -282,13 +327,66 @@ int main(int argc, char** argv)
             Clock::now() - standalonePlaybackStarted);
         standalone->getProcessor().serviceMessageThreadWork();
         require(standaloneMagnitude > 0.0001f,
-                "Standalone host validation should produce audible output from the checked-in package.");
+                "Standalone host validation should produce audible output from the checked-in package."
+                " magnitude=" + std::to_string(standaloneMagnitude)
+                    + " controls=" + std::to_string(standalone->getEngineFacade()
+                                                         .getInstrumentControlDescriptors().size()));
+        const auto renderChannelScopedGain = [](drs::plugin::Processor& host,
+                                                const int midiChannel,
+                                                const int ccValue)
+        {
+            require(host.setInstrumentControlValueFromShell(
+                        "package.instrument.gain", 1.0),
+                    "Host matrix could not prime the any-channel gain control.");
+            require(host.setInstrumentControlValueFromShell(
+                        "package.instrument.channel.gain", 1.0),
+                    "Host matrix could not prime the exact-channel gain control.");
+            juce::MidiBuffer controlMidi;
+            controlMidi.addEvent(juce::MidiMessage::controllerEvent(
+                                     midiChannel, 21, ccValue), 0);
+            juce::AudioBuffer<float> controlBuffer(2, 512);
+            controlBuffer.clear();
+            host.processBlock(controlBuffer, controlMidi);
+            return renderQueuedPerformanceSurfaceMagnitude(host, 69, 0.8f);
+        };
+        const auto standaloneAbsentSourceMagnitude = renderChannelScopedGain(
+            standalone->getProcessor(), 1, 0);
+        const auto standaloneExactChannelMagnitude = renderChannelScopedGain(
+            standalone->getProcessor(), 2, 0);
+        require(standaloneAbsentSourceMagnitude > 0.0001f
+                    && standaloneAbsentSourceMagnitude > standaloneExactChannelMagnitude * 2.5f,
+                "Standalone host matrix did not distinguish an absent source from exact MIDI channel 2."
+                    + std::string(" absent=") + std::to_string(standaloneAbsentSourceMagnitude)
+                    + " exact=" + std::to_string(standaloneExactChannelMagnitude));
+        const auto renderStandaloneUnassignedSource = [&](const int controller,
+                                                           const int value)
+        {
+            require(standalone->getProcessor().setInstrumentControlValueFromShell(
+                        "package.instrument.gain", 1.0),
+                    "Standalone host matrix could not prime the unassigned-source case.");
+            require(standalone->getProcessor().setInstrumentControlValueFromShell(
+                        "package.instrument.channel.gain", 1.0),
+                    "Standalone host matrix could not prime the exact-channel case.");
+            juce::MidiBuffer reservedMidi;
+            reservedMidi.addEvent(juce::MidiMessage::controllerEvent(1, controller, value), 0);
+            juce::AudioBuffer<float> reservedBuffer(2, 512);
+            reservedBuffer.clear();
+            standalone->getProcessor().processBlock(reservedBuffer, reservedMidi);
+            return renderQueuedPerformanceSurfaceMagnitude(standalone->getProcessor(), 69, 0.8f);
+        };
+        require(renderStandaloneUnassignedSource(22, 0) > 0.0001f,
+                "Standalone unassigned CC source must not silence playback.");
+        for (const auto reservedController : { 64, 120, 123 })
+            require(renderStandaloneUnassignedSource(reservedController, 0) > 0.0001f,
+                    "Standalone reserved CC semantics must preserve playable output.");
         const auto standaloneDiagnostics = standalone->getEngineFacade().getDiagnosticsSnapshot();
         const auto standaloneRealtime = standalone->getProcessor().getRealtimeSafetySnapshot();
         require(standaloneDiagnostics.available,
                 "Standalone host validation should publish diagnostics after opening the checked-in package.");
         require(standaloneRealtime.getAudioThreadViolationCount() == 0,
                 "Standalone package playback reported a realtime-thread violation.");
+        require(standaloneRealtime.blockingLockAttemptsOnAudioThread == 0,
+                "Standalone package playback attempted a blocking audio-thread lock.");
         require(!largeV2Qualification
                     || (standaloneDiagnostics.cacheMissCount > 0
                         && standaloneDiagnostics.backgroundReadCount > 0),
@@ -332,12 +430,38 @@ int main(int argc, char** argv)
         requireLicenseViewerContract(pluginLicense, "Plugin host validation");
         processor->prepareToPlay(44100.0, 512);
         processor->serviceMessageThreadWork();
+        processor->releaseResources();
+        processor->prepareToPlay(48000.0, 256);
+        processor->serviceMessageThreadWork();
+        processor->releaseResources();
+        processor->prepareToPlay(44100.0, 512);
+        processor->serviceMessageThreadWork();
         initialPerformancePanel->refreshNow();
         auto* packageMixer = findDescendantByType<drs::app::PerformanceMixer>(
             *initialPerformancePanel);
         require(initialControlsToggle->getButtonText() == "Hide Controls"
-                    && packageMixer != nullptr && packageMixer->isVisible(),
+                    && packageMixer != nullptr && packageMixer->isVisible()
+                    && packageMixer->getControlCount() >= 3,
                 "Loading a package with exposed controls should automatically show Instrument Controls.");
+        const auto performanceControlDescriptors = processor->getEngineFacade().getMacroDescriptors();
+        require(std::any_of(performanceControlDescriptors.begin(), performanceControlDescriptors.end(),
+                            [](const auto& descriptor)
+                            {
+                                return descriptor.id == "package.instrument.gain"
+                                    && descriptor.publishedControl
+                                    && descriptor.exposedInPerformance;
+                            }),
+                "The Performance mixer must surface packaged Instrument Controls alongside authored macros.");
+        processor->setMacroValueFromShell("package.instrument.gain", 0.0);
+        const auto minimumPerformanceControl = processor->getEngineFacade().getInstrumentControlDescriptors();
+        require(std::any_of(minimumPerformanceControl.begin(), minimumPerformanceControl.end(),
+                            [](const auto& descriptor)
+                            {
+                                return descriptor.id == "package.instrument.gain"
+                                    && descriptor.currentValue == 0.0;
+                            }),
+                "The Performance mixer callback must route Instrument Control edits into sampler state.");
+        processor->setMacroValueFromShell("package.instrument.gain", 1.0);
         initialControlsToggle->onClick();
         require(initialControlsToggle->getButtonText() == "Show Controls"
                     && !packageMixer->isVisible(),
@@ -370,6 +494,34 @@ int main(int argc, char** argv)
         require(pluginGraph.compiled
                     && pluginGraph.plan.planDigest == standaloneGraph.plan.planDigest,
                 "Plugin and standalone hosts did not compile the same package DSP graph.");
+        const auto packageControlDescriptors = processor->getEngineFacade()
+            .getInstrumentControlDescriptors();
+        require(std::any_of(packageControlDescriptors.begin(), packageControlDescriptors.end(),
+                             [](const auto& descriptor)
+                             {
+                                 return descriptor.id == "package.instrument.gain"
+                                     && descriptor.importedSourceController == 20;
+                             }),
+                "Plugin host validation did not restore the packaged Instrument Control descriptor.");
+        const auto renderPackageControlFromCc = [&](const int ccValue)
+        {
+            require(processor->setInstrumentControlValueFromShell("package.instrument.gain", 1.0),
+                    "Plugin host validation could not prime the packaged Instrument Control.");
+            require(processor->setInstrumentControlValueFromShell(
+                        "package.instrument.channel.gain", 1.0),
+                    "Plugin host validation could not reset the channel-scoped Instrument Control.");
+            juce::MidiBuffer controlMidi;
+            controlMidi.addEvent(juce::MidiMessage::controllerEvent(1, 20, ccValue), 0);
+            juce::AudioBuffer<float> controlBuffer(2, 512);
+            controlBuffer.clear();
+            processor->processBlock(controlBuffer, controlMidi);
+            return renderQueuedPerformanceSurfaceMagnitude(*processor, 69, 0.8f);
+        };
+        const auto midiControlMinimumMagnitude = renderPackageControlFromCc(0);
+        const auto midiControlMaximumMagnitude = renderPackageControlFromCc(127);
+        require(midiControlMinimumMagnitude < midiControlMaximumMagnitude * 0.5f
+                    && midiControlMaximumMagnitude > 0.0001f,
+                "Host MIDI CC20 did not drive the packaged Instrument Control gain.");
         const auto pluginMacroBindings = processor->getEngineFacade()
             .getActivePublishedMacroBindings();
         require(pluginMacroBindings != nullptr
@@ -394,11 +546,58 @@ int main(int argc, char** argv)
         processor->serviceMessageThreadWork();
         require(pluginMagnitude > 0.0001f,
                 "Plugin host validation should produce audible output from the checked-in package.");
+        require(processor->setInstrumentControlValueFromShell("package.instrument.gain", 0.0),
+                "Plugin host validation could not set the packaged Instrument Control to minimum.");
+        require(processor->setInstrumentControlValueFromShell(
+                    "package.instrument.channel.gain", 1.0),
+                "Plugin host validation could not reset the channel-scoped Instrument Control before minimum render.");
+        const auto packageControlMinimumMagnitude = renderQueuedPerformanceSurfaceMagnitude(
+            *processor, 69, 0.8f);
+        require(processor->setInstrumentControlValueFromShell("package.instrument.gain", 1.0),
+                "Plugin host validation could not set the packaged Instrument Control to maximum.");
+        require(processor->setInstrumentControlValueFromShell(
+                    "package.instrument.channel.gain", 1.0),
+                "Plugin host validation could not reset the channel-scoped Instrument Control before maximum render.");
+        const auto packageControlMaximumMagnitude = renderQueuedPerformanceSurfaceMagnitude(
+            *processor, 69, 0.8f);
+        require(packageControlMinimumMagnitude < packageControlMaximumMagnitude * 0.5f
+                    && packageControlMaximumMagnitude > 0.0001f,
+                "Packaged Instrument Control gain did not change host-rendered output.");
+        const auto pluginAbsentSourceMagnitude = renderChannelScopedGain(*processor, 1, 0);
+        const auto pluginExactChannelMagnitude = renderChannelScopedGain(*processor, 2, 0);
+        require(pluginAbsentSourceMagnitude > 0.0001f
+                    && pluginAbsentSourceMagnitude > pluginExactChannelMagnitude * 2.5f,
+                "Plugin host matrix did not distinguish an absent source from exact MIDI channel 2."
+                    + std::string(" absent=") + std::to_string(pluginAbsentSourceMagnitude)
+                    + " exact=" + std::to_string(pluginExactChannelMagnitude));
+        const auto renderPluginUnassignedSource = [&](const int controller,
+                                                      const int value)
+        {
+            require(processor->setInstrumentControlValueFromShell(
+                        "package.instrument.gain", 1.0),
+                    "Plugin host matrix could not prime the unassigned-source case.");
+            require(processor->setInstrumentControlValueFromShell(
+                        "package.instrument.channel.gain", 1.0),
+                    "Plugin host matrix could not prime the exact-channel case.");
+            juce::MidiBuffer reservedMidi;
+            reservedMidi.addEvent(juce::MidiMessage::controllerEvent(1, controller, value), 0);
+            juce::AudioBuffer<float> reservedBuffer(2, 512);
+            reservedBuffer.clear();
+            processor->processBlock(reservedBuffer, reservedMidi);
+            return renderQueuedPerformanceSurfaceMagnitude(*processor, 69, 0.8f);
+        };
+        require(renderPluginUnassignedSource(22, 0) > 0.0001f,
+                "Plugin unassigned CC source must not silence playback.");
+        for (const auto reservedController : { 64, 120, 123 })
+            require(renderPluginUnassignedSource(reservedController, 0) > 0.0001f,
+                    "Plugin reserved CC semantics must preserve playable output.");
         processor->setMacroValueFromShell("Instrument", 0.0);
+        processor->setInstrumentControlValueFromShell("package.instrument.channel.gain", 1.0);
         processor->serviceMessageThreadWork();
         const auto minimumGainMagnitude = renderQueuedPerformanceSurfaceMagnitude(
             *processor, 69, 0.8f);
         processor->setMacroValueFromShell("Instrument", 1.0);
+        processor->setInstrumentControlValueFromShell("package.instrument.channel.gain", 1.0);
         processor->serviceMessageThreadWork();
         const auto maximumGainMagnitude = renderQueuedPerformanceSurfaceMagnitude(
             *processor, 69, 0.8f);
@@ -413,6 +612,8 @@ int main(int argc, char** argv)
                 "Plugin host validation should publish diagnostics after opening the checked-in package.");
         require(pluginRealtime.getAudioThreadViolationCount() == 0,
                 "Plugin package playback reported a realtime-thread violation.");
+        require(pluginRealtime.blockingLockAttemptsOnAudioThread == 0,
+                "Plugin package playback attempted a blocking audio-thread lock.");
         require(!largeV2Qualification
                     || (pluginDiagnostics.cacheMissCount > 0
                         && pluginDiagnostics.backgroundReadCount > 0),
@@ -514,6 +715,8 @@ int main(int argc, char** argv)
                   << " standaloneWorkspaceUs="
                   << standaloneLoad.timings.workspaceTransitionMicros
                   << " standalonePlaybackMs=" << standalonePlaybackElapsed.count()
+                  << " standaloneAbsentSourceMagnitude=" << standaloneAbsentSourceMagnitude
+                  << " standaloneExactChannelMagnitude=" << standaloneExactChannelMagnitude
                   << " standaloneHeadBytesRead=" << standaloneDiagnostics.headBytesRead
                   << " standaloneCacheMissCount=" << standaloneDiagnostics.cacheMissCount
                   << " standaloneBackgroundReadCount=" << standaloneDiagnostics.backgroundReadCount
@@ -525,6 +728,8 @@ int main(int argc, char** argv)
                   << " pluginWorkspaceUs="
                   << pluginLoad.timings.workspaceTransitionMicros
                   << " pluginPlaybackMs=" << pluginPlaybackElapsed.count()
+                  << " pluginAbsentSourceMagnitude=" << pluginAbsentSourceMagnitude
+                  << " pluginExactChannelMagnitude=" << pluginExactChannelMagnitude
                   << " pluginHeadBytesRead=" << pluginDiagnostics.headBytesRead
                   << " pluginCacheMissCount=" << pluginDiagnostics.cacheMissCount
                   << " pluginBackgroundReadCount=" << pluginDiagnostics.backgroundReadCount
@@ -532,7 +737,11 @@ int main(int argc, char** argv)
                   << " setStateUs=" << setStateElapsed.count()
                   << " standaloneRtViolations="
                   << standaloneRealtime.getAudioThreadViolationCount()
+                  << " standaloneMaxCallbackUs=" << standaloneRealtime.maxProcessBlockMicros
+                  << " standaloneLockAttempts=" << standaloneRealtime.blockingLockAttemptsOnAudioThread
                   << " pluginRtViolations=" << pluginRealtime.getAudioThreadViolationCount()
+                  << " pluginMaxCallbackUs=" << pluginRealtime.maxProcessBlockMicros
+                  << " pluginLockAttempts=" << pluginRealtime.blockingLockAttemptsOnAudioThread
                   << std::endl;
         restoredEditor.reset();
         restoredProcessor.reset();

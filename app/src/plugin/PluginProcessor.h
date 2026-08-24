@@ -290,6 +290,11 @@ public:
     bool retryProjectRestore();
     bool retryProjectRestoreWithFile(const juce::File& locatedProjectFile);
     void setMacroValueFromShell(const std::string& macroId, double value);
+    bool setInstrumentControlValueFromShell(const std::string& controlId, double normalizedValue);
+    bool resetInstrumentControlValueFromShell(const std::string& controlId);
+    bool consumeLatestMidiControlObservation(std::uint8_t& channel,
+                                              std::uint8_t& controllerNumber,
+                                              std::uint8_t& value) noexcept;
     std::optional<bool> getInstrumentControlsExpandedChoice() const noexcept
     {
         return instrumentControlsExpandedChoice;
@@ -647,6 +652,7 @@ private:
     std::atomic<std::size_t> diagnosticsOverBudgetCallbackCount { 0 };
     std::atomic<std::size_t> diagnosticsCurrentAuthoringPreviewDraftRevision { 0 };
     std::atomic<bool> authoringPreviewCloseRequested { false };
+    std::atomic<std::uint32_t> latestMidiControlObservation { 0 };
     std::uint64_t lastPerformanceRenderMicros = 0;
     std::uint64_t maxPerformanceRenderMicros = 0;
     std::uint64_t lastAuthoringPreviewRenderMicros = 0;

@@ -1552,6 +1552,160 @@ add_test(
     COMMAND drs_sfz_loop_prestart_baseline_tests
 )
 
+# Phase 0 characterization for paired SFZ #define directives. This test
+# intentionally records the current parser failure and the exact velocity
+# bands required after the parser/import projection phases are delivered.
+add_executable(drs_instrument_control_phase0_characterization_tests
+    src/InstrumentControlPhase0CharacterizationTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_phase0_characterization_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_definitions(drs_instrument_control_phase0_characterization_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_instrument_control_phase0_characterization_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.phase0_characterization
+    COMMAND drs_instrument_control_phase0_characterization_tests
+)
+
+add_executable(drs_instrument_control_contract_tests
+    src/InstrumentControlContractTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_contract_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_instrument_control_contract_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.contract
+    COMMAND drs_instrument_control_contract_tests
+)
+
+add_executable(drs_instrument_control_persistence_tests
+    src/InstrumentControlPersistenceTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_persistence_tests
+    PRIVATE
+        drs_app_shared
+        drs_engine_adapter
+)
+
+target_compile_features(drs_instrument_control_persistence_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.persistence
+    COMMAND drs_instrument_control_persistence_tests
+)
+
+add_executable(drs_instrument_control_binding_tests
+    src/InstrumentControlBindingTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_binding_tests
+    PRIVATE
+        drs_engine_adapter
+)
+
+target_compile_features(drs_instrument_control_binding_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.binding
+    COMMAND drs_instrument_control_binding_tests
+)
+
+add_executable(drs_instrument_control_runtime_tests
+    src/InstrumentControlRuntimeTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_runtime_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sampler_core
+        drs_sample_import
+        juce::juce_audio_formats
+)
+
+target_compile_features(drs_instrument_control_runtime_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.runtime
+    COMMAND drs_instrument_control_runtime_tests
+)
+
+add_executable(drs_instrument_control_qualification_tests
+    src/InstrumentControlQualificationTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_qualification_tests
+    PRIVATE
+        drs_engine_adapter
+        drs_sampler_core
+        drs_sample_import
+        juce::juce_audio_formats
+)
+
+target_compile_definitions(drs_instrument_control_qualification_tests
+    PRIVATE
+        DRS_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(drs_instrument_control_qualification_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_instrument_control_qualification_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.instrument_controls.qualification
+    COMMAND drs_instrument_control_qualification_tests
+)
+
+add_executable(drs_instrument_control_ui_tests
+    src/InstrumentControlUiTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_ui_tests
+    PRIVATE
+        drs_app_shared
+)
+
+target_compile_features(drs_instrument_control_ui_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.ui
+    COMMAND drs_instrument_control_ui_tests
+)
+
+add_executable(drs_instrument_control_view_model_tests
+    src/InstrumentControlViewModelTests.cpp
+)
+
+target_link_libraries(drs_instrument_control_view_model_tests
+    PRIVATE
+        drs_app_shared
+)
+
+target_compile_features(drs_instrument_control_view_model_tests PRIVATE cxx_std_17)
+
+add_test(
+    NAME drs.instrument_controls.view_models
+    COMMAND drs_instrument_control_view_model_tests
+)
+
+
 add_executable(drs_waveform_region_policy_tests
     src/WaveformRegionPolicyTests.cpp
 )
@@ -4936,6 +5090,13 @@ add_custom_target(drs_all_tests)
 
 add_dependencies(drs_all_tests
     DecentRhapsodyStudioPlugin
+    drs_instrument_control_phase0_characterization_tests
+    drs_instrument_control_contract_tests
+    drs_instrument_control_persistence_tests
+    drs_instrument_control_binding_tests
+    drs_instrument_control_runtime_tests
+    drs_instrument_control_qualification_tests
+    drs_instrument_control_ui_tests
     drs_vst3_host_state_qualification_tests
     drs_package_v2_tests
     drs_host_session_state_contract_tests

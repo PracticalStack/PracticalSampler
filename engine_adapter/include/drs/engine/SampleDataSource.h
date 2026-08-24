@@ -67,11 +67,22 @@ struct WavSampleDataSourceBuildResult
     std::uint64_t sourceFileSizeBytes = 0;
     std::int64_t sourceModifiedTimeTicks = 0;
     bool rf64 = false;
+    // Optional decoder for supported non-WAV sources. When present, the paged
+    // source uses this bounded callback instead of reading PCM byte ranges.
+    std::function<bool(std::uint64_t, std::uint32_t,
+                       std::vector<std::vector<float>>&, std::string&)> rangeDecoder;
     std::string state;
     std::vector<std::string> findings;
 };
 
 WavSampleDataSourceBuildResult buildWavSampleDataSourceDescriptor(
+    const std::string& sourceId,
+    const std::string& sourcePath,
+    std::uint64_t generation = 0,
+    std::uint64_t headSizeBytes = defaultSampleHeadBytes,
+    std::uint64_t pageSizeBytes = defaultSamplePageBytes);
+
+WavSampleDataSourceBuildResult buildPagedSampleDataSourceDescriptor(
     const std::string& sourceId,
     const std::string& sourcePath,
     std::uint64_t generation = 0,
@@ -312,6 +323,8 @@ private:
     std::uint16_t formatTag = 0;
     std::uint16_t bitsPerSample = 0;
     std::uint16_t blockAlign = 0;
+    std::function<bool(std::uint64_t, std::uint32_t,
+                       std::vector<std::vector<float>>&, std::string&)> rangeDecoder;
     std::uint64_t expectedFileSize = 0;
     std::int64_t expectedModifiedTicks = 0;
     std::uint64_t configuredHeadFrames = 0;

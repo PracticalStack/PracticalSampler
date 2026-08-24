@@ -301,6 +301,42 @@ void replaceRequestSamplesWithFlac(drs::app::PerformancePackageExportRequest& re
         sampleSource.path = relativeFlacPath.generic_string();
     }
 }
+
+void addImportedInstrumentControlCatalog(
+    drs::app::PerformancePackageExportRequest& request)
+{
+    request.project.schemaVersion = drs::engine::instrumentControlProjectSchemaVersion;
+    request.project.authoring.schemaVersion = drs::engine::instrumentControlAuthoringSchemaVersion;
+
+    drs::engine::RuntimeProjectInstrumentControlDefinition control;
+    control.id = "imported-mixer-cc20";
+    control.displayName = "Imported Mixer";
+    control.category = drs::engine::RuntimeInstrumentControlCategory::mixer;
+    control.kind = drs::engine::RuntimeInstrumentControlKind::normalized;
+    control.unit = drs::engine::RuntimeInstrumentControlUnit::percent;
+    control.normalizedDefault = 1.0;
+    control.displayMinimum = 0.0;
+    control.displayMaximum = 100.0;
+    control.importedSourceController = 20;
+    request.project.authoring.instrumentControls.push_back(control);
+
+    drs::engine::RuntimeProjectInstrumentControlTargetDefinition target;
+    target.id = "target-imported-mixer-cc20";
+    target.controlId = control.id;
+    target.targetKind = drs::engine::RuntimeInstrumentControlTargetKind::gain;
+    target.contributionMode = drs::engine::RuntimeInstrumentControlContributionMode::multiply;
+    target.destinationMinimum = 0.0;
+    target.destinationMaximum = 1.0;
+    request.project.authoring.instrumentControlTargets.push_back(target);
+
+    drs::engine::RuntimeProjectMidiControlBindingDefinition binding;
+    binding.id = "binding-imported-mixer-cc20";
+    binding.controlId = control.id;
+    binding.controllerNumber = 20;
+    binding.imported = true;
+    binding.importedSourceController = 20;
+    request.project.authoring.midiControlBindings.push_back(binding);
+}
 } // namespace
 
 int main()
@@ -953,6 +989,7 @@ int main()
         auto flacClient = flacService.openClient();
         auto flacRequest = makeRequest(tempRoot / "completed-flac.drpkg");
         replaceRequestSamplesWithFlac(flacRequest);
+        addImportedInstrumentControlCatalog(flacRequest);
         const auto flacAccepted = flacClient.submit(flacRequest);
         require(flacAccepted.disposition == PerformancePackageExportSubmitDisposition::accepted,
                 "A FLAC-backed export request must be accepted.");
@@ -982,9 +1019,21 @@ int main()
                                            && sample.frameCount > 0;
                                    }),
                 "The exported package must retain FLAC source metadata and playable sample records.");
+        require(flacPackage.metadata.instrument.instrument.instrumentControls.size() == 1
+                    && flacPackage.metadata.instrument.instrument.instrumentControlTargets.size() == 1
+                    && flacPackage.metadata.instrument.instrument.midiControlBindings.size() == 1
+                    && flacPackage.metadata.instrument.instrument.instrumentControls.front().id
+                        == "imported-mixer-cc20",
+                "Playable-package projection must retain imported controls, targets, and MIDI CC bindings.");
         auto flacActivation = drs::engine::preparePerformancePackageV2Activation(
             flacPackage.metadata, flacPackage.package, flacPackage.sampleDescriptors);
-        require(flacActivation.prepared && flacActivation.renderModel != nullptr,
+        require(flacActivation.prepared && flacActivation.renderModel != nullptr
+                    && flacActivation.activationPayload != nullptr
+                    && flacActivation.activationPayload->snapshot != nullptr
+                    && flacActivation.activationPayload->snapshot->instrumentControlValues.size() == 1
+                    && flacActivation.activationPayload->snapshot->instrumentControlValues.front().normalizedValue
+                        == 1.0
+                    && flacActivation.renderModel->getInstrumentControlBindings().controlCount() == 1,
                 "The FLAC-backed package must reopen through production activation preparation.");
 
         fs::remove_all(tempRoot);

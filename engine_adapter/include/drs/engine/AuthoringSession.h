@@ -133,6 +133,9 @@ public:
     AuthoringGroupRoundRobinStatus getSelectedGroupRoundRobinStatus() const;
     AuthoringDspSelection getDspSelection() const;
     std::optional<RuntimeProjectPerformanceBankDefinition> getSelectedPerformanceBank() const;
+    const std::vector<RuntimeProjectInstrumentControlDefinition>& getInstrumentControls() const;
+    const std::vector<RuntimeProjectInstrumentControlTargetDefinition>& getInstrumentControlTargets() const;
+    const std::vector<RuntimeProjectMidiControlBindingDefinition>& getMidiControlBindings() const;
     AuthoringZonePreviewRequest buildSelectedZonePreviewRequest() const;
     AuthoringGroupPreviewRequest buildSelectedGroupPreviewRequest() const;
 
@@ -257,9 +260,26 @@ public:
                                                             std::vector<std::string> authoringNotes,
                                                             const std::string& label,
                                                             bool reconcileInferredRoundRobin = true,
-                                                            std::vector<RuntimeControllerDefault> controllerDefaults = {});
+                                                            std::vector<RuntimeControllerDefault> controllerDefaults = {},
+                                                            std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls = {},
+                                                            std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets = {},
+                                                            std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings = {});
     RuntimeProjectDocumentActionResult createMacro(const RuntimeProjectMacroDefinition& macro,
                                                    const std::string& label);
+    RuntimeProjectDocumentActionResult createInstrumentControl(
+        const RuntimeProjectInstrumentControlDefinition& control,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult updateInstrumentControl(
+        const std::string& controlId,
+        const RuntimeProjectInstrumentControlDefinition& control,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult deleteInstrumentControl(const std::string& controlId,
+                                                               const std::string& label);
+    RuntimeProjectDocumentActionResult upsertMidiControlBinding(
+        const RuntimeProjectMidiControlBindingDefinition& binding,
+        const std::string& label);
+    RuntimeProjectDocumentActionResult deleteMidiControlBinding(const std::string& bindingId,
+                                                                const std::string& label);
     RuntimeProjectDocumentActionResult duplicateMacro(const std::string& macroId,
                                                       const std::string& label);
     RuntimeProjectDocumentActionResult deleteMacro(const std::string& macroId,

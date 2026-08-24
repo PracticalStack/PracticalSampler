@@ -3,6 +3,7 @@
 #include "shared/authoring/AuthoringSummaryStrip.h"
 #include "shared/authoring/AuthoringViewModels.h"
 #include "shared/authoring/MacroWorkbenchView.h"
+#include "shared/authoring/InstrumentControlsWorkbenchView.h"
 #include "shared/authoring/RepeatedStructureList.h"
 #include "shared/authoring/RoutingWorkbenchView.h"
 #include "shared/authoring/ZoneMappingEditor.h"
@@ -24,6 +25,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -53,6 +55,12 @@ public:
     using DraftPlaybackActionCallback = std::function<void()>;
     using PreviewCommandCallback = std::function<void(const drs::engine::AuthoringPreviewCommand&)>;
     using SampleFilesDroppedCallback = std::function<void(std::vector<juce::File>)>;
+    using InstrumentControlValueCallback = std::function<void(const std::string&, double)>;
+    using InstrumentControlResetCallback = std::function<void(const std::string&)>;
+    using InstrumentControlBindingCallback = std::function<void(const std::string&, int, std::uint8_t)>;
+    using InstrumentControlBindingClearCallback = std::function<void(const std::string&)>;
+    using InstrumentControlBindingRestoreCallback = std::function<void(const std::string&)>;
+    using InstrumentControlLearnCallback = std::function<void(const std::string&)>;
 
     explicit AuthoringPanel(drs::engine::AuthoringSession& authoringSession,
                             WaveformPreviewProvider waveformPreviewProvider = {},
@@ -69,13 +77,23 @@ public:
                             SourceValidationStatusProvider sourceValidationStatusProvider = {},
                             DraftPlaybackActionCallback onRequestSourceValidation = {},
                             DraftPlaybackActionCallback onCancelSourceValidation = {},
-                            WaveformDetailRequestCallback waveformDetailRequestCallback = {});
+                            WaveformDetailRequestCallback waveformDetailRequestCallback = {},
+                            InstrumentControlValueCallback instrumentControlValueCallback = {},
+                            InstrumentControlResetCallback instrumentControlResetCallback = {},
+                            InstrumentControlBindingCallback instrumentControlBindingCallback = {},
+                            InstrumentControlBindingClearCallback instrumentControlBindingClearCallback = {},
+                            InstrumentControlBindingRestoreCallback instrumentControlBindingRestoreCallback = {},
+                            InstrumentControlLearnCallback instrumentControlLearnCallback = {});
     ~AuthoringPanel() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
     void reloadFromSession();
     void refreshNow();
+    void observeInstrumentControlMidiCc(std::uint8_t channel,
+                                        std::uint8_t controllerNumber,
+                                        std::uint8_t value,
+                                        std::uint64_t nowMs);
     // Shells can forward a learned MIDI note here while the Articulations workbench
     // is listening. The value is validated through the normal project transaction.
     bool applyLearnedKeySwitchMidiNote(int midiNote);
@@ -257,6 +275,12 @@ private:
     DraftPlaybackActionCallback onCancelSourceValidation;
     PreviewCommandCallback previewCommandCallback;
     SampleFilesDroppedCallback sampleFilesDroppedCallback;
+    InstrumentControlValueCallback instrumentControlValueCallback;
+    InstrumentControlResetCallback instrumentControlResetCallback;
+    InstrumentControlBindingCallback instrumentControlBindingCallback;
+    InstrumentControlBindingClearCallback instrumentControlBindingClearCallback;
+    InstrumentControlBindingRestoreCallback instrumentControlBindingRestoreCallback;
+    InstrumentControlLearnCallback instrumentControlLearnCallback;
     struct TimedPreviewNote
     {
         bool active = false;
@@ -353,6 +377,7 @@ private:
     juce::TextButton workbenchRoutingTabButton;
     juce::TextButton workbenchPerformanceTabButton;
     juce::TextButton workbenchArticulationsTabButton;
+    juce::TextButton workbenchInstrumentControlsTabButton;
     juce::Label zoneLabel;
     juce::ComboBox zoneSelector;
     juce::ToggleButton previewEnabledToggle;
@@ -401,6 +426,7 @@ private:
     juce::Label groupVisibilityHintLabel;
 
     authoring::MacroWorkbenchView macroWorkbenchContent;
+    authoring::InstrumentControlsWorkbenchView instrumentControlsWorkbenchContent;
     juce::Viewport macroWorkbenchViewport;
     authoring::RepeatedStructureList macroList;
     authoring::RepeatedStructureList macroAssignmentList;

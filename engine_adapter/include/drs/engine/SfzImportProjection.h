@@ -39,6 +39,9 @@ struct SfzImportProjectionResult
     std::vector<RuntimeProjectGroupDefinition> groups;
     std::vector<RuntimeProjectZoneDefinition> zones;
     std::vector<RuntimeControllerDefault> controllerDefaults;
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls;
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets;
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings;
     std::vector<std::string> projectNotes;
     std::vector<std::string> authoringNotes;
     SfzImportExecutionState execution;

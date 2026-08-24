@@ -444,6 +444,56 @@ ordered_json serializePrepared(const ImmutablePreparedPlayback& prepared, bool i
     for (const auto& value : prepared.controllerDefaults)
         controllerDefaults.push_back({ { "controllerNumber", value.controllerNumber }, { "value", value.value } });
     root["controllerDefaults"] = std::move(controllerDefaults);
+    ordered_json instrumentControlValues = ordered_json::array();
+    for (const auto& value : prepared.instrumentControlValues)
+        instrumentControlValues.push_back({ { "id", value.id }, { "normalizedValue", value.normalizedValue } });
+    root["instrumentControlValues"] = std::move(instrumentControlValues);
+
+    ordered_json instrumentControls = ordered_json::array();
+    for (const auto& control : prepared.instrumentControls)
+    {
+        instrumentControls.push_back({
+            { "id", control.id },
+            { "displayName", control.displayName },
+            { "category", runtimeInstrumentControlCategoryName(control.category) },
+            { "kind", runtimeInstrumentControlKindName(control.kind) },
+            { "unit", runtimeInstrumentControlUnitName(control.unit) },
+            { "normalizedDefault", control.normalizedDefault },
+            { "displayMinimum", control.displayMinimum },
+            { "displayMaximum", control.displayMaximum },
+            { "displayPrecision", control.displayPrecision },
+            { "displayOrder", control.displayOrder },
+            { "section", control.section },
+            { "visible", control.visible },
+            { "provenance", runtimeInstrumentControlProvenanceName(control.provenance) },
+            { "importedSourceController", control.importedSourceController.has_value()
+                ? *control.importedSourceController : -1 }
+        });
+    }
+    root["instrumentControls"] = std::move(instrumentControls);
+    ordered_json instrumentControlTargets = ordered_json::array();
+    for (const auto& target : prepared.instrumentControlTargets)
+        instrumentControlTargets.push_back({ { "id", target.id }, { "controlId", target.controlId },
+                                              { "ownerKind", target.ownerKind }, { "ownerId", target.ownerId },
+                                              { "targetKind", runtimeInstrumentControlTargetKindName(target.targetKind) },
+                                              { "parameterId", target.parameterId },
+                                              { "sourceMinimum", target.sourceMinimum },
+                                              { "sourceMaximum", target.sourceMaximum },
+                                              { "destinationMinimum", target.destinationMinimum },
+                                              { "destinationMaximum", target.destinationMaximum },
+                                              { "curve", target.curve }, { "curveIndex", target.curveIndex },
+                                              { "contributionMode", runtimeInstrumentControlContributionModeName(target.contributionMode) } });
+    root["instrumentControlTargets"] = std::move(instrumentControlTargets);
+    ordered_json midiControlBindings = ordered_json::array();
+    for (const auto& binding : prepared.midiControlBindings)
+        midiControlBindings.push_back({ { "id", binding.id }, { "controlId", binding.controlId },
+                                        { "controllerNumber", binding.controllerNumber },
+                                        { "channelScope", runtimeMidiChannelScopeKindName(binding.channelScope.kind) },
+                                        { "channel", binding.channelScope.channel }, { "enabled", binding.enabled },
+                                        { "imported", binding.imported },
+                                        { "importedSourceController", binding.importedSourceController.has_value()
+                                            ? *binding.importedSourceController : -1 } });
+    root["midiControlBindings"] = std::move(midiControlBindings);
 
     ordered_json notes = ordered_json::array();
     for (const auto& note : prepared.notes)
@@ -1200,7 +1250,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             if (streamingPreparation)
             {
                 result.admission.readiness = PreparedPlaybackReadinessState::playbackDeferred;
-                result.admission.guidance = "Resident budget exceeded; bounded WAV heads will be prepared for streaming playback.";
+                result.admission.guidance = "Resident budget exceeded; bounded source heads will be prepared for streaming playback.";
             }
             else
             {
@@ -1237,6 +1287,10 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
     result.prepared.selectedLayerId = snapshotResult.snapshot.selectedLayerId;
     result.prepared.masterGainDb = snapshotResult.snapshot.masterGainDb;
     result.prepared.controllerDefaults = snapshotResult.snapshot.controllerDefaults;
+    result.prepared.instrumentControlValues = snapshotResult.snapshot.instrumentControlValues;
+    result.prepared.instrumentControls = snapshotResult.snapshot.instrumentControls;
+    result.prepared.instrumentControlTargets = snapshotResult.snapshot.instrumentControlTargets;
+    result.prepared.midiControlBindings = snapshotResult.snapshot.midiControlBindings;
     result.prepared.containerId = streamResult.container.containerId;
     result.prepared.containerPath = streamResult.containerPath;
     result.prepared.payloadEncoding = streamResult.container.payloadEncoding;
@@ -1263,17 +1317,24 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
         const auto path = "sampleIdentities[" + std::to_string(sampleResolution.snapshotSampleIndex) + "]";
         if (streamingPreparation)
         {
-            auto descriptorResult = buildWavSampleDataSourceDescriptor(
-                sampleResolution.sampleSourceId,
-                sampleResolution.normalizedSourcePath,
-                0,
-                defaultSampleHeadBytes,
-                defaultSamplePageBytes);
+            const auto extension = fs::path(sampleResolution.normalizedSourcePath).extension().string();
+            const auto isWav = extension == ".wav" || extension == ".WAV";
+            auto descriptorResult = isWav
+                ? buildWavSampleDataSourceDescriptor(sampleResolution.sampleSourceId,
+                                                     sampleResolution.normalizedSourcePath,
+                                                     0,
+                                                     defaultSampleHeadBytes,
+                                                     defaultSamplePageBytes)
+                : buildPagedSampleDataSourceDescriptor(sampleResolution.sampleSourceId,
+                                                       sampleResolution.normalizedSourcePath,
+                                                       0,
+                                                       defaultSampleHeadBytes,
+                                                       defaultSamplePageBytes);
             if (!descriptorResult.built)
             {
                 addFinding(result,
                            PlaybackSnapshotFindingSeverity::error,
-                           "prepared-wav-descriptor-failed",
+                           "prepared-paged-descriptor-failed",
                            path + ".sourcePath",
                            descriptorResult.findings.empty()
                                ? descriptorResult.state
@@ -1286,7 +1347,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             {
                 addFinding(result,
                            PlaybackSnapshotFindingSeverity::error,
-                           "prepared-wav-head-failed",
+                           "prepared-paged-head-failed",
                            path + ".sourcePath",
                            wavSource->lastFailure());
                 continue;
@@ -1321,7 +1382,7 @@ PreparedPlaybackBuildResult PreparedPlaybackService::prepare(const PreparedPlayb
             streamHandle.sampleSourceId = sampleResolution.sampleSourceId;
             streamHandle.streamSampleId = sampleResolution.sampleSourceId;
             streamHandle.payloadEncoding = descriptor.formatName;
-            streamHandle.topologyKind = "wav-paged";
+            streamHandle.topologyKind = "audio-file-paged";
             streamHandle.pageSizeBytes = descriptor.pageSizeBytes;
             streamHandle.payloadOffsetBytes = descriptor.dataOffsetBytes;
             streamHandle.payloadSizeBytes = descriptor.dataSizeBytes;

@@ -92,7 +92,11 @@ PerformancePackageProjectionResult projectPerformancePackage(
         {
             return !macro.targets.empty();
         });
-    const auto requiresExtendedPackageRuntime = hasAuthoredGraph || hasAuthoredMacroTargets;
+    const auto hasInstrumentControls = !project.authoring.instrumentControls.empty()
+        || !project.authoring.instrumentControlTargets.empty()
+        || !project.authoring.midiControlBindings.empty();
+    const auto requiresExtendedPackageRuntime
+        = hasAuthoredGraph || hasAuthoredMacroTargets || hasInstrumentControls;
 
     auto& plan = result.compilePlan;
     plan.outputProjectPath = std::move(context.outputProjectPath);
@@ -275,6 +279,20 @@ PerformancePackageProjectionResult projectPerformancePackage(
 
     plan.roundRobinResetRules = project.authoring.roundRobinResetRules;
     plan.controllerDefaults = project.authoring.controllerDefaults;
+    plan.instrumentControls = project.authoring.instrumentControls;
+    plan.instrumentControlTargets = project.authoring.instrumentControlTargets;
+    plan.midiControlBindings = project.authoring.midiControlBindings;
+    for (auto& control : plan.instrumentControls)
+    {
+        const auto hasExplicitDefault = control.importedSourceController.has_value()
+            && std::any_of(plan.controllerDefaults.begin(), plan.controllerDefaults.end(),
+                           [&](const auto& value)
+                           {
+                               return value.controllerNumber == *control.importedSourceController;
+                           });
+        control.normalizedDefault = drs::engine::resolveImportedSfzControlDefault(
+            control, plan.instrumentControlTargets, hasExplicitDefault);
+    }
 
     result.manifest.schemaVersion = requiresExtendedPackageRuntime
         ? drs::engine::performancePackageFxRoutingSchemaVersion

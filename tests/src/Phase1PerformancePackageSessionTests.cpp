@@ -133,8 +133,8 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     project.authoring.masterGainDb = -1.5;
     project.authoring.articulations.push_back({ "sustain", "Sustain", true, 0, std::nullopt });
     project.authoring.articulations.push_back({ "lead", "Lead", false, 1, std::nullopt });
-    project.authoring.groups.push_back({ "pad-core", "Pad Core", 0, true, -3.0, 0.0, {}, {} });
-    project.authoring.groups.push_back({ "lead-core", "Lead Core", 1, true, 1.5, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "pad-core", {}, "Pad Core", 0, true, -3.0, 0.0, {}, {} });
+    project.authoring.groups.push_back({ "lead-core", {}, "Lead Core", 1, true, 1.5, 0.0, {}, {} });
 
     drs::engine::RuntimeProjectZoneDefinition padZone;
     padZone.id = "pad-a3";

@@ -1,5 +1,6 @@
 #include "drs/engine/SamplerPlaybackContext.h"
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <utility>
@@ -17,6 +18,10 @@ const CompiledPerformanceProgram emptyPerformanceProgram;
 SamplerPlaybackContext::SamplerPlaybackContext(PlaybackActivationLane lane)
     : contextLane(lane)
 {
+    for (auto& value : pendingInstrumentControlValues)
+        value.store(0.0, std::memory_order_relaxed);
+    for (auto& mask : pendingInstrumentControlMasks)
+        mask.store(0, std::memory_order_relaxed);
     reclaimerThread = std::thread([this] { runBackgroundReclaimer(); });
 }
 
@@ -196,6 +201,42 @@ bool SamplerPlaybackContext::publishActiveDspControl(const std::uint32_t control
             activeDspGeneration->getControlGenerationIdentity(), controlIndex, value);
 }
 
+bool SamplerPlaybackContext::publishActiveInstrumentControl(const std::size_t controlIndex,
+                                                             const double normalizedValue) noexcept
+{
+    if (activeRenderModel == nullptr || controlIndex >= activeRenderModel->getInstrumentControlBindings().controlCount()
+        || !std::isfinite(normalizedValue))
+        return false;
+    pendingInstrumentControlValues[controlIndex].store(std::clamp(normalizedValue, 0.0, 1.0),
+                                                       std::memory_order_relaxed);
+    const auto word = controlIndex / 64;
+    const auto bit = std::uint64_t { 1 } << (controlIndex % 64);
+    pendingInstrumentControlMasks[word].fetch_or(bit, std::memory_order_release);
+    return true;
+}
+
+void SamplerPlaybackContext::applyPendingInstrumentControls() noexcept
+{
+    if (activeRenderModel == nullptr)
+        return;
+    for (std::size_t word = 0; word < pendingInstrumentControlMasks.size(); ++word)
+    {
+        const auto mask = pendingInstrumentControlMasks[word].exchange(0, std::memory_order_acq_rel);
+        auto remaining = mask;
+        while (remaining != 0)
+        {
+            std::size_t bit = 0;
+            while (bit < 64 && (remaining & (std::uint64_t { 1 } << bit)) == 0)
+                ++bit;
+            const auto index = word * 64 + bit;
+            if (index < activeRenderModel->getInstrumentControlBindings().controlCount())
+                voicePool.setInstrumentControlNormalized(
+                    index, pendingInstrumentControlValues[index].load(std::memory_order_acquire));
+            remaining &= remaining - 1;
+        }
+    }
+}
+
 bool SamplerPlaybackContext::publishDspNodeBypass(const std::uint64_t generationIdentity,
                                                   const std::uint32_t nodeIndex,
                                                   const bool bypassed) noexcept
@@ -320,6 +361,7 @@ SamplerPlaybackContextRenderResult SamplerPlaybackContext::renderBlock(
         return result;
 
     result.activationApplied = applyPendingActivationAtBlockBoundary();
+    applyPendingInstrumentControls();
     eventScratch.clear();
     actionScratch.clear();
     const auto& program = activeRenderModel == nullptr
@@ -560,6 +602,8 @@ bool SamplerPlaybackContext::applyPendingActivationAtBlockBoundary() noexcept
         addRetiredActivation(pending);
         return false;
     }
+    for (auto& mask : pendingInstrumentControlMasks)
+        mask.store(0, std::memory_order_release);
 
     if (activeActivationSlot >= 0)
         addRetiredActivation(activeActivationSlot);

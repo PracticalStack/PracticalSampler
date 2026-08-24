@@ -1,3 +1,13 @@
+option(DRS_ENABLE_INSTRUMENT_CONTROLS_UI
+       "Expose the imported instrument-controls workbench in application shells"
+       ON)
+
+if(DRS_ENABLE_INSTRUMENT_CONTROLS_UI)
+    set(DRS_INSTRUMENT_CONTROLS_UI_DEFINE 1)
+else()
+    set(DRS_INSTRUMENT_CONTROLS_UI_DEFINE 0)
+endif()
+
 set(DRS_APP_SHARED_SOURCES
     src/shared/AuthoringPanel.cpp
     src/shared/AuthoringPanel.h
@@ -65,8 +75,14 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/authoring/StructureViewer.h
     src/shared/authoring/AuthoringWorkspaceLayout.h
     src/shared/authoring/OpenWorkbenchVisualSystem.h
-    src/shared/authoring/MacroWorkbenchView.cpp
-    src/shared/authoring/MacroWorkbenchView.h
+     src/shared/authoring/MacroWorkbenchView.cpp
+     src/shared/authoring/MacroWorkbenchView.h
+    src/shared/authoring/InstrumentControlsWorkbenchView.cpp
+    src/shared/authoring/InstrumentControlViewModels.cpp
+    src/shared/authoring/InstrumentControlViewModels.h
+    src/shared/authoring/MidiLearnCoordinator.cpp
+    src/shared/authoring/InstrumentControlsWorkbenchView.h
+    src/shared/authoring/MidiLearnCoordinator.h
     src/shared/authoring/RoutingWorkbenchView.cpp
     src/shared/authoring/RoutingWorkbenchView.h
     src/shared/authoring/CompactInspectorPrimitives.cpp
@@ -128,6 +144,7 @@ target_compile_definitions(drs_app_shared
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
+        DRS_ENABLE_INSTRUMENT_CONTROLS_UI=${DRS_INSTRUMENT_CONTROLS_UI_DEFINE}
 )
 
 target_compile_features(drs_app_shared PUBLIC cxx_std_17)

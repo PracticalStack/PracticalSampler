@@ -52,6 +52,20 @@ struct EngineMacroDescriptor
     CompiledControlLaw controlLaw;
 };
 
+struct EngineInstrumentControlDescriptor
+{
+    std::string id;
+    std::string name;
+    RuntimeInstrumentControlCategory category = RuntimeInstrumentControlCategory::hidden;
+    RuntimeInstrumentControlKind kind = RuntimeInstrumentControlKind::normalized;
+    RuntimeInstrumentControlUnit unit = RuntimeInstrumentControlUnit::generic;
+    double normalizedDefault = 0.0;
+    double currentValue = 0.0;
+    int importedSourceController = -1;
+    std::vector<int> assignedControllers;
+    bool visible = true;
+};
+
 struct EngineArticulationDescriptor
 {
     std::string id;
@@ -444,8 +458,11 @@ public:
     }
     std::vector<EngineArticulationDescriptor> getArticulationDescriptors() const;
     std::vector<EngineMacroDescriptor> getMacroDescriptors() const;
+    std::vector<EngineInstrumentControlDescriptor> getInstrumentControlDescriptors() const;
     bool setSelectedArticulation(const std::string& articulationId);
     bool setMacroValue(const std::string& macroId, double value);
+    bool setInstrumentControlValue(const std::string& controlId, double normalizedValue);
+    bool resetInstrumentControlValue(const std::string& controlId);
     bool stageDraftRevision(std::size_t revision);
     bool refreshPreviewToCurrentDraft();
     bool refreshPreviewForPreparationScope(const PlaybackPreparationScopeRequest& scopeRequest,
@@ -528,6 +545,7 @@ private:
     void syncPreviewSnapshotFromDraftPlayback();
     void initializeDraftPlaybackContract(bool activatePerformanceRevision,
                                          bool bootstrapPreparedPlayback = true);
+    const ImmutablePlaybackSnapshot* getActivePerformanceSnapshot() const;
     void refreshDiagnosticsSnapshot();
     void refreshPerformanceMacroRevisions();
 

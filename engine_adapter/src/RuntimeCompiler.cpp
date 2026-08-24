@@ -452,8 +452,13 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         {
             return zone.loopCrossfadeFrames != 0;
         });
+    const auto requiresInstrumentControlSchema = !plan.instrumentControls.empty()
+        || !plan.instrumentControlTargets.empty()
+        || !plan.midiControlBindings.empty();
     result.instrument.schemaName = "drs.instrument";
-    result.instrument.schemaVersion = requiresLoopCrossfadeInstrumentSchema
+    result.instrument.schemaVersion = requiresInstrumentControlSchema
+        ? instrumentControlInstrumentSchemaVersion
+        : (requiresLoopCrossfadeInstrumentSchema
         ? loopCrossfadeInstrumentSchemaVersion
         : (requiresSfzRegionInstrumentSchema
         ? sfzRegionInstrumentSchemaVersion
@@ -463,7 +468,7 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
         ? continuousDamperInstrumentSchemaVersion
         : (requiresFxRoutingInstrumentSchema ? runtimeInstrumentFxRoutingSchemaVersion
             : (requiresPerformanceInstrumentSchema ? 3
-                : (requiresExtendedInstrumentSchema ? 2 : 1))))));
+                : (requiresExtendedInstrumentSchema ? 2 : 1)))))));
     result.instrument.instrumentId = plan.instrumentId;
     result.instrument.displayName = plan.instrumentDisplayName;
     result.instrument.sourceProjectPath = plan.outputProjectPath;
@@ -476,6 +481,9 @@ RuntimeCompileResult compileRuntimeInstrument(const RuntimeCompilePlan& plan)
     result.instrument.routingBuses = plan.routingBuses;
     result.instrument.roundRobinResetRules = plan.roundRobinResetRules;
     result.instrument.controllerDefaults = plan.controllerDefaults;
+    result.instrument.instrumentControls = plan.instrumentControls;
+    result.instrument.instrumentControlTargets = plan.instrumentControlTargets;
+    result.instrument.midiControlBindings = plan.midiControlBindings;
     result.instrument.validationNotes = plan.instrumentValidationNotes;
     result.payloadFilePath = buildCompiledStreamPayloadPath(plan.outputStreamPath);
 

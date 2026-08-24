@@ -56,6 +56,70 @@ double tuningControllerCents(const RuntimeControllerModulation& modulation,
     return modulation.amount * controllerCurveValue(modulation, controllerValues);
 }
 
+double contributionValue(const SamplerRenderRoute::ControlContribution& contribution,
+                         const SamplerRenderModel& model,
+                         const std::array<std::uint8_t, 128>& controllerValues) noexcept
+{
+    const auto controller = model.getInstrumentControlBindings().destinationController(
+        contribution.controlIndex);
+    if (controller < 0 || controller >= static_cast<int>(controllerValues.size()))
+        return contribution.destinationMinimum;
+    const auto raw = static_cast<double>(controllerValues[static_cast<std::size_t>(controller)]) / 127.0;
+    const auto denominator = contribution.sourceMaximum - contribution.sourceMinimum;
+    auto normalized = std::abs(denominator) < 1.0e-9
+        ? 0.0 : (raw - contribution.sourceMinimum) / denominator;
+    normalized = std::clamp(normalized, 0.0, 1.0);
+    if (contribution.curve == "square")
+        normalized *= normalized;
+    else if (contribution.curve == "sqrt")
+        normalized = std::sqrt(normalized);
+    return contribution.destinationMinimum
+        + normalized * (contribution.destinationMaximum - contribution.destinationMinimum);
+}
+
+void evaluateControlContributions(const SamplerRenderRoute& route,
+                                  const SamplerRenderModel& model,
+                                  const std::array<std::uint8_t, 128>& controllerValues,
+                                  double& gainScale,
+                                  double& panOffset,
+                                  double& tuningCents,
+                                  double& holdSeconds,
+                                  double& decaySeconds,
+                                  double& sustainLevel) noexcept
+{
+    for (const auto& contribution : route.controlContributions)
+    {
+        const auto value = contributionValue(contribution, model, controllerValues);
+        switch (contribution.targetKind)
+        {
+            case RuntimeInstrumentControlTargetKind::gain:
+                if (contribution.contributionMode == RuntimeInstrumentControlContributionMode::replace)
+                    gainScale = std::clamp(value, 0.0, 1.0);
+                else
+                    gainScale *= std::clamp(value, 0.0, 1.0);
+                break;
+            case RuntimeInstrumentControlTargetKind::pan:
+                panOffset += value;
+                break;
+            case RuntimeInstrumentControlTargetKind::tune:
+                tuningCents += value;
+                break;
+            case RuntimeInstrumentControlTargetKind::envelopeHold:
+                holdSeconds += value;
+                break;
+            case RuntimeInstrumentControlTargetKind::envelopeDecay:
+                decaySeconds += value;
+                break;
+            case RuntimeInstrumentControlTargetKind::envelopeSustain:
+                sustainLevel += value;
+                break;
+        }
+    }
+    gainScale = std::clamp(gainScale, 0.0, 1.0);
+    panOffset = std::clamp(panOffset, -1.0, 1.0);
+    sustainLevel = std::clamp(sustainLevel, 0.0, 1.0);
+}
+
 double pitchIncrementFor(const SamplerRenderRoute& route,
                          const SamplerRenderSample& sample,
                          const int effectiveMidiNote,
@@ -112,7 +176,17 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         return false;
     }
 
+    auto controlGainScale = 1.0;
+    auto controlPanOffset = 0.0;
+    auto controlTuningCents = 0.0;
+    auto controlHoldSeconds = 0.0;
+    auto controlDecaySeconds = 0.0;
+    auto controlSustainLevel = 0.0;
+    evaluateControlContributions(selectedRoute, model, request.controllerValues,
+                                 controlGainScale, controlPanOffset, controlTuningCents,
+                                 controlHoldSeconds, controlDecaySeconds, controlSustainLevel);
     const auto effectiveTuning = selectedRoute.fineTuneCents
+        + controlTuningCents
         + tuningControllerCents(selectedRoute.tuningModulation, request.controllerValues);
     const auto increment = pitchIncrementFor(selectedRoute, selectedSample,
                                              request.effectiveMidiNote,
@@ -124,7 +198,8 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     const auto velocityExponent = std::clamp(selectedRoute.amplitudeVelocityTracking, 0.0, 100.0) / 100.0;
     const auto gain = std::pow(normalizedVelocity, velocityExponent)
         * request.routeGainMultiplier
-        * std::pow(10.0, selectedRoute.gainDb / 20.0);
+        * std::pow(10.0, selectedRoute.gainDb / 20.0)
+        * controlGainScale;
     if (!std::isfinite(increment) || increment <= 0.0 || !std::isfinite(gain))
         return false;
 
@@ -146,10 +221,11 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     targetIncrementFrames = increment;
     effectiveTuningCents = effectiveTuning;
     outputSampleRate = request.outputSampleRate;
-    unmodulatedGain = static_cast<float>(gain);
+    unmodulatedGain = static_cast<float>(gain / std::max(controlGainScale, 1.0e-9));
     baseGain = unmodulatedGain * static_cast<float>(amplitudeControllerScale(
-        selectedRoute.amplitudeModulation, request.controllerValues));
-    panGains = computeSamplerPanGains(selectedRoute.pan);
+        selectedRoute.amplitudeModulation, request.controllerValues))
+        * static_cast<float>(controlGainScale);
+    panGains = computeSamplerPanGains(selectedRoute.pan + controlPanOffset);
     const auto& authoredEnvelope = selectedRoute.amplitudeEnvelope;
     const auto holdCurveValue = controllerCurveValue(authoredEnvelope.holdModulation,
                                                       request.controllerValues);
@@ -158,10 +234,13 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     const auto sustainCurveValue = controllerCurveValue(authoredEnvelope.sustainModulation,
                                                         request.controllerValues);
     envelopeHoldSeconds = std::max(0.0, authoredEnvelope.holdSeconds
+        + controlHoldSeconds
         + authoredEnvelope.holdModulation.amount * holdCurveValue);
     envelopeDecaySeconds = std::max(0.0, authoredEnvelope.decaySeconds
+        + controlDecaySeconds
         + authoredEnvelope.decayModulation.amount * decayCurveValue);
     envelopeSustainLevel = std::clamp(authoredEnvelope.sustainLevel
+        + controlSustainLevel
         + (authoredEnvelope.sustainModulation.amount / 100.0) * sustainCurveValue,
         0.0, 1.0);
     envelopeElapsedFrames = 0.0;
@@ -327,6 +406,41 @@ bool SamplerVoice::updatePitchModulation(const std::uint8_t controllerNumber,
         pitchIncrementRampRemaining = pitchModulationRampFrames;
         pitchIncrementRampStep = (targetIncrementFrames - incrementFrames)
             / static_cast<double>(pitchIncrementRampRemaining);
+    }
+    return true;
+}
+
+bool SamplerVoice::updateInstrumentControlModulation(
+    const std::array<std::uint8_t, 128>& controllerValues) noexcept
+{
+    if (!isActive() || route == nullptr || renderModel == nullptr)
+        return false;
+    auto gainScale = 1.0;
+    auto panOffset = 0.0;
+    auto tuningCents = 0.0;
+    auto holdSeconds = 0.0;
+    auto decaySeconds = 0.0;
+    auto sustainLevel = 0.0;
+    evaluateControlContributions(*route, *renderModel, controllerValues,
+                                 gainScale, panOffset, tuningCents,
+                                 holdSeconds, decaySeconds, sustainLevel);
+    baseGain = unmodulatedGain * static_cast<float>(amplitudeControllerScale(
+        route->amplitudeModulation, controllerValues)) * static_cast<float>(gainScale);
+    panGains = computeSamplerPanGains(route->pan + panOffset);
+    const auto tuning = route->fineTuneCents
+        + tuningCents + tuningControllerCents(route->tuningModulation, controllerValues);
+    if (sample != nullptr && std::isfinite(outputSampleRate) && outputSampleRate > 0.0)
+    {
+        const auto increment = pitchIncrementFor(*route, *sample, effectiveMidiNote,
+                                                 outputSampleRate, tuning);
+        if (std::isfinite(increment) && increment > 0.0)
+        {
+            effectiveTuningCents = tuning;
+            targetIncrementFrames = increment;
+            pitchIncrementRampRemaining = pitchModulationRampFrames;
+            pitchIncrementRampStep = (targetIncrementFrames - incrementFrames)
+                / static_cast<double>(pitchModulationRampFrames);
+        }
     }
     return true;
 }

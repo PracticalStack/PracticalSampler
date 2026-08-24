@@ -329,6 +329,11 @@ juce::String SfzImportReviewComponent::buildSummaryText() const
     text += " | Approximated: " + juce::String(static_cast<int>(review.reportModel.approximatedCount));
     text += " | Review-only: " + juce::String(static_cast<int>(review.reportModel.reportedOnlyCount));
     text += " | Blocking: " + juce::String(static_cast<int>(review.reportModel.blockingCount));
+    for (const auto& section : review.reportModel.report.sections)
+    {
+        text += "\n" + juce::String::fromUTF8(section.name.c_str()) + ": "
+            + juce::String(static_cast<int>(section.itemCount));
+    }
     return text;
 }
 

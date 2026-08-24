@@ -75,6 +75,8 @@ add_library(drs_engine_adapter STATIC
     src/EngineFacade.cpp
     src/HostSessionState.cpp
     src/HostStatePublicationService.cpp
+    src/InstrumentControlContract.cpp
+    src/InstrumentControlBinding.cpp
     src/LayerMaterializer.cpp
     src/PlaybackSnapshot.cpp
     src/PlaybackSnapshotWorker.cpp
@@ -135,6 +137,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/DspRenderGeneration.h
     include/drs/engine/HostSessionState.h
     include/drs/engine/HostStatePublicationService.h
+    include/drs/engine/InstrumentControlContract.h
+    include/drs/engine/InstrumentControlBinding.h
     include/drs/engine/PlaybackSnapshot.h
     include/drs/engine/PlaybackSnapshotWorker.h
     include/drs/engine/PerformancePublishContract.h

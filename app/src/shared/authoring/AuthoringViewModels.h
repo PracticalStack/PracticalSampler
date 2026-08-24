@@ -15,7 +15,8 @@ enum class WorkbenchTab
     macros,
     routing,
     performance,
-    articulations
+    articulations,
+    instrumentControls
 };
 
 struct WorkbenchState

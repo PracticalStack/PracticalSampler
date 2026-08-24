@@ -72,6 +72,18 @@ struct SamplerVoicePoolRenderResult
     std::uint32_t repedalCatchCount = 0;
 };
 
+// Render-thread instrumentation is allocation-free and thread-local. Any future lock
+// boundary added to the callback path must call reportLockAttempt(), allowing qualification
+// tests to fail loudly instead of relying on a source review alone.
+class SamplerRenderThreadInstrumentation final
+{
+public:
+    static void begin() noexcept;
+    static void end() noexcept;
+    static void reportLockAttempt() noexcept;
+    static std::uint32_t lastLockAttemptCount() noexcept;
+};
+
 struct SamplerRouteEligibilityQuery
 {
     int midiNote = 60;
@@ -120,6 +132,12 @@ public:
     std::size_t voiceCountUsingGeneration(std::uint64_t activationGeneration) const noexcept;
     std::size_t retiredGenerationVoiceCount() const noexcept;
     std::size_t sustainDeferredVoiceCount() const noexcept;
+    bool setInstrumentControlNormalized(std::size_t controlIndex, double normalized) noexcept;
+    bool resetInstrumentControl(std::size_t controlIndex) noexcept;
+    double instrumentControlValue(std::size_t controlIndex) const noexcept;
+    SamplerPanGains activeVoicePanGains() const noexcept;
+    double activeVoiceEffectiveTuningCents() const noexcept;
+    double activeVoiceEnvelopeDecaySeconds() const noexcept;
     std::uint64_t getActiveGeneration() const noexcept { return activeGeneration; }
     SamplerVoiceSlotSnapshot getSlotSnapshot(std::size_t index) const noexcept;
 
@@ -192,5 +210,6 @@ private:
     bool sustainPedalDown = false;
     bool controllerStateInitialized = false;
     std::array<std::uint8_t, 128> controllerValues {};
+    InstrumentControlRuntimeState instrumentControlState;
 };
 } // namespace drs::engine

@@ -88,6 +88,16 @@ struct SfzImportOpcodeSupportSummary
     std::size_t occurrenceCount = 0;
 };
 
+// Stable, UI-ready report buckets.  The detailed trace remains the source of
+// truth; these summaries let an importer present a useful review surface
+// without making the editor understand SFZ opcode taxonomy.
+struct SfzImportReportSection
+{
+    std::string name;
+    std::size_t itemCount = 0;
+    std::vector<std::string> entries;
+};
+
 struct SfzImportReportSummary
 {
     std::size_t sourceFileCount = 0;
@@ -122,6 +132,7 @@ struct SfzImportReport
     std::vector<SfzImportFinding> findings;
     std::vector<SfzImportTraceEntry> traceEntries;
     std::vector<SfzImportOpcodeSupportSummary> opcodeSupport;
+    std::vector<SfzImportReportSection> sections;
     std::vector<SfzImportRegionSemanticAnalysis> regionSemanticAnalysis;
     SfzImportExecutionState execution;
 };

@@ -1,4 +1,5 @@
 #include "drs/engine/SampleDataSource.h"
+#include "drs/engine/SampleImport.h"
 
 #include <algorithm>
 #include <chrono>
@@ -354,6 +355,74 @@ WavSampleDataSourceBuildResult buildWavSampleDataSourceDescriptor(
     return result;
 }
 
+WavSampleDataSourceBuildResult buildPagedSampleDataSourceDescriptor(
+    const std::string& sourceId,
+    const std::string& sourcePath,
+    const std::uint64_t generation,
+    const std::uint64_t headSizeBytes,
+    const std::uint64_t pageSizeBytes)
+{
+    auto result = WavSampleDataSourceBuildResult {};
+    result.state = "Paged audio-file descriptor unavailable";
+    const auto inspection = inspectSampleFileMetadataOnly(sourcePath);
+    if (!inspection.inspected || !inspection.accepted)
+    {
+        result.findings = inspection.issues;
+        if (result.findings.empty())
+            result.findings.push_back("Audio source metadata could not be inspected.");
+        return result;
+    }
+
+    namespace fs = std::filesystem;
+    std::error_code error;
+    const fs::path path(sourcePath);
+    result.sourceFileSizeBytes = fs::file_size(path, error);
+    if (error)
+    {
+        result.findings.push_back("Audio source file is missing or unreadable.");
+        return result;
+    }
+    const auto modified = fs::last_write_time(path, error);
+    if (!error)
+        result.sourceModifiedTimeTicks = modified.time_since_epoch().count();
+    const auto canonical = fs::weakly_canonical(path, error).generic_string();
+    const auto canonicalPath = error ? path.lexically_normal().generic_string() : canonical;
+    const auto provenance = canonicalPath + "|size=" + std::to_string(result.sourceFileSizeBytes)
+        + "|mtime=" + std::to_string(result.sourceModifiedTimeTicks);
+
+    result.descriptor.version = sampleDataSourceDescriptorVersion;
+    // The concrete class remains the existing paged source so the page service
+    // and render path keep their established lock-free handoff semantics.
+    result.descriptor.kind = SampleDataSourceKind::wavFile;
+    result.descriptor.sourceId = sourceId;
+    result.descriptor.canonicalSourceIdentity = canonicalPath;
+    result.descriptor.provenanceIdentity = provenance;
+    result.descriptor.formatName = inspection.metadata.formatName;
+    result.descriptor.channelLayout = inspection.metadata.channelLayout;
+    result.descriptor.generation = generation == 0 ? stableGeneration(provenance) : generation;
+    result.descriptor.sampleRate = inspection.metadata.sampleRate;
+    result.descriptor.frameCount = inspection.metadata.frameCount;
+    result.descriptor.channelCount = inspection.metadata.channelCount;
+    result.descriptor.bytesPerFrame = static_cast<std::uint64_t>(inspection.metadata.channelCount)
+        * sizeof(float);
+    result.blockAlign = static_cast<std::uint16_t>(result.descriptor.bytesPerFrame);
+    result.descriptor.dataSizeBytes = result.descriptor.frameCount * result.descriptor.bytesPerFrame;
+    result.descriptor.headSizeBytes = headSizeBytes;
+    result.descriptor.pageSizeBytes = pageSizeBytes;
+    result.rangeDecoder = [canonicalPath](const std::uint64_t firstFrame,
+                                           const std::uint32_t frameCount,
+                                           std::vector<std::vector<float>>& channels,
+                                           std::string& issue)
+    {
+        return decodeSampleFileRange(canonicalPath, firstFrame, frameCount, channels, issue);
+    };
+    const auto validation = validateSampleDataSourceDescriptor(result.descriptor);
+    result.findings.insert(result.findings.end(), validation.findings.begin(), validation.findings.end());
+    result.built = validation.valid;
+    result.state = result.built ? "Paged audio-file descriptor ready" : "Paged audio-file descriptor invalid";
+    return result;
+}
+
 ResidentSampleDataSource::ResidentSampleDataSource(
     SampleDataSourceDescriptor descriptor,
     std::shared_ptr<const PreparedPlaybackDecodedSampleData> data)
@@ -612,6 +681,7 @@ WavPagedSampleDataSource::WavPagedSampleDataSource(
       formatTag(descriptorResult.formatTag),
       bitsPerSample(descriptorResult.bitsPerSample),
       blockAlign(descriptorResult.blockAlign),
+      rangeDecoder(std::move(descriptorResult.rangeDecoder)),
       expectedFileSize(descriptorResult.sourceFileSizeBytes),
       expectedModifiedTicks(descriptorResult.sourceModifiedTimeTicks),
       maximumPageCacheBytes(pageCacheBudgetBytes)
@@ -756,21 +826,26 @@ bool WavPagedSampleDataSource::prepareRange(const bool head, const std::uint64_t
         return false;
     const auto byteCount = frameCount64 * blockAlign;
     const auto byteOffset = sourceDescriptor.dataOffsetBytes + firstFrame * blockAlign;
-    if (byteOffset > expectedFileSize || byteCount > expectedFileSize - byteOffset
-        || byteCount > std::numeric_limits<std::size_t>::max())
+    if (rangeDecoder == nullptr
+        && (byteOffset > expectedFileSize || byteCount > expectedFileSize - byteOffset
+            || byteCount > std::numeric_limits<std::size_t>::max()))
     {
         failureState = "WAV range overflows or is truncated";
         return false;
     }
 
-    std::ifstream input(std::filesystem::path(sourcePath), std::ios::binary);
-    input.seekg(static_cast<std::streamoff>(byteOffset));
-    std::vector<unsigned char> raw(static_cast<std::size_t>(byteCount));
-    if (!input.read(reinterpret_cast<char*>(raw.data()),
-                    static_cast<std::streamsize>(raw.size())))
+    std::vector<unsigned char> raw;
+    if (rangeDecoder == nullptr)
     {
-        failureState = "WAV range read failed";
-        return false;
+        std::ifstream input(std::filesystem::path(sourcePath), std::ios::binary);
+        input.seekg(static_cast<std::streamoff>(byteOffset));
+        raw.resize(static_cast<std::size_t>(byteCount));
+        if (!input.read(reinterpret_cast<char*>(raw.data()),
+                        static_cast<std::streamsize>(raw.size())))
+        {
+            failureState = "WAV range read failed";
+            return false;
+        }
     }
 
     const auto residentBytes = frameCount64 * sourceDescriptor.channelCount * sizeof(float);
@@ -789,39 +864,56 @@ bool WavPagedSampleDataSource::prepareRange(const bool head, const std::uint64_t
     page->channels.resize(sourceDescriptor.channelCount);
     for (auto& channel : page->channels)
         channel.resize(page->frameCount);
-    const auto bytesPerSample = bitsPerSample / 8u;
-    for (std::uint32_t frame = 0; frame < page->frameCount; ++frame)
+    if (rangeDecoder != nullptr)
     {
-        for (std::uint32_t channel = 0; channel < sourceDescriptor.channelCount; ++channel)
+        std::vector<std::vector<float>> decoded;
+        std::string issue;
+        if (!rangeDecoder(firstFrame, page->frameCount, decoded, issue)
+            || decoded.size() != sourceDescriptor.channelCount
+            || std::any_of(decoded.begin(), decoded.end(), [&](const auto& channel)
+                           { return channel.size() != page->frameCount; }))
         {
-            const auto offset = static_cast<std::size_t>(frame) * blockAlign
-                + static_cast<std::size_t>(channel) * bytesPerSample;
-            float value = 0.0f;
-            if (formatTag == 3)
+            failureState = issue.empty() ? "Audio-file range decode returned incomplete data" : issue;
+            return false;
+        }
+        page->channels = std::move(decoded);
+    }
+    else
+    {
+        const auto bytesPerSample = bitsPerSample / 8u;
+        for (std::uint32_t frame = 0; frame < page->frameCount; ++frame)
+        {
+            for (std::uint32_t channel = 0; channel < sourceDescriptor.channelCount; ++channel)
             {
-                std::uint32_t bits = readLe32(raw.data() + offset);
-                std::memcpy(&value, &bits, sizeof(value));
+                const auto offset = static_cast<std::size_t>(frame) * blockAlign
+                    + static_cast<std::size_t>(channel) * bytesPerSample;
+                float value = 0.0f;
+                if (formatTag == 3)
+                {
+                    std::uint32_t bits = readLe32(raw.data() + offset);
+                    std::memcpy(&value, &bits, sizeof(value));
+                }
+                else if (bitsPerSample == 16)
+                {
+                    const auto sample = static_cast<std::int16_t>(readLe16(raw.data() + offset));
+                    value = static_cast<float>(sample) / 32768.0f;
+                }
+                else if (bitsPerSample == 24)
+                {
+                    std::int32_t sample = static_cast<std::int32_t>(raw[offset])
+                        | (static_cast<std::int32_t>(raw[offset + 1]) << 8)
+                        | (static_cast<std::int32_t>(raw[offset + 2]) << 16);
+                    if ((sample & 0x00800000) != 0)
+                        sample |= static_cast<std::int32_t>(0xff000000);
+                    value = static_cast<float>(sample) / 8388608.0f;
+                }
+                else
+                {
+                    const auto sample = static_cast<std::int32_t>(readLe32(raw.data() + offset));
+                    value = static_cast<float>(static_cast<double>(sample) / 2147483648.0);
+                }
+                page->channels[channel][frame] = value;
             }
-            else if (bitsPerSample == 16)
-            {
-                const auto sample = static_cast<std::int16_t>(readLe16(raw.data() + offset));
-                value = static_cast<float>(sample) / 32768.0f;
-            }
-            else if (bitsPerSample == 24)
-            {
-                std::int32_t sample = static_cast<std::int32_t>(raw[offset])
-                    | (static_cast<std::int32_t>(raw[offset + 1]) << 8)
-                    | (static_cast<std::int32_t>(raw[offset + 2]) << 16);
-                if ((sample & 0x00800000) != 0)
-                    sample |= static_cast<std::int32_t>(0xff000000);
-                value = static_cast<float>(sample) / 8388608.0f;
-            }
-            else
-            {
-                const auto sample = static_cast<std::int32_t>(readLe32(raw.data() + offset));
-                value = static_cast<float>(static_cast<double>(sample) / 2147483648.0);
-            }
-            page->channels[channel][frame] = value;
         }
     }
 

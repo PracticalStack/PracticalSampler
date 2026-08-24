@@ -319,6 +319,14 @@ bool copySampleFileForImport(const std::string& sourcePath, const std::string& d
 SampleInspectionResult inspectSampleFile(const std::string& samplePath,
                                          const std::string& knownFingerprintHex = {});
 SampleInspectionResult inspectSampleFileMetadataOnly(const std::string& samplePath);
+
+// Decode one bounded frame range without retaining the complete source. This is
+// used by the paged prepared-playback path for compressed sources such as FLAC.
+bool decodeSampleFileRange(const std::string& samplePath,
+                           std::uint64_t firstFrame,
+                           std::uint32_t frameCount,
+                           std::vector<std::vector<float>>& channels,
+                           std::string& issue);
 SampleImportResult importSampleFile(const std::string& samplePath,
                                     const std::string& knownFingerprintHex = {});
 WaveformPeakBuildResult buildWaveformPeaks(const std::string& samplePath,

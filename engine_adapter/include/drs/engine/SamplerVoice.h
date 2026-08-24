@@ -76,6 +76,8 @@ public:
                                     std::uint8_t controllerValue) noexcept;
     bool updatePitchModulation(std::uint8_t controllerNumber,
                                std::uint8_t controllerValue) noexcept;
+    bool updateInstrumentControlModulation(
+        const std::array<std::uint8_t, 128>& controllerValues) noexcept;
     bool isSustainDown(const std::array<std::uint8_t, 128>& controllerValues) const noexcept;
     SamplerVoiceRenderResult render(SamplerAudioBufferView output,
                                     std::uint32_t outputStartFrame,
@@ -105,6 +107,9 @@ public:
                 || route->loopMode == RegionLoopMode::oneShot);
     }
     SamplerPanGains getPanGains() const noexcept { return panGains; }
+    double getEnvelopeHoldSeconds() const noexcept { return envelopeHoldSeconds; }
+    double getEnvelopeDecaySeconds() const noexcept { return envelopeDecaySeconds; }
+    double getEnvelopeSustainLevel() const noexcept { return envelopeSustainLevel; }
     std::uint32_t getReleaseSamplesRemaining() const noexcept { return releaseSamplesRemaining; }
     std::uint32_t getReleaseSamplesTotal() const noexcept { return releaseSamplesTotal; }
     float getReleaseEnvelopeLevel() const noexcept;

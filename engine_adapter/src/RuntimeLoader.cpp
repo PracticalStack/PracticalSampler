@@ -1205,6 +1205,88 @@ ordered_json serializeProjectGroups(const std::vector<RuntimeProjectGroupDefinit
     return array;
 }
 
+ordered_json serializeInstrumentControls(
+    const std::vector<RuntimeProjectInstrumentControlDefinition>& controls)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& control : controls)
+    {
+        ordered_json object;
+        object["id"] = control.id;
+        object["displayName"] = control.displayName;
+        object["category"] = runtimeInstrumentControlCategoryName(control.category);
+        object["kind"] = runtimeInstrumentControlKindName(control.kind);
+        object["unit"] = runtimeInstrumentControlUnitName(control.unit);
+        object["normalizedDefault"] = control.normalizedDefault;
+        object["displayMinimum"] = control.displayMinimum;
+        object["displayMaximum"] = control.displayMaximum;
+        object["displayPrecision"] = control.displayPrecision;
+        object["displayOrder"] = control.displayOrder;
+        object["section"] = control.section;
+        object["visible"] = control.visible;
+        object["provenance"] = runtimeInstrumentControlProvenanceName(control.provenance);
+        if (control.importedSourceController.has_value())
+            object["importedSourceController"] = *control.importedSourceController;
+        array.push_back(std::move(object));
+    }
+    return array;
+}
+
+ordered_json serializeInstrumentControlTargets(
+    const std::vector<RuntimeProjectInstrumentControlTargetDefinition>& targets)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& target : targets)
+    {
+        ordered_json object;
+        object["id"] = target.id;
+        object["controlId"] = target.controlId;
+        object["ownerKind"] = target.ownerKind;
+        object["ownerId"] = target.ownerId;
+        object["targetKind"] = runtimeInstrumentControlTargetKindName(target.targetKind);
+        object["parameterId"] = target.parameterId;
+        object["sourceMinimum"] = target.sourceMinimum;
+        object["sourceMaximum"] = target.sourceMaximum;
+        object["destinationMinimum"] = target.destinationMinimum;
+        object["destinationMaximum"] = target.destinationMaximum;
+        object["curve"] = target.curve;
+        object["curveIndex"] = target.curveIndex;
+        object["contributionMode"] = runtimeInstrumentControlContributionModeName(target.contributionMode);
+        if (target.curveIndex >= 0)
+        {
+            ordered_json points = ordered_json::array();
+            for (const auto point : target.curvePoints)
+                points.push_back(point);
+            object["curvePoints"] = std::move(points);
+        }
+        array.push_back(std::move(object));
+    }
+    return array;
+}
+
+ordered_json serializeMidiControlBindings(
+    const std::vector<RuntimeProjectMidiControlBindingDefinition>& bindings)
+{
+    ordered_json array = ordered_json::array();
+    for (const auto& binding : bindings)
+    {
+        ordered_json object;
+        object["id"] = binding.id;
+        object["controlId"] = binding.controlId;
+        object["controllerNumber"] = binding.controllerNumber;
+        object["channelScope"] = {
+            { "kind", runtimeMidiChannelScopeKindName(binding.channelScope.kind) },
+            { "channel", binding.channelScope.channel }
+        };
+        object["enabled"] = binding.enabled;
+        object["imported"] = binding.imported;
+        if (binding.importedSourceController.has_value())
+            object["importedSourceController"] = *binding.importedSourceController;
+        array.push_back(std::move(object));
+    }
+    return array;
+}
+
 ordered_json serializeProjectLayers(const std::vector<RuntimeProjectLayerDefinition>& layers)
 {
     ordered_json array = ordered_json::array();
@@ -1552,7 +1634,7 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
     project.notes = readRequiredStringArray(root, result, "notes", "Project");
 
     if (project.schemaVersion >= 2
-        && project.schemaVersion <= layerContractProjectSchemaVersion)
+        && project.schemaVersion <= instrumentControlProjectSchemaVersion)
     {
         const auto authoringIterator = root.find("authoring");
         if (authoringIterator == root.end() || !authoringIterator->is_object())
@@ -1999,6 +2081,119 @@ RuntimeProjectLoadResult parseRuntimeProjectManifest(const std::string& rawText,
                         }
 
                         authoring.layers.push_back(std::move(layer));
+                    }
+                }
+            }
+
+            if (project.schemaVersion >= instrumentControlProjectSchemaVersion
+                && authoring.schemaVersion >= instrumentControlAuthoringSchemaVersion)
+            {
+                const auto controlsIterator = authoringIterator->find("instrumentControls");
+                if (controlsIterator == authoringIterator->end() || !isObjectArray(*controlsIterator))
+                {
+                    addIssue(result, "Project authoring field 'instrumentControls' must be an array of objects.");
+                }
+                else
+                {
+                    authoring.instrumentControls.reserve(controlsIterator->size());
+                    for (std::size_t index = 0; index < controlsIterator->size(); ++index)
+                    {
+                        const auto& object = controlsIterator->at(index);
+                        const auto context = "InstrumentControl[" + std::to_string(index) + "]";
+                        RuntimeProjectInstrumentControlDefinition control;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "id", context.c_str())) control.id = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "displayName", context.c_str())) control.displayName = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "category", context.c_str()))
+                            if (!parseRuntimeInstrumentControlCategory(*value, control.category)) addIssue(result, context + " category is unsupported.");
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "kind", context.c_str()))
+                            if (!parseRuntimeInstrumentControlKind(*value, control.kind)) addIssue(result, context + " kind is unsupported.");
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "unit", context.c_str()))
+                            if (!parseRuntimeInstrumentControlUnit(*value, control.unit)) addIssue(result, context + " unit is unsupported.");
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "normalizedDefault", context.c_str())) control.normalizedDefault = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "displayMinimum", context.c_str())) control.displayMinimum = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "displayMaximum", context.c_str())) control.displayMaximum = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, int>(object, result, "displayPrecision", context.c_str())) control.displayPrecision = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, int>(object, result, "displayOrder", context.c_str())) control.displayOrder = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "section", context.c_str())) control.section = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, bool>(object, result, "visible", context.c_str())) control.visible = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "provenance", context.c_str()))
+                            if (!parseRuntimeInstrumentControlProvenance(*value, control.provenance)) addIssue(result, context + " provenance is unsupported.");
+                        if (const auto value = readOptional<RuntimeProjectLoadResult, int>(object, result, "importedSourceController", context.c_str())) control.importedSourceController = *value;
+                        authoring.instrumentControls.push_back(std::move(control));
+                    }
+                }
+
+                const auto targetsIterator = authoringIterator->find("instrumentControlTargets");
+                if (targetsIterator == authoringIterator->end() || !isObjectArray(*targetsIterator))
+                {
+                    addIssue(result, "Project authoring field 'instrumentControlTargets' must be an array of objects.");
+                }
+                else
+                {
+                    authoring.instrumentControlTargets.reserve(targetsIterator->size());
+                    for (std::size_t index = 0; index < targetsIterator->size(); ++index)
+                    {
+                        const auto& object = targetsIterator->at(index);
+                        const auto context = "InstrumentControlTarget[" + std::to_string(index) + "]";
+                        RuntimeProjectInstrumentControlTargetDefinition target;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "id", context.c_str())) target.id = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "controlId", context.c_str())) target.controlId = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "ownerKind", context.c_str())) target.ownerKind = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "ownerId", context.c_str())) target.ownerId = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "targetKind", context.c_str()))
+                            if (!parseRuntimeInstrumentControlTargetKind(*value, target.targetKind)) addIssue(result, context + " targetKind is unsupported.");
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "parameterId", context.c_str())) target.parameterId = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "sourceMinimum", context.c_str())) target.sourceMinimum = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "sourceMaximum", context.c_str())) target.sourceMaximum = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "destinationMinimum", context.c_str())) target.destinationMinimum = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, double>(object, result, "destinationMaximum", context.c_str())) target.destinationMaximum = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "curve", context.c_str())) target.curve = *value;
+                        if (const auto value = readOptional<RuntimeProjectLoadResult, int>(object, result, "curveIndex", context.c_str())) target.curveIndex = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "contributionMode", context.c_str()))
+                            if (!parseRuntimeInstrumentControlContributionMode(*value, target.contributionMode)) addIssue(result, context + " contributionMode is unsupported.");
+                        if (target.curveIndex >= 0)
+                        {
+                            const auto points = object.find("curvePoints");
+                            if (points == object.end() || !points->is_array() || points->size() != target.curvePoints.size())
+                                addIssue(result, context + " curvePoints must contain exactly 128 values when curveIndex is active.");
+                            else
+                                for (std::size_t pointIndex = 0; pointIndex < target.curvePoints.size(); ++pointIndex)
+                                    if (points->at(pointIndex).is_number()) target.curvePoints[pointIndex] = points->at(pointIndex).get<double>();
+                                    else addIssue(result, context + " curvePoints must contain numeric values.");
+                        }
+                        authoring.instrumentControlTargets.push_back(std::move(target));
+                    }
+                }
+
+                const auto bindingsIterator = authoringIterator->find("midiControlBindings");
+                if (bindingsIterator == authoringIterator->end() || !isObjectArray(*bindingsIterator))
+                {
+                    addIssue(result, "Project authoring field 'midiControlBindings' must be an array of objects.");
+                }
+                else
+                {
+                    authoring.midiControlBindings.reserve(bindingsIterator->size());
+                    for (std::size_t index = 0; index < bindingsIterator->size(); ++index)
+                    {
+                        const auto& object = bindingsIterator->at(index);
+                        const auto context = "MidiControlBinding[" + std::to_string(index) + "]";
+                        RuntimeProjectMidiControlBindingDefinition binding;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "id", context.c_str())) binding.id = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(object, result, "controlId", context.c_str())) binding.controlId = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, int>(object, result, "controllerNumber", context.c_str())) binding.controllerNumber = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, bool>(object, result, "enabled", context.c_str())) binding.enabled = *value;
+                        if (const auto value = readRequired<RuntimeProjectLoadResult, bool>(object, result, "imported", context.c_str())) binding.imported = *value;
+                        if (const auto value = readOptional<RuntimeProjectLoadResult, int>(object, result, "importedSourceController", context.c_str())) binding.importedSourceController = *value;
+                        const auto scope = object.find("channelScope");
+                        if (scope == object.end() || !scope->is_object())
+                            addIssue(result, context + " channelScope must be an object.");
+                        else
+                        {
+                            if (const auto value = readRequired<RuntimeProjectLoadResult, std::string>(*scope, result, "kind", (context + ".channelScope").c_str()))
+                                if (!parseRuntimeMidiChannelScopeKind(*value, binding.channelScope.kind)) addIssue(result, context + " channelScope kind is unsupported.");
+                            if (const auto value = readRequired<RuntimeProjectLoadResult, int>(*scope, result, "channel", (context + ".channelScope").c_str())) binding.channelScope.channel = static_cast<std::uint8_t>(std::max(0, std::min(255, *value)));
+                        }
+                        authoring.midiControlBindings.push_back(std::move(binding));
                     }
                 }
             }
@@ -2725,9 +2920,10 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         && project.schemaVersion != continuousDamperProjectSchemaVersion
         && project.schemaVersion != playbackRegionProjectSchemaVersion
         && project.schemaVersion != loopCrossfadeProjectSchemaVersion
-        && project.schemaVersion != layerContractProjectSchemaVersion)
+        && project.schemaVersion != layerContractProjectSchemaVersion
+        && project.schemaVersion != instrumentControlProjectSchemaVersion)
     {
-        addIssue(result, "Project schemaVersion must be between 1 and 10.");
+        addIssue(result, "Project schemaVersion must be between 1 and 11.");
     }
 
     if (project.projectId.empty())
@@ -2762,7 +2958,7 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         }
     }
 
-    if (project.schemaVersion >= 2 && project.schemaVersion <= layerContractProjectSchemaVersion)
+    if (project.schemaVersion >= 2 && project.schemaVersion <= instrumentControlProjectSchemaVersion)
     {
         const auto& authoring = project.authoring;
         const auto explicitRoundRobinRequired = project.schemaVersion >= 3;
@@ -2795,6 +2991,9 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
         if (project.schemaVersion == layerContractProjectSchemaVersion
             && authoring.schemaVersion != layerContractAuthoringSchemaVersion)
             addIssue(result, "Project authoring schemaVersion must be 9 for schemaVersion 10 projects.");
+        if (project.schemaVersion == instrumentControlProjectSchemaVersion
+            && authoring.schemaVersion != instrumentControlAuthoringSchemaVersion)
+            addIssue(result, "Project authoring schemaVersion must be 10 for schemaVersion 11 projects.");
 
         if (!std::isfinite(authoring.masterGainDb))
             addIssue(result, "Project authoring masterGainDb must be finite.");
@@ -2824,6 +3023,17 @@ RuntimeProjectValidationResult validateRuntimeProjectModel(const RuntimeProjectM
 
         if (hasDuplicateIds(authoring.performanceBanks))
             addIssue(result, "Project authoring performance bank ids must be unique.");
+
+        if (project.schemaVersion >= instrumentControlProjectSchemaVersion)
+        {
+            const auto controlValidation = validateInstrumentControlCatalog(
+                authoring.instrumentControls,
+                authoring.instrumentControlTargets,
+                authoring.midiControlBindings);
+            result.issues.insert(result.issues.end(),
+                                 controlValidation.issues.begin(),
+                                 controlValidation.issues.end());
+        }
 
         std::unordered_set<std::string> sampleSourceIds;
         for (const auto& sampleSource : project.sampleSources)
@@ -3816,6 +4026,108 @@ RuntimeProjectMigrationResult migrateRuntimeProjectToLayerSchema(
     return result;
 }
 
+RuntimeProjectMigrationResult migrateRuntimeProjectToInstrumentControlSchema(
+    const RuntimeProjectModel& project)
+{
+    RuntimeProjectMigrationResult result;
+    result.state = "Project instrument-control migration failed";
+    if (project.schemaVersion == instrumentControlProjectSchemaVersion
+        && project.authoring.schemaVersion == instrumentControlAuthoringSchemaVersion)
+    {
+        result.project = project;
+        const auto validation = validateRuntimeProjectModel(result.project);
+        result.issues = validation.issues;
+        result.valid = validation.valid;
+        result.state = validation.valid ? "Project already uses the instrument-control schema"
+                                        : validation.state;
+        return result;
+    }
+
+    if (project.schemaVersion != layerContractProjectSchemaVersion
+        || project.authoring.schemaVersion != layerContractAuthoringSchemaVersion)
+    {
+        addIssue(result,
+                 "Only Project schemaVersion 10 with authoring schemaVersion 9 can migrate to the instrument-control schema.");
+        return result;
+    }
+
+    auto migrated = project;
+    migrated.schemaVersion = instrumentControlProjectSchemaVersion;
+    migrated.authoring.schemaVersion = instrumentControlAuthoringSchemaVersion;
+
+    std::unordered_set<int> controllerNumbers;
+    for (const auto& value : migrated.authoring.controllerDefaults)
+        if (value.controllerNumber >= 0 && value.controllerNumber <= 127)
+            controllerNumbers.insert(value.controllerNumber);
+
+    const auto addController = [&](const int controllerNumber)
+    {
+        if (controllerNumber >= 0 && controllerNumber <= 127)
+            controllerNumbers.insert(controllerNumber);
+    };
+    for (const auto& zone : migrated.authoring.zones)
+    {
+        for (const auto& condition : zone.controllerConditions)
+            addController(condition.controllerNumber);
+        addController(zone.tuningModulation.controllerNumber);
+        addController(zone.amplitudeModulation.controllerNumber);
+        addController(zone.amplitudeEnvelope.holdModulation.controllerNumber);
+        addController(zone.amplitudeEnvelope.decayModulation.controllerNumber);
+        addController(zone.amplitudeEnvelope.sustainModulation.controllerNumber);
+    }
+
+    std::vector<int> orderedControllers(controllerNumbers.begin(), controllerNumbers.end());
+    std::sort(orderedControllers.begin(), orderedControllers.end());
+    for (const auto controllerNumber : orderedControllers)
+    {
+        const auto id = "midi.cc." + std::to_string(controllerNumber);
+        if (std::find_if(migrated.authoring.instrumentControls.begin(),
+                         migrated.authoring.instrumentControls.end(),
+                         [&](const auto& control) { return control.id == id; })
+            != migrated.authoring.instrumentControls.end())
+            continue;
+
+        RuntimeProjectInstrumentControlDefinition control;
+        control.id = id;
+        control.displayName = "CC " + std::to_string(controllerNumber);
+        control.category = RuntimeInstrumentControlCategory::hidden;
+        control.kind = RuntimeInstrumentControlKind::normalized;
+        control.unit = RuntimeInstrumentControlUnit::generic;
+        const auto defaultIterator = std::find_if(
+            migrated.authoring.controllerDefaults.begin(),
+            migrated.authoring.controllerDefaults.end(),
+            [&](const auto& value) { return value.controllerNumber == controllerNumber; });
+        control.normalizedDefault = defaultIterator == migrated.authoring.controllerDefaults.end()
+            ? 0.0 : std::clamp(static_cast<double>(defaultIterator->value) / 127.0, 0.0, 1.0);
+        control.displayMinimum = 0.0;
+        control.displayMaximum = 1.0;
+        control.displayPrecision = 3;
+        control.displayOrder = static_cast<int>(migrated.authoring.instrumentControls.size());
+        control.section = "Imported MIDI";
+        control.visible = false;
+        control.provenance = RuntimeInstrumentControlProvenance::migrated;
+        control.importedSourceController = controllerNumber;
+        migrated.authoring.instrumentControls.push_back(std::move(control));
+
+        RuntimeProjectMidiControlBindingDefinition binding;
+        binding.id = "binding." + id;
+        binding.controlId = id;
+        binding.controllerNumber = controllerNumber;
+        binding.imported = true;
+        binding.importedSourceController = controllerNumber;
+        migrated.authoring.midiControlBindings.push_back(std::move(binding));
+    }
+
+    const auto validation = validateRuntimeProjectModel(migrated);
+    result.project = std::move(migrated);
+    result.issues = validation.issues;
+    result.valid = validation.valid;
+    result.migrated = validation.valid;
+    result.state = validation.valid ? "Project migrated to the instrument-control schema"
+                                    : validation.state;
+    return result;
+}
+
 RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawText,
                                                          const std::string& manifestPath,
                                                          const bool validateReferencedPaths)
@@ -4554,6 +4866,110 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
         }
     }
 
+    if (instrument.schemaVersion >= instrumentControlInstrumentSchemaVersion)
+    {
+        const auto controls = root.find("instrumentControls");
+        if (controls == root.end() || !isObjectArray(*controls))
+            addIssue(result, "Manifest field 'instrumentControls' must be an array of objects.");
+        else
+            for (std::size_t index = 0; index < controls->size(); ++index)
+            {
+                const auto context = "InstrumentControl[" + std::to_string(index) + "]";
+                const auto& object = controls->at(index);
+                RuntimeProjectInstrumentControlDefinition control;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "id", context.c_str())) control.id = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "displayName", context.c_str())) control.displayName = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "category", context.c_str()))
+                    if (!parseRuntimeInstrumentControlCategory(*value, control.category)) addIssue(result, context + " category is unsupported.");
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "kind", context.c_str()))
+                    if (!parseRuntimeInstrumentControlKind(*value, control.kind)) addIssue(result, context + " kind is unsupported.");
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "unit", context.c_str()))
+                    if (!parseRuntimeInstrumentControlUnit(*value, control.unit)) addIssue(result, context + " unit is unsupported.");
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "normalizedDefault", context.c_str())) control.normalizedDefault = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "displayMinimum", context.c_str())) control.displayMinimum = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "displayMaximum", context.c_str())) control.displayMaximum = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, int>(object, result, "displayPrecision", context.c_str())) control.displayPrecision = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, int>(object, result, "displayOrder", context.c_str())) control.displayOrder = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "section", context.c_str())) control.section = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, bool>(object, result, "visible", context.c_str())) control.visible = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "provenance", context.c_str()))
+                    if (!parseRuntimeInstrumentControlProvenance(*value, control.provenance)) addIssue(result, context + " provenance is unsupported.");
+                if (const auto value = readOptional<RuntimeManifestLoadResult, int>(object, result, "importedSourceController", context.c_str())) control.importedSourceController = *value;
+                instrument.instrumentControls.push_back(std::move(control));
+            }
+
+        const auto targets = root.find("instrumentControlTargets");
+        if (targets == root.end() || !isObjectArray(*targets))
+            addIssue(result, "Manifest field 'instrumentControlTargets' must be an array of objects.");
+        else
+            for (std::size_t index = 0; index < targets->size(); ++index)
+            {
+                const auto context = "InstrumentControlTarget[" + std::to_string(index) + "]";
+                const auto& object = targets->at(index);
+                RuntimeProjectInstrumentControlTargetDefinition target;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "id", context.c_str())) target.id = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "controlId", context.c_str())) target.controlId = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "ownerKind", context.c_str())) target.ownerKind = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "ownerId", context.c_str())) target.ownerId = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "targetKind", context.c_str()))
+                    if (!parseRuntimeInstrumentControlTargetKind(*value, target.targetKind)) addIssue(result, context + " targetKind is unsupported.");
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "parameterId", context.c_str())) target.parameterId = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "sourceMinimum", context.c_str())) target.sourceMinimum = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "sourceMaximum", context.c_str())) target.sourceMaximum = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "destinationMinimum", context.c_str())) target.destinationMinimum = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, double>(object, result, "destinationMaximum", context.c_str())) target.destinationMaximum = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "curve", context.c_str())) target.curve = *value;
+                if (const auto value = readOptional<RuntimeManifestLoadResult, int>(object, result, "curveIndex", context.c_str())) target.curveIndex = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "contributionMode", context.c_str()))
+                    if (!parseRuntimeInstrumentControlContributionMode(*value, target.contributionMode)) addIssue(result, context + " contributionMode is unsupported.");
+                if (target.curveIndex >= 0)
+                {
+                    const auto points = object.find("curvePoints");
+                    if (points == object.end() || !points->is_array() || points->size() != target.curvePoints.size())
+                        addIssue(result, context + " curvePoints must contain exactly 128 values when curveIndex is active.");
+                    else
+                        for (std::size_t pointIndex = 0; pointIndex < target.curvePoints.size(); ++pointIndex)
+                            if (points->at(pointIndex).is_number()) target.curvePoints[pointIndex] = points->at(pointIndex).get<double>();
+                            else addIssue(result, context + " curvePoints must contain numeric values.");
+                }
+                instrument.instrumentControlTargets.push_back(std::move(target));
+            }
+
+        const auto bindings = root.find("midiControlBindings");
+        if (bindings == root.end() || !isObjectArray(*bindings))
+            addIssue(result, "Manifest field 'midiControlBindings' must be an array of objects.");
+        else
+            for (std::size_t index = 0; index < bindings->size(); ++index)
+            {
+                const auto context = "MidiControlBinding[" + std::to_string(index) + "]";
+                const auto& object = bindings->at(index);
+                RuntimeProjectMidiControlBindingDefinition binding;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "id", context.c_str())) binding.id = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(object, result, "controlId", context.c_str())) binding.controlId = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, int>(object, result, "controllerNumber", context.c_str())) binding.controllerNumber = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, bool>(object, result, "enabled", context.c_str())) binding.enabled = *value;
+                if (const auto value = readRequired<RuntimeManifestLoadResult, bool>(object, result, "imported", context.c_str())) binding.imported = *value;
+                if (const auto value = readOptional<RuntimeManifestLoadResult, int>(object, result, "importedSourceController", context.c_str())) binding.importedSourceController = *value;
+                const auto scope = object.find("channelScope");
+                if (scope == object.end() || !scope->is_object())
+                    addIssue(result, context + " channelScope must be an object.");
+                else
+                {
+                    if (const auto value = readRequired<RuntimeManifestLoadResult, std::string>(*scope, result, "kind", (context + ".channelScope").c_str()))
+                        if (!parseRuntimeMidiChannelScopeKind(*value, binding.channelScope.kind)) addIssue(result, context + " channelScope kind is unsupported.");
+                    if (const auto value = readRequired<RuntimeManifestLoadResult, int>(*scope, result, "channel", (context + ".channelScope").c_str())) binding.channelScope.channel = static_cast<std::uint8_t>(std::max(0, std::min(255, *value)));
+                }
+                instrument.midiControlBindings.push_back(std::move(binding));
+            }
+
+        const auto controlValidation = validateInstrumentControlCatalog(
+            instrument.instrumentControls,
+            instrument.instrumentControlTargets,
+            instrument.midiControlBindings);
+        for (const auto& issue : controlValidation.issues)
+            addIssue(result, issue);
+    }
+
     instrument.validationNotes = readRequiredStringArray(root, result, "validationNotes", "Manifest");
 
     result.metrics.macroCount = instrument.macros.size();
@@ -4570,8 +4986,9 @@ RuntimeManifestLoadResult parseRuntimeInstrumentManifest(const std::string& rawT
         && instrument.schemaVersion != continuousDamperInstrumentSchemaVersion
         && instrument.schemaVersion != playbackRegionInstrumentSchemaVersion
         && instrument.schemaVersion != sfzRegionInstrumentSchemaVersion
-        && instrument.schemaVersion != loopCrossfadeInstrumentSchemaVersion)
-        addIssue(result, "Manifest schemaVersion must be between 1 and 8.");
+        && instrument.schemaVersion != loopCrossfadeInstrumentSchemaVersion
+        && instrument.schemaVersion != instrumentControlInstrumentSchemaVersion)
+        addIssue(result, "Manifest schemaVersion must be between 1 and 9.");
 
     if (instrument.zones.empty())
         addIssue(result, "Manifest must declare at least one zone.");
@@ -4686,6 +5103,12 @@ std::string serializeRuntimeProjectManifest(const RuntimeProjectModel& project, 
             authoring["groups"] = serializeProjectGroups(project.authoring.groups);
         if (project.schemaVersion >= layerContractProjectSchemaVersion)
             authoring["layers"] = serializeProjectLayers(project.authoring.layers);
+        if (project.schemaVersion >= instrumentControlProjectSchemaVersion)
+        {
+            authoring["instrumentControls"] = serializeInstrumentControls(project.authoring.instrumentControls);
+            authoring["instrumentControlTargets"] = serializeInstrumentControlTargets(project.authoring.instrumentControlTargets);
+            authoring["midiControlBindings"] = serializeMidiControlBindings(project.authoring.midiControlBindings);
+        }
         authoring["macros"] = serializeProjectMacros(project.authoring.macros);
         authoring["fxSlots"] = serializeFxSlots(project.authoring.fxSlots, project.schemaVersion >= 5);
         authoring["routingBuses"] = serializeRoutingBuses(project.authoring.routingBuses, project.schemaVersion >= 5);
@@ -4874,6 +5297,13 @@ std::string serializeRuntimeInstrumentManifest(const RuntimeInstrumentModel& ins
         }
         root["roundRobinResetRules"] = std::move(resetRules);
         root["controllerDefaults"] = serializeControllerDefaults(instrument.controllerDefaults);
+    }
+
+    if (instrument.schemaVersion >= instrumentControlInstrumentSchemaVersion)
+    {
+        root["instrumentControls"] = serializeInstrumentControls(instrument.instrumentControls);
+        root["instrumentControlTargets"] = serializeInstrumentControlTargets(instrument.instrumentControlTargets);
+        root["midiControlBindings"] = serializeMidiControlBindings(instrument.midiControlBindings);
     }
 
     root["validationNotes"] = serializeStringArray(instrument.validationNotes);

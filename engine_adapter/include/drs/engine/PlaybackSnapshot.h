@@ -228,6 +228,15 @@ struct ImmutablePlaybackSnapshot
     std::vector<PlaybackSnapshotGroupRoute> groupRoutes;
     std::vector<PlaybackSnapshotZone> zones;
     std::vector<RuntimeControllerDefault> controllerDefaults;
+    struct InstrumentControlValue
+    {
+        std::string id;
+        double normalizedValue = 0.0;
+    };
+    std::vector<InstrumentControlValue> instrumentControlValues;
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls;
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets;
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings;
     std::vector<RuntimeProjectRoundRobinResetRuleDefinition> roundRobinResetRules;
     CompiledPerformanceProgram performanceProgram;
     std::vector<std::string> notes;

@@ -154,6 +154,23 @@ bool isMacroNameCharacter(const char character) noexcept
     return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
 }
 
+std::size_t findNextDefineDirective(const std::string& text,
+                                    const std::size_t searchStart) noexcept
+{
+    for (std::size_t index = searchStart; index + 7 <= text.size(); ++index)
+    {
+        if (text.compare(index, 7, "#define") != 0)
+            continue;
+        const auto hasLeadingBoundary = index == 0
+            || std::isspace(static_cast<unsigned char>(text[index - 1])) != 0;
+        const auto hasTrailingBoundary = index + 7 == text.size()
+            || std::isspace(static_cast<unsigned char>(text[index + 7])) != 0;
+        if (hasLeadingBoundary && hasTrailingBoundary)
+            return index;
+    }
+    return std::string::npos;
+}
+
 bool parseDefineDirective(const std::string& line,
                           std::string& macroName,
                           std::string& macroValue)
@@ -176,7 +193,11 @@ bool parseDefineDirective(const std::string& line,
         return true;
 
     macroName = remainder.substr(0, nameEnd);
-    macroValue = trimAscii(remainder.substr(nameEnd));
+    const auto nextDefine = findNextDefineDirective(remainder, nameEnd);
+    macroValue = trimAscii(remainder.substr(nameEnd,
+                                             nextDefine == std::string::npos
+                                                 ? std::string::npos
+                                                 : nextDefine - nameEnd));
     return true;
 }
 
@@ -332,8 +353,27 @@ std::string expandMacros(const std::string& line,
         auto nameEnd = index + 1;
         while (nameEnd < line.size() && isMacroNameCharacter(line[nameEnd]))
             ++nameEnd;
-        const auto macroName = line.substr(index, nameEnd - index);
-        const auto macro = state.macros.find(macroName);
+        auto macroName = line.substr(index, nameEnd - index);
+        auto macro = state.macros.find(macroName);
+        // A number of real-world SFZ libraries concatenate a macro with a
+        // literal suffix (for example "$LAB_TOP1") without a delimiter.  If
+        // the greedy token is unknown, fall back to the longest known prefix
+        // and leave the suffix in the input stream.
+        if (macro == state.macros.end())
+        {
+            for (auto candidateEnd = nameEnd; candidateEnd > index + 1; --candidateEnd)
+            {
+                const auto candidate = line.substr(index, candidateEnd - index);
+                const auto candidateIterator = state.macros.find(candidate);
+                if (candidateIterator != state.macros.end())
+                {
+                    macroName = candidate;
+                    nameEnd = candidateEnd;
+                    macro = candidateIterator;
+                    break;
+                }
+            }
+        }
         if (macro == state.macros.end())
         {
             addParserFinding(state,
@@ -481,22 +521,34 @@ bool parseFileRecursive(const fs::path& filePath,
         std::string macroValue;
         if (parseDefineDirective(sourceLine, macroName, macroValue))
         {
-            if (macroName.empty() || macroValue.empty())
+            auto defineLine = trimAscii(sourceLine);
+            bool processedDefine = false;
+            while (!defineLine.empty() && parseDefineDirective(defineLine, macroName, macroValue))
             {
-                addParserFinding(state, context,
-                                 SfzImportFindingSeverity::error,
-                                 SfzImportSupportDisposition::blocking,
-                                 "preprocessor.define_invalid",
-                                 "Invalid SFZ macro definition",
-                                 "A #define directive must provide a $name and value.",
-                                 { toDisplayPath(normalizedPath), lineNumber, 1,
-                                   SfzOpcodeScope::unknown, "#define" });
+                processedDefine = true;
+                if (macroName.empty() || macroValue.empty())
+                {
+                    addParserFinding(state, context,
+                                     SfzImportFindingSeverity::error,
+                                     SfzImportSupportDisposition::blocking,
+                                     "preprocessor.define_invalid",
+                                     "Invalid SFZ macro definition",
+                                     "A #define directive must provide a $name and value.",
+                                     { toDisplayPath(normalizedPath), lineNumber, 1,
+                                       SfzOpcodeScope::unknown, "#define" });
+                }
+                else
+                {
+                    state.macros[macroName] = expandMacros(macroValue, state, context, normalizedPath, lineNumber);
+                }
+
+                const auto nextDefine = findNextDefineDirective(defineLine, 7);
+                if (nextDefine == std::string::npos)
+                    break;
+                defineLine = trimAscii(defineLine.substr(nextDefine));
             }
-            else
-            {
-                state.macros[macroName] = expandMacros(macroValue, state, context, normalizedPath, lineNumber);
-            }
-            continue;
+            if (processedDefine)
+                continue;
         }
 
         const auto line = expandMacros(sourceLine, state, context, normalizedPath, lineNumber);
@@ -508,7 +560,19 @@ bool parseFileRecursive(const fs::path& filePath,
             if (cancellationReason != SfzImportCancellationReason::none)
                 break;
 
-            const auto resolvedIncludePath = (normalizedPath.parent_path() / fs::path(includePath)).lexically_normal();
+            auto resolvedIncludePath = (normalizedPath.parent_path() / fs::path(includePath)).lexically_normal();
+            // Some SFZ authors write paths such as ../Data/group/foo.txt in
+            // files already under Data/stereo or Data/group.  ARIA resolves
+            // these against the instrument root; preserve the conventional
+            // file-relative attempt first, then use the root-relative form
+            // when the first candidate is absent.
+            if (!fs::exists(resolvedIncludePath))
+            {
+                const auto rootRelativeIncludePath =
+                    (state.rootResolutionBasePath / fs::path(includePath)).lexically_normal();
+                if (fs::exists(rootRelativeIncludePath))
+                    resolvedIncludePath = rootRelativeIncludePath;
+            }
             const auto includeComplete = parseFileRecursive(resolvedIncludePath,
                                                             state,
                                                             context,

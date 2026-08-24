@@ -201,6 +201,10 @@ struct ImmutablePreparedPlayback
     std::vector<PreparedPlaybackGroupRoute> groupRoutes;
     std::vector<PreparedPlaybackZoneHandle> zones;
     std::vector<RuntimeControllerDefault> controllerDefaults;
+    std::vector<ImmutablePlaybackSnapshot::InstrumentControlValue> instrumentControlValues;
+    std::vector<RuntimeProjectInstrumentControlDefinition> instrumentControls;
+    std::vector<RuntimeProjectInstrumentControlTargetDefinition> instrumentControlTargets;
+    std::vector<RuntimeProjectMidiControlBindingDefinition> midiControlBindings;
     CompiledPerformanceProgram performanceProgram;
     std::vector<std::string> notes;
 };
@@ -313,6 +317,8 @@ struct PreparedPlaybackSchedulerBudgets
     std::uint64_t maximumRetainedPreparedBytes = 512ull * 1024ull * 1024ull;
     std::uint64_t maximumMessageThreadServiceMicros = 250000;
     std::uint64_t pageServicePollMilliseconds = 5;
+    // Enables bounded file streaming for sources that cannot fit the resident
+    // preparation budget (WAV and supported compressed formats such as FLAC).
     bool allowWavStreaming = true;
 };
 

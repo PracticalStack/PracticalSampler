@@ -1201,6 +1201,58 @@ SampleInspectionResult inspectSampleFileMetadataOnly(const std::string& samplePa
     return result;
 }
 
+bool decodeSampleFileRange(const std::string& samplePath,
+                           const std::uint64_t firstFrame,
+                           const std::uint32_t frameCount,
+                           std::vector<std::vector<float>>& channels,
+                           std::string& issue)
+{
+    channels.clear();
+    issue.clear();
+    if (frameCount == 0)
+    {
+        issue = "Requested sample range is empty.";
+        return false;
+    }
+
+    incrementReaderOpenCount();
+    auto reader = currentSampleImportHooks().createAudioReader(samplePath);
+    if (reader == nullptr)
+    {
+        issue = "Sample file could not be decoded as a supported audio format.";
+        return false;
+    }
+    if (firstFrame >= static_cast<std::uint64_t>(reader->lengthInSamples)
+        || frameCount > static_cast<std::uint64_t>(reader->lengthInSamples) - firstFrame)
+    {
+        issue = "Requested sample range is outside the source.";
+        return false;
+    }
+
+    juce::AudioBuffer<float> buffer(static_cast<int>(reader->numChannels),
+                                    static_cast<int>(frameCount));
+    buffer.clear();
+    if (!reader->read(&buffer,
+                      0,
+                      static_cast<int>(frameCount),
+                      static_cast<juce::int64>(firstFrame),
+                      true,
+                      true))
+    {
+        issue = "Decoded sample reader failed while loading the requested range.";
+        return false;
+    }
+
+    channels.resize(static_cast<std::size_t>(buffer.getNumChannels()));
+    for (int channelIndex = 0; channelIndex < buffer.getNumChannels(); ++channelIndex)
+    {
+        const auto* source = buffer.getReadPointer(channelIndex);
+        channels[static_cast<std::size_t>(channelIndex)] =
+            std::vector<float>(source, source + frameCount);
+    }
+    return true;
+}
+
 SampleImportResult importSampleFile(const std::string& samplePath,
                                     const std::string& knownFingerprintHex)
 {

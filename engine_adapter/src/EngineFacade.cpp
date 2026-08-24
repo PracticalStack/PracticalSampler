@@ -1,5 +1,6 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/CuratedDspCatalog.h"
+#include "drs/engine/ControlLaw.h"
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/DspParameterControl.h"
 #include "drs/engine/NativeContent.h"
@@ -1196,6 +1197,16 @@ PlaybackSnapshotBuildResult buildPerformancePackagePlaybackSnapshot(
                                  stream.notes.begin(),
                                  stream.notes.end());
 
+    // Package snapshots must carry the complete instrument-control contract,
+    // including its authored defaults.  The package path does not pass through
+    // PlaybackSnapshotBuilder, so copy the manifest-owned definitions here.
+    result.snapshot.instrumentControls = instrument.instrumentControls;
+    result.snapshot.instrumentControlTargets = instrument.instrumentControlTargets;
+    result.snapshot.midiControlBindings = instrument.midiControlBindings;
+    result.snapshot.instrumentControlValues.reserve(instrument.instrumentControls.size());
+    for (const auto& control : instrument.instrumentControls)
+        result.snapshot.instrumentControlValues.push_back({ control.id, control.normalizedDefault });
+
     std::unordered_map<std::string, std::string> sampleIdByPath;
     sampleIdByPath.reserve(stream.samples.size());
     result.snapshot.sampleIdentities.reserve(stream.samples.size());
@@ -1783,6 +1794,14 @@ EnginePerformancePackageActivationResult EngineFacade::activatePreparedPerforman
     auto nextSessionState = buildDefaultRuntimeSessionState(preparedActivation.packageLoad.instrument);
     if (!preparedActivation.packageLoad.manifest.defaultLoadProfile.empty())
         nextSessionState.loadProfileId = preparedActivation.packageLoad.manifest.defaultLoadProfile;
+    if (nextActivationPayload->snapshot != nullptr)
+    {
+        nextSessionState.instrumentControlValues.clear();
+        nextSessionState.instrumentControlValues.reserve(
+            nextActivationPayload->snapshot->instrumentControlValues.size());
+        for (const auto& value : nextActivationPayload->snapshot->instrumentControlValues)
+            nextSessionState.instrumentControlValues.push_back({ value.id, value.normalizedValue });
+    }
 
     PublishedMacroBindingBuildRequest macroBindingRequest;
     macroBindingRequest.revision = nextActivationPayload->revision;
@@ -2394,6 +2413,106 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
     if (!referenceInstrumentActive || !referenceManifest.loaded)
         return descriptors;
 
+    const auto appendInstrumentControls = [&]()
+    {
+        const auto controls = getInstrumentControlDescriptors();
+        const auto* activeSnapshot = getActivePerformanceSnapshot();
+        const auto& definitions = activeSnapshot != nullptr
+            ? activeSnapshot->instrumentControls
+            : referenceManifest.instrument.instrumentControls;
+        descriptors.reserve(descriptors.size() + controls.size());
+        for (std::size_t index = 0; index < controls.size(); ++index)
+        {
+            const auto& control = controls[index];
+            const auto definition = std::find_if(
+                definitions.begin(), definitions.end(),
+                [&](const auto& value) { return value.id == control.id; });
+            if (definition == definitions.end())
+                continue;
+
+            const auto categoryLabel = [&]() -> std::string
+            {
+                switch (control.category)
+                {
+                    case RuntimeInstrumentControlCategory::mixer: return "Mixer";
+                    case RuntimeInstrumentControlCategory::tuning: return "Tuning";
+                    case RuntimeInstrumentControlCategory::envelope: return "Envelope";
+                    case RuntimeInstrumentControlCategory::dynamics: return "Dynamics";
+                    case RuntimeInstrumentControlCategory::tone: return "Tone";
+                    case RuntimeInstrumentControlCategory::hidden: return "Imported";
+                }
+                return "Instrument";
+            }();
+            const auto unitLabel = [&]() -> std::string
+            {
+                switch (control.unit)
+                {
+                    case RuntimeInstrumentControlUnit::decibels: return "dB";
+                    case RuntimeInstrumentControlUnit::pan: return "pan";
+                    case RuntimeInstrumentControlUnit::cents: return "cents";
+                    case RuntimeInstrumentControlUnit::seconds: return "s";
+                    case RuntimeInstrumentControlUnit::percent: return "%";
+                    case RuntimeInstrumentControlUnit::integer: return "integer";
+                    case RuntimeInstrumentControlUnit::boolean: return "boolean";
+                    case RuntimeInstrumentControlUnit::generic: return "";
+                }
+                return "";
+            }();
+
+            auto lawId = control.kind == RuntimeInstrumentControlKind::toggle
+                ? controlLawToggleV1
+                : (control.kind == RuntimeInstrumentControlKind::stepped
+                    ? controlLawSteppedV1
+                    : (control.kind == RuntimeInstrumentControlKind::bipolar
+                        ? controlLawBipolarCenteredV1 : controlLawLinearDbV1));
+            if (control.category == RuntimeInstrumentControlCategory::mixer
+                && definition->displayMinimum == -96.0 && definition->displayMaximum == 6.0)
+                lawId = controlLawMixerGainV1;
+            CompiledControlLaw law;
+            if (!compileControlLaw(lawId,
+                                   definition->displayMinimum,
+                                   definition->displayMaximum,
+                                   law))
+                compileControlLaw(controlLawLinearDbV1,
+                                  definition->displayMinimum,
+                                  definition->displayMaximum,
+                                  law);
+
+            auto controllerText = std::string {};
+            if (!control.assignedControllers.empty())
+                controllerText = "MIDI CC" + std::to_string(control.assignedControllers.front());
+            const auto section = definition->section.empty() ? categoryLabel : definition->section;
+            const auto parameter = !unitLabel.empty() ? unitLabel
+                : (!controllerText.empty() ? controllerText : std::string("Control"));
+            descriptors.push_back({
+                control.id,
+                control.name,
+                0.0,
+                1.0,
+                control.normalizedDefault,
+                control.currentValue,
+                "instrumentControl." + control.id,
+                "Instrument control routed into the active sampler.",
+                controllerText,
+                true,
+                control.visible,
+                section,
+                parameter,
+                unitLabel,
+                control.kind == RuntimeInstrumentControlKind::toggle
+                    ? PublishedMacroControlKind::toggle
+                    : (control.category == RuntimeInstrumentControlCategory::mixer
+                        ? PublishedMacroControlKind::fader : PublishedMacroControlKind::knob),
+                descriptors.size() + static_cast<std::size_t>(std::max(0, definition->displayOrder)),
+                control.name + ", " + section + (controllerText.empty() ? "" : ", " + controllerText),
+                definition->displayMinimum,
+                definition->displayMaximum,
+                control.id,
+                law
+            });
+        }
+    };
+
     if (const auto activeBindings = getActivePublishedMacroBindings(); activeBindings != nullptr)
     {
         descriptors.reserve(activeBindings->bindings.size());
@@ -2403,7 +2522,7 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
                 continue;
             descriptors.push_back(makePublishedMacroDescriptor(binding, currentSessionState));
         }
-
+        appendInstrumentControls();
         return descriptors;
     }
 
@@ -2438,6 +2557,50 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
         });
     }
 
+    appendInstrumentControls();
+
+    return descriptors;
+}
+
+std::vector<EngineInstrumentControlDescriptor> EngineFacade::getInstrumentControlDescriptors() const
+{
+    std::vector<EngineInstrumentControlDescriptor> descriptors;
+    if (!referenceInstrumentActive || !referenceManifest.loaded)
+        return descriptors;
+
+    const auto* activeSnapshot = getActivePerformanceSnapshot();
+    const auto& definitions = activeSnapshot != nullptr
+        ? activeSnapshot->instrumentControls
+        : referenceManifest.instrument.instrumentControls;
+    const auto& bindings = activeSnapshot != nullptr
+        ? activeSnapshot->midiControlBindings
+        : referenceManifest.instrument.midiControlBindings;
+    descriptors.reserve(definitions.size());
+    for (const auto& control : definitions)
+    {
+        auto currentValue = control.normalizedDefault;
+        const auto current = std::find_if(currentSessionState.instrumentControlValues.begin(),
+                                          currentSessionState.instrumentControlValues.end(),
+                                          [&](const auto& value) { return value.id == control.id; });
+        if (current != currentSessionState.instrumentControlValues.end())
+            currentValue = current->normalizedValue;
+        EngineInstrumentControlDescriptor descriptor {
+            control.id,
+            control.displayName,
+            control.category,
+            control.kind,
+            control.unit,
+            control.normalizedDefault,
+            currentValue,
+            control.importedSourceController.value_or(-1),
+            {},
+            control.visible
+        };
+        for (const auto& binding : bindings)
+            if (binding.controlId == control.id && binding.enabled)
+                descriptor.assignedControllers.push_back(binding.controllerNumber);
+        descriptors.push_back(std::move(descriptor));
+    }
     return descriptors;
 }
 
@@ -2497,7 +2660,7 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
                                                  return macro.id == macroId;
                                              });
         if (definition == referenceManifest.instrument.macros.end())
-            return false;
+            return setInstrumentControlValue(macroId, value);
         minimum = definition->minValue;
         maximum = definition->maxValue;
     }
@@ -2526,6 +2689,54 @@ bool EngineFacade::setMacroValue(const std::string& macroId, double value)
     refreshPerformanceMacroRevisions();
     markStateChanged();
     return true;
+}
+
+bool EngineFacade::setInstrumentControlValue(const std::string& controlId,
+                                             const double normalizedValue)
+{
+    if (!referenceInstrumentActive || !referenceManifest.loaded
+        || !std::isfinite(normalizedValue))
+        return false;
+    const auto* activeSnapshot = getActivePerformanceSnapshot();
+    const auto& definitions = activeSnapshot != nullptr
+        ? activeSnapshot->instrumentControls
+        : referenceManifest.instrument.instrumentControls;
+    const auto definition = std::find_if(definitions.begin(), definitions.end(),
+                                         [&](const auto& value) { return value.id == controlId; });
+    if (definition == definitions.end())
+        return false;
+    const auto clamped = std::clamp(normalizedValue, 0.0, 1.0);
+    const auto current = std::find_if(currentSessionState.instrumentControlValues.begin(),
+                                      currentSessionState.instrumentControlValues.end(),
+                                      [&](const auto& value) { return value.id == controlId; });
+    if (current != currentSessionState.instrumentControlValues.end())
+    {
+        if (current->normalizedValue == clamped)
+            return true;
+        current->normalizedValue = clamped;
+    }
+    else
+    {
+        currentSessionState.instrumentControlValues.push_back({ controlId, clamped });
+    }
+    currentSessionState.transientMetrics.integrationState = "Instrument control updated";
+    syncSessionSelectionsIntoDiagnostics(currentSessionState, diagnosticsSnapshot);
+    markStateChanged();
+    return true;
+}
+
+bool EngineFacade::resetInstrumentControlValue(const std::string& controlId)
+{
+    if (!referenceInstrumentActive || !referenceManifest.loaded)
+        return false;
+    const auto* activeSnapshot = getActivePerformanceSnapshot();
+    const auto& definitions = activeSnapshot != nullptr
+        ? activeSnapshot->instrumentControls
+        : referenceManifest.instrument.instrumentControls;
+    const auto definition = std::find_if(definitions.begin(), definitions.end(),
+                                         [&](const auto& value) { return value.id == controlId; });
+    return definition != definitions.end()
+        && setInstrumentControlValue(controlId, definition->normalizedDefault);
 }
 
 bool EngineFacade::stageDraftRevision(std::size_t revision)
@@ -3039,7 +3250,22 @@ PlaybackSnapshotBuildResult EngineFacade::buildCurrentPlaybackSnapshot(bool acti
 
     const auto request = playbackSnapshotBuilder.requestBuild(draftPlaybackContract.getStatus().draftRevision,
                                                               activationRequested);
-    return playbackSnapshotBuilder.buildSnapshot(request, authoringProject.project);
+    auto result = playbackSnapshotBuilder.buildSnapshot(request, authoringProject.project);
+    for (const auto& value : currentSessionState.instrumentControlValues)
+    {
+        const auto existing = std::find_if(result.snapshot.instrumentControlValues.begin(),
+                                           result.snapshot.instrumentControlValues.end(),
+                                           [&](const auto& candidate) { return candidate.id == value.id; });
+        if (existing != result.snapshot.instrumentControlValues.end())
+            existing->normalizedValue = value.normalizedValue;
+        else if (std::any_of(result.snapshot.instrumentControls.begin(),
+                             result.snapshot.instrumentControls.end(),
+                             [&](const auto& control) { return control.id == value.id; }))
+            result.snapshot.instrumentControlValues.push_back({ value.id, value.normalizedValue });
+    }
+    if (result.built)
+        result.snapshot.contentDigest = computePlaybackSnapshotContentDigest(result.snapshot);
+    return result;
 }
 
 PreparedPlaybackBuildResult EngineFacade::buildRejectedPreparedPlayback(const PlaybackSnapshotBuildResult& snapshotResult)
@@ -3867,6 +4093,7 @@ EnginePresetStateRestoreResult EngineFacade::restoreProjectPresetState(
     currentSessionState.loadProfileId = presetState.loadProfileId;
     currentSessionState.selectedArticulationId = presetState.selectedArticulationId;
     currentSessionState.macroValues = presetState.macroValues;
+    currentSessionState.instrumentControlValues = presetState.instrumentControlValues;
     currentSessionState.notes = presetState.notes;
     currentSessionState.transientMetrics.integrationState = "Project preset state restored";
     currentSessionState.transientMetrics.lastFailure.clear();
@@ -3930,6 +4157,7 @@ EnginePresetStateRestoreResult EngineFacade::restorePresetStateJson(const std::s
     currentSessionState.loadProfileId = parsedState.preset.loadProfileId;
     currentSessionState.selectedArticulationId = parsedState.preset.selectedArticulationId;
     currentSessionState.macroValues = parsedState.preset.macroValues;
+    currentSessionState.instrumentControlValues = parsedState.preset.instrumentControlValues;
     currentSessionState.notes = parsedState.preset.notes;
     currentSessionState.transientMetrics.integrationState = "Preset state restored";
     currentSessionState.transientMetrics.lastFailure.clear();
@@ -4068,6 +4296,30 @@ void EngineFacade::syncPreviewSnapshotFromDraftPlayback()
 
     if (previewPlaybackSnapshot.errorMessage.empty() && !draftStatus.preview.findings.empty())
         previewPlaybackSnapshot.errorMessage = summarizeSnapshotFindings(draftStatus.preview.findings);
+}
+
+const ImmutablePlaybackSnapshot* EngineFacade::getActivePerformanceSnapshot() const
+{
+    if (const auto active = performancePublishController.getActiveActivationPayload();
+        active != nullptr && active->playbackPayload != nullptr
+        && active->playbackPayload->snapshot != nullptr)
+    {
+        return active->playbackPayload->snapshot.get();
+    }
+
+    const auto& performance = draftPlaybackContract.getStatus().performance;
+    if (performance.available && performance.activationPayload != nullptr
+        && performance.activationPayload->snapshot != nullptr)
+    {
+        return performance.activationPayload->snapshot.get();
+    }
+
+    if (packagePerformanceActivationPayload != nullptr
+        && packagePerformanceActivationPayload->snapshot != nullptr)
+    {
+        return packagePerformanceActivationPayload->snapshot.get();
+    }
+    return nullptr;
 }
 
 void EngineFacade::initializeDraftPlaybackContract(bool activatePerformanceRevision,
