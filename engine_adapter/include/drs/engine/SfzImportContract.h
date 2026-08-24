@@ -72,7 +72,7 @@ struct SfzImportBudgetLimits
     // hostile recursive or diagnostic-heavy documents well below process-
     // threatening sizes.
     std::size_t maximumTotalSourceBytes = 16u * 1024u * 1024u;
-    std::size_t maximumIncludeCount = 256;
+    std::size_t maximumIncludeCount = 1024;
     std::size_t maximumIncludeDepth = 32;
     std::size_t maximumSectionCount = 100000;
     std::size_t maximumRegionCount = 65536;

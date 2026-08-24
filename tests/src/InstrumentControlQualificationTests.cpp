@@ -154,6 +154,55 @@ int main()
                 "Qualification fixture must retain global and region sections.");
         const auto nakedDrums = std::string(DRS_SOURCE_ROOT)
             + "/../DemoSFVInstruments/WilkinsonAudio.NakedDrums-master/WilkinsonAudio.NakedDrums-master/Wilkinson Audio/Naked Drums/User/Naked Drums GM.sfz";
+        const auto fullNakedDrums = std::string(DRS_SOURCE_ROOT)
+            + "/../DemoSFVInstruments/WilkinsonAudio.NakedDrums-master/WilkinsonAudio.NakedDrums-master/Wilkinson Audio/Naked Drums/Stereo/Naked Drums.sfz";
+        require(defaultSfzImportExecutionContext().budgets.maximumIncludeCount == 1024,
+                "The production SFZ include budget must admit legitimate deeply composed instruments.");
+        auto legacyIncludeBudgetContext = defaultSfzImportExecutionContext();
+        legacyIncludeBudgetContext.budgets.maximumIncludeCount = 256;
+        const auto legacyBudgetFullNakedParse = parseSfzDocument(
+            fullNakedDrums, legacyIncludeBudgetContext);
+        require(!legacyBudgetFullNakedParse.complete
+                    && legacyBudgetFullNakedParse.execution.failureReason
+                        == SfzImportFailureReason::budgetExceeded
+                    && std::any_of(legacyBudgetFullNakedParse.findings.begin(),
+                                   legacyBudgetFullNakedParse.findings.end(),
+                        [](const auto& finding)
+                        {
+                            return finding.code == "budget.include_count_exceeded";
+                        }),
+                "The complete Naked Drums stereo fixture must exercise the former 256-include failure.");
+        const auto fullNakedAnalysis = analyzeSfzImportDocument(fullNakedDrums);
+        const auto hasFullKitIncludeBudgetFinding = std::any_of(
+            fullNakedAnalysis.parseResult.findings.begin(),
+            fullNakedAnalysis.parseResult.findings.end(),
+            [](const auto& finding)
+            {
+                return finding.code == "budget.include_count_exceeded";
+            });
+        require(fullNakedAnalysis.analyzed
+                    && fullNakedAnalysis.parseResult.parsed
+                    && fullNakedAnalysis.parseResult.complete
+                    && fullNakedAnalysis.report.available
+                    && !fullNakedAnalysis.report.blocking
+                    && !hasFullKitIncludeBudgetFinding,
+                "The complete Naked Drums stereo kit must fit within the production SFZ include budget.");
+        RuntimeProjectModel fullNakedProject;
+        fullNakedProject.schemaName = "drs.project";
+        fullNakedProject.schemaVersion = instrumentControlProjectSchemaVersion;
+        fullNakedProject.projectId = "naked-drums-full-stereo";
+        fullNakedProject.displayName = "Naked Drums Full Stereo";
+        fullNakedProject.contentRootPath = std::string(DRS_SOURCE_ROOT) + "/../DemoSFVInstruments";
+        fullNakedProject.defaultInstrumentManifestPath = "naked-drums-full-stereo.drinst";
+        fullNakedProject.authoring.schemaName = "drs.authoring";
+        fullNakedProject.authoring.schemaVersion = instrumentControlAuthoringSchemaVersion;
+        const auto fullNakedProjection = projectSfzImportAnalysis(
+            fullNakedProject, fullNakedAnalysis);
+        require(fullNakedProjection.projected && fullNakedProjection.playable
+                    && !fullNakedProjection.blocking
+                    && fullNakedProjection.sampleSources.size() > 1100
+                    && fullNakedProjection.zones.size() > 1100,
+                "The complete Naked Drums stereo kit must project into playable native content.");
         const auto parseStarted = std::chrono::steady_clock::now();
         const auto nakedParsed = parseSfzDocument(nakedDrums);
         const auto parseElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -413,6 +462,7 @@ int main()
                   << " actualGainCc41=" << actualGainCc41.first << "/" << actualGainCc41.second
                   << " actualGainCc42=" << actualGainCc42.first << "/" << actualGainCc42.second
                   << " actualGainCc7=" << actualGainCc7.first << "/" << actualGainCc7.second
+                  << " fullStereoZones=" << fullNakedProjection.zones.size()
                   << " corpusDocuments=" << corpusDocuments << std::endl;
         return 0;
     }
