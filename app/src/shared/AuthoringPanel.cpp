@@ -1658,7 +1658,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     summaryCallbacks.onPublishDraftPlaybackRequested = [this] { publishDraftPlayback(); };
     summaryCallbacks.onUndoRequested = [this] { undoLastEdit(); };
     summaryCallbacks.onRedoRequested = [this] { redoLastEdit(); };
-    summaryCallbacks.onMarkSavedRequested = [this] { markSavedCheckpoint(); };
     summaryStrip.setCallbacks(std::move(summaryCallbacks));
 
     authoring::ZoneFieldCallbacks zoneCallbacks;
@@ -4612,7 +4611,6 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
     viewModel.playbackText = "Draft playback: status unavailable";
     viewModel.canUndo = documentState.undoDepth > 0;
     viewModel.canRedo = documentState.redoDepth > 0;
-    viewModel.dirty = documentState.dirty;
 
     if (draftPlaybackStatusProvider)
     {
@@ -8612,12 +8610,6 @@ void AuthoringPanel::undoLastEdit()
 void AuthoringPanel::redoLastEdit()
 {
     authoringSession.redo();
-    refreshFromSession();
-}
-
-void AuthoringPanel::markSavedCheckpoint()
-{
-    authoringSession.markSaved();
     refreshFromSession();
 }
 

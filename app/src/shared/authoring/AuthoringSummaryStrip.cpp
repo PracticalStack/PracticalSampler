@@ -44,7 +44,7 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
     setComponentID("authoringSummaryStrip");
     configureAccessibleMetadata(*this,
                                 "Selection summary strip",
-                                "Summarizes the current zone selection and exposes preview and save actions.");
+                                "Summarizes the current zone selection and exposes preview and playback actions.");
 
     titleLabel.setFont(juce::FontOptions(visual::titleTypeSize, juce::Font::bold));
     titleLabel.setColour(juce::Label::textColourId, visual::text);
@@ -111,19 +111,6 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
             callbacks.onPublishDraftPlaybackRequested();
     };
 
-    saveCheckpointButton.setButtonText("Mark Saved");
-    saveCheckpointButton.setComponentID("authoringSaveButton");
-    configureAccessibleMetadata(saveCheckpointButton,
-                                "Mark saved",
-                                "Marks the current authoring state as saved.",
-                                "Press to clear the dirty state after reviewing changes.");
-    saveCheckpointButton.setExplicitFocusOrder(12);
-    saveCheckpointButton.onClick = [this]
-    {
-        if (callbacks.onMarkSavedRequested)
-            callbacks.onMarkSavedRequested();
-    };
-
     for (auto* component : {
              static_cast<juce::Component*>(&titleLabel),
              static_cast<juce::Component*>(&statusLabel),
@@ -132,8 +119,7 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
              static_cast<juce::Component*>(&playbackLabel),
              static_cast<juce::Component*>(&previewButton),
              static_cast<juce::Component*>(&prepareDraftButton),
-             static_cast<juce::Component*>(&publishDraftButton),
-             static_cast<juce::Component*>(&saveCheckpointButton)
+             static_cast<juce::Component*>(&publishDraftButton)
          })
     {
         addAndMakeVisible(component);
@@ -158,9 +144,6 @@ void AuthoringSummaryStrip::resized()
     playbackLabel.setBounds(detailRow);
 
     auto heroButtons = hero.removeFromRight(350);
-    auto topRow = heroButtons.removeFromTop(28);
-    saveCheckpointButton.setBounds(topRow.removeFromLeft(120));
-    heroButtons.removeFromTop(10);
     auto actionRow = heroButtons.removeFromTop(30);
     previewButton.setBounds(actionRow.removeFromLeft(140));
     actionRow.removeFromLeft(8);
@@ -204,12 +187,6 @@ void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel
                                    "Unavailable because the latest draft is not ready to publish yet.",
                                    "Press to publish the latest prepared draft to the performance path.",
                                    "Prepare the latest draft before publishing it to the performance path.");
-    saveCheckpointButton.setDescription(viewModel.dirty
-                                            ? "Marks the current authoring state as saved."
-                                            : "Project is already marked saved.");
-    saveCheckpointButton.setHelpText(viewModel.dirty
-                                         ? "Press to clear the dirty state after reviewing changes."
-                                         : "Make a change before marking a new saved state.");
 }
 
 void AuthoringSummaryStrip::setCallbacks(SelectionSummaryCallbacks nextCallbacks)

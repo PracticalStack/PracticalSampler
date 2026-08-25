@@ -245,7 +245,6 @@ private:
     void publishDraftPlayback();
     void undoLastEdit();
     void redoLastEdit();
-    void markSavedCheckpoint();
     std::vector<drs::engine::AuthoringZoneSummary> buildVisibleZoneSummaries() const;
     void syncZoneMapSelectionState();
     bool applyZoneMapSelectionState(const authoring::ZoneMapCanvas::SelectionState& selectionState);

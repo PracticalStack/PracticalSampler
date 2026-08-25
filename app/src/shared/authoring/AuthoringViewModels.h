@@ -38,7 +38,6 @@ struct SelectionSummaryViewModel
     bool canRestoreRootKey = false;
     bool canUndo = false;
     bool canRedo = false;
-    bool dirty = false;
 };
 
 struct ZoneFieldValuesViewModel
@@ -153,7 +152,6 @@ struct SelectionSummaryCallbacks
     std::function<void()> onPublishDraftPlaybackRequested;
     std::function<void()> onUndoRequested;
     std::function<void()> onRedoRequested;
-    std::function<void()> onMarkSavedRequested;
 };
 
 struct ZoneFieldCallbacks
