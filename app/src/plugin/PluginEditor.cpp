@@ -38,6 +38,7 @@ constexpr int menuButtonHeight = 24;
 constexpr int menuButtonSpacing = 8;
 constexpr int menuButtonYInset = 4;
 constexpr int menuButtonWidth = 72;
+constexpr int editButtonWidth = 64;
 constexpr int settingsButtonWidth = 92;
 
 std::string buildPerformancePackageTimingSummary(
@@ -690,6 +691,10 @@ Editor::Editor(Processor& owner)
     appSettingsOptions.commonToAllUsers = false;
     appProperties.setStorageParameters(appSettingsOptions);
 
+    commandManager.setFirstCommandTarget(this);
+    commandManager.registerAllCommandsForTarget(this);
+    addKeyListener(commandManager.getKeyMappings());
+
     workspaceShell.setComponentID("pluginWorkspaceShell");
     addAndMakeVisible(workspaceShell);
 
@@ -701,6 +706,15 @@ Editor::Editor(Processor& owner)
         showFileMenu();
     };
     workspaceShell.addAndMakeVisible(fileMenuButton);
+
+    editMenuButton.setComponentID("pluginEditMenuButton");
+    editMenuButton.setColour(juce::TextButton::buttonColourId, drs::app::authoring::visual::surfaceRaised);
+    editMenuButton.setColour(juce::TextButton::textColourOffId, drs::app::authoring::visual::text);
+    editMenuButton.onClick = [this]
+    {
+        showEditMenu();
+    };
+    workspaceShell.addAndMakeVisible(editMenuButton);
 
     settingsMenuButton.setComponentID("pluginSettingsMenuButton");
     settingsMenuButton.setColour(juce::TextButton::buttonColourId, drs::app::authoring::visual::surfaceRaised);
@@ -762,6 +776,8 @@ Editor::Editor(Processor& owner)
 Editor::~Editor()
 {
     stopTimer();
+    removeKeyListener(commandManager.getKeyMappings());
+    commandManager.setFirstCommandTarget(nullptr);
     if (performancePackageExportClient.has_value())
     {
         performancePackageExportClient->cancel("Editor closed");
@@ -789,6 +805,9 @@ void Editor::resized()
     auto menuRow = area.removeFromTop(menuRowHeight).reduced(8, 0);
 
     fileMenuButton.setBounds(menuRow.removeFromLeft(menuButtonWidth).withTrimmedTop(menuButtonYInset)
+                                 .withTrimmedBottom(menuButtonYInset));
+    menuRow.removeFromLeft(menuButtonSpacing);
+    editMenuButton.setBounds(menuRow.removeFromLeft(editButtonWidth).withTrimmedTop(menuButtonYInset)
                                  .withTrimmedBottom(menuButtonYInset));
     menuRow.removeFromLeft(menuButtonSpacing);
     settingsMenuButton.setBounds(menuRow.removeFromLeft(settingsButtonWidth).withTrimmedTop(menuButtonYInset)
@@ -859,6 +878,18 @@ void Editor::showFileMenu()
                        });
 }
 
+void Editor::showEditMenu()
+{
+    juce::PopupMenu menu;
+    menu.addCommandItem(&commandManager, undoCommandId);
+    menu.addCommandItem(&commandManager, redoCommandId);
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&editMenuButton),
+                       [](int)
+                       {
+                       });
+}
+
 void Editor::showSettingsMenu()
 {
     juce::PopupMenu menu;
@@ -920,6 +951,68 @@ void Editor::handleMenuCommand(int menuItemId)
             break;
         default:
             break;
+    }
+}
+
+juce::ApplicationCommandTarget* Editor::getNextCommandTarget()
+{
+    return nullptr;
+}
+
+void Editor::getAllCommands(juce::Array<juce::CommandID>& commands)
+{
+    commands.add(undoCommandId);
+    commands.add(redoCommandId);
+}
+
+void Editor::getCommandInfo(const juce::CommandID commandID,
+                            juce::ApplicationCommandInfo& result)
+{
+    const auto authoringAvailable = processor.getWorkspaceDocumentState().authoringAvailable;
+    const auto& documentState = processor.getAuthoringSession().getDocumentState();
+
+    switch (commandID)
+    {
+        case undoCommandId:
+            result.setInfo("Undo", "Undo the most recent authoring change", "Edit", 0);
+            result.addDefaultKeypress('z', juce::ModifierKeys::commandModifier);
+            result.setActive(authoringAvailable && documentState.undoDepth > 0);
+            break;
+        case redoCommandId:
+            result.setInfo("Redo", "Redo the most recently undone authoring change", "Edit", 0);
+            result.addDefaultKeypress('z',
+                                       juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier);
+            result.setActive(authoringAvailable && documentState.redoDepth > 0);
+            break;
+        default:
+            break;
+    }
+}
+
+bool Editor::perform(const juce::ApplicationCommandTarget::InvocationInfo& info)
+{
+    if (!processor.getWorkspaceDocumentState().authoringAvailable)
+        return false;
+
+    const auto& documentState = processor.getAuthoringSession().getDocumentState();
+    switch (info.commandID)
+    {
+        case undoCommandId:
+            if (documentState.undoDepth == 0)
+                return false;
+            processor.getAuthoringSession().undo();
+            refreshProjectViews();
+            commandManager.commandStatusChanged();
+            return true;
+        case redoCommandId:
+            if (documentState.redoDepth == 0)
+                return false;
+            processor.getAuthoringSession().redo();
+            refreshProjectViews();
+            commandManager.commandStatusChanged();
+            return true;
+        default:
+            return false;
     }
 }
 

@@ -684,6 +684,8 @@ MainComponent::MainComponent(bool enableAudioOutput)
     appProperties.setStorageParameters(appSettingsOptions);
 
     commandManager.setFirstCommandTarget(this);
+    commandManager.registerAllCommandsForTarget(this);
+    addKeyListener(commandManager.getKeyMappings());
     setApplicationCommandManagerToWatch(&commandManager);
     menuBar.setComponentID("mainMenuBar");
     addAndMakeVisible(menuBar);
@@ -754,6 +756,7 @@ MainComponent::~MainComponent()
         sfzImportClient->waitForTerminal(std::chrono::seconds(10));
     }
     menuBar.setModel(nullptr);
+    removeKeyListener(commandManager.getKeyMappings());
     commandManager.setFirstCommandTarget(nullptr);
     appProperties.saveIfNeeded();
     shutdownAudioOutput();

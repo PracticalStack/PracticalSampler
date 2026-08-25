@@ -16,6 +16,7 @@
 namespace drs::plugin
 {
 class Editor final : public juce::AudioProcessorEditor,
+                     private juce::ApplicationCommandTarget,
                      private juce::Timer
 {
 public:
@@ -40,11 +41,18 @@ private:
         importBackgroundImageCommandId,
         importLicenseFileCommandId,
         viewLicenseCommandId,
+        undoCommandId,
+        redoCommandId,
         preferencesCommandId
     };
 
+    juce::ApplicationCommandTarget* getNextCommandTarget() override;
+    void getAllCommands(juce::Array<juce::CommandID>& commands) override;
+    void getCommandInfo(juce::CommandID commandID, juce::ApplicationCommandInfo& result) override;
+    bool perform(const juce::ApplicationCommandTarget::InvocationInfo& info) override;
     void timerCallback() override;
     void showFileMenu();
+    void showEditMenu();
     void showSettingsMenu();
     void handleMenuCommand(int menuItemId);
     void createNewProject();
@@ -117,8 +125,10 @@ private:
     };
 
     Processor& processor;
+    juce::ApplicationCommandManager commandManager;
     juce::Component workspaceShell;
     juce::TextButton fileMenuButton { "File" };
+    juce::TextButton editMenuButton { "Edit" };
     juce::TextButton settingsMenuButton { "Settings" };
     juce::Label projectStatusLabel;
     juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };
