@@ -98,10 +98,8 @@ void qualifyAuthoringSurfaceAndStates()
     require(shellImage.getPixelAt(30, 30) == visual::surface,
             "Authoring panel must use a warm work surface instead of the former dark card.");
 
-    auto* summaryTitle = dynamic_cast<juce::Label*>(findDescendantById(panel, "authoringSummaryTitleLabel"));
-    require(summaryTitle != nullptr
-                && summaryTitle->findColour(juce::Label::textColourId) == visual::text,
-            "The authoring summary title must no longer depend on a dark background.");
+    require(findDescendantById(panel, "authoringSummaryTitleLabel") == nullptr,
+            "The authoring summary must not render the removed workspace title.");
 
     auto* tab = dynamic_cast<juce::Button*>(findDescendantById(panel, "authoringWorkbenchWaveformTab"));
     require(tab != nullptr,

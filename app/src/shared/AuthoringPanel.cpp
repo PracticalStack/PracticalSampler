@@ -1154,13 +1154,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
                                SourceValidationStatusProvider nextSourceValidationStatusProvider,
                                DraftPlaybackActionCallback nextRequestSourceValidation,
                                DraftPlaybackActionCallback nextCancelSourceValidation,
-                               WaveformDetailRequestCallback nextWaveformDetailRequestCallback,
-                               InstrumentControlValueCallback nextInstrumentControlValueCallback,
-                               InstrumentControlResetCallback nextInstrumentControlResetCallback,
-                               InstrumentControlBindingCallback nextInstrumentControlBindingCallback,
-                               InstrumentControlBindingClearCallback nextInstrumentControlBindingClearCallback,
-                               InstrumentControlBindingRestoreCallback nextInstrumentControlBindingRestoreCallback,
-                               InstrumentControlLearnCallback nextInstrumentControlLearnCallback)
+                               WaveformDetailRequestCallback nextWaveformDetailRequestCallback)
     : authoringSession(session),
       waveformPreviewProvider(std::move(previewProvider)),
       waveformPreviewRequestCallback(std::move(nextWaveformPreviewRequestCallback)),
@@ -1177,12 +1171,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
       onCancelSourceValidation(std::move(nextCancelSourceValidation)),
       previewCommandCallback(std::move(nextPreviewCommandCallback)),
       sampleFilesDroppedCallback(std::move(nextSampleFilesDroppedCallback)),
-      instrumentControlValueCallback(std::move(nextInstrumentControlValueCallback)),
-      instrumentControlResetCallback(std::move(nextInstrumentControlResetCallback)),
-      instrumentControlBindingCallback(std::move(nextInstrumentControlBindingCallback)),
-      instrumentControlBindingClearCallback(std::move(nextInstrumentControlBindingClearCallback)),
-      instrumentControlBindingRestoreCallback(std::move(nextInstrumentControlBindingRestoreCallback)),
-      instrumentControlLearnCallback(std::move(nextInstrumentControlLearnCallback)),
       layerList("authoringLayerList",
                 "authoringLayerListBox",
                 "authoringLayerListEmptyState"),
@@ -1344,52 +1332,12 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     macroWorkbenchViewport.setComponentID("authoringMacroViewport");
     routingWorkbenchContent.setComponentID("authoringRoutingContent");
     routingWorkbenchViewport.setComponentID("authoringRoutingViewport");
-    instrumentControlsWorkbenchContent.setValueChangedCallback(
-        [this](const std::string& id, const double value)
-        {
-            if (instrumentControlValueCallback != nullptr)
-                instrumentControlValueCallback(id, value);
-        });
-    instrumentControlsWorkbenchContent.setResetCallback(
-        [this](const std::string& id)
-        {
-            if (instrumentControlResetCallback != nullptr)
-                instrumentControlResetCallback(id);
-        });
-    instrumentControlsWorkbenchContent.setBindingChangedCallback(
-        [this](const std::string& id, const int controller, const std::uint8_t channel)
-        {
-            if (instrumentControlBindingCallback != nullptr)
-                instrumentControlBindingCallback(id, controller, channel);
-            refreshNow();
-        });
-    instrumentControlsWorkbenchContent.setBindingClearCallback(
-        [this](const std::string& id)
-        {
-            if (instrumentControlBindingClearCallback != nullptr)
-                instrumentControlBindingClearCallback(id);
-            refreshNow();
-        });
-    instrumentControlsWorkbenchContent.setBindingRestoreCallback(
-        [this](const std::string& id)
-        {
-            if (instrumentControlBindingRestoreCallback != nullptr)
-                instrumentControlBindingRestoreCallback(id);
-            refreshNow();
-        });
-    instrumentControlsWorkbenchContent.setLearnRequestedCallback(
-        [this](const std::string& id)
-        {
-            if (instrumentControlLearnCallback != nullptr)
-                instrumentControlLearnCallback(id);
-        });
     workbenchToggleButton.setComponentID("authoringWorkbenchToggleButton");
     workbenchWaveformTabButton.setComponentID("authoringWorkbenchWaveformTab");
     workbenchGroupsTabButton.setComponentID("authoringWorkbenchGroupsTab");
     workbenchMacrosTabButton.setComponentID("authoringWorkbenchMacrosTab");
     workbenchRoutingTabButton.setComponentID("authoringWorkbenchRoutingTab");
     workbenchPerformanceTabButton.setComponentID("authoringWorkbenchPerformanceTab");
-    workbenchInstrumentControlsTabButton.setComponentID("authoringWorkbenchInstrumentControlsTab");
     waveformLabel.setComponentID("authoringWorkbenchTitleLabel");
     waveformScopeLabel.setComponentID("authoringWorkbenchScopeLabel");
     workbenchBreadcrumbLabel.setComponentID("authoringWorkbenchBreadcrumbLabel");
@@ -1564,7 +1512,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     workbenchRoutingTabButton.setButtonText("Routing");
     workbenchPerformanceTabButton.setButtonText("Performance");
     workbenchArticulationsTabButton.setButtonText("Articulations");
-    workbenchInstrumentControlsTabButton.setButtonText("Controls");
     workbenchWaveformTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::waveform); };
     waveformLoopModeSelector.onChange = [this]
     {
@@ -1623,7 +1570,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
     workbenchRoutingTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::routing); };
     workbenchPerformanceTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::performance); };
     workbenchArticulationsTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::articulations); };
-    workbenchInstrumentControlsTabButton.onClick = [this] { setActiveWorkbenchTab(authoring::WorkbenchTab::instrumentControls); };
     workbenchSplitter.setOnHeightRequested([this](const int height)
     {
         workbenchLayoutState.setUserHeight(height);
@@ -2744,7 +2690,6 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&workbenchRoutingTabButton),
              static_cast<juce::Component*>(&workbenchPerformanceTabButton),
              static_cast<juce::Component*>(&workbenchArticulationsTabButton),
-             static_cast<juce::Component*>(&workbenchInstrumentControlsTabButton),
              static_cast<juce::Component*>(&zoneLabel),
              static_cast<juce::Component*>(&zoneSelector),
              static_cast<juce::Component*>(&previewEnabledToggle),
@@ -2885,8 +2830,7 @@ AuthoringPanel::AuthoringPanel(drs::engine::AuthoringSession& session,
              static_cast<juce::Component*>(&roundRobinResetAddButton),
              static_cast<juce::Component*>(&roundRobinResetDeleteButton),
              static_cast<juce::Component*>(&roundRobinResetSummaryLabel),
-             static_cast<juce::Component*>(&articulationWorkbenchViewport),
-             static_cast<juce::Component*>(&instrumentControlsWorkbenchContent)
+             static_cast<juce::Component*>(&articulationWorkbenchViewport)
          })
     {
         addAndMakeVisible(component);
@@ -3284,17 +3228,12 @@ void AuthoringPanel::configureAccessibilityAndFocus()
                                 "Articulations workbench tab",
                                 "Shows project articulations and key-switch assignment.",
                                 "Press to switch the workbench to articulation management.");
-    configureAccessibleMetadata(workbenchInstrumentControlsTabButton,
-                                "Instrument controls workbench tab",
-                                "Shows imported SFZ controls and their MIDI controller sources.",
-                                "Press to switch the workbench to instrument controls.");
     workbenchWaveformTabButton.setExplicitFocusOrder(61);
     workbenchGroupsTabButton.setExplicitFocusOrder(62);
     workbenchMacrosTabButton.setExplicitFocusOrder(63);
     workbenchRoutingTabButton.setExplicitFocusOrder(64);
     workbenchPerformanceTabButton.setExplicitFocusOrder(65);
     workbenchArticulationsTabButton.setExplicitFocusOrder(66);
-    workbenchInstrumentControlsTabButton.setExplicitFocusOrder(67);
 
     configureAccessibleMetadata(waveformLabel,
                                 "Workbench title",
@@ -3738,7 +3677,9 @@ void AuthoringPanel::resized()
     auto area = getLocalBounds().reduced(28);
     const auto shortHeightLayout = getHeight() < authoring::shortHeightBreakpoint;
 
-    summaryStrip.setBounds(area.removeFromTop(authoring::heroHeight));
+    auto summaryArea = getLocalBounds().reduced(14, 28);
+    summaryStrip.setBounds(summaryArea.removeFromTop(authoring::heroHeight));
+    area.removeFromTop(authoring::heroHeight);
 
     area.removeFromTop(shortHeightLayout ? 8 : 12);
     auto toolbarRow = area.removeFromTop(28);
@@ -3882,7 +3823,9 @@ void AuthoringPanel::resized()
     auto inspector = shellArea.removeFromRight(inspectorWidth);
     shellArea.removeFromRight(std::min(14, shellArea.getWidth()));
     juce::Rectangle<int> structureBrowserArea;
-    const auto desiredGroupManagerHeight = expanded ? 252 : 264;
+    const auto baseStructureViewerHeight = expanded ? 252 : 264;
+    const auto desiredGroupManagerHeight = juce::roundToInt(
+        static_cast<float>(baseStructureViewerHeight) * 0.95f);
     constexpr auto minimumStackedStructureHeight = 180;
     const auto availableStackedStructureHeight = shellArea.getHeight()
         - authoring::minimumMapVisibleHeight - 8;
@@ -3922,7 +3865,7 @@ void AuthoringPanel::resized()
 
     auto tabArea = workbenchTabStrip.getBounds().reduced(0, 4);
     constexpr auto tabGap = 8;
-    const auto tabCount = DRS_ENABLE_INSTRUMENT_CONTROLS_UI ? 7 : 6;
+    constexpr auto tabCount = 6;
     const auto desiredTabWidth = expanded ? 104 : 96;
     const auto tabWidth = juce::jlimit(54,
                                        desiredTabWidth,
@@ -3938,9 +3881,6 @@ void AuthoringPanel::resized()
     workbenchPerformanceTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
     tabArea.removeFromLeft(tabGap);
     workbenchArticulationsTabButton.setBounds(tabArea.removeFromLeft(tabWidth + (expanded ? 8 : 2)));
-    tabArea.removeFromLeft(tabGap);
-    workbenchInstrumentControlsTabButton.setVisible(DRS_ENABLE_INSTRUMENT_CONTROLS_UI != 0);
-    workbenchInstrumentControlsTabButton.setBounds(tabArea.removeFromLeft(tabWidth));
 
     const auto waveformWorkbenchInShortLayout = workbenchState.activeTab
             == authoring::WorkbenchTab::waveform
@@ -4282,13 +4222,6 @@ void AuthoringPanel::resized()
             roundRobinResetSummaryLabel.setBounds(workbenchEditorArea.removeFromTop(18));
         }
     }
-    else if (workbenchState.activeTab == authoring::WorkbenchTab::instrumentControls)
-    {
-        instrumentControlsWorkbenchContent.setBounds(workbenchEditorArea);
-        instrumentControlsWorkbenchContent.setSize(
-            workbenchEditorArea.getWidth(),
-            instrumentControlsWorkbenchContent.preferredContentHeight(workbenchEditorArea.getWidth()));
-    }
     else if (workbenchState.activeTab == authoring::WorkbenchTab::articulations)
     {
         articulationWorkbenchViewport.setBounds(workbenchEditorArea);
@@ -4601,14 +4534,11 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
 {
     authoring::SelectionSummaryViewModel viewModel;
     const auto& documentState = authoringSession.getDocumentState();
-    viewModel.title = "Phase 2 Authoring Workspace";
-    viewModel.statusText = "Revision " + std::to_string(documentState.revision)
-        + " | dirty=" + std::string(documentState.dirty ? "yes" : "no")
-        + " | undo=" + std::to_string(documentState.undoDepth)
-        + " | redo=" + std::to_string(documentState.redoDepth);
+    viewModel.statusText = std::string(documentState.dirty ? "Dirty" : "Clean")
+        + " | Revision " + std::to_string(documentState.revision);
     viewModel.sourceText = "Sample source: none";
     viewModel.articulationText = "Articulation: none";
-    viewModel.playbackText = "Draft playback: status unavailable";
+    viewModel.playbackText = "Preview: unavailable | Draft: unavailable | Publish: unavailable";
     viewModel.canUndo = documentState.undoDepth > 0;
     viewModel.canRedo = documentState.redoDepth > 0;
 
@@ -4616,11 +4546,9 @@ authoring::SelectionSummaryViewModel AuthoringPanel::buildSelectionSummaryViewMo
     {
         const auto playbackStatus = draftPlaybackStatusProvider();
         const auto playbackGuidance = buildDraftPlaybackGuidance(authoringSession, playbackStatus);
-        viewModel.playbackText = "Draft playback: draft r" + std::to_string(playbackStatus.draftRevision)
-            + " | preview r" + std::to_string(playbackStatus.preview.revision)
-            + " (" + playbackStatus.preview.state + ")"
-            + " | published r" + std::to_string(playbackStatus.performance.revision)
-            + " (" + playbackStatus.performance.state + ")";
+        viewModel.playbackText = "Preview: " + playbackStatus.preview.state
+            + " | Draft r" + std::to_string(playbackStatus.draftRevision)
+            + " | Publish: " + playbackStatus.performance.state;
         viewModel.canPrepareDraftPlayback = playbackGuidance.canPrepareDraftPlayback;
         viewModel.canPublishDraftPlayback = playbackGuidance.canPublishDraftPlayback;
         if (!playbackGuidance.statusText.empty())
@@ -4950,20 +4878,9 @@ void AuthoringPanel::rebuildZoneSelector()
     zoneSelector.setSelectedId(selectedItemId, juce::dontSendNotification);
 }
 
-void AuthoringPanel::observeInstrumentControlMidiCc(const std::uint8_t channel,
-                                                     const std::uint8_t controllerNumber,
-                                                     const std::uint8_t value,
-                                                     const std::uint64_t nowMs)
-{
-    instrumentControlsWorkbenchContent.observeMidiCc(channel, controllerNumber, value, nowMs);
-}
-
 void AuthoringPanel::rebuildLayerList()
 {
     const auto& project = authoringSession.getProject();
-    instrumentControlsWorkbenchContent.setControls(
-        project.authoring.instrumentControls,
-        project.authoring.midiControlBindings);
     const auto selectedLayer = authoringSession.getSelectedLayer();
     authoring::RepeatedStructureListViewModel viewModel;
     viewModel.emptyStateText = "No layers are authored in this project yet.";
@@ -5432,8 +5349,6 @@ void AuthoringPanel::refreshWorkbenchVisibility()
     const auto routingTab = workbenchState.activeTab == authoring::WorkbenchTab::routing;
     const auto performanceTab = workbenchState.activeTab == authoring::WorkbenchTab::performance;
     const auto articulationsTab = workbenchState.activeTab == authoring::WorkbenchTab::articulations;
-    const auto instrumentControlsTab = DRS_ENABLE_INSTRUMENT_CONTROLS_UI
-        && workbenchState.activeTab == authoring::WorkbenchTab::instrumentControls;
     const auto workbenchContentVisible = workbenchState.open;
     const auto expanded = isExpandedLayout(layoutMode);
     const auto* focusedComponent = juce::Component::getCurrentlyFocusedComponent();
@@ -5683,17 +5598,12 @@ void AuthoringPanel::refreshWorkbenchVisibility()
     setVisibleAndAccessible(articulationDeleteReassignLabel, workbenchContentVisible && articulationsTab);
     setVisibleAndAccessible(articulationDeleteReassignSelector, workbenchContentVisible && articulationsTab);
     setVisibleAndAccessible(articulationStatusLabel, workbenchContentVisible && articulationsTab);
-    setVisibleAndAccessible(instrumentControlsWorkbenchContent,
-                            workbenchContentVisible && instrumentControlsTab);
-
     workbenchWaveformTabButton.setToggleState(waveformTab, juce::dontSendNotification);
     workbenchGroupsTabButton.setToggleState(groupsTab, juce::dontSendNotification);
     workbenchMacrosTabButton.setToggleState(macrosTab, juce::dontSendNotification);
     workbenchRoutingTabButton.setToggleState(routingTab, juce::dontSendNotification);
     workbenchPerformanceTabButton.setToggleState(performanceTab, juce::dontSendNotification);
     workbenchArticulationsTabButton.setToggleState(articulationsTab, juce::dontSendNotification);
-    workbenchInstrumentControlsTabButton.setToggleState(instrumentControlsTab, juce::dontSendNotification);
-
     const auto focusedWorkbenchContentBecameHidden = !workbenchContentVisible
         ? (focusWithinWaveform || focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
         : (waveformTab ? (focusWithinGroups || focusWithinMacros || focusWithinRouting || focusWithinPerformance || focusWithinArticulations)
@@ -5717,8 +5627,6 @@ void AuthoringPanel::refreshWorkbenchVisibility()
             workbenchRoutingTabButton.grabKeyboardFocus();
         else if (performanceTab)
             workbenchPerformanceTabButton.grabKeyboardFocus();
-        else if (instrumentControlsTab)
-            workbenchInstrumentControlsTabButton.grabKeyboardFocus();
         else
             workbenchArticulationsTabButton.grabKeyboardFocus();
     }
@@ -6391,11 +6299,6 @@ void AuthoringPanel::refreshWorkbenchContextLabels()
                                           juce::dontSendNotification);
             break;
         }
-        case authoring::WorkbenchTab::instrumentControls:
-            waveformLabel.setText("Instrument Controls", juce::dontSendNotification);
-            waveformScopeLabel.setText("Imported SFZ parameters and MIDI sources", juce::dontSendNotification);
-            workbenchBreadcrumbLabel.setText("Project > Instrument Controls", juce::dontSendNotification);
-            break;
         default:
             break;
     }

@@ -597,81 +597,30 @@ MainComponent::MainComponent(bool enableAudioOutput)
                          processor.requestAuthoringWaveformDetail(startFrame,
                                                                   endFrameExclusive,
                                                                   displayPointCount);
-                     },
-                     [this](const std::string& controlId, const double value)
-                     {
-                         processor.setInstrumentControlValueFromShell(controlId, value);
-                     },
-                     [this](const std::string& controlId)
-                     {
-                         processor.resetInstrumentControlValueFromShell(controlId);
-                     },
-                     [this](const std::string& controlId, const int controller, const std::uint8_t channel)
-                     {
-                         auto& session = processor.getAuthoringSession();
-                         if (controller < 0)
-                         {
-                             const auto bindings = session.getMidiControlBindings();
-                             for (const auto& binding : bindings)
-                                 if (binding.controlId == controlId)
-                                     session.deleteMidiControlBinding(binding.id, "Clear instrument control MIDI assignment");
-                             return;
-                         }
-                         auto binding = drs::engine::RuntimeProjectMidiControlBindingDefinition {};
-                         const auto existing = std::find_if(session.getMidiControlBindings().begin(),
-                                                            session.getMidiControlBindings().end(),
-                                                            [&](const auto& candidate)
-                                                            {
-                                                                return candidate.controlId == controlId;
-                                                            });
-                         if (existing != session.getMidiControlBindings().end())
-                             binding = *existing;
-                         else
-                             binding.id = "binding.authoring." + controlId;
-                         binding.controlId = controlId;
-                         binding.controllerNumber = controller;
-                         binding.imported = false;
-                         binding.channelScope.kind = channel == 0
-                             ? drs::engine::RuntimeMidiChannelScopeKind::any
-                             : drs::engine::RuntimeMidiChannelScopeKind::exact;
-                         binding.channelScope.channel = channel;
-                         session.upsertMidiControlBinding(binding, "Assign instrument control MIDI source");
-                     },
-                     [this](const std::string& controlId)
-                     {
-                         auto& session = processor.getAuthoringSession();
-                         const auto bindings = session.getMidiControlBindings();
-                         for (const auto& binding : bindings)
-                             if (binding.controlId == controlId)
-                                 session.deleteMidiControlBinding(binding.id, "Clear instrument control MIDI assignment");
-                     },
-                     [this](const std::string& controlId)
-                     {
-                         const auto& session = processor.getAuthoringSession();
-                         const auto control = std::find_if(session.getInstrumentControls().begin(),
-                                                           session.getInstrumentControls().end(),
-                                                           [&](const auto& candidate)
-                                                           {
-                                                               return candidate.id == controlId;
-                                                           });
-                         if (control == session.getInstrumentControls().end()
-                             || !control->importedSourceController.has_value())
-                             return;
-                         auto binding = drs::engine::RuntimeProjectMidiControlBindingDefinition {};
-                         binding.id = "binding.sfz.cc." + std::to_string(*control->importedSourceController);
-                         binding.controlId = controlId;
-                         binding.controllerNumber = *control->importedSourceController;
-                         binding.enabled = true;
-                         binding.imported = true;
-                         binding.importedSourceController = binding.controllerNumber;
-                         processor.getAuthoringSession().upsertMidiControlBinding(
-                             binding, "Restore imported instrument control MIDI source");
-                     },
-                     [this](const std::string&)
-                     {
-                         // The workbench owns the learn state machine; retain this hook
-                         // for future status/announcement integration.
                      }),
+      instrumentControlsPanel(processor.getEngineFacade(),
+                              [this](const std::string& controlId, const double value)
+                              {
+                                  return processor.setInstrumentControlValueFromShell(controlId, value);
+                              },
+                              [this]
+                              {
+                                  std::vector<drs::engine::EngineInstrumentControlDescriptor> descriptors;
+                                  for (const auto& control : processor.getAuthoringSession().getInstrumentControls())
+                                      descriptors.push_back({
+                                          control.id,
+                                          control.displayName,
+                                          control.category,
+                                          control.kind,
+                                          control.unit,
+                                          control.normalizedDefault,
+                                          control.normalizedDefault,
+                                          control.importedSourceController.value_or(-1),
+                                          {},
+                                          control.visible
+                                      });
+                                  return descriptors;
+                              }),
       restoreBanner([this] { locateProjectForRestore(); },
                     [this] { processor.retryProjectRestore(); })
 {
@@ -1018,15 +967,6 @@ void MainComponent::timerCallback()
         processor.serviceMessageThreadWork();
     }
     {
-        std::uint8_t channel = 0;
-        std::uint8_t controllerNumber = 0;
-        std::uint8_t value = 0;
-        if (processor.consumeLatestMidiControlObservation(channel, controllerNumber, value))
-            authoringPanel.observeInstrumentControlMidiCc(
-                channel, controllerNumber, value,
-                static_cast<std::uint64_t>(juce::Time::currentTimeMillis()));
-    }
-    {
         const drs::app::ScopedMessageThreadSpan section(
             drs::app::MessageThreadSpanKind::editorRestoreWork);
         if (restoreBanner.update(processor.getProjectRestoreSnapshot()))
@@ -1041,6 +981,12 @@ void MainComponent::timerCallback()
         const drs::app::ScopedMessageThreadSpan section(
             drs::app::MessageThreadSpanKind::editorPerformanceWork);
         performancePanel.refreshNow();
+    }
+    {
+        const drs::app::ScopedMessageThreadSpan section(
+            drs::app::MessageThreadSpanKind::editorAuthoringWork);
+        instrumentControlsPanel.refreshNow();
+        synchronizeWorkspacePresentation();
     }
     {
         const drs::app::ScopedMessageThreadSpan section(
@@ -2256,6 +2202,7 @@ void MainComponent::refreshProjectViews()
 {
     if (processor.getWorkspaceDocumentState().authoringAvailable)
         authoringPanel.reloadFromSession();
+    instrumentControlsPanel.refreshNow();
     synchronizeWorkspacePresentation();
     updateWorkspaceStatusLabel();
     updateWindowTitle();
@@ -2265,8 +2212,15 @@ void MainComponent::synchronizeWorkspacePresentation()
 {
     const auto performanceOnly
         = processor.getWorkspaceDocumentState().workspaceMode == drs::engine::WorkspaceMode::performanceOnly;
-    const auto expectedTabCount = performanceOnly ? 1 : 2;
-    if (workspaceTabs.getNumTabs() == expectedTabCount)
+    const auto hasControls = instrumentControlsPanel.hasControls();
+    const auto expectedTabCount = (performanceOnly ? 1 : 2) + (hasControls ? 1 : 0);
+    const auto tabsMatch = workspaceTabs.getNumTabs() == expectedTabCount
+        && workspaceTabs.getTabContentComponent(0) == &performancePanel
+        && (performanceOnly || workspaceTabs.getTabContentComponent(1) == &authoringPanel)
+        && (!hasControls
+            || workspaceTabs.getTabContentComponent(performanceOnly ? 1 : 2)
+                == &instrumentControlsPanel);
+    if (tabsMatch)
         return;
 
     const auto previousIndex = workspaceTabs.getCurrentTabIndex();
@@ -2274,6 +2228,8 @@ void MainComponent::synchronizeWorkspacePresentation()
     workspaceTabs.addTab("Perform", performTabColour, &performancePanel, false);
     if (!performanceOnly)
         workspaceTabs.addTab("Map", mapTabColour, &authoringPanel, false);
+    if (hasControls)
+        workspaceTabs.addTab("Controls", mapTabColour, &instrumentControlsPanel, false);
 
     workspaceTabs.setCurrentTabIndex(std::clamp(previousIndex, 0, workspaceTabs.getNumTabs() - 1));
 }

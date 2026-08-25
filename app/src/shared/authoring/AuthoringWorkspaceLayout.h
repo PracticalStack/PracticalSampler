@@ -11,7 +11,7 @@ inline constexpr int expandedTargetShellHeight = 800;
 inline constexpr int expandedMinimumShellWidth = 900;
 inline constexpr int minimumShellHeight = 700;
 
-inline constexpr int heroHeight = 76;
+inline constexpr int heroHeight = 58;
 inline constexpr int compactZoneMapHeight = 160;
 inline constexpr int expandedZoneMapHeight = 190;
 inline constexpr int waveformPreviewHeight = 150;

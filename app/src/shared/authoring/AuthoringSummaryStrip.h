@@ -11,6 +11,7 @@ class AuthoringSummaryStrip final : public juce::Component
 public:
     AuthoringSummaryStrip();
 
+    void paint(juce::Graphics&) override;
     void resized() override;
     void setViewModel(SelectionSummaryViewModel nextViewModel);
     void setCallbacks(SelectionSummaryCallbacks nextCallbacks);
@@ -19,7 +20,6 @@ private:
     SelectionSummaryViewModel viewModel;
     SelectionSummaryCallbacks callbacks;
 
-    juce::Label titleLabel;
     juce::Label statusLabel;
     juce::Label sourceLabel;
     juce::Label articulationLabel;

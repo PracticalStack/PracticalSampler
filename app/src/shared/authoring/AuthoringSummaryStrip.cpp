@@ -46,17 +46,17 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
                                 "Selection summary strip",
                                 "Summarizes the current zone selection and exposes preview and playback actions.");
 
-    titleLabel.setFont(juce::FontOptions(visual::titleTypeSize, juce::Font::bold));
-    titleLabel.setColour(juce::Label::textColourId, visual::text);
-    titleLabel.setComponentID("authoringSummaryTitleLabel");
-    configureAccessibleMetadata(titleLabel,
-                                "Selected zone title",
-                                "Displays the selected zone name.");
-
     statusLabel.setColour(juce::Label::textColourId, summaryMuted);
     sourceLabel.setColour(juce::Label::textColourId, summaryMuted);
     articulationLabel.setColour(juce::Label::textColourId, summaryMuted);
     playbackLabel.setColour(juce::Label::textColourId, summaryMuted);
+    for (auto* label : { &statusLabel, &sourceLabel, &articulationLabel, &playbackLabel })
+    {
+        label->setFont(juce::FontOptions(visual::compactTypeSize, juce::Font::plain));
+        label->setMinimumHorizontalScale(0.68f);
+        label->setJustificationType(juce::Justification::centredLeft);
+    }
+    statusLabel.setFont(juce::FontOptions(visual::compactTypeSize, juce::Font::bold));
     statusLabel.setComponentID("authoringSummaryStatusLabel");
     sourceLabel.setComponentID("authoringSummarySourceLabel");
     articulationLabel.setComponentID("authoringSummaryArticulationLabel");
@@ -74,7 +74,7 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
                                 "Playback revision state",
                                 "Displays the current draft, preview, and published revision state.");
 
-    previewButton.setButtonText("Preview Selected Zone");
+    previewButton.setButtonText("Preview Zone");
     previewButton.setComponentID("authoringPreviewButton");
     configureAccessibleMetadata(previewButton,
                                 "Preview selected zone",
@@ -112,7 +112,6 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
     };
 
     for (auto* component : {
-             static_cast<juce::Component*>(&titleLabel),
              static_cast<juce::Component*>(&statusLabel),
              static_cast<juce::Component*>(&sourceLabel),
              static_cast<juce::Component*>(&articulationLabel),
@@ -126,41 +125,63 @@ AuthoringSummaryStrip::AuthoringSummaryStrip()
     }
 }
 
+void AuthoringSummaryStrip::paint(juce::Graphics& g)
+{
+    const auto surface = getLocalBounds().toFloat().reduced(0.5f, 4.5f);
+    g.setColour(visual::surfaceSubtle);
+    g.fillRoundedRectangle(surface, visual::panelRadius);
+    g.setColour(visual::border);
+    g.drawRoundedRectangle(surface, visual::panelRadius, visual::borderWidth);
+
+    g.setColour(visual::border.withAlpha(0.7f));
+    const auto top = surface.getY() + 10.0f;
+    const auto bottom = surface.getBottom() - 10.0f;
+    for (const auto* label : { &statusLabel, &sourceLabel, &articulationLabel })
+    {
+        const auto dividerX = static_cast<float>(label->getRight() + 3);
+        if (dividerX < static_cast<float>(previewButton.getX() - 8))
+            g.drawVerticalLine(juce::roundToInt(dividerX), top, bottom);
+    }
+    const auto actionDividerX = previewButton.getX() - 10;
+    if (actionDividerX > playbackLabel.getX())
+        g.drawVerticalLine(actionDividerX, top, bottom);
+}
+
 void AuthoringSummaryStrip::resized()
 {
-    auto hero = getLocalBounds();
-    auto heroLeft = hero.removeFromLeft(hero.proportionOfWidth(0.54f));
-    titleLabel.setBounds(heroLeft.removeFromTop(30));
-    heroLeft.removeFromTop(2);
-    statusLabel.setBounds(heroLeft.removeFromTop(20));
-    heroLeft.removeFromTop(2);
-    auto detailRow = heroLeft;
-    constexpr auto detailGap = 6;
-    const auto detailWidth = std::max(1, (detailRow.getWidth() - (detailGap * 2)) / 3);
-    sourceLabel.setBounds(detailRow.removeFromLeft(detailWidth));
-    detailRow.removeFromLeft(std::min(detailGap, detailRow.getWidth()));
-    articulationLabel.setBounds(detailRow.removeFromLeft(detailWidth));
-    detailRow.removeFromLeft(std::min(detailGap, detailRow.getWidth()));
-    playbackLabel.setBounds(detailRow);
+    auto area = getLocalBounds().reduced(12, 14);
+    auto actionArea = area.removeFromRight(294);
+    constexpr auto detailGap = 8;
+    const auto diagnosticWidth = area.getWidth();
+    const auto statusWidth = std::min(152, std::max(108, diagnosticWidth * 20 / 100));
+    const auto sourceWidth = std::min(210, std::max(118, diagnosticWidth * 26 / 100));
+    const auto articulationWidth = std::min(176, std::max(106, diagnosticWidth * 22 / 100));
+    statusLabel.setBounds(area.removeFromLeft(statusWidth));
+    area.removeFromLeft(detailGap);
+    sourceLabel.setBounds(area.removeFromLeft(sourceWidth));
+    area.removeFromLeft(detailGap);
+    articulationLabel.setBounds(area.removeFromLeft(articulationWidth));
+    area.removeFromLeft(detailGap);
+    playbackLabel.setBounds(area);
 
-    auto heroButtons = hero.removeFromRight(350);
-    auto actionRow = heroButtons.removeFromTop(30);
-    previewButton.setBounds(actionRow.removeFromLeft(140));
+    auto actionRow = actionArea;
+    previewButton.setBounds(actionRow.removeFromLeft(112));
     actionRow.removeFromLeft(8);
-    prepareDraftButton.setBounds(actionRow.removeFromLeft(94));
+    prepareDraftButton.setBounds(actionRow.removeFromLeft(82));
     actionRow.removeFromLeft(8);
-    publishDraftButton.setBounds(actionRow.removeFromLeft(94));
+    publishDraftButton.setBounds(actionRow.removeFromLeft(82));
 }
 
 void AuthoringSummaryStrip::setViewModel(SelectionSummaryViewModel nextViewModel)
 {
     viewModel = std::move(nextViewModel);
-    titleLabel.setText(juce::String::fromUTF8(viewModel.title.c_str()), juce::dontSendNotification);
     statusLabel.setText(juce::String::fromUTF8(viewModel.statusText.c_str()), juce::dontSendNotification);
     sourceLabel.setText(juce::String::fromUTF8(viewModel.sourceText.c_str()), juce::dontSendNotification);
     articulationLabel.setText(juce::String::fromUTF8(viewModel.articulationText.c_str()), juce::dontSendNotification);
     playbackLabel.setText(juce::String::fromUTF8(viewModel.playbackText.c_str()), juce::dontSendNotification);
-    updateDynamicAccessibleText(titleLabel, titleLabel.getText(), "Selected zone title: ");
+    statusLabel.setColour(juce::Label::textColourId,
+                          statusLabel.getText().startsWith("Dirty")
+                              ? visual::warning : visual::success);
     updateDynamicAccessibleText(statusLabel, statusLabel.getText(), "Selection status: ");
     updateDynamicAccessibleText(sourceLabel, sourceLabel.getText(), "Selected zone source: ");
     updateDynamicAccessibleText(articulationLabel, articulationLabel.getText(), "Selected zone articulation: ");

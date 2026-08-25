@@ -15,8 +15,7 @@ enum class WorkbenchTab
     macros,
     routing,
     performance,
-    articulations,
-    instrumentControls
+    articulations
 };
 
 struct WorkbenchState
@@ -27,7 +26,6 @@ struct WorkbenchState
 
 struct SelectionSummaryViewModel
 {
-    std::string title;
     std::string statusText;
     std::string sourceText;
     std::string articulationText;

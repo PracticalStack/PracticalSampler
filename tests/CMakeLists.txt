@@ -5603,3 +5603,40 @@ add_dependencies(drs_open_workbench_qualification
     drs_performance_engine_s10_articulation_ui_tests
 )
 set_target_properties(drs_open_workbench_qualification PROPERTIES FOLDER "Tests")
+
+# SampleDataSource.cpp now contains WAV-backed paged-source helpers, so any
+# executable that pulls sampler-core sample-source code also needs the import
+# implementation and its JUCE decoder modules at the final link boundary.
+set(drs_sampler_core_sample_import_test_targets
+    drs_sprint4_render_model_tests
+    drs_sprint4_voice_kernel_tests
+    drs_sprint4_scheduler_tests
+    drs_sprint4_voice_lifecycle_tests
+    drs_sprint4_playback_context_tests
+    drs_continuous_damper_hp03_tests
+    drs_continuous_damper_hp04_tests
+    drs_continuous_damper_hp05_qualification
+    drs_performance_engine_s4_state_tests
+    drs_performance_engine_s5_keyswitch_tests
+    drs_performance_engine_s6_release_tests
+    drs_performance_engine_s7_pedal_tests
+    drs_performance_engine_s8_choke_tests
+    drs_performance_engine_s9_round_robin_tests
+    drs_curated_dsp_scoped_routing_tests
+    drs_sprint4_offline_renderer_tests
+    drs_sprint4_crossfade_mixing_tests
+    drs_layer_runtime_tests
+    drs_sprint6_published_macro_binding_tests
+    drs_performance_mixer_s0_red_tests
+    drs_host_state_recovery_ui_tests
+    drs_open_workbench_phase6_tests
+    drs_performance_responsiveness_tests
+)
+
+foreach(test_target IN LISTS drs_sampler_core_sample_import_test_targets)
+    target_link_libraries(${test_target}
+        PRIVATE
+            drs_sample_import
+            juce::juce_audio_formats
+    )
+endforeach()

@@ -4,6 +4,7 @@
 #include "shared/AuthoringPanel.h"
 #include "shared/HostStateRecoveryBanner.h"
 #include "shared/PerformancePanel.h"
+#include "shared/InstrumentControlsPanel.h"
 #include "shared/WavImportWorkflow.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -157,6 +158,7 @@ private:
     juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };
     drs::app::PerformancePanel performancePanel;
     drs::app::AuthoringPanel authoringPanel;
+    drs::app::InstrumentControlsPanel instrumentControlsPanel;
     drs::app::HostStateRecoveryBanner restoreBanner;
     drs::app::PerformancePackageExportProgressComponent performancePackageExportProgress;
     drs::app::WavImportProgressComponent wavImportProgress;

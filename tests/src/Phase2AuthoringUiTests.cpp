@@ -691,11 +691,10 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     strip.setCallbacks(std::move(callbacks));
 
     drs::app::authoring::SelectionSummaryViewModel viewModel;
-    viewModel.title = "Lead Sustain";
-    viewModel.statusText = "Selected zone is ready to preview";
+    viewModel.statusText = "Clean | Revision 4";
     viewModel.sourceText = "Source: fixtures/phase2/lead-a4-sustain.wav";
     viewModel.articulationText = "Articulation: sustain";
-    viewModel.playbackText = "Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)";
+    viewModel.playbackText = "Preview: Stale | Draft r4 | Publish: Active";
     viewModel.canPreview = true;
     viewModel.canPrepareDraftPlayback = true;
     viewModel.canPublishDraftPlayback = false;
@@ -713,24 +712,21 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
     requireComponentVisibleWithin(strip, "authoringPreviewButton", bounds);
     requireComponentVisibleWithin(strip, "authoringPrepareDraftButton", bounds);
     requireComponentVisibleWithin(strip, "authoringPublishDraftButton", bounds);
-    requireComponentVisibleWithin(strip, "authoringSummaryTitleLabel", bounds);
     requireComponentVisibleWithin(strip, "authoringSummaryStatusLabel", bounds);
     requireComponentVisibleWithin(strip, "authoringSummarySourceLabel", bounds);
     requireComponentVisibleWithin(strip, "authoringSummaryArticulationLabel", bounds);
     requireComponentVisibleWithin(strip, "authoringSummaryPlaybackLabel", bounds);
-    requireAccessibilityTitleEquals(strip, "authoringSummaryTitleLabel", "Lead Sustain");
-    requireAccessibilityTitleEquals(strip, "authoringSummaryStatusLabel", "Selected zone is ready to preview");
+    requireAccessibilityTitleEquals(strip, "authoringSummaryStatusLabel", "Clean | Revision 4");
     requireAccessibilityTitleEquals(strip,
                                     "authoringSummarySourceLabel",
                                     "Source: fixtures/phase2/lead-a4-sustain.wav");
     requireAccessibilityTitleEquals(strip, "authoringSummaryArticulationLabel", "Articulation: sustain");
     requireAccessibilityTitleEquals(strip,
                                     "authoringSummaryPlaybackLabel",
-                                    "Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)");
-    requireAccessibilityDescriptionContains(strip, "authoringSummaryTitleLabel", "Selected zone title: Lead Sustain");
+                                    "Preview: Stale | Draft r4 | Publish: Active");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringSummaryStatusLabel",
-                                            "Selection status: Selected zone is ready to preview");
+                                            "Selection status: Clean | Revision 4");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringSummarySourceLabel",
                                             "Selected zone source: Source: fixtures/phase2/lead-a4-sustain.wav");
@@ -739,7 +735,7 @@ void exerciseSummaryStripLeaf(const fs::path& outputDirectory)
                                             "Selected zone articulation: Articulation: sustain");
     requireAccessibilityDescriptionContains(strip,
                                             "authoringSummaryPlaybackLabel",
-                                            "Playback revision state: Draft playback: draft r4 | preview r3 (Stale) | published r2 (Active)");
+                                            "Playback revision state: Preview: Stale | Draft r4 | Publish: Active");
     requireAccessibilityDescriptionContains(strip, "authoringPreviewButton", "Previews the selected zone.");
     requireAccessibilityDescriptionContains(strip, "authoringPrepareDraftButton", "Builds the latest draft for playback preview.");
     requireAccessibilityDescriptionContains(strip, "authoringPublishDraftButton", "Unavailable because the latest draft is not ready to publish yet.");
