@@ -121,6 +121,8 @@ private:
                                            const std::vector<std::string>& details) const;
     juce::File getLibraryLocation() const;
     void setLibraryLocation(const juce::File& folder);
+    juce::File getLastSfzImportDirectory() const;
+    void setLastSfzImportDirectory(const juce::File& folder);
     juce::File getProjectDirectory() const;
     void setProjectDirectory(const juce::File& folder);
     juce::File getRecentProjectDirectory() const;

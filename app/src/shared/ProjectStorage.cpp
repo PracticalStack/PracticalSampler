@@ -216,10 +216,10 @@ juce::File ensureProjectFileExtension(juce::File file)
     return file.withFileExtension(".drsproj");
 }
 
-juce::File getDefaultStudioProjectDirectory()
+juce::File getDefaultPracticalSamplerDirectory()
 {
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-        .getChildFile("DecentRhapsodyStudio");
+        .getChildFile("PracticalSampler");
 }
 
 juce::File makeSelfContainedProjectFile(juce::File selectedFile)

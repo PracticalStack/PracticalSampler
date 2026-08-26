@@ -175,6 +175,12 @@ int main()
 {
     try
     {
+        const auto defaultPracticalSamplerDirectory = drs::app::getDefaultPracticalSamplerDirectory();
+        require(defaultPracticalSamplerDirectory.getParentDirectory()
+                    == juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                    && defaultPracticalSamplerDirectory.getFileName() == "PracticalSampler",
+                "A clean install should default project and library storage to Documents/PracticalSampler.");
+
         const auto storageTestRoot = juce::File::getSpecialLocation(juce::File::tempDirectory)
                                          .getNonexistentChildFile("drs-project-storage-test", {}, false);
         const auto selectedProjectFile = storageTestRoot.getChildFile("Felt Piano.drsproj");

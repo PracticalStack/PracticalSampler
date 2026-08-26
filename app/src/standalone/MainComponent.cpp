@@ -31,6 +31,7 @@ constexpr int saveButtonResult = 1;
 constexpr int discardButtonResult = 2;
 constexpr int cancelButtonResult = 0;
 constexpr auto libraryLocationPropertyKey = "libraryLocation";
+constexpr auto lastSfzImportDirectoryPropertyKey = "lastSfzImportDirectory";
 constexpr auto projectDirectoryPropertyKey = "projectDirectory";
 constexpr auto recentProjectDirectoryPropertyKey = "recentProjectDirectory";
 constexpr auto audioDeviceStatePropertyKey = "audioDeviceState";
@@ -232,7 +233,7 @@ public:
         projectDirectoryLabel.setText("Default Project Directory", juce::dontSendNotification);
         projectDirectoryLabel.setJustificationType(juce::Justification::centredLeft);
 
-        libraryHelpLabel.setText("Used as the default starting folder for WAV imports.",
+        libraryHelpLabel.setText("Used for WAV imports and as the initial SFZ import folder. SFZ imports remember their last folder.",
                                  juce::dontSendNotification);
         libraryHelpLabel.setJustificationType(juce::Justification::centredLeft);
 
@@ -280,7 +281,7 @@ public:
 
             auto chosenProjectDirectory = juce::File(projectDirectoryEditor.getText().trim());
             if (chosenProjectDirectory == juce::File())
-                chosenProjectDirectory = drs::app::getDefaultStudioProjectDirectory();
+                chosenProjectDirectory = drs::app::getDefaultPracticalSamplerDirectory();
 
             if (!ensureDirectoryExists(chosenProjectDirectory))
             {
@@ -2395,7 +2396,7 @@ juce::File MainComponent::getLibraryLocation() const
             return juce::File(storedPath);
     }
 
-    return {};
+    return drs::app::getDefaultPracticalSamplerDirectory();
 }
 
 void MainComponent::setLibraryLocation(const juce::File& folder)
@@ -2403,6 +2404,34 @@ void MainComponent::setLibraryLocation(const juce::File& folder)
     if (auto* settings = appProperties.getUserSettings())
     {
         settings->setValue(libraryLocationPropertyKey, folder.getFullPathName());
+        settings->saveIfNeeded();
+    }
+}
+
+juce::File MainComponent::getLastSfzImportDirectory() const
+{
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        const auto storedPath = settings->getValue(lastSfzImportDirectoryPropertyKey).trim();
+        if (storedPath.isNotEmpty())
+        {
+            const auto storedDirectory = juce::File(storedPath);
+            if (storedDirectory.isDirectory())
+                return storedDirectory;
+        }
+    }
+
+    return {};
+}
+
+void MainComponent::setLastSfzImportDirectory(const juce::File& folder)
+{
+    if (!folder.isDirectory())
+        return;
+
+    if (auto* settings = appProperties.getUserSettings())
+    {
+        settings->setValue(lastSfzImportDirectoryPropertyKey, folder.getFullPathName());
         settings->saveIfNeeded();
     }
 }
@@ -2416,7 +2445,7 @@ juce::File MainComponent::getProjectDirectory() const
             return juce::File(storedPath);
     }
 
-    return drs::app::getDefaultStudioProjectDirectory();
+    return drs::app::getDefaultPracticalSamplerDirectory();
 }
 
 void MainComponent::setProjectDirectory(const juce::File& folder)
@@ -2493,7 +2522,7 @@ juce::File MainComponent::buildChooserBaseDirectory() const
         return projectDirectory;
     }
 
-    return drs::app::getDefaultStudioProjectDirectory();
+    return drs::app::getDefaultPracticalSamplerDirectory();
 }
 
 juce::File MainComponent::buildDefaultSaveTarget() const
@@ -2650,7 +2679,9 @@ void MainComponent::launchImportWavChooser(std::function<void(std::vector<juce::
 
 void MainComponent::launchImportSfzChooser(std::function<void(juce::File)> completion)
 {
-    auto initialDirectory = getLibraryLocation();
+    auto initialDirectory = getLastSfzImportDirectory();
+    if (!initialDirectory.isDirectory())
+        initialDirectory = getLibraryLocation();
     if (!initialDirectory.isDirectory())
         initialDirectory = buildChooserBaseDirectory();
     activeFileChooser = std::make_unique<juce::FileChooser>("Import SFZ document into the current project",
@@ -2668,6 +2699,8 @@ void MainComponent::launchImportSfzChooser(std::function<void(juce::File)> compl
                                            return;
 
                                        const auto selectedFile = chooser.getResult();
+                                       if (selectedFile != juce::File())
+                                           safeThis->setLastSfzImportDirectory(selectedFile.getParentDirectory());
                                        safeThis->activeFileChooser.reset();
                                        if (completion)
                                            completion(selectedFile);

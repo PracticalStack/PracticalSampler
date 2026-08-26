@@ -9,7 +9,7 @@
 namespace drs::app
 {
 juce::File ensureProjectFileExtension(juce::File file);
-juce::File getDefaultStudioProjectDirectory();
+juce::File getDefaultPracticalSamplerDirectory();
 juce::File makeSelfContainedProjectFile(juce::File selectedFile);
 bool ensureProjectFolderLayout(const juce::File& projectFile);
 

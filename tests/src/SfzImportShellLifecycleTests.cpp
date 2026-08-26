@@ -1,7 +1,22 @@
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <string>
+
+namespace
+{
+bool containsAll(const std::string& text, std::initializer_list<const char*> needles)
+{
+    for (const auto* needle : needles)
+    {
+        if (text.find(needle) == std::string::npos)
+            return false;
+    }
+
+    return true;
+}
+} // namespace
 
 int main()
 {
@@ -17,8 +32,16 @@ int main()
             return 1;
         }
         const std::string text((std::istreambuf_iterator<char>(input)), {});
-        if (text.find(".detach()") != std::string::npos
-            || text.find("MessageManager::callAsync") != std::string::npos)
+        const auto sfzLifecycleBegin = text.find("::reviewSfzImportFile(");
+        const auto sfzLifecycleEnd = text.find("::showPreferencesDialog(", sfzLifecycleBegin);
+        if (sfzLifecycleBegin == std::string::npos || sfzLifecycleEnd == std::string::npos)
+        {
+            std::cerr << "unable to isolate SFZ lifecycle in " << file << '\n';
+            return 1;
+        }
+        const auto sfzLifecycle = text.substr(sfzLifecycleBegin, sfzLifecycleEnd - sfzLifecycleBegin);
+        if (sfzLifecycle.find(".detach()") != std::string::npos
+            || sfzLifecycle.find("MessageManager::callAsync") != std::string::npos)
         {
             std::cerr << "detached SFZ shell worker remains in " << file << '\n';
             return 1;
@@ -28,6 +51,17 @@ int main()
             || text.find("Project changed") == std::string::npos)
         {
             std::cerr << "service/stale-guard integration missing in " << file << '\n';
+            return 1;
+        }
+        if (!containsAll(text,
+                         {
+                             "lastSfzImportDirectoryPropertyKey",
+                             "getLastSfzImportDirectory()",
+                             "setLastSfzImportDirectory(selectedFile.getParentDirectory())",
+                             "settings->saveIfNeeded()"
+                         }))
+        {
+            std::cerr << "persisted SFZ import directory integration missing in " << file << '\n';
             return 1;
         }
     }
