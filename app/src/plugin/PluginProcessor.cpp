@@ -1516,6 +1516,8 @@ bool Processor::submitAuthoringPreviewCommand(
         dispatch.event.hasAuditionRegion,
         dispatch.event.auditionStartFrame,
         dispatch.event.auditionEndFrameExclusive,
+        dispatch.event.hasAuditionInitialFrame,
+        dispatch.event.auditionInitialFrame,
         dispatch.event.auditionLoopEnabled,
         dispatch.event.auditionLoopStartFrame,
         dispatch.event.auditionLoopEndFrameExclusive
@@ -4093,6 +4095,8 @@ void Processor::drainRealtimeNoteEvents(RealtimeNoteEventQueue& queue,
         renderEvent.hasPlaybackRegionOverride = event.hasPlaybackRegionOverride;
         renderEvent.playbackStartFrameOverride = event.playbackStartFrameOverride;
         renderEvent.playbackEndFrameExclusiveOverride = event.playbackEndFrameExclusiveOverride;
+        renderEvent.hasPlaybackInitialFrameOverride = event.hasPlaybackInitialFrameOverride;
+        renderEvent.playbackInitialFrameOverride = event.playbackInitialFrameOverride;
         renderEvent.loopOverrideEnabled = event.loopOverrideEnabled;
         renderEvent.loopStartFrameOverride = event.loopStartFrameOverride;
         renderEvent.loopEndFrameExclusiveOverride = event.loopEndFrameExclusiveOverride;

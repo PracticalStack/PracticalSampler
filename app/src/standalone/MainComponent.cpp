@@ -787,7 +787,7 @@ void MainComponent::handleCloseRequest(std::function<void(bool)> completion)
 
 juce::StringArray MainComponent::getMenuBarNames()
 {
-    return { "File", "Edit", "Settings" };
+    return { "File", "Edit", "View", "Settings" };
 }
 
 juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce::String&)
@@ -830,6 +830,10 @@ juce::PopupMenu MainComponent::getMenuForIndex(int topLevelMenuIndex, const juce
         menu.addCommandItem(&commandManager, redoCommandId);
     }
     else if (topLevelMenuIndex == 2)
+    {
+        menu.addItem(restoreDefaultViewCommandId, "Restore Default View");
+    }
+    else if (topLevelMenuIndex == 3)
     {
         menu.addItem(audioDeviceSettingsCommandId, "Audio & MIDI Device Settings...");
         menu.addSeparator();
@@ -938,6 +942,9 @@ void MainComponent::menuItemSelected(int menuItemID, int)
             break;
         case viewLicenseCommandId:
             viewLicense();
+            break;
+        case restoreDefaultViewCommandId:
+            authoringPanel.restoreDefaultView();
             break;
         case audioDeviceSettingsCommandId:
             showAudioDeviceSettingsDialog();

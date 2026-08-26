@@ -95,12 +95,14 @@ void qualifyExpandedWorkbench()
     auto& map = requireComponent(panel, "authoringZoneMap");
     auto& splitter = dynamic_cast<drs::app::authoring::WorkbenchSplitter&>(
         requireComponent(panel, "authoringWorkbenchSplitter"));
+    requireButton(panel, "authoringWorkbenchWaveformTab").onClick();
     require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::standardDefaultHeight,
             "Expanded Waveform must begin in the 232 px Standard state.");
     require(splitter.isVisible() && splitter.getHeight() == 6
                 && splitter.getExplicitFocusOrder() == 59,
             "Expanded workbench must expose a keyboard-focusable six-pixel splitter.");
-    require(map.getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
+    require(map.isVisible()
+                && map.getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
             "Standard workbench must preserve the protected map height.");
 
     const auto initialUndoDepth = session.getDocumentState().undoDepth;
@@ -157,9 +159,9 @@ void qualifyExpandedWorkbench()
             "Workbench navigation and sizing must stay outside authored undo history.");
 
     requireButton(panel, "authoringWorkbenchToggleButton").onClick();
-    require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::collapsedHeight
+    require(region.getBounds().isEmpty()
                 && !splitter.isVisible(),
-            "Collapse must leave only the approximately 38 px tab rail.");
+            "Collapse must remove the editor surface and leave the separate tab rail visible.");
     requireButton(panel, "authoringWorkbenchToggleButton").onClick();
     require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::focusedDefaultHeight,
             "Re-expanding must restore the last expanded height.");
@@ -179,8 +181,8 @@ void qualifyCompactShortHost()
 
     auto& region = requireComponent(panel, "authoringWorkbench");
     auto& map = requireComponent(panel, "authoringZoneMap");
-    require(region.getHeight() == drs::app::authoring::WorkbenchLayoutState::collapsedHeight,
-            "Compact/plugin shell must begin with the same collapsed workbench state.");
+    require(region.getBounds().isEmpty() && map.isVisible(),
+            "Compact/plugin shell must begin with a collapsed workbench and visible Map.");
     requireButton(panel, "authoringWorkbenchRoutingTab").onClick();
     require(region.getHeight() < drs::app::authoring::WorkbenchLayoutState::focusedMinimumHeight
                 && map.getHeight() >= drs::app::authoring::minimumMapVisibleHeight,

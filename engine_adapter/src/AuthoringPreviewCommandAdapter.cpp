@@ -12,6 +12,9 @@ bool validNoteCommand(const AuthoringPreviewCommand& command) noexcept
 {
     const auto validAuditionRegion = !command.hasAuditionRegion
         || (command.auditionStartFrame < command.auditionEndFrameExclusive
+            && (!command.hasAuditionInitialFrame
+                || (command.auditionInitialFrame >= command.auditionStartFrame
+                    && command.auditionInitialFrame < command.auditionEndFrameExclusive))
             && (!command.auditionLoopEnabled
                 || (command.auditionLoopStartFrame >= command.auditionStartFrame
                     && command.auditionLoopStartFrame < command.auditionLoopEndFrameExclusive
@@ -19,6 +22,7 @@ bool validNoteCommand(const AuthoringPreviewCommand& command) noexcept
     return command.midiNote >= 0 && command.midiNote <= 127
         && std::isfinite(command.velocity)
         && command.velocity > 0.0f && command.velocity <= 1.0f
+        && (!command.hasAuditionInitialFrame || command.hasAuditionRegion)
         && validAuditionRegion;
 }
 } // namespace
@@ -139,6 +143,8 @@ AuthoringPreviewCommandDispatch AuthoringPreviewCommandAdapter::dispatchNoteOn(
     result.event.hasAuditionRegion = command.hasAuditionRegion;
     result.event.auditionStartFrame = command.auditionStartFrame;
     result.event.auditionEndFrameExclusive = command.auditionEndFrameExclusive;
+    result.event.hasAuditionInitialFrame = command.hasAuditionInitialFrame;
+    result.event.auditionInitialFrame = command.auditionInitialFrame;
     result.event.auditionLoopEnabled = command.auditionLoopEnabled;
     result.event.auditionLoopStartFrame = command.auditionLoopStartFrame;
     result.event.auditionLoopEndFrameExclusive = command.auditionLoopEndFrameExclusive;

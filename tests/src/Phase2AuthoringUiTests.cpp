@@ -17,6 +17,7 @@
 #include <cmath>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -591,8 +592,9 @@ drs::app::AuthoringWaveformPreview makePreviewFixture()
     preview.playbackEndFrameExclusive = 110000;
     preview.loopEnabled = true;
     preview.loopMode = drs::engine::RegionLoopMode::loopContinuous;
-    preview.loopStartFrame = 12000;
+    preview.loopStartFrame = 2000;
     preview.loopEndFrame = 88000;
+    preview.loopCrossfadeFrames = 10000;
 
     preview.points.reserve(96);
     for (int index = 0; index < 96; ++index)
@@ -821,10 +823,6 @@ void exerciseDraftPlaybackFailureVisibility()
         = "playback blocked: graph-unresolved-effect: Active effects must resolve to a curated catalog entry.";
     require(requireLabel(panel, "authoringSummaryStatusLabel").getText().contains(expectedFailure),
             "The summary strip must expose the concrete DSP graph rejection after Prepare Draft fails.");
-    require(requireLabel(panel, "authoringPlaybackBannerLabel").getText().contains(expectedFailure),
-            "The workspace banner must expose the concrete DSP graph rejection after Prepare Draft fails.");
-    require(requireButton(panel, "authoringPlaybackBannerPrepareButton").isEnabled(),
-            "A failed draft build should retain an enabled retry action after the project is corrected.");
 }
 
 void exerciseDraftPlaybackProgressVisibility()
@@ -855,8 +853,6 @@ void exerciseDraftPlaybackProgressVisibility()
     const auto expectedProgress = "playback busy: Preparing sources 187/637.";
     require(requireLabel(panel, "authoringSummaryStatusLabel").getText().contains(expectedProgress),
             "The summary strip must expose per-source draft preparation progress.");
-    require(requireLabel(panel, "authoringPlaybackBannerLabel").getText().contains(expectedProgress),
-            "The workspace banner must expose per-source draft preparation progress.");
 }
 
 void exerciseZoneMappingEditorLeaf(const fs::path& outputDirectory)
@@ -1237,7 +1233,6 @@ void writeReachabilityChecklist(std::ostream& inventory)
 {
     inventory << "Reachability checklist\n";
     inventory << "- Summary strip: authoringSummaryStrip, authoringPreviewButton, authoringPrepareDraftButton, authoringPublishDraftButton\n";
-    inventory << "- Playback banner: authoringPlaybackBanner, authoringPlaybackBannerLabel, authoringPlaybackBannerPrepareButton, authoringPlaybackBannerPublishButton\n";
     inventory << "- Toolbar row: authoringZoneSelector\n";
     inventory << "- Persistent map: authoringZoneMap\n";
     inventory << "- Zone Map context menu: Delete Selected Sample\n";
@@ -1315,11 +1310,9 @@ void exerciseSurface(drs::app::AuthoringPanel& panel,
 
     requireComponentVisibleWithin(panel, "authoringWorkspace", panelBounds);
     requireComponentVisibleWithin(panel, "authoringZoneSelector", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringPlaybackBanner", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringPlaybackBannerLabel", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringPlaybackBannerPrepareButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringZoneMap", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringWorkbench", panelBounds);
+    require(findDescendantById(panel, "authoringWorkbench") != nullptr,
+            "The collapsed workspace must retain the workbench surface component.");
     requireComponentVisibleWithin(panel, "authoringWorkbenchTabStrip", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWorkbenchToggleButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWorkbenchWaveformTab", panelBounds);
@@ -1606,26 +1599,114 @@ void exerciseDefaultWorkspaceAndWorkbenchSwap(drs::app::AuthoringPanel& panel)
     require(zoneInspector->isVisible() && !zoneInspector->getBounds().isEmpty(),
             "The selected zone inspector must remain visible in the default workspace.");
 
-    const auto mapBounds = zoneMap->getBounds();
+    const auto closedMapBounds = zoneMap->getBounds();
     const auto inspectorBounds = zoneInspector->getBounds();
-    const auto hierarchyBounds = structureTree->getParentComponent()->getBounds();
 
     toggleButton.onClick();
 
     require(toggleButton.getButtonText() == "Hide Workbench",
             "Opening the workbench must update the disclosure action.");
-    require(!zoneMap->isVisible() && workbenchContent->isVisible(),
-            "The open workbench must replace the Map instead of sharing its space.");
-    require(workbenchContent->getBounds() == mapBounds,
-            "The workbench must occupy exactly the Map rectangle.");
-    require(zoneInspector->isVisible() && zoneInspector->getBounds() == inspectorBounds,
+    require(zoneMap->isVisible() && workbenchContent->isVisible(),
+            "Opening the workbench must keep the Map visible.");
+    const auto openMapBounds = zoneMap->getBounds();
+    const auto openWorkbenchBounds = workbenchContent->getBounds();
+    require(!openMapBounds.isEmpty()
+                && openMapBounds.getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
+            "Opening the workbench must preserve a usable Map height.");
+    require(!openWorkbenchBounds.isEmpty()
+                && !openMapBounds.intersects(openWorkbenchBounds)
+                && openMapBounds.getBottom() <= openWorkbenchBounds.getY(),
+            "The workbench must open below the Map without covering it.");
+    require(panel.getLocalBounds().contains(openMapBounds)
+                && panel.getLocalBounds().contains(openWorkbenchBounds),
+            "The Map and workbench split must remain within the authoring workspace.");
+    require(zoneInspector->isVisible()
+                && !zoneInspector->getBounds().isEmpty()
+                && zoneInspector->getBounds().getX() == inspectorBounds.getX()
+                && zoneInspector->getBounds().getWidth() == inspectorBounds.getWidth(),
             "Opening the workbench must keep the zone inspector visible at the same width and position.");
-    require(structureTree->getParentComponent()->getBounds() == hierarchyBounds,
-            "Opening the workbench must not resize or move the Instrument Structure browser.");
+    require(structureTree->isVisible()
+                && !structureTree->getParentComponent()->getBounds().isEmpty(),
+            "Opening the workbench must keep the Instrument Structure browser visible.");
 
     toggleButton.onClick();
     require(zoneMap->isVisible() && !workbenchContent->isVisible(),
-            "Closing the workbench must restore the Map without reflowing the workspace.");
+            "Closing the workbench must leave the Map visible.");
+    require(zoneMap->getBounds() == closedMapBounds,
+            "Closing the workbench must restore the Map to its full surface.");
+}
+
+void exerciseStructureMapSplitter(drs::app::AuthoringPanel& panel,
+                                  drs::engine::AuthoringSession& session)
+{
+    auto* splitter = dynamic_cast<drs::app::authoring::StructureMapSplitter*>(
+        findDescendantById(panel, "authoringStructureMapSplitter"));
+    auto* structureList = findDescendantById(panel, "authoringInstrumentStructureBrowser");
+    auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
+    auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
+    require(splitter != nullptr && structureList != nullptr
+                && structureList->getParentComponent() != nullptr
+                && zoneMap != nullptr && workbenchContent != nullptr,
+            "Structure/Map splitter coverage requires both surfaces and the splitter.");
+    auto* structureBrowser = structureList->getParentComponent();
+    require(!splitter->isVisible() && splitter->getBounds().isEmpty(),
+            "The Structure/Map splitter must stay hidden in the stacked default layout.");
+
+    const auto initialDocumentRevision = session.getDocumentState().revision;
+    requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
+    require(splitter->isVisible() && !splitter->getBounds().isEmpty(),
+            "The Structure/Map splitter must appear when the surfaces are side by side.");
+    require(structureBrowser->getWidth() >= drs::app::authoring::minimumStructureBrowserWidth
+                && zoneMap->getWidth() >= drs::app::authoring::minimumSideBySideMapWidth,
+            "The side-by-side layout must preserve minimum usable widths for both surfaces.");
+
+    const auto defaultStructureWidth = structureBrowser->getWidth();
+    splitter->requestWidth(defaultStructureWidth + 32);
+    const auto customStructureWidth = structureBrowser->getWidth();
+    require(customStructureWidth > defaultStructureWidth
+                && zoneMap->getWidth() >= drs::app::authoring::minimumSideBySideMapWidth,
+            "Dragging the splitter should widen Structure without crowding out the Map.");
+
+    requireButton(panel, "authoringWorkbenchToggleButton").onClick();
+    require(!splitter->isVisible()
+                && structureBrowser->getX() == zoneMap->getX()
+                && structureBrowser->getWidth() == zoneMap->getWidth(),
+            "Stacked layouts must ignore the remembered side-by-side width and use fixed full width.");
+    requireButton(panel, "authoringWorkbenchMacrosTab").onClick();
+    require(splitter->isVisible() && structureBrowser->getWidth() == customStructureWidth,
+            "The Structure Viewer width must survive layout changes for the current session.");
+
+    require(splitter->keyPressed(juce::KeyPress(juce::KeyPress::leftKey)),
+            "The Structure/Map splitter must support keyboard resizing.");
+    require(structureBrowser->getWidth() == customStructureWidth - 8,
+            "Left Arrow should reduce the Structure Viewer width by one keyboard step.");
+
+    splitter->requestWidth(-10000);
+    require(structureBrowser->getWidth() == drs::app::authoring::minimumStructureBrowserWidth,
+            "The splitter must clamp the Structure Viewer to its usable minimum width.");
+    splitter->requestWidth(10000);
+    require(zoneMap->getWidth() >= drs::app::authoring::minimumSideBySideMapWidth,
+            "The splitter must clamp before the Zone Map falls below its usable minimum width.");
+
+    splitter->requestWidth(defaultStructureWidth + 16);
+    const auto mouseSource = juce::Desktop::getInstance().getMainMouseSource();
+    const auto eventTime = juce::Time::getCurrentTime();
+    const auto splitterCentre = splitter->getLocalBounds().toFloat().getCentre();
+    const juce::MouseEvent doubleClick(mouseSource,
+                                       splitterCentre,
+                                       juce::ModifierKeys::leftButtonModifier,
+                                       1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                       splitter, splitter,
+                                       eventTime, splitterCentre, eventTime, 2, false);
+    splitter->mouseDoubleClick(doubleClick);
+    require(structureBrowser->getWidth() == defaultStructureWidth,
+            "Double-clicking the splitter must restore its responsive default width.");
+    splitter->requestWidth(defaultStructureWidth + 24);
+    panel.restoreDefaultView();
+    require(!splitter->isVisible() && !workbenchContent->isVisible() && zoneMap->isVisible(),
+            "Restore Default View must restore the stacked Map workspace.");
+    require(session.getDocumentState().revision == initialDocumentRevision,
+            "Splitter sizing and restoring the view must not modify the authored project.");
 }
 
 void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
@@ -1633,6 +1714,9 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
                             const std::string& shellName,
                             const fs::path& outputDirectory,
                             std::vector<std::string>& baselineFindings,
+                            int& previewStartCount,
+                            int& previewEndCount,
+                            std::optional<drs::engine::AuthoringPreviewCommand>& lastPreviewCommand,
                             drs::app::AuthoringSourceValidationSnapshot& validationSnapshot,
                             int& validationRequestCount,
                             int& validationCancelCount)
@@ -1667,11 +1751,8 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformValidationButton", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformPlaybackStart", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformPlaybackEnd", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringWaveformPlaybackApply", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformPlaybackReset", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformSetPlaybackSelection", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringWaveformSelectPlayback", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringWaveformSelectLoop", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformPlaybackAudition", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformSelectionAudition", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformSnapToggle", panelBounds);
@@ -1679,7 +1760,6 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformLoopStart", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopEnd", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopCrossfade", panelBounds);
-    requireComponentVisibleWithin(panel, "authoringWaveformLoopApply", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformSetLoopSelection", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopAudition", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformPlaybackStartLabel", panelBounds);
@@ -1687,6 +1767,17 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     requireComponentVisibleWithin(panel, "authoringWaveformLoopStartLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopEndLabel", panelBounds);
     requireComponentVisibleWithin(panel, "authoringWaveformLoopCrossfadeLabel", panelBounds);
+    for (const auto& retiredId : {
+             juce::String("authoringWaveformPlaybackApply"),
+             juce::String("authoringWaveformLoopApply"),
+             juce::String("authoringWaveformSelectPlayback"),
+             juce::String("authoringWaveformSelectLoop")
+         })
+    {
+        require(findDescendantById(panel, retiredId) == nullptr,
+                "The simplified waveform editor must not recreate retired control: "
+                    + retiredId.toStdString());
+    }
 
     auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
     require(workbenchContent != nullptr,
@@ -1695,17 +1786,13 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     const std::vector<juce::String> waveformInteractiveIds {
         "authoringWaveformPlaybackStart",
         "authoringWaveformPlaybackEnd",
-        "authoringWaveformPlaybackApply",
         "authoringWaveformPlaybackReset",
         "authoringWaveformSetPlaybackSelection",
-        "authoringWaveformSelectPlayback",
-        "authoringWaveformSelectLoop",
         "authoringWaveformPlaybackAudition",
         "authoringWaveformLoopMode",
         "authoringWaveformLoopStart",
         "authoringWaveformLoopEnd",
         "authoringWaveformLoopCrossfade",
-        "authoringWaveformLoopApply",
         "authoringWaveformSetLoopSelection",
         "authoringWaveformLoopAudition",
         "authoringWaveformSelectionAudition",
@@ -1736,22 +1823,18 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
     {
         "authoringWaveformPlaybackStart",
         "authoringWaveformPlaybackEnd",
-        "authoringWaveformPlaybackApply",
-        "authoringWaveformPlaybackReset",
-        "authoringWaveformSetPlaybackSelection",
-        "authoringWaveformSelectPlayback",
-        "authoringWaveformSelectLoop",
-        "authoringWaveformPlaybackAudition",
-        "authoringWaveformLoopMode",
-        "authoringWaveformLoopStart",
-        "authoringWaveformLoopEnd",
-        "authoringWaveformLoopCrossfade",
-        "authoringWaveformLoopApply",
-        "authoringWaveformSetLoopSelection",
-        "authoringWaveformLoopAudition",
-        "authoringWaveformSelectionAudition",
-        "authoringWaveformSnapToggle",
-        "authoringWaveformValidationButton"
+                                    "authoringWaveformPlaybackReset",
+                                    "authoringWaveformPlaybackAudition",
+                                    "authoringWaveformLoopMode",
+                                    "authoringWaveformLoopStart",
+                                    "authoringWaveformLoopEnd",
+                                    "authoringWaveformLoopCrossfade",
+                                    "authoringWaveformLoopAudition",
+                                    "authoringWaveformSnapToggle",
+                                    "authoringWaveformSetPlaybackSelection",
+                                    "authoringWaveformSetLoopSelection",
+                                    "authoringWaveformSelectionAudition",
+                                    "authoringWaveformValidationButton"
     });
 
     auto* waveformComponent = findDescendantById(panel, "authoringWaveformPreview");
@@ -1873,6 +1956,11 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
             "Waveform workbench should restore its original metadata when the original zone is reselected.");
 
     auto& loopModeSelector = requireComboBox(panel, "authoringWaveformLoopMode");
+    require(loopModeSelector.getNumItems() == 3
+                && loopModeSelector.getItemText(0) == "Loop Off"
+                && loopModeSelector.getItemText(1) == "While Held"
+                && loopModeSelector.getItemText(2) == "Always",
+            "Waveform loop behavior should use three authoring-oriented choices instead of raw SFZ names.");
     const auto loopModeUndoDepth = session.getDocumentState().undoDepth;
     const auto previousLoopMode = session.getSelectedZone()->loopMode;
     loopModeSelector.setSelectedId(4, juce::sendNotificationSync);
@@ -1888,9 +1976,22 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
             "Redo should restore the typed SFZ loop mode transaction.");
 
     const auto loopCrossfadeUndoDepth = session.getDocumentState().undoDepth;
-    requireTextEditor(panel, "authoringWaveformLoopCrossfade").setText(
-        "128", juce::dontSendNotification);
-    requireButton(panel, "authoringWaveformLoopApply").onClick();
+    {
+        DesktopHostedComponent hostedPanel(panel);
+        pumpMessages();
+        auto& loopCrossfadeEditor = requireTextEditor(panel, "authoringWaveformLoopCrossfade");
+        loopCrossfadeEditor.grabKeyboardFocus();
+        pumpMessages();
+        require(loopCrossfadeEditor.hasKeyboardFocus(false),
+                "Waveform numeric refresh coverage requires a focused editor.");
+        loopCrossfadeEditor.setText("128", juce::dontSendNotification);
+        panel.refreshNow();
+        require(loopCrossfadeEditor.getText() == "128",
+                "Periodic status refresh must not erase an in-progress waveform numeric edit.");
+        require(static_cast<bool>(loopCrossfadeEditor.onReturnKey),
+                "Loop crossfade should commit from Return without a separate Apply button.");
+        loopCrossfadeEditor.onReturnKey();
+    }
     require(session.getSelectedZone()->loopCrossfadeFrames == 128
                 && session.getProject().schemaVersion
                     == drs::engine::loopCrossfadeProjectSchemaVersion
@@ -1904,12 +2005,41 @@ void exerciseWorkbenchBehavior(drs::app::AuthoringPanel& panel,
                 + ", undo=" + std::to_string(session.getDocumentState().undoDepth)
                 + ", expectedUndo=" + std::to_string(loopCrossfadeUndoDepth + 1) + ").");
 
+    auto& loopAuditionButton = requireButton(panel, "authoringWaveformLoopAudition");
+    require(loopAuditionButton.getButtonText() == "Play Loop",
+            "An idle loop audition should expose the Play Loop action.");
+    const auto previewStartsBeforeLoopAudition = previewStartCount;
+    const auto previewEndsBeforeLoopAudition = previewEndCount;
+    loopAuditionButton.onClick();
+    require(previewStartCount == previewStartsBeforeLoopAudition + 1
+                && lastPreviewCommand.has_value(),
+            "Play Loop should emit one selected-zone Preview command.");
+    const auto& loopCommand = *lastPreviewCommand;
+    require(loopCommand.hasAuditionRegion
+                && loopCommand.auditionStartFrame == 2000
+                && loopCommand.auditionEndFrameExclusive == 110000
+                && loopCommand.hasAuditionInitialFrame
+                && loopCommand.auditionInitialFrame == 75600
+                && loopCommand.auditionLoopEnabled
+                && loopCommand.auditionLoopStartFrame == 2000
+                && loopCommand.auditionLoopEndFrameExclusive == 88000,
+            "Loop audition should retain an earlier imported loop head and the authored tail while including the full crossfade plus seam context.");
+    require(loopAuditionButton.getButtonText() == "Release Loop",
+            "A held loop audition should turn the same action into Release Loop.");
+    loopAuditionButton.onClick();
+    require(previewEndCount == previewEndsBeforeLoopAudition + 1
+                && loopAuditionButton.getButtonText() == "Play Loop",
+            "Release Loop should emit note-off and restore the idle loop action.");
+
     const auto playbackUndoDepth = session.getDocumentState().undoDepth;
     requireTextEditor(panel, "authoringWaveformPlaybackStart").setText("6000",
                                                                          juce::dontSendNotification);
     requireTextEditor(panel, "authoringWaveformPlaybackEnd").setText("100000",
                                                                        juce::dontSendNotification);
-    requireButton(panel, "authoringWaveformPlaybackApply").onClick();
+    auto& playbackEndEditor = requireTextEditor(panel, "authoringWaveformPlaybackEnd");
+    require(static_cast<bool>(playbackEndEditor.onReturnKey),
+            "Playback region should commit from Return without a separate Apply button.");
+    playbackEndEditor.onReturnKey();
     require(session.getSelectedZone()->sampleStartFrame == 6000
                 && session.getSelectedZone()->sampleEndFrame == 100000
                 && session.getDocumentState().undoDepth == playbackUndoDepth + 1,
@@ -1992,7 +2122,7 @@ void exerciseMacroWorkbenchLayout(drs::app::AuthoringPanel& panel,
     {
         require(content->getHeight() > viewport.getHeight()
                     && viewport.getVerticalScrollBar().isVisible(),
-                "A Map-sized workbench should keep full-size macro controls reachable by scrolling.");
+                "A compact workbench should keep full-size macro controls reachable by scrolling.");
     }
     else
     {
@@ -2504,14 +2634,17 @@ void exerciseShortHeightGroupLayout(drs::app::AuthoringPanel& panel,
     }
 
     auto* zoneMap = findDescendantById(panel, "authoringZoneMap");
-    require(zoneMap != nullptr && !zoneMap->isVisible()
+    require(zoneMap != nullptr && zoneMap->isVisible()
                 && zoneMap->getHeight() >= drs::app::authoring::minimumMapVisibleHeight,
-            "The short-height workbench should cover, rather than resize, the Map surface.");
+            "The short-height workbench must preserve a visible, usable Map surface.");
 
     auto* workbenchContent = findDescendantById(panel, "authoringWorkbenchContentHost");
     require(workbenchContent != nullptr
-                && workbenchContent->getBounds() == zoneMap->getBounds(),
-            "The short-height Group workbench should occupy exactly the Map rectangle.");
+                && workbenchContent->isVisible()
+                && !workbenchContent->getBounds().isEmpty()
+                && !workbenchContent->getBounds().intersects(zoneMap->getBounds())
+                && zoneMap->getBounds().getBottom() <= workbenchContent->getBounds().getY(),
+            "The short-height Group workbench must open below the Map without covering it.");
     const auto workbenchContentBounds = workbenchContent->getBounds();
     for (const auto& componentId : {
              juce::String("authoringWorkbenchTitleLabel"),
@@ -2568,17 +2701,13 @@ void exerciseShortHeightWaveformLayout(drs::app::AuthoringPanel& panel,
     for (const auto& componentId : {
              juce::String("authoringWaveformPlaybackStart"),
              juce::String("authoringWaveformPlaybackEnd"),
-             juce::String("authoringWaveformPlaybackApply"),
              juce::String("authoringWaveformPlaybackReset"),
              juce::String("authoringWaveformSetPlaybackSelection"),
-             juce::String("authoringWaveformSelectPlayback"),
-             juce::String("authoringWaveformSelectLoop"),
              juce::String("authoringWaveformPlaybackAudition"),
              juce::String("authoringWaveformLoopMode"),
              juce::String("authoringWaveformLoopStart"),
              juce::String("authoringWaveformLoopEnd"),
              juce::String("authoringWaveformLoopCrossfade"),
-             juce::String("authoringWaveformLoopApply"),
              juce::String("authoringWaveformSetLoopSelection"),
              juce::String("authoringWaveformLoopAudition"),
              juce::String("authoringWaveformSelectionAudition"),
@@ -2635,17 +2764,12 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     auto* phraseImportPath = findDescendantById(panel, "authoringPhraseImportPath");
     auto& phraseImportButton = requireButton(panel, "authoringPhraseImportButton");
     auto& zoneSelector = requireComboBox(panel, "authoringZoneSelector");
-    auto& playbackBannerPrepareButton = requireButton(panel, "authoringPlaybackBannerPrepareButton");
-    auto& playbackBannerPublishButton = requireButton(panel, "authoringPlaybackBannerPublishButton");
     auto& zoneMap = requireZoneMapCanvas(panel, "authoringZoneMap");
     auto& macroList = requireRepeatedStructureList(panel, "authoringMacroList");
     require(phraseImportPath != nullptr, "Performance workbench accessibility checks require the phrase import path.");
 
     for (const auto& componentId : {
              juce::String("authoringPreviewButton"),
-             juce::String("authoringPlaybackBanner"),
-             juce::String("authoringPlaybackBannerLabel"),
-             juce::String("authoringPlaybackBannerPrepareButton"),
              juce::String("authoringZoneSelector"),
              juce::String("authoringZoneMap"),
              juce::String("authoringWorkbenchToggleButton"),
@@ -2680,7 +2804,6 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireIncreasingFocusOrder(panel,
                                 {
                                     "authoringPreviewButton",
-                                    "authoringPlaybackBannerPrepareButton",
                                     "authoringZoneSelector",
                                     "authoringZoneMap",
                                     "authoringWorkbenchToggleButton",
@@ -2700,7 +2823,6 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     const auto initialSummaryStatus = requireLabel(panel, "authoringSummaryStatusLabel").getText();
     const auto initialSummaryArticulation = requireLabel(panel, "authoringSummaryArticulationLabel").getText();
     const auto initialSummaryPlayback = requireLabel(panel, "authoringSummaryPlaybackLabel").getText();
-    const auto initialPlaybackBannerText = requireLabel(panel, "authoringPlaybackBannerLabel").getText();
     require(initialSummaryStatus.contains("preview blocked: Selected authoring sample could not be prepared."),
             "Summary strip should surface the authoring preview failure detail in the status line.");
     require(initialSummaryStatus.contains("fix: Relink or re-import the selected sample file."),
@@ -2709,15 +2831,6 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
             "Summary strip should surface the next draft-playback action when the performance preview is stale.");
     require(initialSummaryPlayback.contains("authoring preview r4 (Failed)"),
             "Summary strip should surface the authoring preview revision state in the playback line.");
-    requireComponentVisible(panel, "authoringPlaybackBanner");
-    requireComponentVisible(panel, "authoringPlaybackBannerLabel");
-    requireComponentVisible(panel, "authoringPlaybackBannerPrepareButton");
-    require(initialPlaybackBannerText.contains("playback action: Prepare the latest draft for preview."),
-            "Workspace banner should surface the next draft-playback action when the performance preview is stale.");
-    require(playbackBannerPrepareButton.isVisible() && playbackBannerPrepareButton.isEnabled(),
-            "Workspace banner should expose an enabled prepare-draft action when the current draft is stale.");
-    require(!playbackBannerPublishButton.isVisible(),
-            "Workspace banner should hide publish-draft actions until the latest draft is ready to publish.");
     requireAccessibilityTitleEquals(panel, "authoringSummarySourceLabel", initialSummarySource);
     requireAccessibilityTitleEquals(panel, "authoringSummaryStatusLabel", initialSummaryStatus);
     requireAccessibilityTitleEquals(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
@@ -2726,14 +2839,6 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
     requireAccessibilityDescriptionContains(panel, "authoringSummaryStatusLabel", initialSummaryStatus);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryArticulationLabel", initialSummaryArticulation);
     requireAccessibilityDescriptionContains(panel, "authoringSummaryPlaybackLabel", initialSummaryPlayback);
-    requireAccessibilityTitleEquals(panel, "authoringPlaybackBannerLabel", initialPlaybackBannerText);
-    requireAccessibilityDescriptionContains(panel, "authoringPlaybackBanner", initialPlaybackBannerText);
-    requireAccessibilityDescriptionContains(panel, "authoringPlaybackBannerLabel", initialPlaybackBannerText);
-    requireAccessibilityDescriptionContains(panel,
-                                            "authoringPlaybackBannerPrepareButton",
-                                            "Builds the latest draft for playback preview from the workspace banner.");
-    requireNonEmptyAccessibilityHelpText(panel, "authoringPlaybackBannerPrepareButton");
-    requireAccessibilityHandlerState(panel, "authoringPlaybackBannerPublishButton", false);
 
     auto summarySourceChanged = false;
     for (int candidateId = 1; candidateId <= zoneSelector.getNumItems(); ++candidateId)
@@ -3108,7 +3213,7 @@ void exerciseAccessibilityAndFocusBehavior(drs::app::AuthoringPanel& panel,
 
     waveformTabButton.onClick();
     requireAccessibilityHandlerState(panel, "authoringWaveformPreview", true);
-    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Waveform Detail");
+    requireAccessibilityTitleEquals(panel, "authoringWorkbenchTitleLabel", "Sample Region");
     requireAccessibilityDescriptionContains(panel, "authoringWorkbenchScopeLabel", "Zone-scoped");
     requireAccessibilityDescriptionContains(panel, "authoringWorkbenchBreadcrumbLabel", "Project > Zones >");
     requireAccessibilityDescriptionContains(panel,
@@ -3946,6 +4051,13 @@ void exerciseWaveformViewportGestures()
         committedPlaybackStart = start;
         committedPlaybackEnd = end;
     });
+    auto selectionAvailable = false;
+    auto selectionChangeCount = 0;
+    waveform.setSelectionChangedCallback([&](const bool available)
+    {
+        selectionAvailable = available;
+        ++selectionChangeCount;
+    });
 
     require(waveform.getViewportFrames().startFrame == 0
                 && waveform.getViewportFrames().endFrameExclusive == preview.frameCount,
@@ -3972,8 +4084,29 @@ void exerciseWaveformViewportGestures()
     require(waveform.getViewportFrames().startFrame == zoomed.startFrame
                 && waveform.getViewportFrames().endFrameExclusive == zoomed.endFrameExclusive,
             "Waveform resize should preserve its source-frame viewport.");
+
+    const auto panStart = waveform.getLocalBounds().toFloat().getCentre();
+    const auto panEnd = panStart.translated(-80.0f, 0.0f);
+    const juce::MouseEvent panMouseDown(mouseSource,
+                                        panStart,
+                                        juce::ModifierKeys::middleButtonModifier,
+                                        1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        &waveform, &waveform,
+                                        eventTime, panStart, eventTime, 1, false);
+    const juce::MouseEvent panMouseDrag(mouseSource,
+                                        panEnd,
+                                        juce::ModifierKeys::middleButtonModifier,
+                                        1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        &waveform, &waveform,
+                                        eventTime, panStart, eventTime, 1, true);
+    waveform.mouseDown(panMouseDown);
+    waveform.mouseDrag(panMouseDrag);
+    waveform.mouseUp(panMouseDrag);
+    const auto panned = waveform.getViewportFrames();
+    require(panned.startFrame > zoomed.startFrame,
+            "Middle-drag should pan the waveform without creating a selection.");
     require(waveform.keyPressed(juce::KeyPress(juce::KeyPress::rightKey))
-                && waveform.getViewportFrames().startFrame > zoomed.startFrame,
+                && waveform.getViewportFrames().startFrame > panned.startFrame,
             "Waveform keyboard navigation should pan the detailed viewport.");
     require(waveform.keyPressed(juce::KeyPress(juce::KeyPress::homeKey))
                 && waveform.getViewportFrames().startFrame == 0
@@ -4045,17 +4178,16 @@ void exerciseWaveformViewportGestures()
 
     const auto selectionStartPoint = juce::Point<float>(canvas.getX() + 180.0f, canvas.getCentreY());
     const auto selectionEndPoint = juce::Point<float>(canvas.getX() + 310.0f, canvas.getCentreY());
-    const auto shiftDragModifiers = juce::ModifierKeys::leftButtonModifier
-        | juce::ModifierKeys::shiftModifier;
+    const auto selectionDragModifiers = juce::ModifierKeys::leftButtonModifier;
     const juce::MouseEvent selectionMouseDown(mouseSource,
                                                selectionStartPoint,
-                                               shiftDragModifiers,
+                                               selectionDragModifiers,
                                                1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                                &waveform, &waveform,
                                                eventTime, selectionStartPoint, eventTime, 1, false);
     const juce::MouseEvent selectionMouseDrag(mouseSource,
                                                selectionEndPoint,
-                                               shiftDragModifiers,
+                                               selectionDragModifiers,
                                                1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                                &waveform, &waveform,
                                                eventTime, selectionStartPoint, eventTime, 1, true);
@@ -4063,15 +4195,16 @@ void exerciseWaveformViewportGestures()
     waveform.mouseDrag(selectionMouseDrag);
     waveform.mouseUp(selectionMouseDrag);
     const auto selection = waveform.getSelectionFrames();
-    require(!selection.empty() && loopCommitCount == 2,
-            "Shift-drag must create a temporary non-persistent selection without editing the loop.");
+    require(!selection.empty() && selectionAvailable && selectionChangeCount == 1
+                && loopCommitCount == 2,
+            "A plain drag must create a temporary non-persistent selection without editing the loop.");
     waveform.setPreview(preview);
     require(waveform.getSelectionFrames().startFrame == selection.startFrame
                 && waveform.getSelectionFrames().endFrameExclusive == selection.endFrameExclusive,
             "A refresh for the same source must preserve the temporary waveform selection.");
     preview.sourceIdentity = "phase2-waveform-fixture-reselected";
     waveform.setPreview(preview);
-    require(!waveform.hasSelection(),
+    require(!waveform.hasSelection() && !selectionAvailable && selectionChangeCount == 2,
             "Changing the selected waveform source must cancel its temporary selection.");
 }
 
@@ -4212,6 +4345,7 @@ int main()
             int validationCancelCount = 0;
             int lastPreviewMidiNote = -1;
             float lastPreviewVelocity = -1.0f;
+            std::optional<drs::engine::AuthoringPreviewCommand> lastPreviewCommand;
             auto validationSnapshot = makeSourceValidationFixture();
             drs::app::AuthoringPanel* panelPtr = nullptr;
             drs::app::AuthoringPanel panel(session,
@@ -4252,13 +4386,15 @@ int main()
                                            [&previewStartCount,
                                             &previewEndCount,
                                             &lastPreviewMidiNote,
-                                            &lastPreviewVelocity](const drs::engine::AuthoringPreviewCommand& command)
+                                            &lastPreviewVelocity,
+                                            &lastPreviewCommand](const drs::engine::AuthoringPreviewCommand& command)
                                            {
                                                if (command.type == drs::engine::AuthoringPreviewCommandType::auditionSelectedZone)
                                                {
                                                    ++previewStartCount;
                                                    lastPreviewMidiNote = command.midiNote;
                                                    lastPreviewVelocity = command.velocity;
+                                                   lastPreviewCommand = command;
                                                }
                                                else if (command.type == drs::engine::AuthoringPreviewCommandType::noteOff)
                                                {
@@ -4299,6 +4435,7 @@ int main()
             requireRetiredTemporaryIdsAbsent(panel);
             requireUniqueNonEmptyComponentIds(panel);
             exerciseDefaultWorkspaceAndWorkbenchSwap(panel);
+            exerciseStructureMapSplitter(panel, session);
 
             if (shellName == "short-host")
             {
@@ -4326,6 +4463,9 @@ int main()
                                    shellName,
                                    outputDirectory,
                                    baselineFindings,
+                                   previewStartCount,
+                                   previewEndCount,
+                                   lastPreviewCommand,
                                    validationSnapshot,
                                    validationRequestCount,
                                    validationCancelCount);

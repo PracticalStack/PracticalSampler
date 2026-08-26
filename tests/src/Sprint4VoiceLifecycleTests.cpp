@@ -379,6 +379,45 @@ void runPlaybackRegionMatrix()
     loopAuditionVoice.render(loopAuditionOutput.view(), 0, 7);
     requireVector(loopAuditionOutput.left, { 1.0f, 2.0f, 3.0f, 2.0f, 3.0f, 2.0f, 3.0f },
                   "Temporary loop audition changed");
+
+    ModelOptions sustainLoop;
+    sustainLoop.loopEnabled = true;
+    sustainLoop.loopMode = drs::engine::RegionLoopMode::loopSustain;
+    sustainLoop.loopStartFrame = 2;
+    sustainLoop.loopEndFrame = 5;
+    const auto sustainAuditionModel = buildModel(
+        { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f }, sustainLoop);
+    auto seamAudition = startRequest();
+    seamAudition.hasPlaybackRegionOverride = true;
+    seamAudition.playbackStartFrameOverride = 0;
+    seamAudition.playbackEndFrameExclusiveOverride = 8;
+    seamAudition.hasPlaybackInitialFrameOverride = true;
+    seamAudition.playbackInitialFrameOverride = 4;
+    seamAudition.loopOverrideEnabled = true;
+    seamAudition.loopStartFrameOverride = 2;
+    seamAudition.loopEndFrameExclusiveOverride = 5;
+    drs::engine::SamplerVoice seamAuditionVoice;
+    require(seamAuditionVoice.start(*sustainAuditionModel, seamAudition),
+            "A seam-focused audition should retain the full playback range.");
+    StereoOutput seamOutput(3);
+    seamAuditionVoice.render(seamOutput.view(), 0, 3);
+    requireVector(seamOutput.left, { 4.0f, 2.0f, 3.0f },
+                  "Seam-focused audition must begin before the authored wrap without shortening the loop");
+    require(seamAuditionVoice.beginRelease() && !seamAuditionVoice.isLoopActive(),
+            "Releasing a seam-focused sustain audition must leave the temporary loop.");
+    StereoOutput tailOutput(5);
+    const auto tailResult = seamAuditionVoice.render(tailOutput.view(), 0, 5);
+    require(tailResult.mixedFrameCount == 4 && tailResult.voiceFinished,
+            "A released sustain audition must retain enough range to reach the authored tail end.");
+    require(tailOutput.left[0] > 3.9f && tailOutput.left[1] > 4.9f
+                && tailOutput.left[2] > 5.9f && tailOutput.left[3] > 6.9f
+                && tailOutput.left[4] == 0.0f,
+            "A released sustain audition must advance through the post-loop tail.");
+
+    seamAudition.playbackInitialFrameOverride = 9;
+    drs::engine::SamplerVoice invalidInitialVoice;
+    require(!invalidInitialVoice.start(*sustainAuditionModel, seamAudition),
+            "A temporary initial frame outside the audition range must be rejected before render.");
 }
 
 void runReleaseLawMatrix()

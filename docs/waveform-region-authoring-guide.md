@@ -9,11 +9,11 @@ This is a one-way SFZ conversion workflow. Practical Sampler projects and playab
 ## Creator workflow
 
 1. Select a zone and open **Waveform** in the Authoring workspace.
-2. Use the waveform selection for temporary auditioning, or choose **Set Playback Region** to make it the zone's non-destructive playback range.
-3. Choose the loop mode and set the loop start/end. Imported zones may have a loop start before playback start; playback begins at the authored playback start, reaches loop end, then wraps to the earlier loop start.
+2. Drag across the waveform to make a temporary selection. Use **Use for Playback**, **Use for Loop**, or **Play Selection** to act on it.
+3. Choose **Loop Off**, **While Held**, or **Always**, then set the loop start/end. One-shot behavior remains a Trigger setting rather than a loop choice. Imported zones may have a loop start before playback start; playback begins at the authored playback start, reaches loop end, then wraps to the earlier loop start.
 4. Optionally set a native loop crossfade. This is a Practical Sampler enhancement, not a portable SFZ opcode.
-5. Use **Apply** or press Return from a numeric field. One completed action creates one undo step; transient selections and canceled gestures do not dirty the project.
-6. Preview the selected range, then Publish when the draft is ready. Saving, publishing, and package export preserve the source file unchanged.
+5. Press Return or leave a numeric field to commit it. Boundary drags commit on pointer release. One completed action creates one undo step; transient selections and canceled gestures do not dirty the project.
+6. Use **Play Loop** to begin shortly before the loop end, so the authored crossfade and wrap are heard immediately. The action changes to **Release Loop** while the note is held. For **While Held** loops, releasing exits the loop and continues through the authored post-loop tail; **Always** loops continue wrapping while their release envelope fades. **Stop** remains available for an immediate Preview stop. Then Publish when the draft is ready. Saving, publishing, and package export preserve the source file unchanged.
 
 Numeric fields accept source frames or seconds using an `s` suffix. End values shown by Practical Sampler are exclusive; they identify the first frame after the playable range.
 
@@ -33,8 +33,10 @@ The loop head may therefore precede playback start. Playback still begins at the
 
 | Input | Action |
 |---|---|
-| Tab / Shift+Tab | Move through playback start/end, loop mode, loop start/end, crossfade, Apply, selection, and audition controls. |
-| Return | Apply the value in a focused playback, loop, or crossfade field. |
+| Drag | Create a temporary waveform selection. |
+| Space-drag or middle-drag | Pan the visible waveform. |
+| Tab / Shift+Tab | Move through playback, loop, selection, snap, and audition controls. |
+| Return or leave field | Apply the value in a focused playback, loop, or crossfade field. |
 | Left / Right on a selected boundary | Move that boundary by one source frame and commit one undoable edit. |
 | Left / Right with no boundary selected | Pan the visible waveform by one tenth of the viewport. |
 | `+` or `=` / `-` | Zoom in / out around the viewport center. |

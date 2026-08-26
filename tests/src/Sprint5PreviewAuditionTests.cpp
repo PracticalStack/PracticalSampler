@@ -122,6 +122,8 @@ void runCommandOwnershipContract()
     ranged.hasAuditionRegion = true;
     ranged.auditionStartFrame = 120;
     ranged.auditionEndFrameExclusive = 240;
+    ranged.hasAuditionInitialFrame = true;
+    ranged.auditionInitialFrame = 190;
     ranged.auditionLoopEnabled = true;
     ranged.auditionLoopStartFrame = 160;
     ranged.auditionLoopEndFrameExclusive = 200;
@@ -130,12 +132,18 @@ void runCommandOwnershipContract()
                 && rangedDispatch.event.hasAuditionRegion
                 && rangedDispatch.event.auditionStartFrame == 120
                 && rangedDispatch.event.auditionEndFrameExclusive == 240
+                && rangedDispatch.event.hasAuditionInitialFrame
+                && rangedDispatch.event.auditionInitialFrame == 190
                 && rangedDispatch.event.auditionLoopEnabled,
-            "A temporary audition range must survive Preview command adaptation without changing project state.");
+            "A temporary audition range and seam-focused initial frame must survive Preview command adaptation without changing project state.");
     auto invalidRange = ranged;
     invalidRange.auditionLoopEndFrameExclusive = 300;
     require(!adapter.dispatch(invalidRange).accepted,
             "Preview adaptation must reject a temporary loop outside its audition range.");
+    invalidRange = ranged;
+    invalidRange.auditionInitialFrame = 300;
+    require(!adapter.dispatch(invalidRange).accepted,
+            "Preview adaptation must reject a temporary initial frame outside its audition range.");
     require(adapter.dispatch(makeCommand(AuthoringPreviewCommandType::noteOff,
                                          AuthoringPreviewAuditionSource::inspector,
                                          ranged.midiNote)).accepted,

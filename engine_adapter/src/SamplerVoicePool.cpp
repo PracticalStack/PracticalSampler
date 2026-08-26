@@ -1048,6 +1048,8 @@ void SamplerVoicePool::applyEvent(const SamplerRenderEvent& event,
                 request.hasPlaybackRegionOverride = event.hasPlaybackRegionOverride;
                 request.playbackStartFrameOverride = event.playbackStartFrameOverride;
                 request.playbackEndFrameExclusiveOverride = event.playbackEndFrameExclusiveOverride;
+                request.hasPlaybackInitialFrameOverride = event.hasPlaybackInitialFrameOverride;
+                request.playbackInitialFrameOverride = event.playbackInitialFrameOverride;
                 request.loopOverrideEnabled = event.loopOverrideEnabled;
                 request.loopStartFrameOverride = event.loopStartFrameOverride;
                 request.loopEndFrameExclusiveOverride = event.loopEndFrameExclusiveOverride;

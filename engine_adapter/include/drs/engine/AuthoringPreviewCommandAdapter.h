@@ -41,6 +41,8 @@ struct AuthoringPreviewCommand
     bool hasAuditionRegion = false;
     std::uint64_t auditionStartFrame = 0;
     std::uint64_t auditionEndFrameExclusive = 0;
+    bool hasAuditionInitialFrame = false;
+    std::uint64_t auditionInitialFrame = 0;
     bool auditionLoopEnabled = false;
     std::uint64_t auditionLoopStartFrame = 0;
     std::uint64_t auditionLoopEndFrameExclusive = 0;
@@ -55,6 +57,8 @@ struct AuthoringPreviewEventCommand
     bool hasAuditionRegion = false;
     std::uint64_t auditionStartFrame = 0;
     std::uint64_t auditionEndFrameExclusive = 0;
+    bool hasAuditionInitialFrame = false;
+    std::uint64_t auditionInitialFrame = 0;
     bool auditionLoopEnabled = false;
     std::uint64_t auditionLoopStartFrame = 0;
     std::uint64_t auditionLoopEndFrameExclusive = 0;

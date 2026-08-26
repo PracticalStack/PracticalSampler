@@ -168,9 +168,12 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
         ? request.playbackStartFrameOverride : selectedRoute.sampleStartFrame;
     const auto playbackEnd = request.hasPlaybackRegionOverride
         ? request.playbackEndFrameExclusiveOverride : resolvedPlaybackEnd;
+    const auto playbackInitialFrame = request.hasPlaybackInitialFrameOverride
+        ? request.playbackInitialFrameOverride : playbackStart;
     if (selectedSample.dataSource == nullptr
         || selectedSample.frameCount == 0
         || playbackStart >= playbackEnd || playbackEnd > selectedSample.frameCount
+        || playbackInitialFrame < playbackStart || playbackInitialFrame >= playbackEnd
         || !std::isfinite(selectedSample.sampleRate) || selectedSample.sampleRate <= 0.0)
     {
         return false;
@@ -214,9 +217,9 @@ bool SamplerVoice::start(const SamplerRenderModel& model,
     renderModel = &model;
     route = &selectedRoute;
     sample = &selectedSample;
-    positionFrames = static_cast<double>(playbackStart);
+    positionFrames = static_cast<double>(playbackInitialFrame);
     playbackEndFrame = playbackEnd;
-    nextLookAheadPublicationFrame = playbackStart;
+    nextLookAheadPublicationFrame = playbackInitialFrame;
     incrementFrames = increment;
     targetIncrementFrames = increment;
     effectiveTuningCents = effectiveTuning;

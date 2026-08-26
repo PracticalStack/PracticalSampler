@@ -23,16 +23,19 @@ public:
     using PlaybackRegionCommitCallback = std::function<void(std::uint64_t startFrame,
                                                             std::uint64_t endFrameExclusive,
                                                             const std::string& label)>;
+    using SelectionChangedCallback = std::function<void(bool hasSelection)>;
 
     WaveformDetailView();
     void setPreview(AuthoringWaveformPreview nextPreview);
     void setDetailRequestCallback(DetailRequestCallback callback);
     void setLoopRegionCommitCallback(LoopRegionCommitCallback callback);
     void setPlaybackRegionCommitCallback(PlaybackRegionCommitCallback callback);
+    void setSelectionChangedCallback(SelectionChangedCallback callback);
     void setZeroCrossingSnapEnabled(bool enabled);
     bool isZeroCrossingSnapEnabled() const noexcept { return zeroCrossingSnapEnabled; }
     const std::string& getSnapStatus() const noexcept { return snapStatus; }
     void paint(juce::Graphics& g) override;
+    void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
@@ -44,7 +47,7 @@ public:
 
     drs::engine::WaveformFrameRange getViewportFrames() const noexcept { return viewportFrames; }
     drs::engine::WaveformFrameRange getSelectionFrames() const noexcept;
-    bool hasSelection() const noexcept { return preview.selectionActive; }
+    bool hasSelection() const noexcept { return !getSelectionFrames().empty(); }
     void clearSelection();
     void setSelectionFrames(drs::engine::WaveformFrameRange selection);
 
@@ -62,6 +65,7 @@ private:
     void cancelRegionGesture();
     void applyBoundaryCandidate(std::uint64_t candidateFrame, bool snapped);
     void submitSnapCandidate(std::uint64_t candidateFrame);
+    void notifySelectionChanged(bool previouslyHadSelection);
     drs::engine::WaveformEditableRegions currentRegions() const noexcept;
     void timerCallback() override;
 
@@ -81,6 +85,7 @@ private:
     DetailRequestCallback detailRequestCallback;
     LoopRegionCommitCallback loopRegionCommitCallback;
     PlaybackRegionCommitCallback playbackRegionCommitCallback;
+    SelectionChangedCallback selectionChangedCallback;
     WaveformSnapService snapService;
     drs::engine::WaveformFrameRange viewportFrames;
     drs::engine::WaveformFrameRange dragStartViewport;

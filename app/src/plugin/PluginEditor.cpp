@@ -39,6 +39,7 @@ constexpr int menuButtonSpacing = 8;
 constexpr int menuButtonYInset = 4;
 constexpr int menuButtonWidth = 72;
 constexpr int editButtonWidth = 64;
+constexpr int viewButtonWidth = 64;
 constexpr int settingsButtonWidth = 92;
 
 std::string buildPerformancePackageTimingSummary(
@@ -665,6 +666,15 @@ Editor::Editor(Processor& owner)
     };
     workspaceShell.addAndMakeVisible(editMenuButton);
 
+    viewMenuButton.setComponentID("pluginViewMenuButton");
+    viewMenuButton.setColour(juce::TextButton::buttonColourId, drs::app::authoring::visual::surfaceRaised);
+    viewMenuButton.setColour(juce::TextButton::textColourOffId, drs::app::authoring::visual::text);
+    viewMenuButton.onClick = [this]
+    {
+        showViewMenu();
+    };
+    workspaceShell.addAndMakeVisible(viewMenuButton);
+
     settingsMenuButton.setComponentID("pluginSettingsMenuButton");
     settingsMenuButton.setColour(juce::TextButton::buttonColourId, drs::app::authoring::visual::surfaceRaised);
     settingsMenuButton.setColour(juce::TextButton::textColourOffId, drs::app::authoring::visual::text);
@@ -759,6 +769,9 @@ void Editor::resized()
     editMenuButton.setBounds(menuRow.removeFromLeft(editButtonWidth).withTrimmedTop(menuButtonYInset)
                                  .withTrimmedBottom(menuButtonYInset));
     menuRow.removeFromLeft(menuButtonSpacing);
+    viewMenuButton.setBounds(menuRow.removeFromLeft(viewButtonWidth).withTrimmedTop(menuButtonYInset)
+                                 .withTrimmedBottom(menuButtonYInset));
+    menuRow.removeFromLeft(menuButtonSpacing);
     settingsMenuButton.setBounds(menuRow.removeFromLeft(settingsButtonWidth).withTrimmedTop(menuButtonYInset)
                                      .withTrimmedBottom(menuButtonYInset));
     menuRow.removeFromLeft(menuButtonSpacing);
@@ -839,6 +852,22 @@ void Editor::showEditMenu()
                        });
 }
 
+void Editor::showViewMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem(restoreDefaultViewCommandId, "Restore Default View");
+
+    auto safeThis = juce::Component::SafePointer<Editor>(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&viewMenuButton),
+                       [safeThis](int menuItemId)
+                       {
+                           if (safeThis == nullptr || menuItemId == 0)
+                               return;
+
+                           safeThis->handleMenuCommand(menuItemId);
+                       });
+}
+
 void Editor::showSettingsMenu()
 {
     juce::PopupMenu menu;
@@ -894,6 +923,9 @@ void Editor::handleMenuCommand(int menuItemId)
             break;
         case viewLicenseCommandId:
             viewLicense();
+            break;
+        case restoreDefaultViewCommandId:
+            authoringPanel.restoreDefaultView();
             break;
         case preferencesCommandId:
             showPreferencesDialog();

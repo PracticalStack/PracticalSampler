@@ -15,6 +15,7 @@
 #include "shared/authoring/WaveformDetailView.h"
 #include "shared/authoring/WorkbenchLayoutState.h"
 #include "shared/authoring/WorkbenchSplitter.h"
+#include "shared/authoring/StructureMapSplitter.h"
 #include "shared/AuthoringPreviewModel.h"
 #include "shared/PerformanceBankImport.h"
 #include "drs/engine/AuthoringSession.h"
@@ -77,6 +78,7 @@ public:
     void resized() override;
     void reloadFromSession();
     void refreshNow();
+    void restoreDefaultView();
     // Shells can forward a learned MIDI note here while the Articulations workbench
     // is listening. The value is validated through the normal project transaction.
     bool applyLearnedKeySwitchMidiNote(int midiNote);
@@ -150,13 +152,10 @@ private:
     void resetWaveformPlaybackRegion();
     void setWaveformPlaybackToSelection();
     void setWaveformLoopToSelection();
-    void selectWaveformPlaybackRegion();
-    void selectWaveformLoopRegion();
     void auditionWaveformLoop();
     void auditionWaveformRegion(drs::engine::WaveformAuditionMode mode);
     std::optional<std::uint64_t> parseWaveformFrameText(const juce::String& text,
                                                         double sampleRate) const;
-    void refreshDraftPlaybackBanner();
     void refreshFromSession();
     void refreshStructureBrowser();
     void refreshStructureInspector();
@@ -275,7 +274,11 @@ private:
     CrossfadeAuditionSequence crossfadeAuditionSequence;
     bool waveformAuditionCueActive = false;
     double waveformAuditionCueStartedMillis = 0.0;
+    double waveformAuditionNoteOffMillis = 0.0;
+    std::uint64_t waveformAuditionInitialFrame = 0;
     drs::engine::WaveformAuditionRegion waveformAuditionRegion;
+    drs::engine::RegionLoopMode waveformAuditionLoopMode
+        = drs::engine::RegionLoopMode::noLoop;
     bool isRefreshing = false;
     bool scopedMapProjectionActive = false;
     bool hasObservedSessionRevisions = false;
@@ -300,16 +303,13 @@ private:
     double keySwitchMidiLearnDeadlineMillis = 0.0;
     authoring::WorkbenchState workbenchState;
     authoring::WorkbenchLayoutState workbenchLayoutState;
+    std::optional<int> userStructureBrowserWidth;
     authoring::SelectionSummaryViewModel selectionSummaryViewModel;
     authoring::ZoneFieldValuesViewModel zoneFieldValuesViewModel;
     std::vector<std::string> zoneMapSelectedZoneIds;
     AuthoringControlLookAndFeel authoringLookAndFeel;
 
     authoring::AuthoringSummaryStrip summaryStrip;
-    juce::Component playbackBanner;
-    juce::Label playbackBannerLabel;
-    juce::TextButton playbackBannerPrepareButton;
-    juce::TextButton playbackBannerPublishButton;
     juce::Label waveformLabel;
     juce::Label waveformScopeLabel;
     juce::Label workbenchBreadcrumbLabel;
@@ -325,18 +325,14 @@ private:
     juce::ComboBox waveformLoopModeSelector;
     juce::TextEditor waveformPlaybackStartEditor;
     juce::TextEditor waveformPlaybackEndEditor;
-    juce::TextButton waveformPlaybackApplyButton;
     juce::TextButton waveformPlaybackResetButton;
     juce::TextButton waveformSetPlaybackSelectionButton;
-    juce::TextButton waveformSelectPlaybackButton;
-    juce::TextButton waveformSelectLoopButton;
     juce::TextButton waveformPlaybackAuditionButton;
     juce::TextButton waveformSelectionAuditionButton;
     juce::ToggleButton waveformSnapToggle;
     juce::TextEditor waveformLoopStartEditor;
     juce::TextEditor waveformLoopEndEditor;
     juce::TextEditor waveformLoopCrossfadeEditor;
-    juce::TextButton waveformLoopApplyButton;
     juce::TextButton waveformSetLoopSelectionButton;
     juce::TextButton waveformLoopAuditionButton;
     juce::Label waveformLoopGuidanceLabel;
@@ -359,6 +355,7 @@ private:
     juce::TextButton previewStopButton;
     authoring::ZoneMapCanvas zoneMap;
     authoring::InstrumentStructureBrowser structureBrowser;
+    authoring::StructureMapSplitter structureMapSplitter;
     authoring::StructureInspectorHost structureInspector;
     juce::Label structureSearchLabel;
     juce::TextEditor structureSearchEditor;

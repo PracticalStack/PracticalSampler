@@ -59,6 +59,7 @@ private:
         viewLicenseCommandId,
         undoCommandId,
         redoCommandId,
+        restoreDefaultViewCommandId,
         audioDeviceSettingsCommandId,
         preferencesCommandId,
         exitApplicationCommandId

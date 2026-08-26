@@ -60,6 +60,8 @@ struct SamplerRenderEvent
     bool hasPlaybackRegionOverride = false;
     std::uint64_t playbackStartFrameOverride = 0;
     std::uint64_t playbackEndFrameExclusiveOverride = 0;
+    bool hasPlaybackInitialFrameOverride = false;
+    std::uint64_t playbackInitialFrameOverride = 0;
     bool loopOverrideEnabled = false;
     std::uint64_t loopStartFrameOverride = 0;
     std::uint64_t loopEndFrameExclusiveOverride = 0;

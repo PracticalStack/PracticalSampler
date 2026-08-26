@@ -44,6 +44,7 @@ private:
         viewLicenseCommandId,
         undoCommandId,
         redoCommandId,
+        restoreDefaultViewCommandId,
         preferencesCommandId
     };
 
@@ -54,6 +55,7 @@ private:
     void timerCallback() override;
     void showFileMenu();
     void showEditMenu();
+    void showViewMenu();
     void showSettingsMenu();
     void handleMenuCommand(int menuItemId);
     void createNewProject();
@@ -130,6 +132,7 @@ private:
     juce::Component workspaceShell;
     juce::TextButton fileMenuButton { "File" };
     juce::TextButton editMenuButton { "Edit" };
+    juce::TextButton viewMenuButton { "View" };
     juce::TextButton settingsMenuButton { "Settings" };
     juce::Label projectStatusLabel;
     juce::TabbedComponent workspaceTabs { juce::TabbedButtonBar::TabsAtTop };

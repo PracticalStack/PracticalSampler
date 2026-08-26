@@ -345,6 +345,18 @@ int main()
                 "Standalone shell height changed unexpectedly.");
         require(mainComponent.getNumChildComponents() >= 2,
                 "Standalone shell should expose the menu bar and workspace tabs as top-level children.");
+        auto* mainMenuBar = dynamic_cast<juce::MenuBarComponent*>(
+            findDescendantById(mainComponent, "mainMenuBar"));
+        require(mainMenuBar != nullptr && mainMenuBar->getModel() != nullptr,
+                "Standalone shell should expose its menu model.");
+        const auto standaloneMenuNames = mainMenuBar->getModel()->getMenuBarNames();
+        require(standaloneMenuNames == juce::StringArray { "File", "Edit", "View", "Settings" },
+                "The standalone View menu must appear between Edit and Settings.");
+        const auto standaloneViewMenu = mainMenuBar->getModel()->getMenuForIndex(2, "View");
+        juce::PopupMenu::MenuItemIterator viewMenuItems(standaloneViewMenu);
+        require(viewMenuItems.next()
+                    && viewMenuItems.getItem().text == "Restore Default View",
+                "The standalone View menu must expose Restore Default View.");
         require(findDescendantById(mainComponent, "workspaceTabs") != nullptr,
                 "Standalone shell should expose the workspace tab container.");
         require(findDescendantById(mainComponent, "performanceKeyboard") != nullptr,
@@ -458,8 +470,14 @@ int main()
                 "Plugin editor should expose the workspace tab container.");
         require(findDescendantById(*editor, "pluginFileMenuButton") != nullptr,
                 "Plugin editor should expose the File menu entry point.");
-        require(findDescendantById(*editor, "pluginSettingsMenuButton") != nullptr,
-                "Plugin editor should expose the Settings menu entry point.");
+        auto* pluginEditMenu = findDescendantById(*editor, "pluginEditMenuButton");
+        auto* pluginViewMenu = findDescendantById(*editor, "pluginViewMenuButton");
+        auto* pluginSettingsMenu = findDescendantById(*editor, "pluginSettingsMenuButton");
+        require(pluginEditMenu != nullptr && pluginViewMenu != nullptr && pluginSettingsMenu != nullptr,
+                "Plugin editor should expose Edit, View, and Settings menu entry points.");
+        require(pluginEditMenu->getBounds().getRight() < pluginViewMenu->getBounds().getX()
+                    && pluginViewMenu->getBounds().getRight() < pluginSettingsMenu->getBounds().getX(),
+                "The View menu must appear between Edit and Settings.");
         require(findDescendantById(*editor, "performanceKeyboard") != nullptr,
                 "Plugin editor should expose the Sprint 5 keyboard surface.");
         require(findDescendantById(*editor, "performanceArtworkPanel") != nullptr,
