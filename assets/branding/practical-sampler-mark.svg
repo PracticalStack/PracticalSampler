@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Practical Sampler PS mark</title>
+  <desc id="desc">The letters PS in warm white on a dark rounded square with teal and orange accents.</desc>
+  <defs>
+    <clipPath id="tile">
+      <rect x="16" y="16" width="480" height="480" rx="92" />
+    </clipPath>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="92" fill="#181d21" />
+  <rect x="16" y="16" width="480" height="48" fill="#1c6c58" clip-path="url(#tile)" />
+
+  <g fill="#f4f0e8">
+    <path fill-rule="evenodd" d="M72 392V136H172C231 136 263 166 263 216C263 266 231 296 172 296H132V392H72ZM132 184V248H168C196 248 208 238 208 216C208 194 196 184 168 184H132Z" />
+    <path d="M430 190C409 173 385 165 356 165C327 165 313 174 313 189C313 204 325 210 366 220C421 234 447 256 447 300C447 354 406 390 345 390C301 390 264 377 237 354L269 312C291 330 318 340 346 340C374 340 391 330 391 313C391 297 379 290 338 280C284 267 258 244 258 201C258 151 298 119 355 119C394 119 429 131 456 153L430 190Z" />
+  </g>
+
+  <rect x="424" y="424" width="40" height="40" rx="8" fill="#b56015" />
+</svg>

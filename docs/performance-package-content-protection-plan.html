@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - Performance Package Content Protection Plan</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --brown-soft: #f2dfcd;
+      --blue: #286c83;
+      --blue-soft: #deedf1;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --violet-soft: #ebe4f5;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+
+    a { color: var(--blue); }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1, h2, h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+    h1 { max-width: 1120px; margin-bottom: 18px; font-size: clamp(2.4rem, 5vw, 4.7rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.7rem, 3vw, 2.55rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.35rem; }
+    h4 { margin-bottom: 7px; font-size: 0.97rem; letter-spacing: 0.02em; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code {
+      padding: 0.12em 0.35em;
+      border-radius: 5px;
+      color: #26343c;
+      background: #e9edeb;
+      font: 0.9em "Cascadia Code", Consolas, monospace;
+    }
+    pre {
+      overflow-x: auto;
+      margin: 18px 0 0;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: #eaf1ee;
+      background: var(--charcoal);
+    }
+    pre code { padding: 0; color: inherit; background: transparent; }
+
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 48px;
+      border-radius: 27px;
+      color: #fffaf3;
+      background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2));
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "PROTECT";
+      position: absolute;
+      right: 18px;
+      bottom: -31px;
+      color: rgba(255, 255, 255, 0.045);
+      font: 700 7.3rem/1 Georgia, serif;
+      pointer-events: none;
+    }
+    .eyebrow, .section-label {
+      display: inline-block;
+      margin-bottom: 10px;
+      color: #efc39f;
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .section-label { color: var(--brown); }
+    .lede { position: relative; z-index: 1; max-width: 1020px; color: #dce3df; font-size: 1.08rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+
+    .summary-grid, .grid-2, .grid-3, .grid-4, .gate-grid { display: grid; gap: 15px; }
+    .summary-grid { position: relative; z-index: 1; grid-template-columns: repeat(4, 1fr); margin-top: 28px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.7rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .gate-grid { grid-template-columns: 1.15fr 0.85fr; }
+
+    .toc, .section, .phase, .callout {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .toc { margin-top: 20px; padding: 21px 25px; }
+    .toc ol { columns: 3; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .section, .phase { margin-top: 24px; padding: 30px; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+
+    .card { padding: 21px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-alt); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card.accent { border-top: 4px solid var(--blue); }
+    .card.good { border-top: 4px solid var(--green); }
+    .card.warn { border-top: 4px solid var(--amber); }
+    .card.violet { border-top: 4px solid var(--violet); }
+    .card.problem { border-top: 4px solid var(--red); }
+
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout p:last-child { margin-bottom: 0; }
+
+    .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 18px; }
+    .flow-step { position: relative; min-height: 160px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .flow-step:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 2; top: 50%; right: -14px; width: 20px; color: var(--brown); background: var(--paper); font-weight: 900; text-align: center; }
+    .flow-step strong { display: block; margin-bottom: 7px; color: var(--blue); }
+    .flow-step span { color: var(--muted); font-size: 0.84rem; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 980px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242, 238, 230, 0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .priority { display: inline-block; min-width: 34px; padding: 3px 8px; border-radius: 999px; color: var(--brown); background: var(--brown-soft); font-size: 0.74rem; font-weight: 850; text-align: center; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+    .status.draft { color: var(--blue); background: var(--blue-soft); }
+    .status.not-started { color: var(--muted); background: #e7e8e6; }
+    .status.in-progress { color: var(--amber); background: var(--amber-soft); }
+    .status.blocked { color: var(--red); background: var(--red-soft); }
+    .status.complete { color: var(--green); background: var(--green-soft); }
+
+    .phase { overflow: hidden; padding: 0; }
+    .phase-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 22px 25px; color: #fffaf3; background: var(--charcoal); }
+    .phase-number { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.18rem Georgia, serif; }
+    .phase-head h2 { margin: 0; font-size: 1.65rem; }
+    .phase-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .phase-focus { color: #ccd6d3; font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .phase-intent { margin: 0; padding: 18px 25px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .phase-body { padding: 23px 25px 26px; }
+    .task-list, .validation-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li, .validation-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
+    .task-list li:last-child, .validation-list li:last-child { border-bottom: 0; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .validation-list li::before { content: "TEST"; position: absolute; left: 9px; top: 13px; color: var(--violet); font: 800 0.62rem "Cascadia Code", Consolas, monospace; }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    .subhead { margin: 23px 0 8px; color: var(--brown); font-family: "Cascadia Code", Consolas, monospace; font-size: 0.78rem; font-weight: 850; letter-spacing: 0.11em; text-transform: uppercase; }
+    .exit { margin-top: 20px; padding: 18px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .exit p:last-child { margin-bottom: 0; }
+    .files { margin-top: 15px; color: var(--muted); font-size: 0.88rem; }
+
+    .timeline { display: grid; grid-template-columns: repeat(6, minmax(110px, 1fr)); gap: 6px; margin-top: 16px; overflow-x: auto; }
+    .timeline div { min-width: 110px; padding: 12px 7px; border-radius: 10px; color: #fff; background: var(--blue); font-size: 0.75rem; font-weight: 800; text-align: center; }
+    .timeline div:nth-child(1) { background: var(--brown); }
+    .timeline div:nth-child(n+2):nth-child(-n+4) { background: var(--green); }
+    .timeline div:nth-child(n+5) { background: var(--violet); }
+
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+
+    @media (max-width: 1100px) {
+      .summary-grid, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .gate-grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(3, 1fr); }
+      .flow-step:nth-child(3)::after { display: none; }
+      .toc ol { columns: 2; }
+    }
+    @media (max-width: 700px) {
+      .page { width: calc(100% - 22px); padding-top: 18px; }
+      .hero, .section { padding: 25px 22px; }
+      .summary-grid, .grid-3, .grid-4, .flow { grid-template-columns: 1fr; }
+      .flow-step:not(:last-child)::after { content: "\2193"; top: auto; right: 50%; bottom: -17px; }
+      .flow-step:nth-child(3)::after { display: block; }
+      .toc ol { columns: 1; }
+      .phase-head { grid-template-columns: auto 1fr; }
+      .phase-meta { grid-column: 2; align-items: flex-start; }
+      .phase-focus { text-align: left; }
+      .phase-body { padding: 20px; }
+      .hero::after { display: none; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero, .toc, .section, .phase { box-shadow: none; }
+      .phase, .card, .callout, table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Engineering Initiative Plan | August 27, 2026</span>
+      <h1>Performance Package Content Protection</h1>
+      <p class="lede">
+        This plan upgrades Practical Sampler playable instruments from the current deterministic custom transform to a
+        defensible encrypted, signed, read-only distribution format. Packages remain portable and require no customer
+        entitlement, while compiled settings, artwork, UI definitions, and sample data become resistant to direct
+        inspection, unauthorized editing, and ordinary WAV extraction.
+      </p>
+      <div class="meta">
+        <span class="chip">Target format: <code>DRSPKG3</code></span>
+        <span class="chip">AEAD: XChaCha20-Poly1305</span>
+        <span class="chip">Publisher signature: Ed25519</span>
+        <span class="chip">V1/V2 read compatibility</span>
+        <span class="chip">No licensing or machine binding</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <strong>6</strong>
+          <span>Phased implementation gates</span>
+        </div>
+        <div class="summary-card">
+          <strong>5–8</strong>
+          <span>Estimated engineer-weeks before external review</span>
+        </div>
+        <div class="summary-card">
+          <strong>0</strong>
+          <span>Authoring project or original WAV containers included</span>
+        </div>
+        <div class="summary-card">
+          <strong>Draft</strong>
+          <span>Overall initiative status</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#decision">Decision and Security Promise</a></li>
+        <li><a href="#baseline">Current Technical Baseline</a></li>
+        <li><a href="#architecture">Target Architecture</a></li>
+        <li><a href="#roadmap">Phase Roadmap and Status</a></li>
+        <li><a href="#phase-0">Phase 0: Contract</a></li>
+        <li><a href="#phase-1">Phase 1: Crypto Foundation</a></li>
+        <li><a href="#phase-2">Phase 2: Package V3</a></li>
+        <li><a href="#phase-3">Phase 3: Signing and Keys</a></li>
+        <li><a href="#phase-4">Phase 4: Product Cutover</a></li>
+        <li><a href="#phase-5">Phase 5: Qualification</a></li>
+        <li><a href="#release-gates">Release Gates</a></li>
+        <li><a href="#risks">Risks and Decisions</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="decision">
+      <div class="heading"><h2>Decision and Security Promise</h2></div>
+      <div class="grid-3">
+        <article class="card good">
+          <h3>What We Protect</h3>
+          <p>Compiled runtime settings, UI controls, artwork, routing, effects, sample metadata, sample heads, and sample pages are encrypted and authenticated.</p>
+        </article>
+        <article class="card accent">
+          <h3>What Users May Do</h3>
+          <p>Users may copy a package, load it on another Practical Sampler installation, use published controls, save permitted preset state, and render audio.</p>
+        </article>
+        <article class="card warn">
+          <h3>What We Do Not Claim</h3>
+          <p>This is not ownership enforcement or impenetrable DRM. Debugger-assisted key capture, process-memory extraction, binary patching, and audio recording remain outside the guarantee.</p>
+        </article>
+      </div>
+      <div class="callout decision">
+        <strong>Defensible product statement:</strong>
+        playable-instrument settings and samples are protected using authenticated encryption, and packages are signed to detect unauthorized modification and verify publishing origin. The design prevents direct inspection, editing, repacking, and ordinary extraction without claiming resistance to determined runtime reverse engineering.
+      </div>
+      <div class="callout warning">
+        <strong>Immutability rule:</strong>
+        performance controls may change permitted runtime or preset values, but they never mutate the signed package definition. Background images, control topology, routing, zone definitions, and embedded content remain package-owned and read-only.
+      </div>
+    </section>
+
+    <section class="section" id="baseline">
+      <div class="heading"><h2>Current Technical Baseline</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Current State</th>
+              <th>Initiative Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">Crypto provider</td>
+              <td><code>PackageCryptoProvider</code> is already injected into package readers, writers, and page sources.</td>
+              <td>Useful seam, but requests must receive real key material or an opaque key handle.</td>
+            </tr>
+            <tr>
+              <td class="id">Current algorithm</td>
+              <td><code>PackageCrypto.cpp</code> uses a source-visible fixed seed, FNV-style mixing, deterministic nonce generation, XOR transformation, and a forgeable custom tag.</td>
+              <td>The implementation and <code>drs.sha256.stream-seal.v1</code> identifier must be retired from all new exports.</td>
+            </tr>
+            <tr>
+              <td class="id">Package V2</td>
+              <td>V2 already stores independently addressable, bounded metadata, sample-head, and sample-page records with AAD-like identity fields.</td>
+              <td>The record/page architecture can remain; V3 changes cryptography, key envelope, signed structure, and compatibility identity.</td>
+            </tr>
+            <tr>
+              <td class="id">Reader dispatch</td>
+              <td><code>PackageReaderDispatch</code> distinguishes <code>DRSPKG1</code> and <code>DRSPKG2</code>.</td>
+              <td>Add explicit V3 dispatch while preserving bounded legacy reads.</td>
+            </tr>
+            <tr>
+              <td class="id">Runtime model</td>
+              <td>Packages already omit the editable <code>.drsproj</code>, suppress authoring state, and activate a compiled runtime model.</td>
+              <td>No authoring-format redesign is required.</td>
+            </tr>
+            <tr>
+              <td class="id">Sample streaming</td>
+              <td>Package-backed samples use authenticated head/page records and the common bounded cache/worker path.</td>
+              <td>AEAD decryption remains off the audio thread and should preserve existing bounded memory behavior.</td>
+            </tr>
+            <tr>
+              <td class="id">Release gate</td>
+              <td>The current gate requires byte-identical deterministic exports.</td>
+              <td>V3 must replace byte determinism with semantic determinism because secure random nonces intentionally change encrypted bytes.</td>
+            </tr>
+            <tr>
+              <td class="id">Dependencies</td>
+              <td>No production libsodium, OpenSSL EVP, or equivalent modern crypto integration was found outside vendored JUCE code.</td>
+              <td>Dependency selection, platform linking, provenance, and update policy are first-class tasks.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <div class="heading"><h2>Target Architecture</h2></div>
+      <div class="flow">
+        <div class="flow-step">
+          <strong>1. Runtime Compile</strong>
+          <span>Compile the editable project into runtime-only settings and bounded internal sample records. Omit original paths and WAV containers.</span>
+        </div>
+        <div class="flow-step">
+          <strong>2. Package Key</strong>
+          <span>Generate a random 256-bit data-encryption key for this package and retain it only for the export operation.</span>
+        </div>
+        <div class="flow-step">
+          <strong>3. Record AEAD</strong>
+          <span>Encrypt each record with XChaCha20-Poly1305 using a unique random nonce and authenticated record metadata.</span>
+        </div>
+        <div class="flow-step">
+          <strong>4. Key Envelope</strong>
+          <span>Wrap the package key under a versioned Practical Sampler release key; write only the wrapped value.</span>
+        </div>
+        <div class="flow-step">
+          <strong>5. Publish Signature</strong>
+          <span>Sign the header, key envelope, TOC, ordering, nonces, ciphertext, and tags with an offline publisher key.</span>
+        </div>
+        <div class="flow-step">
+          <strong>6. Verified Open</strong>
+          <span>Verify signature and entitlement-free key access, then authenticate/decrypt only required records on package workers.</span>
+        </div>
+      </div>
+
+      <pre><code>DRSPKG3 cleartext envelope
+  magic, formatVersion, cryptoSuite, signatureSuite
+  packageId, encryptionKeyId, signingKeyId
+  wrappedPackageContentKey
+  bounded TOC offsets and encrypted sizes
+  publisher signature
+
+encrypted records
+  runtime instrument and UI definition
+  background artwork and license text
+  sample metadata, heads, and bounded pages
+  nonce[24] + ciphertext[n] + authenticationTag[16]
+
+authenticated associated data
+  formatVersion + packageId + recordId + recordKind
+  sourceGeneration + pageIndex + plaintextSize</code></pre>
+
+      <div class="grid-2" style="margin-top: 18px;">
+        <article class="card violet">
+          <h3>Key Separation</h3>
+          <ul>
+            <li>A unique package content key limits the effect of record/key reuse.</li>
+            <li>A versioned release key permits rotation without redesigning record encryption.</li>
+            <li>The publisher signing private key is never shipped in the application.</li>
+            <li>Decryption and signing keys use separate algorithms, identifiers, and operational ownership.</li>
+          </ul>
+        </article>
+        <article class="card warn">
+          <h3>Plaintext Boundary</h3>
+          <ul>
+            <li>No plaintext record is published before tag and package-signature validation.</li>
+            <li>No decrypted settings, images, or samples are written to temporary files.</li>
+            <li>Only format dispatch and bounded range metadata remain cleartext.</li>
+            <li>Plaintext buffers and package keys are cleared on generation retirement where practical.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="roadmap">
+      <div class="heading"><h2>Phase Roadmap and Status</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>Scope</th>
+              <th>Estimate</th>
+              <th>Dependency</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">0</td>
+              <td>Security contract, threat model, V3 byte contract, and publishing decision</td>
+              <td>3–5 days</td>
+              <td>Product and security review</td>
+              <td><span class="status draft">Draft</span></td>
+            </tr>
+            <tr>
+              <td class="id">1</td>
+              <td>Modern crypto dependency, AEAD provider, signatures, random generation, and key interfaces</td>
+              <td>5–7 days</td>
+              <td>Phase 0 gate</td>
+              <td><span class="status not-started">Not started</span></td>
+            </tr>
+            <tr>
+              <td class="id">2</td>
+              <td>DRSPKG3 record format, encrypted export/open, and bounded page decryption</td>
+              <td>7–10 days</td>
+              <td>Phase 1 gate</td>
+              <td><span class="status not-started">Not started</span></td>
+            </tr>
+            <tr>
+              <td class="id">3</td>
+              <td>Publisher signatures, release-key pipeline, trust store, and key rotation</td>
+              <td>5–8 days</td>
+              <td>Signing-authority decision</td>
+              <td><span class="status not-started">Not started</span></td>
+            </tr>
+            <tr>
+              <td class="id">4</td>
+              <td>Exporter/reader cutover, legacy migration, diagnostics, host restore, and user-facing behavior</td>
+              <td>4–6 days</td>
+              <td>Phases 2 and 3</td>
+              <td><span class="status not-started">Not started</span></td>
+            </tr>
+            <tr>
+              <td class="id">5</td>
+              <td>Adversarial fixtures, large-corpus performance, fuzzing, review, and release qualification</td>
+              <td>5–8 days</td>
+              <td>Phase 4 gate</td>
+              <td><span class="status not-started">Not started</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="timeline">
+        <div>P0 Contract</div>
+        <div>P1 Crypto</div>
+        <div>P2 V3 Format</div>
+        <div>P3 Sign &amp; Keys</div>
+        <div>P4 Cutover</div>
+        <div>P5 Qualify</div>
+      </div>
+      <div class="callout warning">
+        <strong>Schedule assumption:</strong>
+        the 5–8 engineer-week estimate assumes one experienced engineer, an available supported crypto library, and no hosted signing or customer provisioning service. Independent security review and remediation should be scheduled separately. Two engineers can overlap format/crypto work with integration/qualification after Phase 0, but phase gates remain sequential.
+      </div>
+    </section>
+
+    <section class="phase" id="phase-0">
+      <div class="phase-head">
+        <div class="phase-number">0</div>
+        <div><h2>Security Contract and V3 Design</h2></div>
+        <div class="phase-meta">
+          <span class="status draft">Draft</span>
+          <span class="phase-focus">Focus: decisions before implementation</span>
+        </div>
+      </div>
+      <p class="phase-intent">Freeze the promise, attacker boundary, byte layout, key ownership, and publishing authority so implementation does not accidentally make a stronger claim than the system can support.</p>
+      <div class="phase-body">
+        <div class="subhead">Development tasks</div>
+        <ul class="task-list">
+          <li><span class="task-id">CPS-P0-T1</span> Write the content-protection ADR defining protected assets, allowed operations, excluded attacks, terminology, and exact customer-facing claim.</li>
+          <li><span class="task-id">CPS-P0-T2</span> Specify the byte-exact <code>DRSPKG3</code> header, TOC, record, AAD, key-envelope, and signature coverage contracts, including checked bounds and maximum sizes.</li>
+          <li><span class="task-id">CPS-P0-T3</span> Decide who may sign production packages: Practical Sampler release infrastructure, a hosted author-publishing service, or provisioned author certificates.</li>
+          <li><span class="task-id">CPS-P0-T4</span> Define release-key generation, storage, build injection, rotation, compromise response, retention, and development/test-key separation.</li>
+          <li><span class="task-id">CPS-P0-T5</span> Define the legacy policy: V1/V2 remain readable, are labeled legacy/unprotected internally, and are upgraded only through explicit re-export.</li>
+          <li><span class="task-id">CPS-P0-T6</span> Establish performance budgets for metadata open, head readiness, first note, page-service latency, working set, and package-size overhead.</li>
+          <li><span class="task-id">CPS-P0-T7</span> Create a requirement-to-test traceability matrix for every confidentiality, integrity, compatibility, and real-time invariant.</li>
+        </ul>
+
+        <div class="subhead">Validation steps</div>
+        <ul class="validation-list">
+          <li>Conduct product, runtime, release-engineering, and security walkthroughs of the threat model and explicit non-goals.</li>
+          <li>Perform paper attacks for record substitution, TOC reordering, header mutation, nonce reuse, wrong-key use, downgrade, truncation, and signing-key compromise.</li>
+          <li>Confirm every encrypted asset type has an owner, record kind, size bound, AAD identity, and negative test.</li>
+          <li>Confirm the signing workflow is possible for the actual package authors without placing a production signing key in desktop code.</li>
+        </ul>
+
+        <div class="files">Primary deliverables: security ADR, <code>DRSPKG3</code> format specification, key-operations runbook, test traceability matrix, performance budget.</div>
+        <div class="exit">
+          <h3>Exit Gate P0</h3>
+          <p>Product and engineering approve the exact security promise; security approves the V3 construction and key lifecycle; signing authority has one selected implementation; every P0 decision is closed or explicitly deferred outside the release claim.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="phase" id="phase-1">
+      <div class="phase-head">
+        <div class="phase-number">1</div>
+        <div><h2>Cryptographic Foundation</h2></div>
+        <div class="phase-meta">
+          <span class="status not-started">Not started</span>
+          <span class="phase-focus">Focus: maintained primitives and key-aware APIs</span>
+        </div>
+      </div>
+      <p class="phase-intent">Introduce modern, testable cryptographic primitives behind product-owned interfaces without changing the production package writer yet.</p>
+      <div class="phase-body">
+        <div class="subhead">Development tasks</div>
+        <ul class="task-list">
+          <li><span class="task-id">CPS-P1-T1</span> Select, approve, and integrate a maintained cryptographic library supporting XChaCha20-Poly1305, Ed25519, secure randomness, and secure memory utilities.</li>
+          <li><span class="task-id">CPS-P1-T2</span> Add dependency provenance, pinned version, license review, CMake integration, supported-platform build wiring, and documented update ownership.</li>
+          <li><span class="task-id">CPS-P1-T3</span> Replace seed-derived provider assumptions with <code>PackageKeyProvider</code>, key identifiers, opaque key handles, and explicit seal/open key inputs.</li>
+          <li><span class="task-id">CPS-P1-T4</span> Implement an XChaCha20-Poly1305 provider that uses 256-bit keys, 192-bit random nonces, 128-bit tags, caller-provided AAD, and verify-before-release semantics.</li>
+          <li><span class="task-id">CPS-P1-T5</span> Implement Ed25519 detached signature verification and signing adapters with separate public/private key types.</li>
+          <li><span class="task-id">CPS-P1-T6</span> Add owned sensitive-buffer types with non-copying defaults and best-effort clearing on destruction and generation retirement.</li>
+          <li><span class="task-id">CPS-P1-T7</span> Retain the deterministic legacy provider only behind V1/V2 compatibility paths and remove it as the default for new format APIs.</li>
+        </ul>
+
+        <div class="subhead">Validation steps</div>
+        <ul class="validation-list">
+          <li>Run official known-answer tests or upstream vectors for AEAD and Ed25519 on every supported build architecture.</li>
+          <li>Prove wrong key, wrong nonce, modified ciphertext, modified tag, and modified AAD all fail without returning partial plaintext.</li>
+          <li>Generate at least one million test nonces through the production RNG seam and verify size, error handling, and absence of deterministic test-provider leakage into production builds.</li>
+          <li>Run Debug and Release builds plus focused sanitizer/static-analysis coverage where available.</li>
+          <li>Verify no production key bytes, test keys, environment values, or private signing material appear in compiler output, logs, diagnostics, or checked-in fixtures.</li>
+        </ul>
+
+        <div class="files">Likely files: <code>engine_adapter/include/drs/engine/PackageCrypto.h</code>, <code>engine_adapter/src/PackageCrypto.cpp</code>, new <code>PackageKeys.*</code>, new <code>PackageSignature.*</code>, CMake dependency files, focused crypto tests.</div>
+        <div class="exit">
+          <h3>Exit Gate P1</h3>
+          <p>Supported configurations build with the approved library; official vectors and all negative tests pass; production APIs cannot fall back to the fixed seed; plaintext is never returned on authentication failure; no production secret is present in source or fixtures.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="phase" id="phase-2">
+      <div class="phase-head">
+        <div class="phase-number">2</div>
+        <div><h2>Encrypted Package V3</h2></div>
+        <div class="phase-meta">
+          <span class="status not-started">Not started</span>
+          <span class="phase-focus">Focus: confidential runtime records and bounded paging</span>
+        </div>
+      </div>
+      <p class="phase-intent">Build a complete V3 read/write path with per-package content keys while retaining the existing runtime-only model and page-streaming behavior.</p>
+      <div class="phase-body">
+        <div class="subhead">Development tasks</div>
+        <ul class="task-list">
+          <li><span class="task-id">CPS-P2-T1</span> Add <code>DRSPKG3</code> dispatch, packed header/TOC structures, checked serialization, crypto-suite IDs, signing-key IDs, encryption-key IDs, and future-version rejection.</li>
+          <li><span class="task-id">CPS-P2-T2</span> Generate a fresh 256-bit content key per export and a unique random 192-bit nonce per encrypted record.</li>
+          <li><span class="task-id">CPS-P2-T3</span> Define canonical binary AAD over format version, package ID, record ID/kind, generation, page index, plaintext size, and any required compatibility identity.</li>
+          <li><span class="task-id">CPS-P2-T4</span> Encrypt runtime settings, UI definitions, background artwork, license text, stream metadata, sample heads, and sample pages; keep only the approved envelope fields cleartext.</li>
+          <li><span class="task-id">CPS-P2-T5</span> Ensure compilation removes source paths, original WAV names, unnecessary WAV chunks, and authoring-only metadata before encryption.</li>
+          <li><span class="task-id">CPS-P2-T6</span> Implement bounded package-key unwrap and worker-side record decryption for metadata, heads, and requested pages without plaintext temporary files.</li>
+          <li><span class="task-id">CPS-P2-T7</span> Update export staging, selected-record verification, cancellation, atomic publication, and cleanup to handle V3 key lifetime safely.</li>
+          <li><span class="task-id">CPS-P2-T8</span> Replace byte-identical fixture expectations with deterministic plaintext/semantic digests and intentionally nondeterministic encrypted output.</li>
+        </ul>
+
+        <div class="subhead">Validation steps</div>
+        <ul class="validation-list">
+          <li>Export identical input twice and require different nonces/ciphertexts but identical authenticated plaintext digests and rendered output.</li>
+          <li>Search complete package bytes for known JSON fields, control labels, source paths, filenames, PNG/JPEG signatures, <code>RIFF</code>/<code>WAVE</code> markers, and planted PCM canaries; require no plaintext matches.</li>
+          <li>Mutate every header/TOC/record field class and require precise rejection before the affected plaintext is published.</li>
+          <li>Verify package page opening reads and decrypts only the requested bounded range and leaves unrelated records unopened.</li>
+          <li>Audit temporary and staging directories during export/open; require no plaintext settings, image, or sample artifacts.</li>
+          <li>Compare V2 and V3 large-corpus metadata open, head readiness, first note, page latency, memory peak, and package-size overhead against approved budgets.</li>
+        </ul>
+
+        <div class="files">Likely files: new <code>PackageV3.*</code>, <code>PackageReaderDispatch.*</code>, <code>PerformancePackageExportService.cpp</code>, <code>SampleDataSource.*</code>, fixture tooling, package V3 tests.</div>
+        <div class="exit">
+          <h3>Exit Gate P2</h3>
+          <p>A real project exports to V3 and reopens through bounded streaming; all protected asset classes are encrypted; plaintext scanning and mutation matrices pass; no plaintext files are materialized; large-instrument performance remains within the approved budget.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="phase" id="phase-3">
+      <div class="phase-head">
+        <div class="phase-number">3</div>
+        <div><h2>Publisher Signatures and Release-Key Pipeline</h2></div>
+        <div class="phase-meta">
+          <span class="status not-started">Not started</span>
+          <span class="phase-focus">Focus: immutable origin and operational secrets</span>
+        </div>
+      </div>
+      <p class="phase-intent">Separate confidentiality from publishing authority so extraction of a symmetric decryption key does not permit creation of a publisher-valid modified package.</p>
+      <div class="phase-body">
+        <div class="subhead">Development tasks</div>
+        <ul class="task-list">
+          <li><span class="task-id">CPS-P3-T1</span> Implement canonical signature coverage for the complete header, wrapped content key, TOC, record ordering, nonces, ciphertext, and authentication tags.</li>
+          <li><span class="task-id">CPS-P3-T2</span> Add a pinned public-key trust store with signing-key identifiers, activation/revocation metadata, rotation rules, and unknown-key rejection.</li>
+          <li><span class="task-id">CPS-P3-T3</span> Build the selected publishing workflow so the Ed25519 private key exists only in controlled release/signing infrastructure or approved author hardware/credentials.</li>
+          <li><span class="task-id">CPS-P3-T4</span> Build release-key generation and injection/provisioning without checking secrets into source, fixtures, build logs, symbols, crash reports, or distributable debugging artifacts.</li>
+          <li><span class="task-id">CPS-P3-T5</span> Wrap each package content key under the active release key and support explicit lookup by key ID, rotation, and controlled legacy-key retention.</li>
+          <li><span class="task-id">CPS-P3-T6</span> Verify the publisher signature before accepting package-owned settings, artwork, controls, or sample records into an activation generation.</li>
+          <li><span class="task-id">CPS-P3-T7</span> Add operational runbooks for signing outage, key rotation, suspected compromise, package revocation policy, and emergency reader update.</li>
+        </ul>
+
+        <div class="subhead">Validation steps</div>
+        <ul class="validation-list">
+          <li>Use a deliberately disclosed test decryption key to create AEAD-valid modified content and prove publisher-signature verification still rejects it.</li>
+          <li>Test altered signature, wrong signing key, unknown key ID, revoked test key, key-ID substitution, record reordering, cross-package record substitution, and signature truncation.</li>
+          <li>Inspect source, repository history, produced packages, CI logs, application logs, crash artifacts, symbols, and test fixtures for private signing or release-key leakage.</li>
+          <li>Exercise a complete signing-key rotation and verify new packages open, retained-key packages follow policy, and unknown/retired keys fail with actionable diagnostics.</li>
+          <li>Run the real package-author workflow end to end and confirm production signing cannot be invoked by an unauthorized desktop build.</li>
+        </ul>
+
+        <div class="files">Likely files: <code>PackageSignature.*</code>, <code>PackageKeys.*</code>, V3 reader/writer, release tooling, CI secret configuration, publishing service or author-certificate tooling, operational documentation.</div>
+        <div class="exit">
+          <h3>Exit Gate P3</h3>
+          <p>No production signing private key exists in shipped code; an attacker holding the symmetric test decryption key still cannot create an accepted modified package; key rotation and failure recovery are demonstrated; the authorized publishing workflow is operational and auditable.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="phase" id="phase-4">
+      <div class="phase-head">
+        <div class="phase-number">4</div>
+        <div><h2>Product Cutover and Compatibility</h2></div>
+        <div class="phase-meta">
+          <span class="status not-started">Not started</span>
+          <span class="phase-focus">Focus: safe adoption without breaking existing packages</span>
+        </div>
+      </div>
+      <p class="phase-intent">Make V3 the only new export format, preserve deliberate legacy reads, and integrate secure failure behavior across standalone, plugin, host restore, and support surfaces.</p>
+      <div class="phase-body">
+        <div class="subhead">Development tasks</div>
+        <ul class="task-list">
+          <li><span class="task-id">CPS-P4-T1</span> Switch <em>Export Playable Instrument</em> to V3 and remove the deterministic provider from every default production writer path.</li>
+          <li><span class="task-id">CPS-P4-T2</span> Preserve read-only V1/V2 dispatch with explicit internal legacy security classification, size bounds, and no rewrite-on-open behavior.</li>
+          <li><span class="task-id">CPS-P4-T3</span> Add explicit re-export guidance for creators who need to migrate existing packages; never imply that an old file was secured in place.</li>
+          <li><span class="task-id">CPS-P4-T4</span> Add distinct diagnostics for unsupported format, unknown key, unavailable key, bad signature, AEAD failure, corruption, compatibility mismatch, cancellation, and I/O failure.</li>
+          <li><span class="task-id">CPS-P4-T5</span> Integrate V3 with deferred activation, package replacement, last-known-good playback, host state restore, plugin/standalone open flows, and package license/artwork viewing.</li>
+          <li><span class="task-id">CPS-P4-T6</span> Update support, operator, compatibility, and customer-facing documentation with the approved promise and explicit non-goals.</li>
+          <li><span class="task-id">CPS-P4-T7</span> Add telemetry that reports only non-sensitive suite/key identifiers and failure categories; prohibit keys, plaintext, nonces, tags, and protected metadata from logs.</li>
+        </ul>
+
+        <div class="subhead">Validation steps</div>
+        <ul class="validation-list">
+          <li>Run the complete checked-in V1/V2 positive and negative corpus unchanged and verify no legacy file is rewritten.</li>
+          <li>Export/reopen V3 through standalone, plugin, host restore, package replacement, and first-play paths.</li>
+          <li>Attempt failed V3 replacement while a valid package is active and prove last-known-good playback remains active without publishing failed plaintext.</li>
+          <li>Verify UI and logs distinguish security failures without leaking internal paths, keys, encrypted content, or attacker-controlled unbounded strings.</li>
+          <li>Confirm all normal production export entry points emit V3 and no hidden/test switch can emit the legacy format in release builds.</li>
+        </ul>
+
+        <div class="files">Likely files: <code>PackageReaderDispatch.*</code>, <code>PluginProcessor.cpp</code>, standalone open flow, <code>ProjectRestoreCoordinator.cpp</code>, <code>PerformancePackageExportService.cpp</code>, diagnostics, compatibility/operator docs.</div>
+        <div class="exit">
+          <h3>Exit Gate P4</h3>
+          <p>Every production export is signed V3; standalone, plugin, replacement, and restore paths open it correctly; V1/V2 remain bounded legacy-read only; failure diagnostics are actionable and non-sensitive; migration documentation is complete.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="phase" id="phase-5">
+      <div class="phase-head">
+        <div class="phase-number">5</div>
+        <div><h2>Adversarial Hardening and Release Qualification</h2></div>
+        <div class="phase-meta">
+          <span class="status not-started">Not started</span>
+          <span class="phase-focus">Focus: evidence, performance, and independent review</span>
+        </div>
+      </div>
+      <p class="phase-intent">Qualify the implementation as a long-lived hostile-input boundary and produce reproducible evidence for the exact content-protection promise.</p>
+      <div class="phase-body">
+        <div class="subhead">Development tasks</div>
+        <ul class="task-list">
+          <li><span class="task-id">CPS-P5-T1</span> Build checked-in V3 positive/negative fixtures and mutation generators covering every header, TOC, envelope, signature, nonce, tag, ciphertext, and bounds field class.</li>
+          <li><span class="task-id">CPS-P5-T2</span> Add coverage-guided fuzz targets for format dispatch, header/TOC parsing, key-envelope parsing, signature verification, record framing, and AAD construction.</li>
+          <li><span class="task-id">CPS-P5-T3</span> Extend the Accurate Salamander qualification with V3 export throughput, package size, metadata open, head readiness, page latency, first note, cache peak, cancellation, and sustained playback evidence.</li>
+          <li><span class="task-id">CPS-P5-T4</span> Add automated plaintext-leak scans over packages, staging directories, temp directories, logs, crash artifacts, and host state.</li>
+          <li><span class="task-id">CPS-P5-T5</span> Update the package release gate to require semantic determinism, signature validity, mutation rejection, confidentiality scans, shell parity, legacy compatibility, and real-time safety.</li>
+          <li><span class="task-id">CPS-P5-T6</span> Conduct focused manual reverse-engineering review at the declared threat boundary, including archive/hex inspection, record carving, key-string scans, and attempted package repacking.</li>
+          <li><span class="task-id">CPS-P5-T7</span> Obtain independent cryptographic/security review of construction, key operations, implementation, test coverage, and public claims; remediate all release-blocking findings.</li>
+          <li><span class="task-id">CPS-P5-T8</span> Freeze V3 compatibility policy, incident owner, dependency-update cadence, release checklist, and support escalation path.</li>
+        </ul>
+
+        <div class="subhead">Validation steps</div>
+        <ul class="validation-list">
+          <li>Run fuzzers for the agreed execution budget with zero crash, out-of-bounds, unbounded allocation, or unauthenticated plaintext findings.</li>
+          <li>Run focused tests, full repository tests, standalone/plugin host validation, and Release large-corpus qualification.</li>
+          <li>Compare all performance measures with frozen V2 and authored-project baselines; investigate every budget regression rather than raising thresholds without review.</li>
+          <li>Prove no protected plaintext appears in package bytes or persistent artifacts and no decryption/signature/file operation executes on the audio thread.</li>
+          <li>Have an independent reviewer reproduce wrong-key, compromised-symmetric-key, mutation, downgrade, and extraction-resistance evidence from documented commands.</li>
+        </ul>
+
+        <div class="files">Primary deliverables: V3 corpus, fuzz harnesses, large-instrument report, content-protection release-gate JSON, independent review report, frozen compatibility and incident runbooks.</div>
+        <div class="exit">
+          <h3>Exit Gate P5 / Release Gate</h3>
+          <p>All automated gates are green; performance budgets pass; no unresolved critical/high security findings remain; independent review supports the approved claim; release, rotation, incident, migration, and support procedures are signed off by their owners.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="release-gates">
+      <div class="heading"><h2>Cross-Phase Validation and Release Gates</h2></div>
+      <div class="gate-grid">
+        <article class="card good">
+          <h3>Mandatory Security Gates</h3>
+          <ul>
+            <li>Approved maintained cryptographic library; no custom cipher or tag construction.</li>
+            <li>Unique random per-record nonces and random per-package content keys.</li>
+            <li>No source-visible production secret or shipped signing private key.</li>
+            <li>Publisher signature covers all mutable package structure and encrypted content.</li>
+            <li>Wrong-key, bad-signature, mutation, substitution, downgrade, and truncation rejection.</li>
+            <li>No plaintext settings, artwork, filenames, WAV containers, or planted PCM in package bytes.</li>
+            <li>No unauthenticated plaintext publication or plaintext temporary files.</li>
+          </ul>
+        </article>
+        <article class="card warn">
+          <h3>Mandatory Product Gates</h3>
+          <ul>
+            <li>V3 package opens in standalone, plugin, and host restore paths.</li>
+            <li>Package remains read-only and authoring state remains absent.</li>
+            <li>Published controls and preset overrides retain intended behavior.</li>
+            <li>V1/V2 continue to open under the bounded compatibility policy.</li>
+            <li>Large-instrument load, memory, and page-service budgets pass.</li>
+            <li>Support diagnostics are specific without exposing protected data.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout problem">
+        <strong>Release blocker:</strong>
+        do not ship V3 if production signing authority is present in the desktop binary, if identical exports reuse nonces, if authenticated plaintext is exposed before verification, if original WAV containers remain directly recoverable from package bytes, or if any production path silently falls back to the deterministic provider.
+      </div>
+    </section>
+
+    <section class="section" id="risks">
+      <div class="heading"><h2>Risks and Required Decisions</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Risk / Decision</th>
+              <th>Impact</th>
+              <th>Mitigation or Required Decision</th>
+              <th>Owner Gate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="id">Signing authority</td>
+              <td>If arbitrary desktop exporters possess the publisher private key, package-origin verification is not defensible.</td>
+              <td>Select controlled vendor signing, hosted author publishing, or an author certificate chain during Phase 0.</td>
+              <td><span class="priority">P0</span></td>
+            </tr>
+            <tr>
+              <td class="id">Shared decryption key</td>
+              <td>A determined reverse engineer can eventually extract an offline shared key.</td>
+              <td>Use per-package content keys, versioned wrapping keys, signature separation, rotation, and claims limited to direct inspection/extraction deterrence.</td>
+              <td><span class="priority">P0/P3</span></td>
+            </tr>
+            <tr>
+              <td class="id">Key loss or compromise</td>
+              <td>Lost keys can strand packages; compromised keys weaken confidentiality or publishing trust.</td>
+              <td>Document backup, escrow, access control, rotation, retained-reader policy, revocation semantics, and incident response.</td>
+              <td><span class="priority">P3</span></td>
+            </tr>
+            <tr>
+              <td class="id">Third-party dependency</td>
+              <td>Build portability, supply chain, licensing, and security updates become release responsibilities.</td>
+              <td>Pin provenance, automate platform builds/tests, monitor advisories, and assign an update owner.</td>
+              <td><span class="priority">P1</span></td>
+            </tr>
+            <tr>
+              <td class="id">Performance regression</td>
+              <td>Record verification may increase worker CPU, first-note latency, or page-miss recovery time.</td>
+              <td>Benchmark from Phase 2 onward; preserve bounded pages and keep all cryptographic work off the audio thread.</td>
+              <td><span class="priority">P2/P5</span></td>
+            </tr>
+            <tr>
+              <td class="id">Compatibility ambiguity</td>
+              <td>Legacy packages cannot be retroactively secured and silent rewrites risk data loss.</td>
+              <td>Read V1/V2 under explicit legacy policy; write only V3; migrate only through verified re-export.</td>
+              <td><span class="priority">P4</span></td>
+            </tr>
+            <tr>
+              <td class="id">Overstated marketing</td>
+              <td>Claims such as “impossible to extract” exceed what an offline audio client can guarantee.</td>
+              <td>Use the approved statement from this plan and require security review for changes to customer-facing language.</td>
+              <td><span class="priority">P0/P5</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Prepared for the Practical Sampler performance-package content-protection initiative. Status indicators describe
+      implementation state, not confidence: Phase 0 is a draft pending approval, and Phases 1–5 are not started until
+      their development work and validation evidence begin. This plan intentionally excludes customer licensing,
+      machine binding, entitlement checks, and package copy prevention.
+    </footer>
+  </main>
+</body>
+</html>

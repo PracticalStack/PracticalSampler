@@ -199,6 +199,8 @@ juce_add_gui_app(DecentRhapsodyStudioApp
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME}"
     COMPANY_NAME "${DRS_COMPANY_DISPLAY_NAME}"
     BUNDLE_ID "com.decentrhapsody.studio.app"
+    ICON_BIG "${CMAKE_SOURCE_DIR}/assets/branding/practical-sampler-icon-256.png"
+    ICON_SMALL "${CMAKE_SOURCE_DIR}/assets/branding/practical-sampler-icon-32.png"
     NEEDS_WEB_BROWSER FALSE
     NEEDS_CURL FALSE
 )
