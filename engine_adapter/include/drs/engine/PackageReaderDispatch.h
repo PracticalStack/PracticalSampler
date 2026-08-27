@@ -2,6 +2,7 @@
 
 #include "drs/engine/PackageReader.h"
 #include "drs/engine/PackageV2.h"
+#include "drs/engine/PackageV3.h"
 #include "drs/engine/SampleDataSource.h"
 
 #include <cstdint>
@@ -15,7 +16,8 @@ enum class PerformancePackageDiskFormat
 {
     unknown,
     version1,
-    version2
+    version2,
+    version3
 };
 
 struct PerformancePackageDispatchResult
@@ -28,6 +30,7 @@ struct PerformancePackageDispatchResult
     std::vector<std::string> issues;
     PerformancePackageReaderResult version1;
     PackageV2OpenResult version2;
+    PackageV3OpenResult version3;
 };
 
 PerformancePackageDispatchResult dispatchPerformancePackageReader(

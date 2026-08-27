@@ -19,6 +19,10 @@ struct PackageSealRequest
     std::string packageId;
     std::string recordId;
     std::string additionalAuthenticatedData;
+    std::string encryptionKeyId;
+    // A 32-byte key is required by the production AEAD provider.  Legacy
+    // deterministic callers intentionally leave this empty.
+    std::vector<std::uint8_t> encryptionKey;
     std::vector<std::uint8_t> plaintext;
 };
 
@@ -27,6 +31,8 @@ struct PackageOpenRequest
     std::string packageId;
     std::string recordId;
     std::string additionalAuthenticatedData;
+    std::string encryptionKeyId;
+    std::vector<std::uint8_t> encryptionKey;
     PackageSealedBlob sealed;
 };
 
@@ -49,4 +55,15 @@ public:
 };
 
 const PackageCryptoProvider& getDeterministicPackageCryptoProvider();
+
+// Production package crypto.  Keys are supplied by the package key
+// lifecycle and are never derived from package metadata.  The provider is
+// intentionally separate from the deterministic V1/V2 compatibility
+// provider so a new writer cannot accidentally select the legacy transform.
+const PackageCryptoProvider& getSecurePackageCryptoProvider();
+
+inline constexpr std::size_t securePackageKeySizeBytes = 32;
+
+bool generateSecurePackageKey(std::vector<std::uint8_t>& key,
+                              std::string& issue);
 } // namespace drs::engine

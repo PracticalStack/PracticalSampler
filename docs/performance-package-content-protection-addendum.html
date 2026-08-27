@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Practical Sampler - Content Protection Completion Addendum</title>
+  <style>
+    :root {
+      --paper: #f2eee6;
+      --surface: #fffdf8;
+      --surface-alt: #f8f3eb;
+      --ink: #222b30;
+      --muted: #687278;
+      --line: #d8d0c3;
+      --charcoal: #253238;
+      --charcoal-2: #34464d;
+      --brown: #8a4615;
+      --blue: #286c83;
+      --blue-soft: #deedf1;
+      --green: #24715e;
+      --green-soft: #dfeee8;
+      --amber: #946315;
+      --amber-soft: #f5e8ce;
+      --red: #9a3f38;
+      --red-soft: #f4dfdc;
+      --violet: #69509a;
+      --shadow: 0 18px 42px rgba(53, 43, 32, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(138, 70, 21, 0.11), transparent 31rem),
+        radial-gradient(circle at 95% 8%, rgba(40, 108, 131, 0.11), transparent 29rem),
+        var(--paper);
+      font-family: Inter, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+    a { color: var(--blue); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.025em; }
+    h1 { max-width: 1080px; margin-bottom: 18px; font-size: clamp(2.35rem, 5vw, 4.5rem); line-height: 0.98; }
+    h2 { margin-bottom: 14px; font-size: clamp(1.65rem, 3vw, 2.45rem); line-height: 1.08; }
+    h3 { margin-bottom: 9px; font-size: 1.3rem; }
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 9px 0 0; padding-left: 1.3rem; }
+    li + li { margin-top: 6px; }
+    code { padding: 0.12em 0.35em; border-radius: 5px; color: #26343c; background: #e9edeb; font: 0.9em "Cascadia Code", Consolas, monospace; }
+    .page { width: min(1340px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 76px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 46px;
+      border-radius: 27px;
+      color: #fffaf3;
+      background: linear-gradient(135deg, var(--charcoal), var(--charcoal-2));
+      box-shadow: var(--shadow);
+    }
+    .hero::after { content: "FINISH"; position: absolute; right: 18px; bottom: -31px; color: rgba(255,255,255,0.045); font: 700 7rem/1 Georgia, serif; }
+    .eyebrow { display: inline-block; margin-bottom: 10px; color: #efc39f; font-size: 0.75rem; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+    .lede { position: relative; z-index: 1; max-width: 1010px; color: #dce3df; font-size: 1.07rem; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 23px; }
+    .chip { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 0.83rem; }
+    .summary-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 27px; }
+    .summary-card { padding: 17px; border: 1px solid rgba(255,255,255,0.13); border-radius: 15px; background: rgba(255,255,255,0.07); }
+    .summary-card strong { display: block; margin-bottom: 3px; color: #fff; font: 600 1.65rem Georgia, serif; }
+    .summary-card span { color: #d7dedb; font-size: 0.84rem; }
+    .toc, .section, .workstream, .callout { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .toc, .section { margin-top: 22px; padding: 27px; }
+    .toc ol { columns: 2; column-gap: 34px; }
+    .toc li { break-inside: avoid; }
+    .heading { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .heading h2 { margin: 0; }
+    .heading::after { content: ""; height: 1px; background: var(--line); }
+    .callout { margin-top: 18px; padding: 18px 21px; border-left: 6px solid var(--blue); }
+    .callout.warning { border-left-color: var(--amber); background: #fffaf0; }
+    .callout.problem { border-left-color: var(--red); background: #fff8f6; }
+    .callout.decision { border-left-color: var(--green); background: #f7fcfa; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+    table { width: 100%; min-width: 940px; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #fffaf3; background: var(--charcoal); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    tbody tr:nth-child(even) td { background: rgba(242,238,230,0.45); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .id { color: var(--blue); font-weight: 850; white-space: nowrap; }
+    .status { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 850; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+    .status.ready { color: var(--blue); background: var(--blue-soft); }
+    .status.in-progress { color: var(--amber); background: var(--amber-soft); }
+    .status.blocked { color: var(--red); background: var(--red-soft); }
+    .status.complete { color: var(--green); background: var(--green-soft); }
+    .sequence { display: grid; grid-template-columns: repeat(8, minmax(105px, 1fr)); gap: 6px; overflow-x: auto; }
+    .sequence div { min-width: 105px; padding: 12px 8px; border-radius: 10px; color: #fff; background: var(--blue); font-size: 0.74rem; font-weight: 800; text-align: center; }
+    .sequence div:nth-child(3), .sequence div:nth-child(8) { background: var(--red); }
+    .workstream { overflow: hidden; margin-top: 22px; }
+    .work-head { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; padding: 20px 24px; color: #fffaf3; background: var(--charcoal); }
+    .work-number { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 50%; color: var(--charcoal); background: #fffaf3; font: 700 1.1rem Georgia, serif; }
+    .work-head h2 { margin: 0; font-size: 1.55rem; }
+    .work-body { padding: 22px 25px 25px; }
+    .work-intent { color: var(--muted); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+    .panel { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-alt); }
+    .panel h3 { color: var(--brown); }
+    .exit { margin-top: 18px; padding: 17px; border-left: 5px solid var(--green); border-radius: 0 13px 13px 0; background: var(--green-soft); }
+    .exit h3 { color: var(--green); }
+    .files { margin-top: 14px; color: var(--muted); font-size: 0.88rem; }
+    .task-list { margin: 0; padding: 0; list-style: none; }
+    .task-list li { position: relative; padding-left: 29px; }
+    .task-list li::before { content: "[ ]"; position: absolute; left: 0; color: var(--blue); font: 700 0.88rem "Cascadia Code", Consolas, monospace; }
+    .task-list li.done::before { content: "[x]"; color: var(--green); }
+    .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
+    footer { margin-top: 30px; padding: 20px 3px 0; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.84rem; }
+    @media (max-width: 900px) { .summary-grid, .grid-2 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 650px) {
+      .page { width: calc(100% - 22px); padding-top: 18px; }
+      .hero, .section, .toc { padding: 24px 21px; }
+      .summary-grid, .grid-2 { grid-template-columns: 1fr; }
+      .toc ol { columns: 1; }
+      .work-head { grid-template-columns: auto 1fr; }
+      .work-head .status { grid-column: 2; justify-self: start; }
+      .hero::after { display: none; }
+    }
+    @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .toc, .section, .workstream { box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">Engineering Completion Addendum | August 27, 2026</span>
+      <h1>Performance Package Content Protection: Remaining Work</h1>
+      <p class="lede">
+        This addendum converts the implementation review findings into eight ordered completion workstreams. It starts
+        from the existing libsodium, AEAD, V3 prototype, key-envelope, signature, and focused-test foundation, and ends
+        only when production exports are signed V3 packages that load safely through every supported product path.
+      </p>
+      <div class="meta">
+        <span class="chip"><a href="performance-package-content-protection-plan.html" style="color:#fff">Parent initiative plan</a></span>
+        <span class="chip">Scope: remaining production work</span>
+        <span class="chip">Release claim unchanged</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>8</strong><span>Ordered workstreams</span></div>
+        <div class="summary-card"><strong>3–5</strong><span>Estimated engineer-weeks before external review</span></div>
+        <div class="summary-card"><strong>CPCA-1</strong><span>Canonical format gate complete</span></div>
+        <div class="summary-card"><strong>In progress</strong><span>Completion status</span></div>
+      </div>
+    </section>
+
+    <section class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#baseline">Reviewed Baseline</a></li>
+        <li><a href="#roadmap">Completion Roadmap</a></li>
+        <li><a href="#step-1">1. Freeze the Real V3 Format</a></li>
+        <li><a href="#step-2">2. Build the Bounded Reader</a></li>
+        <li><a href="#step-3">3. Operationalize Keys and Signing</a></li>
+        <li><a href="#step-4">4. Connect Production Export</a></li>
+        <li><a href="#step-5">5. Integrate Product Activation</a></li>
+        <li><a href="#step-6">6. Complete Adversarial Qualification</a></li>
+        <li><a href="#step-7">7. Resolve Validation and Cut Over</a></li>
+        <li><a href="#step-8">8. Independent Review and Release</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="baseline">
+      <div class="heading"><h2>Reviewed Baseline</h2></div>
+      <p>The cryptographic primitives are useful, but the current implementation is not yet a protected package product path.</p>
+      <div class="callout warning">
+        <strong>Current boundary:</strong> normal exports still call the V2 streaming writer with the deterministic compatibility provider. CPCA-1 now provides a canonical in-memory V3 container with a wrapped content key and publisher signature, but it is not yet connected to a bounded file reader or any product export/open path.
+      </div>
+      <ul>
+        <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519 adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, semantic SHA-256, and focused negative tests.</li>
+        <li>Missing: bounded file-backed reads, concrete trust/key providers, production export/load integration, complete hostile-input qualification, and independent review.</li>
+        <li>Current validation: seven of eight related tests pass; <code>drs.phase1.performance_package_host_validation</code> remains red.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="roadmap">
+      <div class="heading"><h2>Completion Roadmap</h2></div>
+      <div class="sequence">
+        <div>1 · Format</div><div>2 · Reader</div><div>3 · Keys</div><div>4 · Export</div>
+        <div>5 · Activate</div><div>6 · Qualify</div><div>7 · Cutover</div><div>8 · Review</div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead><tr><th>ID</th><th>Outcome</th><th>Dependency</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="id">CPCA-1</td><td>Complete, unambiguous, signed V3 byte contract</td><td>Existing V3 prototype</td><td><span class="status complete">Complete</span></td></tr>
+            <tr><td class="id">CPCA-2</td><td>Bounded file-backed verification/decryption</td><td>CPCA-1</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">External owner</span></td></tr>
+            <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-7</td><td>Green suite and irreversible production cutover</td><td>CPCA-4 through CPCA-6</td><td><span class="status blocked">Gate blocked</span></td></tr>
+            <tr><td class="id">CPCA-8</td><td>Independent approval and release sign-off</td><td>CPCA-7</td><td><span class="status blocked">External review</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-1">
+      <div class="work-head"><div class="work-number">1</div><h2>Freeze the Real V3 Byte Format</h2><span class="status complete">Complete</span></div>
+      <div class="work-body">
+        <p class="work-intent">Replace the prototype framing with the byte-exact format promised by the parent plan.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-1-T1</span> Serialize the wrapped content key, encryption-key ID, signing-key ID, signature suite, signature, bounded TOC, and record offsets.</li>
+            <li class="done"><span class="task-id">CPCA-1-T2</span> Replace delimiter-joined AAD with a versioned, length-prefixed binary encoding for every authenticated field.</li>
+            <li class="done"><span class="task-id">CPCA-1-T3</span> Define signature coverage over the complete canonical envelope, TOC, record ordering, identities, nonces, ciphertext, and tags.</li>
+            <li class="done"><span class="task-id">CPCA-1-T4</span> Reject duplicate identities, invalid ordering, empty identities, unknown suites, unsupported versions, overflow, truncation, and trailing bytes.</li>
+            <li class="done"><span class="task-id">CPCA-1-T5</span> Replace the FNV plaintext digest with SHA-256 over canonical semantic records, including identities and boundaries.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Publish golden byte-layout and AAD vectors.</li>
+            <li>Prove delimiter/field-boundary ambiguity is impossible.</li>
+            <li>Mutate every header, envelope, TOC, identity, ordering, size, nonce, ciphertext, tag, and signature field.</li>
+            <li>Round-trip empty, maximum-size, multi-page, and multi-generation records.</li>
+          </ul></article>
+        </div>
+        <div class="files">Primary code: <code>PackageV3.*</code>, <code>PackageKeyEnvelope.*</code>, <code>PackageSignature.*</code>, format specification, golden fixtures.</div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> canonical AAD golden vector, structural bounds and ordering cases, signed header/envelope/TOC/payload mutation cases, and a complete one-bit-per-byte package mutation sweep pass in <code>drs.package_v3</code>. The focused V1/V2 compatibility and package-protection tests also remain green.</div>
+        <div class="exit"><h3>Exit gate</h3><p>One canonical serialization exists; no ambiguous AAD or unsigned mutable field remains; golden vectors and the complete mutation matrix pass.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-2">
+      <div class="work-head"><div class="work-number">2</div><h2>Build the Bounded, Signature-First Reader</h2><span class="status ready">Ready</span></div>
+      <div class="work-body">
+        <p class="work-intent">Make V3 a hostile-file boundary that never reads the whole package or publishes unauthenticated plaintext.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul>
+            <li>Parse only a fixed-size header and bounded envelope/TOC ranges from the file.</li>
+            <li>Verify publisher signature and all bounds before trusting package-owned structure.</li>
+            <li>Resolve and unwrap the content key only after signature validation.</li>
+            <li>Decrypt metadata, heads, and requested sample pages independently on worker threads.</li>
+            <li>Use checked offset arithmetic and explicit package, TOC, record, and allocation ceilings.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Exercise sparse, oversized, truncated, reordered, duplicate, and adversarial-length files.</li>
+            <li>Measure bytes read for metadata, heads, one page, and unrelated records.</li>
+            <li>Prove signature/AEAD failure returns no plaintext and leaves last-known-good playback unchanged.</li>
+            <li>Audit thread use: no crypto, allocation, seek, or file operation on the audio thread.</li>
+          </ul></article>
+        </div>
+        <div class="files">Primary code: <code>PackageReaderDispatch.*</code>, new V3 file reader, <code>SampleDataSource.*</code>, runtime streaming worker.</div>
+        <div class="exit"><h3>Exit gate</h3><p>Reader memory is bounded independently of package size; signature verification precedes acceptance; requested records/pages open without resident package loading.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-3">
+      <div class="work-head"><div class="work-number">3</div><h2>Operationalize Release Keys and Publisher Signing</h2><span class="status blocked">External owner</span></div>
+      <div class="work-body">
+        <p class="work-intent">Turn helper APIs into an auditable key lifecycle without placing production secrets in desktop code.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul>
+            <li>Implement the concrete runtime <code>PackageKeyProvider</code> and versioned release-key lookup.</li>
+            <li>Embed a read-only public trust store with activation, retirement, and revocation metadata.</li>
+            <li>Build controlled CI/service signing that accepts canonical package bytes and returns an Ed25519 signature.</li>
+            <li>Keep private signing material and release keys out of source, desktop binaries, fixtures, logs, symbols, crash reports, and artifacts.</li>
+            <li>Use move-only sensitive buffers and dependable zeroization such as <code>sodium_memzero</code> throughout key paths.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Exercise signing-key and release-key rotation, retirement, unknown-key, revoked-key, and outage scenarios.</li>
+            <li>Demonstrate that disclosure of a symmetric test key cannot create a publisher-valid modified package.</li>
+            <li>Scan repositories, binaries, symbols, logs, artifacts, and fixtures for secret leakage.</li>
+            <li>Prove an unauthorized desktop build cannot invoke production signing.</li>
+          </ul></article>
+        </div>
+        <div class="callout problem"><strong>Required decision:</strong> assign release-engineering/security owners and provision the controlled signing and key-storage environment.</div>
+        <div class="exit"><h3>Exit gate</h3><p>The production publishing path is operational and auditable; shipped applications contain no private signing key; rotation and recovery are demonstrated.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-4">
+      <div class="work-head"><div class="work-number">4</div><h2>Connect Production Export to V3</h2><span class="status ready">Ready</span></div>
+      <div class="work-body">
+        <p class="work-intent">Make the existing playable-instrument record plan produce a complete signed V3 package.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul>
+            <li>Map manifest, runtime settings, UI definitions, artwork, license, stream metadata, sample heads, and sample pages into V3 records.</li>
+            <li>Strip source paths, original WAV names/chunks, authoring-only state, and unnecessary metadata before encryption.</li>
+            <li>Generate one random content key per export and unique random nonces per record.</li>
+            <li>Wrap the content key, request publisher signing, verify selected records, and atomically publish the final file.</li>
+            <li>Preserve cancellation, progress reporting, staging cleanup, and sensitive-key retirement on every exit path.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Export a real project twice: encrypted bytes differ while semantic digest and rendered playback match.</li>
+            <li>Search package and staging bytes for JSON labels, paths, filenames, image signatures, WAV markers, and planted PCM canaries.</li>
+            <li>Force cancellation and failures at every stage; require no partial publication or plaintext residue.</li>
+            <li>Reopen and verify the completed package before reporting export success.</li>
+          </ul></article>
+        </div>
+        <div class="files">Primary code: <code>PerformancePackageExportService.cpp</code>, V3 streaming writer, compiler/sanitizer, export lifecycle tests.</div>
+        <div class="exit"><h3>Exit gate</h3><p>The normal Export Playable Instrument workflow produces a verified signed V3 file and never invokes the deterministic provider.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-5">
+      <div class="work-head"><div class="work-number">5</div><h2>Integrate V3 Product Activation</h2><span class="status ready">Ready</span></div>
+      <div class="work-body">
+        <p class="work-intent">Carry authenticated V3 content through every open, restore, replacement, and playback path.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul>
+            <li>Add key-aware V3 metadata loading and activation preparation.</li>
+            <li>Integrate plugin, standalone, host restore, package replacement, license/artwork, and first-play flows.</li>
+            <li>Preserve V1/V2 as explicitly classified, bounded, read-only legacy paths with no rewrite-on-open.</li>
+            <li>Keep the active generation when replacement signature, key, compatibility, or AEAD checks fail.</li>
+            <li>Emit stable, redacted failure categories without package-controlled strings or secret material.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Open V3 through standalone, plugin, replacement, and host state restore.</li>
+            <li>Verify read-only behavior, published controls, preset overrides, artwork, license, and page streaming.</li>
+            <li>Inject every failure category during replacement and prove last-known-good playback remains active.</li>
+            <li>Run the complete unchanged V1/V2 compatibility corpus.</li>
+          </ul></article>
+        </div>
+        <div class="files">Primary code: <code>PluginProcessor.cpp</code>, <code>ProjectRestoreCoordinator.cpp</code>, V3 metadata/activation services, standalone shell.</div>
+        <div class="exit"><h3>Exit gate</h3><p>All supported product entry points activate authenticated V3 packages; security failures cannot publish plaintext or replace valid playback.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-6">
+      <div class="work-head"><div class="work-number">6</div><h2>Complete Adversarial and Performance Qualification</h2><span class="status ready">Ready</span></div>
+      <div class="work-body">
+        <p class="work-intent">Expand the focused smoke tests into reproducible evidence for every security and real-time invariant.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul>
+            <li>Add official AEAD and Ed25519 vectors plus a one-million-nonce production-RNG test.</li>
+            <li>Build complete positive/negative fixture generators and coverage-guided parser, envelope, signature, and framing fuzz targets.</li>
+            <li>Add automated plaintext scans across packages, staging/temp directories, logs, host state, and crash artifacts.</li>
+            <li>Run Accurate Salamander export/load/page/playback benchmarks against the frozen V2 and project baselines.</li>
+            <li>Run Debug/Release, supported architectures, static analysis, and sanitizers where available.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Require zero crash, overflow, unbounded-allocation, unauthenticated-plaintext, nonce-reuse, and signature-bypass findings.</li>
+            <li>Measure package overhead, metadata open, head readiness, page latency, first note, working set, cancellation, and sustained playback.</li>
+            <li>Perform manual archive/hex inspection, record carving, key-string scans, and attempted repacking.</li>
+            <li>Produce machine-readable release-gate evidence tied to the traceability matrix.</li>
+          </ul></article>
+        </div>
+        <div class="exit"><h3>Exit gate</h3><p>All hostile-input, confidentiality, performance, compatibility, and real-time budgets pass in supported Release configurations.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-7">
+      <div class="work-head"><div class="work-number">7</div><h2>Resolve Validation Failures and Cut Over</h2><span class="status blocked">Gate blocked</span></div>
+      <div class="work-body">
+        <p class="work-intent">Reach a green product suite before making V3 the only normal export format.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development tasks</h3><ul>
+            <li>Diagnose and resolve <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility failure.</li>
+            <li>Run focused package tests, complete repository tests, plugin validation, standalone qualification, and host restore tests.</li>
+            <li>Switch all production export entry points to signed V3 only after every preceding gate is green.</li>
+            <li>Remove or compile-gate every release-build path that can write V1/V2 or select the deterministic provider.</li>
+            <li>Publish explicit re-export guidance for legacy creators.</li>
+          </ul></article>
+          <article class="panel"><h3>Validation</h3><ul>
+            <li>Search production call graphs for legacy writer and deterministic-provider reachability.</li>
+            <li>Export and reopen V3 from every UI and command entry point.</li>
+            <li>Verify V1/V2 remain readable but are never rewritten or described as protected.</li>
+            <li>Require a completely green release candidate test run.</li>
+          </ul></article>
+        </div>
+        <div class="exit"><h3>Exit gate</h3><p>Production writes only signed V3; all supported opens and restores pass; the full release candidate suite is green.</p></div>
+      </div>
+    </section>
+
+    <section class="workstream" id="step-8">
+      <div class="work-head"><div class="work-number">8</div><h2>Independent Security Review and Release Approval</h2><span class="status blocked">External review</span></div>
+      <div class="work-body">
+        <p class="work-intent">Validate construction, implementation, operations, and public claims independently before release.</p>
+        <div class="grid-2">
+          <article class="panel"><h3>Development and coordination tasks</h3><ul>
+            <li>Provide the reviewer with the ADR, byte contract, source, key runbook, threat model, fixtures, fuzz results, performance evidence, and reproducible commands.</li>
+            <li>Request focused review of canonical encoding, signature coverage, key separation, parser bounds, secret handling, downgrade behavior, and extraction-resistance claims.</li>
+            <li>Remediate every release-blocking finding and rerun all affected gates.</li>
+            <li>Freeze compatibility policy, dependency cadence, incident owner, rotation procedure, release checklist, and support escalation.</li>
+          </ul></article>
+          <article class="panel"><h3>Approval evidence</h3><ul>
+            <li>No unresolved critical/high security findings.</li>
+            <li>Independent reproduction of wrong-key, mutation, symmetric-key-compromise, downgrade, and plaintext-scan evidence.</li>
+            <li>Product/security approval of the exact customer-facing promise and non-goals.</li>
+            <li>Release, incident, migration, and support owners sign off.</li>
+          </ul></article>
+        </div>
+        <div class="callout problem"><strong>External dependency:</strong> this gate cannot be self-certified by the implementation author. Assign and schedule an independent reviewer before the release candidate is frozen.</div>
+        <div class="exit"><h3>Release gate</h3><p>The independent report supports the approved claim, all blocking findings are closed, and operational owners approve release.</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="heading"><h2>Definition of Complete</h2></div>
+      <div class="callout decision">
+        <strong>The initiative is complete only when:</strong> a normal Practical Sampler export produces a signed V3 package; every supported product path verifies and opens it through bounded worker-side reads; protected plaintext is absent from persistent artifacts; legacy packages remain explicitly unprotected read-only compatibility inputs; all qualification gates pass; and independent review approves the construction and claim.
+      </div>
+      <p><a href="performance-package-content-protection-plan.html">Return to the parent Performance Package Content Protection Plan</a></p>
+    </section>
+
+    <footer>
+      Completion addendum for the Practical Sampler Performance Package Content Protection initiative. This document
+      narrows the remaining implementation and release work; it does not expand the approved security claim to
+      licensing, machine binding, copy prevention, or impenetrable DRM.
+    </footer>
+  </main>
+</body>
+</html>

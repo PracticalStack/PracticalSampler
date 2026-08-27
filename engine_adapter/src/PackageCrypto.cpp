@@ -3,7 +3,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 #include <string_view>
+
+#include <sodium/core.h>
+#include <sodium/crypto_aead_xchacha20poly1305.h>
+#include <sodium/randombytes.h>
 
 namespace drs::engine
 {
@@ -16,6 +21,32 @@ constexpr std::size_t kTagSizeBytes = 16;
 constexpr std::uint64_t kFnv1aOffsetBasis = 14695981039346656037ull;
 constexpr std::uint64_t kFnv1aPrime = 1099511628211ull;
 constexpr std::uint8_t kSeparatorByte = 0xffu;
+
+constexpr std::string_view kSecureAlgorithmId = "drs.xchacha20poly1305.ietf.v1";
+
+bool ensureSodium(std::string& issue) noexcept
+{
+    static std::once_flag initializationFlag;
+    static int initializationResult = -1;
+    std::call_once(initializationFlag, [] { initializationResult = sodium_init(); });
+    if (initializationResult < 0)
+    {
+        issue = "The package crypto library could not initialize its secure random source.";
+        return false;
+    }
+    return true;
+}
+
+bool validateSecureKey(const std::vector<std::uint8_t>& key,
+                       std::string& issue) noexcept
+{
+    if (key.size() != crypto_aead_xchacha20poly1305_ietf_KEYBYTES)
+    {
+        issue = "Secure package crypto requires a 32-byte encryption key.";
+        return false;
+    }
+    return true;
+}
 
 std::uint64_t mix64(std::uint64_t value) noexcept
 {
@@ -285,11 +316,169 @@ public:
         return true;
     }
 };
+
+class SecurePackageCryptoProvider final : public PackageCryptoProvider
+{
+public:
+    const char* algorithmId() const noexcept override
+    {
+        return kSecureAlgorithmId.data();
+    }
+
+    std::size_t nonceSizeBytes() const noexcept override
+    {
+        return crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
+    }
+
+    std::size_t tagSizeBytes() const noexcept override
+    {
+        return crypto_aead_xchacha20poly1305_ietf_ABYTES;
+    }
+
+    bool seal(const PackageSealRequest& request,
+              PackageSealedBlob& output,
+              std::string& issue) const override
+    {
+        output = {};
+        if (request.packageId.empty())
+        {
+            issue = "Secure package crypto seal requires a non-empty packageId.";
+            return false;
+        }
+        if (request.recordId.empty())
+        {
+            issue = "Secure package crypto seal requires a non-empty recordId.";
+            return false;
+        }
+        if (!validateSecureKey(request.encryptionKey, issue)
+            || !ensureSodium(issue))
+            return false;
+
+        output.nonce.resize(nonceSizeBytes());
+        randombytes_buf(output.nonce.data(), output.nonce.size());
+
+        std::vector<std::uint8_t> ciphertextWithTag(
+            request.plaintext.size() + tagSizeBytes());
+        unsigned long long ciphertextSize = 0;
+        const auto* aad = reinterpret_cast<const unsigned char*>(
+            request.additionalAuthenticatedData.data());
+        const auto aadSize = static_cast<unsigned long long>(
+            request.additionalAuthenticatedData.size());
+        const auto result = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            ciphertextWithTag.data(), &ciphertextSize,
+            request.plaintext.data(),
+            static_cast<unsigned long long>(request.plaintext.size()),
+            request.additionalAuthenticatedData.empty() ? nullptr : aad,
+            aadSize,
+            nullptr,
+            output.nonce.data(),
+            request.encryptionKey.data());
+        if (result != 0 || ciphertextSize < tagSizeBytes())
+        {
+            issue = "Secure package crypto encryption failed.";
+            output = {};
+            return false;
+        }
+
+        ciphertextWithTag.resize(static_cast<std::size_t>(ciphertextSize));
+        const auto tagOffset = ciphertextWithTag.size() - tagSizeBytes();
+        output.ciphertext.assign(ciphertextWithTag.begin(),
+                                 ciphertextWithTag.begin()
+                                     + static_cast<std::ptrdiff_t>(tagOffset));
+        output.tag.assign(ciphertextWithTag.begin()
+                              + static_cast<std::ptrdiff_t>(tagOffset),
+                          ciphertextWithTag.end());
+        issue.clear();
+        return true;
+    }
+
+    bool open(const PackageOpenRequest& request,
+              std::vector<std::uint8_t>& plaintext,
+              std::string& issue) const override
+    {
+        plaintext.clear();
+        if (request.packageId.empty())
+        {
+            issue = "Secure package crypto open requires a non-empty packageId.";
+            return false;
+        }
+        if (request.recordId.empty())
+        {
+            issue = "Secure package crypto open requires a non-empty recordId.";
+            return false;
+        }
+        if (request.sealed.nonce.size() != nonceSizeBytes())
+        {
+            issue = "Secure package crypto open received a nonce with an unexpected size.";
+            return false;
+        }
+        if (request.sealed.tag.size() != tagSizeBytes())
+        {
+            issue = "Secure package crypto open received an authentication tag with an unexpected size.";
+            return false;
+        }
+        if (!validateSecureKey(request.encryptionKey, issue)
+            || !ensureSodium(issue))
+            return false;
+
+        std::vector<std::uint8_t> ciphertextWithTag;
+        ciphertextWithTag.reserve(request.sealed.ciphertext.size() + request.sealed.tag.size());
+        ciphertextWithTag.insert(ciphertextWithTag.end(),
+                                 request.sealed.ciphertext.begin(),
+                                 request.sealed.ciphertext.end());
+        ciphertextWithTag.insert(ciphertextWithTag.end(),
+                                 request.sealed.tag.begin(),
+                                 request.sealed.tag.end());
+        plaintext.resize(request.sealed.ciphertext.size());
+        unsigned long long plaintextSize = 0;
+        const auto* aad = reinterpret_cast<const unsigned char*>(
+            request.additionalAuthenticatedData.data());
+        const auto aadSize = static_cast<unsigned long long>(
+            request.additionalAuthenticatedData.size());
+        const auto result = crypto_aead_xchacha20poly1305_ietf_decrypt(
+            plaintext.data(), &plaintextSize,
+            nullptr,
+            ciphertextWithTag.data(),
+            static_cast<unsigned long long>(ciphertextWithTag.size()),
+            request.additionalAuthenticatedData.empty() ? nullptr : aad,
+            aadSize,
+            request.sealed.nonce.data(),
+            request.encryptionKey.data());
+        if (result != 0)
+        {
+            plaintext.clear();
+            issue = "Secure package crypto authentication failed.";
+            return false;
+        }
+
+        plaintext.resize(static_cast<std::size_t>(plaintextSize));
+        issue.clear();
+        return true;
+    }
+};
 } // namespace
 
 const PackageCryptoProvider& getDeterministicPackageCryptoProvider()
 {
     static const DeterministicPackageCryptoProvider provider;
     return provider;
+}
+
+const PackageCryptoProvider& getSecurePackageCryptoProvider()
+{
+    static const SecurePackageCryptoProvider provider;
+    return provider;
+}
+
+bool generateSecurePackageKey(std::vector<std::uint8_t>& key,
+                              std::string& issue)
+{
+    key.clear();
+    if (!ensureSodium(issue))
+        return false;
+    key.resize(securePackageKeySizeBytes);
+    randombytes_buf(key.data(), key.size());
+    issue.clear();
+    return true;
 }
 } // namespace drs::engine

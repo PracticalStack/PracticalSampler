@@ -41,6 +41,23 @@ PerformancePackageDispatchResult dispatchPerformancePackageReader(
         result.issues = result.version2.issues;
         return result;
     }
+    const std::array<char, 8> v3 { 'D', 'R', 'S', 'P', 'K', 'G', '3', '\0' };
+    if (magic == v3)
+    {
+        result.format = PerformancePackageDiskFormat::version3;
+        input.seekg(0, std::ios::beg);
+        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(result.packageBytes));
+        if (! input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
+        {
+            result.issues.push_back("Performance package v3 is truncated.");
+            return result;
+        }
+        result.version3 = parsePackageV3(bytes);
+        result.state = "Performance package v3 requires a key-aware activation loader";
+        result.issues = result.version3.issues;
+        result.issues.push_back("Use the key-aware V3 metadata loader; unkeyed dispatch never publishes plaintext.");
+        return result;
+    }
     if (magic != v1)
     {
         result.issues.push_back("Performance package signature is unsupported.");

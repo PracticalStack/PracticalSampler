@@ -15,6 +15,50 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(DRS_ENABLE_THREAD_SANITIZER "Instrument supported builds with ThreadSanitizer" OFF)
 
+# The package content-protection path uses a maintained, upstream crypto
+# implementation.  The release archive is hash-pinned because package
+# encryption is part of the product trust boundary; no crypto primitive is
+# implemented in product code.
+include(FetchContent)
+FetchContent_Declare(
+    drs_libsodium
+    URL https://github.com/jedisct1/libsodium/archive/refs/tags/1.0.20-RELEASE.tar.gz
+    URL_HASH SHA256=8E5AECA07A723A27BBECC3BEEF14B0068D37E7FC0E97F51B3F1C82D2A58005C1
+)
+FetchContent_GetProperties(drs_libsodium)
+if(NOT drs_libsodium_POPULATED)
+    FetchContent_Populate(drs_libsodium)
+endif()
+file(GLOB_RECURSE DRS_LIBSODIUM_SOURCES CONFIGURE_DEPENDS
+    "${drs_libsodium_SOURCE_DIR}/src/libsodium/*.c"
+)
+file(GLOB_RECURSE DRS_LIBSODIUM_INCLUDE_DIRS LIST_DIRECTORIES true
+    "${drs_libsodium_SOURCE_DIR}/src/libsodium/*"
+)
+set(DRS_LIBSODIUM_INCLUDE_PATHS
+    "${drs_libsodium_SOURCE_DIR}/src/libsodium/include"
+    "${drs_libsodium_SOURCE_DIR}/src/libsodium/include/sodium"
+    "${drs_libsodium_SOURCE_DIR}/builds/msvc"
+    "${drs_libsodium_SOURCE_DIR}/src/libsodium"
+)
+foreach(DRS_LIBSODIUM_INCLUDE_DIR IN LISTS DRS_LIBSODIUM_INCLUDE_DIRS)
+    if(IS_DIRECTORY "${DRS_LIBSODIUM_INCLUDE_DIR}")
+        list(APPEND DRS_LIBSODIUM_INCLUDE_PATHS "${DRS_LIBSODIUM_INCLUDE_DIR}")
+    endif()
+endforeach()
+add_library(drs_libsodium STATIC ${DRS_LIBSODIUM_SOURCES})
+target_include_directories(drs_libsodium
+    PUBLIC
+        ${DRS_LIBSODIUM_INCLUDE_PATHS}
+    PRIVATE
+        ${DRS_LIBSODIUM_INCLUDE_PATHS}
+)
+target_compile_definitions(drs_libsodium PRIVATE SODIUM_STATIC=1)
+if(WIN32)
+    target_compile_definitions(drs_libsodium PRIVATE WINAPI_DESKTOP=1)
+endif()
+set_target_properties(drs_libsodium PROPERTIES FOLDER "Third Party")
+
 if(DRS_ENABLE_THREAD_SANITIZER)
     if(MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         message(FATAL_ERROR "DRS_ENABLE_THREAD_SANITIZER requires Clang or GCC on a non-MSVC build.")

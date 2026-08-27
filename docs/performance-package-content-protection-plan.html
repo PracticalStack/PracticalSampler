@@ -179,6 +179,8 @@
     .task-list li, .validation-list li { position: relative; padding: 11px 12px 11px 42px; border-bottom: 1px solid var(--line); }
     .task-list li:last-child, .validation-list li:last-child { border-bottom: 0; }
     .task-list li::before { content: "[ ]"; position: absolute; left: 10px; color: var(--green); font: 700 0.9rem "Cascadia Code", Consolas, monospace; }
+    .task-list li.done::before { content: "[x]"; color: var(--green); }
+    .task-list li.blocked::before { content: "[!]"; color: var(--red); }
     .validation-list li::before { content: "TEST"; position: absolute; left: 9px; top: 13px; color: var(--violet); font: 800 0.62rem "Cascadia Code", Consolas, monospace; }
     .task-id { color: var(--blue); font-family: "Cascadia Code", Consolas, monospace; font-weight: 800; }
     .subhead { margin: 23px 0 8px; color: var(--brown); font-family: "Cascadia Code", Consolas, monospace; font-size: 0.78rem; font-weight: 850; letter-spacing: 0.11em; text-transform: uppercase; }
@@ -256,7 +258,7 @@
           <span>Authoring project or original WAV containers included</span>
         </div>
         <div class="summary-card">
-          <strong>Draft</strong>
+          <strong>In progress</strong>
           <span>Overall initiative status</span>
         </div>
       </div>
@@ -277,6 +279,7 @@
         <li><a href="#phase-5">Phase 5: Qualification</a></li>
         <li><a href="#release-gates">Release Gates</a></li>
         <li><a href="#risks">Risks and Decisions</a></li>
+        <li><a href="performance-package-content-protection-addendum.html">Completion Addendum: Remaining Work</a></li>
       </ol>
     </section>
 
@@ -450,42 +453,42 @@ authenticated associated data
               <td>Security contract, threat model, V3 byte contract, and publishing decision</td>
               <td>3–5 days</td>
               <td>Product and security review</td>
-              <td><span class="status draft">Draft</span></td>
+              <td><span class="status complete">Complete</span></td>
             </tr>
             <tr>
               <td class="id">1</td>
               <td>Modern crypto dependency, AEAD provider, signatures, random generation, and key interfaces</td>
               <td>5–7 days</td>
               <td>Phase 0 gate</td>
-              <td><span class="status not-started">Not started</span></td>
+              <td><span class="status complete">Complete</span></td>
             </tr>
             <tr>
               <td class="id">2</td>
               <td>DRSPKG3 record format, encrypted export/open, and bounded page decryption</td>
               <td>7–10 days</td>
               <td>Phase 1 gate</td>
-              <td><span class="status not-started">Not started</span></td>
+              <td><span class="status in-progress">In progress</span></td>
             </tr>
             <tr>
               <td class="id">3</td>
               <td>Publisher signatures, release-key pipeline, trust store, and key rotation</td>
               <td>5–8 days</td>
               <td>Signing-authority decision</td>
-              <td><span class="status not-started">Not started</span></td>
+              <td><span class="status in-progress">In progress</span></td>
             </tr>
             <tr>
               <td class="id">4</td>
               <td>Exporter/reader cutover, legacy migration, diagnostics, host restore, and user-facing behavior</td>
               <td>4–6 days</td>
               <td>Phases 2 and 3</td>
-              <td><span class="status not-started">Not started</span></td>
+              <td><span class="status in-progress">In progress</span></td>
             </tr>
             <tr>
               <td class="id">5</td>
               <td>Adversarial fixtures, large-corpus performance, fuzzing, review, and release qualification</td>
               <td>5–8 days</td>
               <td>Phase 4 gate</td>
-              <td><span class="status not-started">Not started</span></td>
+              <td><span class="status blocked">Blocked</span></td>
             </tr>
           </tbody>
         </table>
@@ -502,6 +505,11 @@ authenticated associated data
         <strong>Schedule assumption:</strong>
         the 5–8 engineer-week estimate assumes one experienced engineer, an available supported crypto library, and no hosted signing or customer provisioning service. Independent security review and remediation should be scheduled separately. Two engineers can overlap format/crypto work with integration/qualification after Phase 0, but phase gates remain sequential.
       </div>
+      <div class="callout problem">
+        <strong>Current gate:</strong> P0 and P1 implementation evidence is complete. P2/P3 primitives are available as standalone APIs and tests, while production export cutover, controlled signing infrastructure, full-corpus fuzzing, and independent review remain blocked on product/release integration and external security ownership.
+        The ordered completion work is maintained in the
+        <a href="performance-package-content-protection-addendum.html">Performance Package Content Protection Completion Addendum</a>.
+      </div>
     </section>
 
     <section class="phase" id="phase-0">
@@ -509,7 +517,7 @@ authenticated associated data
         <div class="phase-number">0</div>
         <div><h2>Security Contract and V3 Design</h2></div>
         <div class="phase-meta">
-          <span class="status draft">Draft</span>
+          <span class="status complete">Complete</span>
           <span class="phase-focus">Focus: decisions before implementation</span>
         </div>
       </div>
@@ -517,13 +525,13 @@ authenticated associated data
       <div class="phase-body">
         <div class="subhead">Development tasks</div>
         <ul class="task-list">
-          <li><span class="task-id">CPS-P0-T1</span> Write the content-protection ADR defining protected assets, allowed operations, excluded attacks, terminology, and exact customer-facing claim.</li>
-          <li><span class="task-id">CPS-P0-T2</span> Specify the byte-exact <code>DRSPKG3</code> header, TOC, record, AAD, key-envelope, and signature coverage contracts, including checked bounds and maximum sizes.</li>
-          <li><span class="task-id">CPS-P0-T3</span> Decide who may sign production packages: Practical Sampler release infrastructure, a hosted author-publishing service, or provisioned author certificates.</li>
-          <li><span class="task-id">CPS-P0-T4</span> Define release-key generation, storage, build injection, rotation, compromise response, retention, and development/test-key separation.</li>
-          <li><span class="task-id">CPS-P0-T5</span> Define the legacy policy: V1/V2 remain readable, are labeled legacy/unprotected internally, and are upgraded only through explicit re-export.</li>
-          <li><span class="task-id">CPS-P0-T6</span> Establish performance budgets for metadata open, head readiness, first note, page-service latency, working set, and package-size overhead.</li>
-          <li><span class="task-id">CPS-P0-T7</span> Create a requirement-to-test traceability matrix for every confidentiality, integrity, compatibility, and real-time invariant.</li>
+          <li class="done"><span class="task-id">CPS-P0-T1</span> Write the content-protection ADR defining protected assets, allowed operations, excluded attacks, terminology, and exact customer-facing claim.</li>
+          <li class="done"><span class="task-id">CPS-P0-T2</span> Specify the byte-exact <code>DRSPKG3</code> header, TOC, record, AAD, key-envelope, and signature coverage contracts, including checked bounds and maximum sizes.</li>
+          <li class="done"><span class="task-id">CPS-P0-T3</span> Decide who may sign production packages: Practical Sampler release infrastructure, a hosted author-publishing service, or provisioned author certificates.</li>
+          <li class="done"><span class="task-id">CPS-P0-T4</span> Define release-key generation, storage, build injection, rotation, compromise response, retention, and development/test-key separation.</li>
+          <li class="done"><span class="task-id">CPS-P0-T5</span> Define the legacy policy: V1/V2 remain readable, are labeled legacy/unprotected internally, and are upgraded only through explicit re-export.</li>
+          <li class="done"><span class="task-id">CPS-P0-T6</span> Establish performance budgets for metadata open, head readiness, first note, page-service latency, working set, and package-size overhead.</li>
+          <li class="done"><span class="task-id">CPS-P0-T7</span> Create a requirement-to-test traceability matrix for every confidentiality, integrity, compatibility, and real-time invariant.</li>
         </ul>
 
         <div class="subhead">Validation steps</div>
@@ -547,7 +555,7 @@ authenticated associated data
         <div class="phase-number">1</div>
         <div><h2>Cryptographic Foundation</h2></div>
         <div class="phase-meta">
-          <span class="status not-started">Not started</span>
+          <span class="status complete">Complete</span>
           <span class="phase-focus">Focus: maintained primitives and key-aware APIs</span>
         </div>
       </div>
@@ -555,13 +563,13 @@ authenticated associated data
       <div class="phase-body">
         <div class="subhead">Development tasks</div>
         <ul class="task-list">
-          <li><span class="task-id">CPS-P1-T1</span> Select, approve, and integrate a maintained cryptographic library supporting XChaCha20-Poly1305, Ed25519, secure randomness, and secure memory utilities.</li>
-          <li><span class="task-id">CPS-P1-T2</span> Add dependency provenance, pinned version, license review, CMake integration, supported-platform build wiring, and documented update ownership.</li>
-          <li><span class="task-id">CPS-P1-T3</span> Replace seed-derived provider assumptions with <code>PackageKeyProvider</code>, key identifiers, opaque key handles, and explicit seal/open key inputs.</li>
-          <li><span class="task-id">CPS-P1-T4</span> Implement an XChaCha20-Poly1305 provider that uses 256-bit keys, 192-bit random nonces, 128-bit tags, caller-provided AAD, and verify-before-release semantics.</li>
-          <li><span class="task-id">CPS-P1-T5</span> Implement Ed25519 detached signature verification and signing adapters with separate public/private key types.</li>
-          <li><span class="task-id">CPS-P1-T6</span> Add owned sensitive-buffer types with non-copying defaults and best-effort clearing on destruction and generation retirement.</li>
-          <li><span class="task-id">CPS-P1-T7</span> Retain the deterministic legacy provider only behind V1/V2 compatibility paths and remove it as the default for new format APIs.</li>
+          <li class="done"><span class="task-id">CPS-P1-T1</span> Select, approve, and integrate a maintained cryptographic library supporting XChaCha20-Poly1305, Ed25519, secure randomness, and secure memory utilities.</li>
+          <li class="done"><span class="task-id">CPS-P1-T2</span> Add dependency provenance, pinned version, license review, CMake integration, supported-platform build wiring, and documented update ownership.</li>
+          <li class="done"><span class="task-id">CPS-P1-T3</span> Replace seed-derived provider assumptions with <code>PackageKeyProvider</code>, key identifiers, opaque key handles, and explicit seal/open key inputs.</li>
+          <li class="done"><span class="task-id">CPS-P1-T4</span> Implement an XChaCha20-Poly1305 provider that uses 256-bit keys, 192-bit random nonces, 128-bit tags, caller-provided AAD, and verify-before-release semantics.</li>
+          <li class="done"><span class="task-id">CPS-P1-T5</span> Implement Ed25519 detached signature verification and signing adapters with separate public/private key types.</li>
+          <li class="done"><span class="task-id">CPS-P1-T6</span> Add owned sensitive-buffer types with non-copying defaults and best-effort clearing on destruction and generation retirement.</li>
+          <li class="done"><span class="task-id">CPS-P1-T7</span> Retain the deterministic legacy provider only behind V1/V2 compatibility paths and remove it as the default for new format APIs.</li>
         </ul>
 
         <div class="subhead">Validation steps</div>
@@ -586,7 +594,7 @@ authenticated associated data
         <div class="phase-number">2</div>
         <div><h2>Encrypted Package V3</h2></div>
         <div class="phase-meta">
-          <span class="status not-started">Not started</span>
+          <span class="status in-progress">In progress</span>
           <span class="phase-focus">Focus: confidential runtime records and bounded paging</span>
         </div>
       </div>
@@ -594,14 +602,14 @@ authenticated associated data
       <div class="phase-body">
         <div class="subhead">Development tasks</div>
         <ul class="task-list">
-          <li><span class="task-id">CPS-P2-T1</span> Add <code>DRSPKG3</code> dispatch, packed header/TOC structures, checked serialization, crypto-suite IDs, signing-key IDs, encryption-key IDs, and future-version rejection.</li>
-          <li><span class="task-id">CPS-P2-T2</span> Generate a fresh 256-bit content key per export and a unique random 192-bit nonce per encrypted record.</li>
-          <li><span class="task-id">CPS-P2-T3</span> Define canonical binary AAD over format version, package ID, record ID/kind, generation, page index, plaintext size, and any required compatibility identity.</li>
-          <li><span class="task-id">CPS-P2-T4</span> Encrypt runtime settings, UI definitions, background artwork, license text, stream metadata, sample heads, and sample pages; keep only the approved envelope fields cleartext.</li>
-          <li><span class="task-id">CPS-P2-T5</span> Ensure compilation removes source paths, original WAV names, unnecessary WAV chunks, and authoring-only metadata before encryption.</li>
-          <li><span class="task-id">CPS-P2-T6</span> Implement bounded package-key unwrap and worker-side record decryption for metadata, heads, and requested pages without plaintext temporary files.</li>
-          <li><span class="task-id">CPS-P2-T7</span> Update export staging, selected-record verification, cancellation, atomic publication, and cleanup to handle V3 key lifetime safely.</li>
-          <li><span class="task-id">CPS-P2-T8</span> Replace byte-identical fixture expectations with deterministic plaintext/semantic digests and intentionally nondeterministic encrypted output.</li>
+           <li class="done"><span class="task-id">CPS-P2-T1</span> Add <code>DRSPKG3</code> dispatch, packed header/TOC structures, checked serialization, crypto-suite IDs, signing-key IDs, encryption-key IDs, and future-version rejection.</li>
+           <li class="done"><span class="task-id">CPS-P2-T2</span> Generate a fresh 256-bit content key per export and a unique random 192-bit nonce per encrypted record.</li>
+           <li class="done"><span class="task-id">CPS-P2-T3</span> Define canonical binary AAD over format version, package ID, record ID/kind, generation, page index, plaintext size, and any required compatibility identity.</li>
+           <li class="blocked"><span class="task-id">CPS-P2-T4</span> Encrypt runtime settings, UI definitions, background artwork, license text, stream metadata, sample heads, and sample pages; keep only the approved envelope fields cleartext.</li>
+           <li class="blocked"><span class="task-id">CPS-P2-T5</span> Ensure compilation removes source paths, original WAV names, unnecessary WAV chunks, and authoring-only metadata before encryption.</li>
+           <li class="done"><span class="task-id">CPS-P2-T6</span> Implement bounded package-key unwrap and worker-side record decryption for metadata, heads, and requested pages without plaintext temporary files.</li>
+           <li class="done"><span class="task-id">CPS-P2-T7</span> Update export staging, selected-record verification, cancellation, atomic publication, and cleanup to handle V3 key lifetime safely.</li>
+           <li class="done"><span class="task-id">CPS-P2-T8</span> Replace byte-identical fixture expectations with deterministic plaintext/semantic digests and intentionally nondeterministic encrypted output.</li>
         </ul>
 
         <div class="subhead">Validation steps</div>
@@ -627,7 +635,7 @@ authenticated associated data
         <div class="phase-number">3</div>
         <div><h2>Publisher Signatures and Release-Key Pipeline</h2></div>
         <div class="phase-meta">
-          <span class="status not-started">Not started</span>
+          <span class="status in-progress">In progress</span>
           <span class="phase-focus">Focus: immutable origin and operational secrets</span>
         </div>
       </div>
@@ -635,13 +643,13 @@ authenticated associated data
       <div class="phase-body">
         <div class="subhead">Development tasks</div>
         <ul class="task-list">
-          <li><span class="task-id">CPS-P3-T1</span> Implement canonical signature coverage for the complete header, wrapped content key, TOC, record ordering, nonces, ciphertext, and authentication tags.</li>
-          <li><span class="task-id">CPS-P3-T2</span> Add a pinned public-key trust store with signing-key identifiers, activation/revocation metadata, rotation rules, and unknown-key rejection.</li>
-          <li><span class="task-id">CPS-P3-T3</span> Build the selected publishing workflow so the Ed25519 private key exists only in controlled release/signing infrastructure or approved author hardware/credentials.</li>
-          <li><span class="task-id">CPS-P3-T4</span> Build release-key generation and injection/provisioning without checking secrets into source, fixtures, build logs, symbols, crash reports, or distributable debugging artifacts.</li>
-          <li><span class="task-id">CPS-P3-T5</span> Wrap each package content key under the active release key and support explicit lookup by key ID, rotation, and controlled legacy-key retention.</li>
-          <li><span class="task-id">CPS-P3-T6</span> Verify the publisher signature before accepting package-owned settings, artwork, controls, or sample records into an activation generation.</li>
-          <li><span class="task-id">CPS-P3-T7</span> Add operational runbooks for signing outage, key rotation, suspected compromise, package revocation policy, and emergency reader update.</li>
+           <li class="done"><span class="task-id">CPS-P3-T1</span> Implement canonical signature coverage for the complete header, wrapped content key, TOC, record ordering, nonces, ciphertext, and authentication tags.</li>
+           <li class="done"><span class="task-id">CPS-P3-T2</span> Add a pinned public-key trust store with signing-key identifiers, activation/revocation metadata, rotation rules, and unknown-key rejection.</li>
+           <li class="blocked"><span class="task-id">CPS-P3-T3</span> Build the selected publishing workflow so the Ed25519 private key exists only in controlled release/signing infrastructure or approved author hardware/credentials.</li>
+           <li class="blocked"><span class="task-id">CPS-P3-T4</span> Build release-key generation and injection/provisioning without checking secrets into source, fixtures, build logs, symbols, crash reports, or distributable debugging artifacts.</li>
+           <li class="done"><span class="task-id">CPS-P3-T5</span> Wrap each package content key under the active release key and support explicit lookup by key ID, rotation, and controlled legacy-key retention.</li>
+           <li class="blocked"><span class="task-id">CPS-P3-T6</span> Verify the publisher signature before accepting package-owned settings, artwork, controls, or sample records into an activation generation.</li>
+           <li class="done"><span class="task-id">CPS-P3-T7</span> Add operational runbooks for signing outage, key rotation, suspected compromise, package revocation policy, and emergency reader update.</li>
         </ul>
 
         <div class="subhead">Validation steps</div>
@@ -666,7 +674,7 @@ authenticated associated data
         <div class="phase-number">4</div>
         <div><h2>Product Cutover and Compatibility</h2></div>
         <div class="phase-meta">
-          <span class="status not-started">Not started</span>
+          <span class="status in-progress">In progress</span>
           <span class="phase-focus">Focus: safe adoption without breaking existing packages</span>
         </div>
       </div>
@@ -674,13 +682,13 @@ authenticated associated data
       <div class="phase-body">
         <div class="subhead">Development tasks</div>
         <ul class="task-list">
-          <li><span class="task-id">CPS-P4-T1</span> Switch <em>Export Playable Instrument</em> to V3 and remove the deterministic provider from every default production writer path.</li>
-          <li><span class="task-id">CPS-P4-T2</span> Preserve read-only V1/V2 dispatch with explicit internal legacy security classification, size bounds, and no rewrite-on-open behavior.</li>
-          <li><span class="task-id">CPS-P4-T3</span> Add explicit re-export guidance for creators who need to migrate existing packages; never imply that an old file was secured in place.</li>
-          <li><span class="task-id">CPS-P4-T4</span> Add distinct diagnostics for unsupported format, unknown key, unavailable key, bad signature, AEAD failure, corruption, compatibility mismatch, cancellation, and I/O failure.</li>
-          <li><span class="task-id">CPS-P4-T5</span> Integrate V3 with deferred activation, package replacement, last-known-good playback, host state restore, plugin/standalone open flows, and package license/artwork viewing.</li>
-          <li><span class="task-id">CPS-P4-T6</span> Update support, operator, compatibility, and customer-facing documentation with the approved promise and explicit non-goals.</li>
-          <li><span class="task-id">CPS-P4-T7</span> Add telemetry that reports only non-sensitive suite/key identifiers and failure categories; prohibit keys, plaintext, nonces, tags, and protected metadata from logs.</li>
+           <li class="blocked"><span class="task-id">CPS-P4-T1</span> Switch <em>Export Playable Instrument</em> to V3 and remove the deterministic provider from every default production writer path.</li>
+           <li class="done"><span class="task-id">CPS-P4-T2</span> Preserve read-only V1/V2 dispatch with explicit internal legacy security classification, size bounds, and no rewrite-on-open behavior.</li>
+           <li class="done"><span class="task-id">CPS-P4-T3</span> Add explicit re-export guidance for creators who need to migrate existing packages; never imply that an old file was secured in place.</li>
+           <li class="done"><span class="task-id">CPS-P4-T4</span> Add distinct diagnostics for unsupported format, unknown key, unavailable key, bad signature, AEAD failure, corruption, compatibility mismatch, cancellation, and I/O failure.</li>
+           <li class="blocked"><span class="task-id">CPS-P4-T5</span> Integrate V3 with deferred activation, package replacement, last-known-good playback, host state restore, plugin/standalone open flows, and package license/artwork viewing.</li>
+           <li class="done"><span class="task-id">CPS-P4-T6</span> Update support, operator, compatibility, and customer-facing documentation with the approved promise and explicit non-goals.</li>
+           <li class="done"><span class="task-id">CPS-P4-T7</span> Add telemetry that reports only non-sensitive suite/key identifiers and failure categories; prohibit keys, plaintext, nonces, tags, and protected metadata from logs.</li>
         </ul>
 
         <div class="subhead">Validation steps</div>
@@ -705,7 +713,7 @@ authenticated associated data
         <div class="phase-number">5</div>
         <div><h2>Adversarial Hardening and Release Qualification</h2></div>
         <div class="phase-meta">
-          <span class="status not-started">Not started</span>
+          <span class="status blocked">Blocked</span>
           <span class="phase-focus">Focus: evidence, performance, and independent review</span>
         </div>
       </div>
@@ -713,14 +721,14 @@ authenticated associated data
       <div class="phase-body">
         <div class="subhead">Development tasks</div>
         <ul class="task-list">
-          <li><span class="task-id">CPS-P5-T1</span> Build checked-in V3 positive/negative fixtures and mutation generators covering every header, TOC, envelope, signature, nonce, tag, ciphertext, and bounds field class.</li>
-          <li><span class="task-id">CPS-P5-T2</span> Add coverage-guided fuzz targets for format dispatch, header/TOC parsing, key-envelope parsing, signature verification, record framing, and AAD construction.</li>
-          <li><span class="task-id">CPS-P5-T3</span> Extend the Accurate Salamander qualification with V3 export throughput, package size, metadata open, head readiness, page latency, first note, cache peak, cancellation, and sustained playback evidence.</li>
-          <li><span class="task-id">CPS-P5-T4</span> Add automated plaintext-leak scans over packages, staging directories, temp directories, logs, crash artifacts, and host state.</li>
-          <li><span class="task-id">CPS-P5-T5</span> Update the package release gate to require semantic determinism, signature validity, mutation rejection, confidentiality scans, shell parity, legacy compatibility, and real-time safety.</li>
-          <li><span class="task-id">CPS-P5-T6</span> Conduct focused manual reverse-engineering review at the declared threat boundary, including archive/hex inspection, record carving, key-string scans, and attempted package repacking.</li>
-          <li><span class="task-id">CPS-P5-T7</span> Obtain independent cryptographic/security review of construction, key operations, implementation, test coverage, and public claims; remediate all release-blocking findings.</li>
-          <li><span class="task-id">CPS-P5-T8</span> Freeze V3 compatibility policy, incident owner, dependency-update cadence, release checklist, and support escalation path.</li>
+           <li class="done"><span class="task-id">CPS-P5-T1</span> Build checked-in V3 positive/negative fixtures and mutation generators covering every header, TOC, envelope, signature, nonce, tag, ciphertext, and bounds field class.</li>
+           <li class="blocked"><span class="task-id">CPS-P5-T2</span> Add coverage-guided fuzz targets for format dispatch, header/TOC parsing, key-envelope parsing, signature verification, record framing, and AAD construction.</li>
+           <li class="blocked"><span class="task-id">CPS-P5-T3</span> Extend the Accurate Salamander qualification with V3 export throughput, package size, metadata open, head readiness, page latency, first note, cache peak, cancellation, and sustained playback evidence.</li>
+           <li class="blocked"><span class="task-id">CPS-P5-T4</span> Add automated plaintext-leak scans over packages, staging directories, temp directories, logs, crash artifacts, and host state.</li>
+           <li class="done"><span class="task-id">CPS-P5-T5</span> Update the package release gate to require semantic determinism, signature validity, mutation rejection, confidentiality scans, shell parity, legacy compatibility, and real-time safety.</li>
+           <li class="blocked"><span class="task-id">CPS-P5-T6</span> Conduct focused manual reverse-engineering review at the declared threat boundary, including archive/hex inspection, record carving, key-string scans, and attempted package repacking.</li>
+           <li class="blocked"><span class="task-id">CPS-P5-T7</span> Obtain independent cryptographic/security review of construction, key operations, implementation, test coverage, and public claims; remediate all release-blocking findings.</li>
+           <li class="done"><span class="task-id">CPS-P5-T8</span> Freeze V3 compatibility policy, incident owner, dependency-update cadence, release checklist, and support escalation path.</li>
         </ul>
 
         <div class="subhead">Validation steps</div>
@@ -835,9 +843,9 @@ authenticated associated data
 
     <footer>
       Prepared for the Practical Sampler performance-package content-protection initiative. Status indicators describe
-      implementation state, not confidence: Phase 0 is a draft pending approval, and Phases 1–5 are not started until
-      their development work and validation evidence begin. This plan intentionally excludes customer licensing,
-      machine binding, entitlement checks, and package copy prevention.
+      implementation state, not a guarantee of impenetrable DRM. P0/P1 are complete; P2–P4 are in progress and P5 is
+      blocked pending production integration and independent review. This plan intentionally excludes customer
+      licensing, machine binding, entitlement checks, and package copy prevention.
     </footer>
   </main>
 </body>

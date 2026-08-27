@@ -88,6 +88,10 @@ add_library(drs_engine_adapter STATIC
     src/PerformanceRuleContract.cpp
     src/PlayableInstrumentLicense.cpp
     src/PackageCrypto.cpp
+    src/PackageSignature.cpp
+    src/PackageV3.cpp
+    src/PackageKeyEnvelope.cpp
+    src/PackageProtectionDiagnostics.cpp
     src/PackageReader.cpp
     src/PackageReaderDispatch.cpp
     src/PackageV2.cpp
@@ -121,6 +125,12 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/LayerContract.h
     include/drs/engine/LayerMaterializer.h
     include/drs/engine/VelocityCrossfadeAuthoring.h
+    include/drs/engine/PackageSignature.h
+    include/drs/engine/SecureBuffer.h
+    include/drs/engine/PackageKeys.h
+    include/drs/engine/PackageV3.h
+    include/drs/engine/PackageKeyEnvelope.h
+    include/drs/engine/PackageProtectionDiagnostics.h
     include/drs/engine/ControlLaw.h
     include/drs/engine/ContinuousDamper.h
     include/drs/engine/ContinuousDamperContract.h
@@ -178,6 +188,13 @@ target_include_directories(drs_engine_adapter
 )
 
 target_compile_features(drs_engine_adapter PUBLIC cxx_std_17)
+
+target_link_libraries(drs_engine_adapter
+    PRIVATE
+        drs_libsodium
+)
+
+target_compile_definitions(drs_engine_adapter PRIVATE SODIUM_STATIC=1)
 
 target_link_libraries(drs_sampler_core
     PUBLIC

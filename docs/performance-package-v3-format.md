@@ -1,0 +1,165 @@
+# Performance Package V3 Format Contract
+
+Status: Implemented canonical contract for CPCA-1
+
+Date: 2026-08-27
+
+## Container identity
+
+- Magic: `DRSPKG3`
+- Format version: `3`
+- Crypto suite: `xchacha20-poly1305-ietf`
+- Signature suite: `ed25519`
+- Key identifiers: opaque `encryptionKeyId` and `signingKeyId`
+- Package identity: stable `packageId`
+- V1/V2 compatibility is selected by magic/format dispatch, never by
+  silently trying multiple algorithms after authentication failure.
+
+## Fixed header
+
+All integers are unsigned little-endian. Offsets are absolute file offsets.
+The fixed header is 76 bytes:
+
+| Offset | Size | Field | Required value |
+|---:|---:|---|---|
+| 0 | 8 | magic | `DRSPKG3\0` |
+| 8 | 4 | formatVersion | `3` |
+| 12 | 4 | headerSize | fixed plus variable envelope |
+| 16 | 4 | flags | `0x00000007` (encrypted, authenticated, signed) |
+| 20 | 2 | cryptoSuite | `1` = XChaCha20-Poly1305-IETF |
+| 22 | 2 | signatureSuite | `1` = Ed25519 |
+| 24 | 4 | recordCount | `1..16384` |
+| 28 | 8 | tocOffset | exactly `headerSize` |
+| 36 | 8 | tocSize | exact serialized TOC size |
+| 44 | 8 | payloadOffset | exactly `tocOffset + tocSize` |
+| 52 | 8 | payloadSize | sum of ciphertext sizes |
+| 60 | 8 | signatureOffset | exactly `payloadOffset + payloadSize` |
+| 68 | 4 | signatureSize | exactly `64` |
+| 72 | 4 | reserved | zero |
+
+The fixed header is followed by four length-prefixed UTF-8 byte strings in
+this order: `packageId`, `compatibilityId`, `encryptionKeyId`, and
+`signingKeyId`. Each string uses a two-byte length, must be non-empty, and is
+limited to 4096 bytes.
+
+The variable header ends with the key envelope:
+
+```text
+wrappedKeyNonce[24]
+wrappedKeyCiphertextSize:u16 = 32
+wrappedKeyCiphertext[32]
+wrappedKeyTag[16]
+```
+
+`headerSize` must equal the byte immediately following the envelope. Padding
+and unrecognized header extensions are rejected in V3.
+
+## Cleartext envelope
+
+The cleartext envelope contains only data required for safe dispatch and
+bounds checking:
+
+```text
+magic, formatVersion
+cryptoSuite, signatureSuite
+packageId, encryptionKeyId, signingKeyId
+wrappedPackageContentKey
+bounded TOC offsets and encrypted sizes
+publisher signature
+```
+
+Display name, authoring metadata, UI controls, artwork, sample identities,
+source paths, runtime settings, and sample content are encrypted records.
+
+## TOC record framing
+
+Records are ordered canonically by `(recordKind, recordId, generation,
+pageIndex)`. Duplicate identities and non-canonical ordering are rejected.
+Each TOC entry is:
+
+```text
+ordinal:u32
+recordIdLength:u16 + recordId
+recordKindLength:u16 + recordKind
+generation:u32
+pageIndex:u32
+plaintextSize:u64
+ciphertextOffset:u64
+ciphertextSize:u64 = plaintextSize
+nonce[24]
+tag[16]
+```
+
+Ciphertexts are stored contiguously in canonical TOC order between
+`payloadOffset` and `signatureOffset`. Every offset must equal the end of the
+previous region; gaps, overlap, padding, trailing bytes, and partial coverage
+are rejected.
+
+## Associated data
+
+Canonical AAD is a length-prefixed binary serialization, never delimiter-
+joined text:
+
+```text
+"DRSAAD3\0"[8]
+formatVersion:u32 = 3
+cryptoSuite:u16 = 1
+ordinal:u32
+packageIdLength:u16 + packageId
+compatibilityIdLength:u16 + compatibilityId
+recordIdLength:u16 + recordId
+recordKindLength:u16 + recordKind
+generation:u32
+pageIndex:u32
+plaintextSize:u64
+```
+
+Changing any authenticated identity must make record opening fail. The AAD
+construction is versioned and tested as a byte-exact contract.
+
+## Signature coverage
+
+The 64-byte Ed25519 signature is the final file region and covers every byte
+from offset zero through `signatureOffset - 1`. This includes the fixed and
+variable header, wrapped content key, key identifiers, complete TOC, record
+order, every identity, nonce, ciphertext, and authentication tag. No mutable
+V3 package byte is outside signature coverage.
+
+Structural parsing does not establish trust. Signature verification against
+the application trust store must succeed before key unwrap or record opening.
+
+## Key envelope
+
+The package content key is a random 32-byte data-encryption key. The active
+release-key provider wraps and unwraps it under a key identified by
+`encryptionKeyId`. Wrapped-key decoding is bounded and fails closed on an
+unknown, retired, or unavailable key.
+
+The signing key is independent from the release encryption key. A signing-key
+rotation changes `signingKeyId` and does not require re-encrypting records.
+
+Key-envelope AAD is also length-prefixed binary:
+
+```text
+"DRSKEYE3"[8]
+packageIdLength:u16 + packageId
+encryptionKeyIdLength:u16 + encryptionKeyId
+```
+
+## Semantic digest
+
+The semantic digest is SHA-256 over `DRSSEM3\0`, package identity,
+compatibility identity, canonical record count, and each canonical record's
+ordinal, identity, generation, page index, plaintext length, and plaintext.
+Release-key IDs, signing-key IDs, nonces, ciphertext, tags, and signatures are
+excluded so equivalent exports retain the same semantic digest while their
+encrypted bytes remain intentionally nondeterministic.
+
+## Compatibility policy
+
+- V1/V2 packages remain readable only through their existing bounded legacy
+  paths and are never rewritten on open.
+- V3 readers reject V4 or unknown future formats with an explicit format
+  failure.
+- V3 writers never emit the deterministic legacy algorithm.
+- Re-export is the only migration path from V1/V2 to V3.

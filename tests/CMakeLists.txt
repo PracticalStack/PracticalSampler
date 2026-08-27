@@ -4443,6 +4443,73 @@ add_test(
     COMMAND drs_phase1_performance_package_tests
 )
 
+juce_add_console_app(drs_package_secure_crypto_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Secure Package Crypto Tests"
+)
+
+target_sources(drs_package_secure_crypto_tests
+    PRIVATE
+        src/PackageSecureCryptoTests.cpp
+)
+
+target_link_libraries(drs_package_secure_crypto_tests
+    PRIVATE
+        drs_engine_adapter
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+target_compile_features(drs_package_secure_crypto_tests PRIVATE cxx_std_17)
+
+target_include_directories(drs_package_secure_crypto_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/juce/modules
+)
+
+add_test(
+    NAME drs.package_secure_crypto
+    COMMAND drs_package_secure_crypto_tests
+)
+
+juce_add_console_app(drs_package_v3_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package V3 Tests"
+)
+
+target_sources(drs_package_v3_tests PRIVATE src/PackageV3Tests.cpp)
+target_link_libraries(drs_package_v3_tests
+    PRIVATE drs_engine_adapter
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_package_v3_tests PRIVATE cxx_std_17)
+target_include_directories(drs_package_v3_tests PRIVATE ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+add_test(NAME drs.package_v3 COMMAND drs_package_v3_tests)
+
+juce_add_console_app(drs_package_signing_keys_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package Signing and Key Tests"
+)
+target_sources(drs_package_signing_keys_tests PRIVATE src/PackageSigningAndKeysTests.cpp)
+target_link_libraries(drs_package_signing_keys_tests
+    PRIVATE drs_engine_adapter
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_package_signing_keys_tests PRIVATE cxx_std_17)
+target_include_directories(drs_package_signing_keys_tests PRIVATE ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+add_test(NAME drs.package_signing_keys COMMAND drs_package_signing_keys_tests)
+
+juce_add_console_app(drs_package_protection_release_gate_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package Protection Release Gate Tests"
+)
+target_sources(drs_package_protection_release_gate_tests PRIVATE src/PackageProtectionReleaseGateTests.cpp)
+target_link_libraries(drs_package_protection_release_gate_tests
+    PRIVATE drs_engine_adapter
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_package_protection_release_gate_tests PRIVATE cxx_std_17)
+target_include_directories(drs_package_protection_release_gate_tests PRIVATE ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+add_test(NAME drs.package_protection.release_gate COMMAND drs_package_protection_release_gate_tests)
+
 add_executable(drs_packaged_instrument_fx_routing_contract_tests
     src/PackagedInstrumentFxRoutingContractTests.cpp
 )
@@ -5099,6 +5166,10 @@ add_dependencies(drs_all_tests
     drs_instrument_control_ui_tests
     drs_vst3_host_state_qualification_tests
     drs_package_v2_tests
+    drs_package_secure_crypto_tests
+    drs_package_v3_tests
+    drs_package_signing_keys_tests
+    drs_package_protection_release_gate_tests
     drs_host_session_state_contract_tests
     drs_host_project_recall_tests
     drs_host_state_recovery_ui_tests
