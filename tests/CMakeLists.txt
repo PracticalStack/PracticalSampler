@@ -4502,6 +4502,37 @@ target_include_directories(drs_package_v3_file_reader_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
 add_test(NAME drs.package_v3.file_reader COMMAND drs_package_v3_file_reader_tests)
 
+juce_add_console_app(drs_package_v3_streaming_export_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package V3 Streaming Export Tests"
+)
+target_sources(drs_package_v3_streaming_export_tests
+    PRIVATE src/PackageV3StreamingExportTests.cpp)
+target_link_libraries(drs_package_v3_streaming_export_tests
+    PRIVATE drs_engine_adapter
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_package_v3_streaming_export_tests PRIVATE cxx_std_17)
+target_include_directories(drs_package_v3_streaming_export_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/support
+    ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+add_test(NAME drs.package_v3.streaming_export COMMAND drs_package_v3_streaming_export_tests)
+
+juce_add_console_app(drs_performance_package_v3_production_export_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Performance Package V3 Production Export Tests"
+)
+target_sources(drs_performance_package_v3_production_export_tests
+    PRIVATE src/PerformancePackageV3ProductionExportTests.cpp)
+target_link_libraries(drs_performance_package_v3_production_export_tests
+    PRIVATE drs_app_shared drs_engine_adapter drs_sampler_core drs_sample_import
+    PUBLIC juce::juce_audio_formats juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_performance_package_v3_production_export_tests PRIVATE cxx_std_17)
+target_include_directories(drs_performance_package_v3_production_export_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/support
+    ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+add_test(NAME drs.performance_package.v3_production_export
+    COMMAND drs_performance_package_v3_production_export_tests)
+
 juce_add_console_app(drs_package_signing_keys_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package Signing and Key Tests"
 )
@@ -4708,6 +4739,7 @@ target_compile_features(drs_performance_package_export_lifecycle_tests PRIVATE c
 
 target_include_directories(drs_performance_package_export_lifecycle_tests
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
 )
 
@@ -5202,6 +5234,8 @@ add_dependencies(drs_all_tests
     drs_package_secure_crypto_tests
     drs_package_v3_tests
     drs_package_v3_file_reader_tests
+    drs_package_v3_streaming_export_tests
+    drs_performance_package_v3_production_export_tests
     drs_package_signing_keys_tests
     drs_package_protection_release_gate_tests
     drs_package_key_lifecycle_tests

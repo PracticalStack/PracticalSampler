@@ -10,6 +10,8 @@ struct PackagePublisherSigningRequest
 {
     std::string signingKeyId;
     const std::vector<std::uint8_t>* canonicalSignedBytes = nullptr;
+    std::string canonicalSignedFilePath;
+    std::uint64_t canonicalSignedBytesLength = 0;
 };
 
 struct PackagePublisherSigningResponse

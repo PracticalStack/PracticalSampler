@@ -42,20 +42,6 @@ private:
     std::filesystem::path path_;
 };
 
-bool readFile(const std::filesystem::path& path,
-              std::vector<std::uint8_t>& bytes)
-{
-    std::error_code error;
-    const auto size = std::filesystem::file_size(path, error);
-    if (error || size > drs::engine::packageV3MaximumPackageBytes)
-        return false;
-    bytes.resize(static_cast<std::size_t>(size));
-    std::ifstream input(path, std::ios::binary);
-    input.read(reinterpret_cast<char*>(bytes.data()),
-               static_cast<std::streamsize>(bytes.size()));
-    return input.good() || (input.eof()
-        && input.gcount() == static_cast<std::streamsize>(bytes.size()));
-}
 } // namespace
 
 int main(int argc, char** argv)
@@ -84,8 +70,9 @@ int main(int argc, char** argv)
     drs::engine::SecureBuffer privateKey(std::move(keyVector));
     sodium_memzero(inputKey.data(), inputKey.size());
 
-    std::vector<std::uint8_t> canonicalBytes;
-    if (! readFile(argv[2], canonicalBytes))
+    std::error_code fileError;
+    const auto canonicalBytes = std::filesystem::file_size(argv[2], fileError);
+    if (fileError || canonicalBytes > drs::engine::packageV3MaximumPackageBytes)
     {
         std::cerr << "Canonical package region is missing, unreadable, or oversized.\n";
         return 4;
@@ -96,7 +83,8 @@ int main(int argc, char** argv)
         std::move(privateKey), auditSink);
     drs::engine::PackagePublisherSigningRequest request;
     request.signingKeyId = argv[1];
-    request.canonicalSignedBytes = &canonicalBytes;
+    request.canonicalSignedFilePath = argv[2];
+    request.canonicalSignedBytesLength = canonicalBytes;
     drs::engine::PackagePublisherSigningResponse response;
     std::string issue;
     if (! signer.signCanonicalPackage(request, response, issue))

@@ -3,7 +3,7 @@
 
 #include "drs/engine/PackageReader.h"
 #include "drs/engine/PackageReaderDispatch.h"
-#include "drs/engine/PackageV2StreamingExport.h"
+#include "drs/engine/PackageV3StreamingExport.h"
 #include "drs/engine/PlayableInstrumentLicense.h"
 
 #include <algorithm>
@@ -432,6 +432,16 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         return result;
     }
 
+    const auto security = request.securityContext;
+    if (security == nullptr || ! security->valid())
+    {
+        result.state = "Playable package V3 export security is unavailable";
+        result.issues.push_back(
+            "V3 export requires an active release-key provider, controlled publisher signer, "
+            "and publisher trust store. No legacy package was written.");
+        return result;
+    }
+
     publishProgress(options,
                     PerformancePackageExportStage::validating,
                     validationProgress,
@@ -569,17 +579,23 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
                     streamWrite.alignedPayloadBytes,
                     streamWrite.alignedPayloadBytes);
 
-    auto packagePlan = drs::engine::buildPerformancePackageV2StreamingExportPlan(
+    auto packagePlan = drs::engine::buildPerformancePackageV3StreamingExportPlan(
         preparation.manifest,
         compileResult,
         targetPackageFile.getFullPathName().toStdString(),
+        security->compatibilityId,
+        security->encryptionKeyId,
+        security->signingKeyId,
+        *security->keyProvider,
+        *security->publisherSigner,
+        *security->trustStore,
         preparation.additionalPayloads);
     if (!packagePlan.built)
     {
         result.state = packagePlan.state;
         result.issues = packagePlan.issues;
         if (result.issues.empty())
-            result.issues.push_back("The bounded package v2 record plan could not be built.");
+            result.issues.push_back("The bounded package V3 record plan could not be built.");
         return cleanupAndReturn(std::move(result));
     }
 
@@ -590,11 +606,10 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         return cleanupAndReturn(std::move(result));
     }
 
-    const auto packageWrite = drs::engine::writePackageV2Streaming(
+    const auto packageWrite = drs::engine::writePackageV3Streaming(
         packagePlan.plan,
-        drs::engine::getDeterministicPackageCryptoProvider(),
-        drs::engine::PackageV2StreamingWriteOptions {
-            [options](const drs::engine::PackageV2StreamingWriteProgress& progress)
+        drs::engine::PackageV3StreamingWriteOptions {
+            [options](const drs::engine::PackageV3StreamingWriteProgress& progress)
             {
                 publishProgress(options,
                                 PerformancePackageExportStage::sealingPackage,
@@ -606,7 +621,7 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
                                 progress.status,
                                 progress.completedPlaintextBytes,
                                 progress.totalPlaintextBytes,
-                                progress.identity.sourceId);
+                                progress.recordId);
             },
             options.cancellationProbe
         });
@@ -616,7 +631,7 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
         result.issues = packageWrite.issues;
         if (result.issues.empty())
             result.issues.push_back("The playable package file could not be written.");
-        if (packageWrite.failure == drs::engine::PackageV2Failure::cancelled)
+        if (packageWrite.failure == drs::engine::PackageV3StreamingFailure::cancelled)
             result.canceled = true;
         return cleanupAndReturn(std::move(result));
     }
@@ -635,19 +650,13 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
                     "Verifying playable package",
                     targetPackageFile.getFileName().toStdString());
 
-    const auto verification = drs::engine::loadPerformancePackageV2Metadata(
-        packagePath, drs::engine::getDeterministicPackageCryptoProvider());
-    if (!verification.loaded)
+    const auto publishedDispatch = drs::engine::dispatchPerformancePackageReader(packagePath);
+    if (! packageWrite.verified || ! packageWrite.atomicallyPublished
+        || publishedDispatch.format != drs::engine::PerformancePackageDiskFormat::version3)
     {
-        result.state = verification.state.empty()
-            ? std::string("Playable package export verification failed")
-            : verification.state;
-        result.issues = verification.issues;
-        if (result.issues.empty())
-        {
-            result.issues.push_back(
-                "The exported playable package was written, but the current reader could not reopen it.");
-        }
+        result.state = "Playable package V3 export verification failed";
+        result.issues.push_back(
+            "The signed package was not published as a verified V3 container.");
         return cleanupAndReturn(std::move(result));
     }
 
@@ -661,6 +670,8 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
     result.verificationBytesRead = packageWrite.verificationBytesRead;
     result.totalDurationMicros = packageWrite.totalDurationMicros;
     result.plaintextThroughputBytesPerSecond = packageWrite.plaintextThroughputBytesPerSecond;
+    result.semanticDigest = packageWrite.semanticDigest;
+    result.signingAuditId = packageWrite.signingAuditId;
     publishProgress(options,
                     PerformancePackageExportStage::verifying,
                     verifyEndProgress,
@@ -858,6 +869,9 @@ PerformancePackageExportSubmitResult PerformancePackageExportService::submit(
             return result;
         }
 
+        if (request.securityContext == nullptr)
+            request.securityContext = options.securityContext;
+
         result.disposition = PerformancePackageExportSubmitDisposition::accepted;
         result.identity.ownerId = ownerId;
         result.identity.generation = ++nextGeneration;
@@ -895,6 +909,25 @@ PerformancePackageExportServiceMetrics PerformancePackageExportService::getMetri
     copy.shutdownWaitMilliseconds = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(copy.shutdownWaitDuration).count());
     return copy;
+}
+
+bool PerformancePackageExportService::setSecurityContext(
+    std::shared_ptr<const PerformancePackageExportSecurityContext> securityContext)
+{
+    if (securityContext != nullptr && ! securityContext->valid())
+        return false;
+    std::lock_guard<std::mutex> lock(mutex);
+    if (pending.has_value() || active.has_value())
+        return false;
+    options.securityContext = std::move(securityContext);
+    return true;
+}
+
+std::shared_ptr<const PerformancePackageExportSecurityContext>
+PerformancePackageExportService::getSecurityContext() const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    return options.securityContext;
 }
 
 std::shared_ptr<const PerformancePackageExportSnapshot>

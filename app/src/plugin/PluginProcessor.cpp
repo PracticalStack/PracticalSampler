@@ -2340,6 +2340,7 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
     request.packagePath = resolvedPackageFile == juce::File()
         ? std::string {}
         : resolvedPackageFile.getFullPathName().toStdString();
+    request.securityContext = performancePackageExportService.getSecurityContext();
 
     const auto sharedResult = drs::app::executePerformancePackageExport(request);
     result.exported = sharedResult.exported;

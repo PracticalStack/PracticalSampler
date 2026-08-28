@@ -106,6 +106,7 @@ add_library(drs_engine_adapter STATIC
     src/PackageSignature.cpp
     src/PackageV3.cpp
     src/PackageV3FileReader.cpp
+    src/PackageV3StreamingExport.cpp
     src/PackageKeyEnvelope.cpp
     src/PackageProtectionDiagnostics.cpp
     src/PackagePublisherTrustStore.cpp
@@ -148,6 +149,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PackageKeys.h
     include/drs/engine/PackageV3.h
     include/drs/engine/PackageV3FileReader.h
+    include/drs/engine/PackageV3StreamingExport.h
     include/drs/engine/PackageKeyEnvelope.h
     include/drs/engine/PackageProtectionDiagnostics.h
     include/drs/engine/PackagePublisherTrustStore.h

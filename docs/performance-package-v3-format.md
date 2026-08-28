@@ -181,6 +181,29 @@ Release-key IDs, signing-key IDs, nonces, ciphertext, tags, and signatures are
 excluded so equivalent exports retain the same semantic digest while their
 encrypted bytes remain intentionally nondeterministic.
 
+## Production streaming export
+
+`PerformancePackageExportService` maps the sanitized runtime manifest,
+runtime instrument/UI contract, stream index, background image, license text,
+sample heads, and sample pages into canonical V3 records. It does not call a
+V1/V2 writer or the deterministic compatibility crypto provider.
+
+The V3 writer loads, hashes, seals, and writes one bounded record at a time.
+Only non-secret record descriptors, nonces, and tags remain resident while the
+payload is staged. It then finalizes the canonical header/TOC, asks the
+publisher client to sign the staged file-backed signed region, appends the
+detached signature, verifies the complete signature with the immutable trust
+store, opens selected records with AEAD, and atomically replaces the output.
+Cancellation or any key, signing, verification, or I/O failure removes the
+staging file and preserves the last published package.
+
+The export service requires an injected
+`PerformancePackageExportSecurityContext`. An absent or invalid context fails
+closed before compilation and cannot select a legacy writer. Production must
+inject the managed provider/signer/trust objects described in the key
+operations runbook; test signers and ephemeral test keys are not compiled into
+the release path.
+
 ## Compatibility policy
 
 - V1/V2 packages remain readable only through their existing bounded legacy

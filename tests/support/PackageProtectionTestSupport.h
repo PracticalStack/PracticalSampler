@@ -5,6 +5,7 @@
 #include <drs/engine/PackageSignature.h>
 
 #include <string>
+#include <fstream>
 #include <utility>
 #include <vector>
 
@@ -24,9 +25,23 @@ public:
         std::string& issue) const override
     {
         response = {};
-        if (request.signingKeyId != keyId_ || request.canonicalSignedBytes == nullptr
+        std::vector<std::uint8_t> fileBytes;
+        const std::vector<std::uint8_t>* signedBytes = request.canonicalSignedBytes;
+        if (signedBytes == nullptr && ! request.canonicalSignedFilePath.empty())
+        {
+            std::ifstream input(request.canonicalSignedFilePath, std::ios::binary);
+            fileBytes.assign(std::istreambuf_iterator<char>(input),
+                             std::istreambuf_iterator<char>());
+            if (input.bad() || fileBytes.size() != request.canonicalSignedBytesLength)
+            {
+                issue = "test signer could not read the canonical signed file";
+                return false;
+            }
+            signedBytes = &fileBytes;
+        }
+        if (request.signingKeyId != keyId_ || signedBytes == nullptr
             || ! drs::engine::packageSignEd25519ph(
-                privateKey_, *request.canonicalSignedBytes, response.signature, issue))
+                privateKey_, *signedBytes, response.signature, issue))
             return false;
         response.auditId = "test-signing:" + keyId_;
         return true;
@@ -34,7 +49,7 @@ public:
 
 private:
     std::string keyId_;
-    const std::vector<std::uint8_t>& privateKey_;
+    std::vector<std::uint8_t> privateKey_;
 };
 
 inline drs::engine::PackageSigningKey activeTestSigningKey(

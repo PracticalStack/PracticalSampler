@@ -1,11 +1,24 @@
 #include <drs/engine/PackageV3.h>
+#include <drs/engine/PackageV3FileReader.h>
+#include <drs/engine/PackageV3StreamingExport.h>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <tuple>
 
 #include <sodium/crypto_hash_sha256.h>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace drs::engine
 {
@@ -77,6 +90,8 @@ struct SealedRecord
     PackageV3RecordInput input;
     PackageSealedBlob sealed;
     std::uint32_t ordinal = 0;
+    std::uint64_t plaintextSize = 0;
+    std::uint64_t ciphertextSize = 0;
     std::uint64_t ciphertextOffset = 0;
 };
 
@@ -132,9 +147,9 @@ std::vector<std::uint8_t> serializeToc(const std::vector<SealedRecord>& records)
             return {};
         appendU32(bytes, record.input.generation);
         appendU32(bytes, record.input.pageIndex);
-        appendU64(bytes, static_cast<std::uint64_t>(record.input.plaintext.size()));
+        appendU64(bytes, record.plaintextSize);
         appendU64(bytes, record.ciphertextOffset);
-        appendU64(bytes, static_cast<std::uint64_t>(record.sealed.ciphertext.size()));
+        appendU64(bytes, record.ciphertextSize);
         bytes.insert(bytes.end(), record.sealed.nonce.begin(), record.sealed.nonce.end());
         bytes.insert(bytes.end(), record.sealed.tag.begin(), record.sealed.tag.end());
     }
@@ -343,8 +358,10 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
         SealedRecord sealed;
         sealed.input = std::move(records[index]);
         sealed.ordinal = static_cast<std::uint32_t>(index);
+        sealed.plaintextSize = sealed.input.plaintext.size();
         if (! crypto.seal(seal, sealed.sealed, issue))
         { result.issues.push_back(issue); return result; }
+        sealed.ciphertextSize = sealed.sealed.ciphertext.size();
         if (! checkedAdd(payloadSize, sealed.sealed.ciphertext.size(), payloadSize))
         { result.issues.push_back("V3 payload size overflow"); return result; }
         sealedRecords.push_back(std::move(sealed));
@@ -422,6 +439,441 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
     if (! buildSemanticDigest(request, semanticRecords, result.semanticDigest))
     { result.issues.push_back("V3 semantic SHA-256 could not be computed"); result.packageBytes.clear(); return result; }
     result.written = true;
+    return result;
+}
+
+PackageV3StreamingWriteResult writePackageV3Streaming(
+    const PackageV3StreamingWritePlan& plan,
+    const PackageV3StreamingWriteOptions& options)
+{
+    namespace fs = std::filesystem;
+    PackageV3StreamingWriteResult result;
+    static std::atomic<std::uint64_t> nextStagingId { 1u };
+    const auto started = std::chrono::steady_clock::now();
+    const auto elapsedMicros = [&]
+    {
+        return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - started).count());
+    };
+    result.packagePath = plan.outputPath;
+    result.stagingPath = plan.outputPath + ".v3-stage-"
+        + std::to_string(nextStagingId.fetch_add(1u, std::memory_order_relaxed));
+    result.state = "Package V3 streaming write not attempted";
+    const auto cancelled = [&]
+    {
+        return options.cancellationProbe && options.cancellationProbe();
+    };
+    const auto publish = [&](const PackageV3StreamingWriteStage stage,
+                             const std::size_t index,
+                             const std::uint64_t completed,
+                             const PackageV3StreamingRecordSource* record,
+                             const std::string& status,
+                             const std::uint64_t total)
+    {
+        if (options.progressSink)
+        {
+            options.progressSink({ stage, index, plan.records.size(), completed, total,
+                                   record == nullptr ? std::string {} : record->recordId,
+                                   record == nullptr ? std::string {} : record->recordKind,
+                                   status });
+        }
+    };
+    const auto fail = [&](const PackageV3StreamingFailure failure,
+                          std::string issue)
+    {
+        result.failure = failure;
+        result.state = std::move(issue);
+        result.issues = { result.state };
+        result.totalDurationMicros = elapsedMicros();
+        std::error_code error;
+        fs::remove(fs::path(result.stagingPath), error);
+        publish(failure == PackageV3StreamingFailure::cancelled
+                    ? PackageV3StreamingWriteStage::cancelled
+                    : PackageV3StreamingWriteStage::failed,
+                result.completedRecordCount, result.processedPlaintextBytes, nullptr,
+                result.state, result.processedPlaintextBytes);
+        return result;
+    };
+
+    if (plan.packageId.empty() || plan.compatibilityId.empty() || plan.outputPath.empty()
+        || plan.encryptionKeyId.empty() || plan.signingKeyId.empty()
+        || plan.packageId.size() > packageV3MaximumIdentityBytes
+        || plan.compatibilityId.size() > packageV3MaximumIdentityBytes
+        || plan.encryptionKeyId.size() > packageV3MaximumIdentityBytes
+        || plan.signingKeyId.size() > packageV3MaximumIdentityBytes
+        || plan.keyProvider == nullptr || plan.publisherSigner == nullptr
+        || plan.trustStore == nullptr || ! plan.trustStore->valid()
+        || plan.records.empty() || plan.records.size() > packageV3MaximumRecords)
+        return fail(PackageV3StreamingFailure::configuration,
+                    "V3 export security configuration or record plan is invalid");
+
+    auto records = plan.records;
+    const auto less = [](const auto& left, const auto& right)
+    {
+        return std::tie(left.recordKind, left.recordId, left.generation, left.pageIndex)
+            < std::tie(right.recordKind, right.recordId, right.generation, right.pageIndex);
+    };
+    std::sort(records.begin(), records.end(), less);
+    std::uint64_t totalPlaintextBytes = 0;
+    for (std::size_t index = 0; index < records.size(); ++index)
+    {
+        const auto& record = records[index];
+        if (record.recordId.empty() || record.recordKind.empty()
+            || record.recordId.size() > packageV3MaximumIdentityBytes
+            || record.recordKind.size() > packageV3MaximumIdentityBytes
+            || record.expectedPlaintextBytes > packageV3MaximumRecordBytes
+            || ! record.loadPlaintext
+            || ! checkedAdd(totalPlaintextBytes, record.expectedPlaintextBytes,
+                            totalPlaintextBytes))
+            return fail(PackageV3StreamingFailure::bounds,
+                        "V3 streaming record identity, size, or byte accounting is invalid");
+        if (index != 0 && ! less(records[index - 1u], record))
+            return fail(PackageV3StreamingFailure::format,
+                        "V3 streaming record identities must be unique");
+    }
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before key resolution");
+
+    std::string issue;
+    SecureBuffer releaseKey;
+    if (! plan.keyProvider->resolvePackageKey(
+            plan.packageId, plan.encryptionKeyId, PackageKeyUse::encryptNewPackage,
+            releaseKey, issue))
+        return fail(PackageV3StreamingFailure::keyUnavailable,
+                    issue.empty() ? "Package release key is unavailable" : issue);
+    SecureBuffer contentKey;
+    if (! generateSecurePackageKey(contentKey, issue))
+        return fail(PackageV3StreamingFailure::keyUnavailable, issue);
+    PackageKeyEnvelope envelope;
+    if (! wrapPackageContentKey(plan.packageId, plan.encryptionKeyId,
+                                contentKey, releaseKey, envelope, issue))
+        return fail(PackageV3StreamingFailure::authentication, issue);
+
+    PackageV3WriteRequest layout;
+    layout.packageId = plan.packageId;
+    layout.compatibilityId = plan.compatibilityId;
+    layout.encryptionKeyId = plan.encryptionKeyId;
+    layout.releaseKey = &releaseKey;
+    layout.signingKeyId = plan.signingKeyId;
+    layout.publisherSigner = plan.publisherSigner;
+    std::vector<SealedRecord> descriptors;
+    descriptors.reserve(records.size());
+    std::uint64_t payloadSize = 0;
+    for (std::size_t index = 0; index < records.size(); ++index)
+    {
+        SealedRecord descriptor;
+        descriptor.input.recordId = records[index].recordId;
+        descriptor.input.recordKind = records[index].recordKind;
+        descriptor.input.generation = records[index].generation;
+        descriptor.input.pageIndex = records[index].pageIndex;
+        descriptor.ordinal = static_cast<std::uint32_t>(index);
+        descriptor.plaintextSize = records[index].expectedPlaintextBytes;
+        descriptor.ciphertextSize = records[index].expectedPlaintextBytes;
+        if (! checkedAdd(payloadSize, descriptor.ciphertextSize, payloadSize))
+            return fail(PackageV3StreamingFailure::bounds, "V3 payload size overflow");
+        descriptor.sealed.nonce.resize(getSecurePackageCryptoProvider().nonceSizeBytes());
+        descriptor.sealed.tag.resize(getSecurePackageCryptoProvider().tagSizeBytes());
+        descriptors.push_back(std::move(descriptor));
+    }
+    auto provisionalHeader = serializeHeader(
+        layout, envelope, 0u, static_cast<std::uint32_t>(descriptors.size()),
+        0u, 0u, 0u, payloadSize, 0u);
+    if (provisionalHeader.empty()
+        || provisionalHeader.size() > packageV3MaximumHeaderBytes
+        || provisionalHeader.size() > std::numeric_limits<std::uint32_t>::max())
+        return fail(PackageV3StreamingFailure::bounds, "V3 header could not be encoded");
+    const auto headerSize = static_cast<std::uint32_t>(provisionalHeader.size());
+    auto provisionalToc = serializeToc(descriptors);
+    if (provisionalToc.empty() || provisionalToc.size() > packageV3MaximumTocBytes)
+        return fail(PackageV3StreamingFailure::bounds, "V3 TOC could not be encoded");
+    const std::uint64_t tocOffset = headerSize;
+    const std::uint64_t tocSize = provisionalToc.size();
+    std::uint64_t payloadOffset = 0, signatureOffset = 0, totalPackageBytes = 0;
+    if (! checkedAdd(tocOffset, tocSize, payloadOffset)
+        || ! checkedAdd(payloadOffset, payloadSize, signatureOffset)
+        || ! checkedAdd(signatureOffset, packageEd25519SignatureBytes, totalPackageBytes)
+        || totalPackageBytes > packageV3MaximumPackageBytes)
+        return fail(PackageV3StreamingFailure::bounds,
+                    "V3 package size exceeds its bounded format limit");
+    auto ciphertextOffset = payloadOffset;
+    for (auto& descriptor : descriptors)
+    {
+        descriptor.ciphertextOffset = ciphertextOffset;
+        if (! checkedAdd(ciphertextOffset, descriptor.ciphertextSize, ciphertextOffset))
+            return fail(PackageV3StreamingFailure::bounds, "V3 ciphertext offset overflow");
+    }
+
+    std::error_code error;
+    const auto parent = fs::path(plan.outputPath).parent_path();
+    if (! parent.empty()) fs::create_directories(parent, error);
+    fs::remove(fs::path(result.stagingPath), error);
+    std::ofstream output(fs::path(result.stagingPath), std::ios::binary | std::ios::trunc);
+    if (! output)
+        return fail(PackageV3StreamingFailure::io,
+                    "Could not create the V3 package staging file");
+    output.seekp(static_cast<std::streamoff>(payloadOffset), std::ios::beg);
+    if (! output)
+    {
+        output.close();
+        return fail(PackageV3StreamingFailure::io,
+                    "Could not reserve the V3 package index region");
+    }
+
+    crypto_hash_sha256_state semanticState;
+    if (crypto_hash_sha256_init(&semanticState) != 0)
+    {
+        output.close();
+        return fail(PackageV3StreamingFailure::authentication,
+                    "V3 semantic SHA-256 could not be initialized");
+    }
+    crypto_hash_sha256_update(&semanticState, kSemanticMagic.data(), kSemanticMagic.size());
+    std::vector<std::uint8_t> semanticMetadata;
+    if (! appendString(semanticMetadata, plan.packageId)
+        || ! appendString(semanticMetadata, plan.compatibilityId))
+    {
+        output.close();
+        return fail(PackageV3StreamingFailure::format,
+                    "V3 semantic identities could not be encoded");
+    }
+    appendU32(semanticMetadata, static_cast<std::uint32_t>(records.size()));
+    crypto_hash_sha256_update(&semanticState, semanticMetadata.data(), semanticMetadata.size());
+
+    const auto& crypto = getSecurePackageCryptoProvider();
+    for (std::size_t index = 0; index < records.size(); ++index)
+    {
+        const auto& source = records[index];
+        if (cancelled())
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::cancelled,
+                        "Package V3 export was cancelled between records");
+        }
+        publish(PackageV3StreamingWriteStage::loadingRecord, index,
+                result.processedPlaintextBytes, &source, source.sourceLabel,
+                totalPlaintextBytes);
+        if (cancelled())
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::cancelled,
+                        "Package V3 export was cancelled before loading a record");
+        }
+        std::vector<std::uint8_t> plaintext;
+        if (! source.loadPlaintext(plaintext, issue)
+            || plaintext.size() != source.expectedPlaintextBytes)
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::io,
+                        issue.empty() ? "Could not load a bounded V3 record" : issue);
+        }
+        result.peakPlaintextBufferBytes = std::max<std::uint64_t>(
+            result.peakPlaintextBufferBytes, plaintext.size());
+        semanticMetadata.clear();
+        appendU32(semanticMetadata, static_cast<std::uint32_t>(index));
+        if (! appendString(semanticMetadata, source.recordId)
+            || ! appendString(semanticMetadata, source.recordKind))
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::format,
+                        "V3 semantic record identity could not be encoded");
+        }
+        appendU32(semanticMetadata, source.generation);
+        appendU32(semanticMetadata, source.pageIndex);
+        appendU64(semanticMetadata, source.expectedPlaintextBytes);
+        crypto_hash_sha256_update(&semanticState, semanticMetadata.data(),
+                                  semanticMetadata.size());
+        if (! plaintext.empty())
+            crypto_hash_sha256_update(&semanticState, plaintext.data(), plaintext.size());
+
+        const auto aad = buildPackageV3RecordAad(
+            plan.packageId, plan.compatibilityId, static_cast<std::uint32_t>(index),
+            source.recordId, source.recordKind, source.generation, source.pageIndex,
+            source.expectedPlaintextBytes);
+        SecureBuffer securePlaintext(std::move(plaintext));
+        PackageSealRequest seal;
+        seal.packageId = plan.packageId;
+        seal.recordId = source.recordId;
+        seal.encryptionKeyId = plan.encryptionKeyId;
+        seal.secureEncryptionKey = &contentKey;
+        seal.additionalAuthenticatedData = asBinaryString(aad);
+        seal.securePlaintext = &securePlaintext;
+        publish(PackageV3StreamingWriteStage::sealingRecord, index,
+                result.processedPlaintextBytes, &source, "Sealing protected record",
+                totalPlaintextBytes);
+        if (cancelled())
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::cancelled,
+                        "Package V3 export was cancelled before sealing a record");
+        }
+        PackageSealedBlob sealed;
+        if (aad.empty() || ! crypto.seal(seal, sealed, issue)
+            || sealed.ciphertext.size() != source.expectedPlaintextBytes
+            || sealed.nonce.size() != crypto.nonceSizeBytes()
+            || sealed.tag.size() != crypto.tagSizeBytes())
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::authentication,
+                        issue.empty() ? "Could not seal a bounded V3 record" : issue);
+        }
+        result.peakSealedBufferBytes = std::max<std::uint64_t>(
+            result.peakSealedBufferBytes, sealed.ciphertext.size());
+        descriptors[index].sealed.nonce = std::move(sealed.nonce);
+        descriptors[index].sealed.tag = std::move(sealed.tag);
+        publish(PackageV3StreamingWriteStage::writingRecord, index,
+                result.processedPlaintextBytes, &source, "Writing protected record",
+                totalPlaintextBytes);
+        if (cancelled())
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::cancelled,
+                        "Package V3 export was cancelled before writing a record");
+        }
+        output.write(reinterpret_cast<const char*>(sealed.ciphertext.data()),
+                     static_cast<std::streamsize>(sealed.ciphertext.size()));
+        if (! output)
+        {
+            output.close();
+            return fail(PackageV3StreamingFailure::io,
+                        "Could not append a protected V3 record");
+        }
+        result.processedPlaintextBytes += source.expectedPlaintextBytes;
+        ++result.completedRecordCount;
+    }
+    result.semanticDigest.resize(crypto_hash_sha256_BYTES);
+    if (crypto_hash_sha256_final(&semanticState, result.semanticDigest.data()) != 0)
+    {
+        output.close();
+        return fail(PackageV3StreamingFailure::authentication,
+                    "V3 semantic SHA-256 could not be finalized");
+    }
+
+    publish(PackageV3StreamingWriteStage::finalizingIndex, records.size(),
+            result.processedPlaintextBytes, nullptr, "Finalizing canonical V3 index",
+            totalPlaintextBytes);
+    if (cancelled())
+    {
+        output.close();
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before finalizing the index");
+    }
+    const auto header = serializeHeader(
+        layout, envelope, headerSize, static_cast<std::uint32_t>(descriptors.size()),
+        tocOffset, tocSize, payloadOffset, payloadSize, signatureOffset);
+    const auto toc = serializeToc(descriptors);
+    if (header.size() != headerSize || toc.size() != tocSize)
+    {
+        output.close();
+        return fail(PackageV3StreamingFailure::format,
+                    "V3 canonical layout changed during serialization");
+    }
+    output.seekp(0, std::ios::beg);
+    output.write(reinterpret_cast<const char*>(header.data()),
+                 static_cast<std::streamsize>(header.size()));
+    output.write(reinterpret_cast<const char*>(toc.data()),
+                 static_cast<std::streamsize>(toc.size()));
+    output.flush();
+    output.close();
+    if (! output)
+        return fail(PackageV3StreamingFailure::io,
+                    "Could not finalize the V3 package staging file");
+
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before publisher signing");
+    publish(PackageV3StreamingWriteStage::signing, records.size(),
+            result.processedPlaintextBytes, nullptr, "Requesting publisher signature",
+            totalPlaintextBytes);
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before publisher signing");
+    PackagePublisherSigningRequest signingRequest;
+    signingRequest.signingKeyId = plan.signingKeyId;
+    signingRequest.canonicalSignedFilePath = result.stagingPath;
+    signingRequest.canonicalSignedBytesLength = signatureOffset;
+    PackagePublisherSigningResponse signingResponse;
+    if (! plan.publisherSigner->signCanonicalPackage(
+            signingRequest, signingResponse, issue)
+        || signingResponse.signature.size() != packageEd25519SignatureBytes
+        || signingResponse.auditId.empty())
+        return fail(PackageV3StreamingFailure::signing,
+                    issue.empty() ? "Publisher signing response is invalid" : issue);
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled after publisher signing");
+    result.signingAuditId = std::move(signingResponse.auditId);
+    std::ofstream append(fs::path(result.stagingPath), std::ios::binary | std::ios::app);
+    append.write(reinterpret_cast<const char*>(signingResponse.signature.data()),
+                 static_cast<std::streamsize>(signingResponse.signature.size()));
+    append.flush();
+    append.close();
+    if (! append)
+        return fail(PackageV3StreamingFailure::io,
+                    "Could not append the publisher signature to the V3 package");
+
+    publish(PackageV3StreamingWriteStage::verifying, records.size(),
+            result.processedPlaintextBytes, nullptr, "Verifying staged signed V3 package",
+            totalPlaintextBytes);
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before staged verification");
+    const auto verified = openPackageV3File(result.stagingPath, *plan.trustStore);
+    if (! verified.opened || verified.package.packageId != plan.packageId
+        || verified.package.compatibilityId != plan.compatibilityId
+        || verified.package.encryptionKeyId != plan.encryptionKeyId
+        || verified.package.signingKeyId != plan.signingKeyId
+        || verified.package.records.size() != records.size())
+        return fail(PackageV3StreamingFailure::signing,
+                    verified.issues.empty() ? "Staged V3 publisher verification failed"
+                                            : verified.issues.front());
+    result.verificationBytesRead = verified.verificationBytesRead
+        + verified.indexBytesRead + verified.signatureBytesRead;
+    const std::array<std::size_t, 2> selected { 0u, records.size() - 1u };
+    for (std::size_t index = 0; index < selected.size(); ++index)
+    {
+        if (index == 1u && selected[1] == selected[0]) continue;
+        const auto opened = openPackageV3FileRecord(
+            verified, contentKey, verified.package.records[selected[index]]);
+        result.verificationBytesRead += opened.ciphertextBytesRead;
+        if (! opened.opened)
+            return fail(PackageV3StreamingFailure::authentication,
+                        opened.issues.empty() ? "Staged V3 record verification failed"
+                                              : opened.issues.front());
+    }
+    result.verified = true;
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before atomic publication");
+
+    publish(PackageV3StreamingWriteStage::publishing, records.size(),
+            result.processedPlaintextBytes, nullptr, "Publishing verified V3 package atomically",
+            totalPlaintextBytes);
+    if (cancelled())
+        return fail(PackageV3StreamingFailure::cancelled,
+                    "Package V3 export was cancelled before atomic publication");
+#if defined(_WIN32)
+    const auto moved = MoveFileExW(fs::path(result.stagingPath).c_str(),
+                                   fs::path(plan.outputPath).c_str(),
+                                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+    fs::rename(fs::path(result.stagingPath), fs::path(plan.outputPath), error);
+    const auto moved = ! error;
+#endif
+    if (! moved)
+        return fail(PackageV3StreamingFailure::io,
+                    "Verified V3 package could not be atomically published");
+    result.atomicallyPublished = true;
+    result.written = true;
+    result.failure = PackageV3StreamingFailure::none;
+    result.packageBytes = totalPackageBytes;
+    result.state = "Package V3 streaming export completed";
+    result.totalDurationMicros = elapsedMicros();
+    if (result.totalDurationMicros != 0)
+        result.plaintextThroughputBytesPerSecond
+            = static_cast<double>(result.processedPlaintextBytes) * 1000000.0
+            / static_cast<double>(result.totalDurationMicros);
+    publish(PackageV3StreamingWriteStage::completed, records.size(),
+            result.processedPlaintextBytes, nullptr, result.state, totalPlaintextBytes);
     return result;
 }
 

@@ -214,6 +214,27 @@ int main()
                     oldPackage.packageBytes, revokedTrust, parsedOld, issue),
                 "publisher revocation blocks historical signature");
 
+    const auto streamingSignedPath = std::filesystem::temp_directory_path()
+        / "drs-controlled-signer-streaming-region.bin";
+    {
+        std::ofstream output(streamingSignedPath, std::ios::binary | std::ios::trunc);
+        output.write(reinterpret_cast<const char*>(oldPackage.packageBytes.data()),
+                     static_cast<std::streamsize>(oldPackage.packageBytes.size()
+                                                  - packageEd25519SignatureBytes));
+    }
+    PackagePublisherSigningRequest streamingSigningRequest;
+    streamingSigningRequest.signingKeyId = "publisher-old";
+    streamingSigningRequest.canonicalSignedFilePath = streamingSignedPath.generic_string();
+    streamingSigningRequest.canonicalSignedBytesLength
+        = oldPackage.packageBytes.size() - packageEd25519SignatureBytes;
+    PackagePublisherSigningResponse streamingSigningResponse;
+    ok &= check(oldSigner.signCanonicalPackage(
+                    streamingSigningRequest, streamingSigningResponse, issue)
+                    && streamingSigningResponse.signature.size()
+                        == packageEd25519SignatureBytes,
+                "controlled signer streams a canonical staged V3 file");
+    std::filesystem::remove(streamingSignedPath);
+
     RecordingAuditSink unavailableAudit;
     unavailableAudit.available = false;
     drs::signing::ControlledPackageSigner unavailableSigner(

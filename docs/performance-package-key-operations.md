@@ -113,6 +113,23 @@ compiled/configured lifecycle policy:
 
 Source-specific errors must not flow to UI, logs, or package diagnostics.
 
+## Desktop export injection
+
+The desktop and plug-in shells contain no private signing key and no release
+key. Authorized publishing bootstrap code supplies a valid
+`PerformancePackageExportSecurityContext` to
+`PerformancePackageExportService::setSecurityContext` before export. The
+context names the active encryption/signing key IDs and owns references to the
+managed `PackageKeyProvider`, remote or controlled
+`PackagePublisherSigningClient`, and public-only
+`PackagePublisherTrustStore`.
+
+The normal asynchronous Export Playable Instrument request inherits that
+context from the service. The synchronous processor export path obtains the
+same service context. If provisioning is absent, invalid, retired, revoked, or
+unavailable, export reports a redacted security-configuration failure and
+publishes no V1, V2, partial V3, or staging file.
+
 ## Rotation procedure
 
 1. Provision the new signing public/private pair and release key under new,

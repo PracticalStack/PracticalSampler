@@ -143,8 +143,8 @@
       <div class="summary-grid">
         <div class="summary-card"><strong>8</strong><span>Ordered workstreams</span></div>
         <div class="summary-card"><strong>3–5</strong><span>Estimated engineer-weeks before external review</span></div>
-        <div class="summary-card"><strong>2 / 8</strong><span>Format and reader gates complete</span></div>
-        <div class="summary-card"><strong>Phase 3</strong><span>Code complete; production provisioning gated</span></div>
+        <div class="summary-card"><strong>4 / 8</strong><span>Engineering workstreams code-complete</span></div>
+        <div class="summary-card"><strong>Phases 3–4</strong><span>Production provisioning remains gated</span></div>
       </div>
     </section>
 
@@ -168,12 +168,12 @@
       <div class="heading"><h2>Reviewed Baseline</h2></div>
       <p>The cryptographic primitives are useful, but the current implementation is not yet a protected package product path.</p>
       <div class="callout warning">
-        <strong>Current boundary:</strong> normal exports still call the V2 streaming writer with the deterministic compatibility provider. CPCA-1 and CPCA-2 now provide a canonical V3 container plus a bounded, signature-first file reader, but neither is connected to a production export/open path.
+        <strong>Current boundary:</strong> normal exports now require an injected release-key provider, controlled publisher signer, and immutable trust store, then emit only a verified signed V3 package. Missing production provisioning fails closed without a V1/V2 fallback. The V3 activation/open path remains CPCA-5 scope.
       </div>
       <ul>
         <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, versioned release-key policy/provider, immutable publisher trust store, isolated controlled signer, move-only zeroized secret buffers, semantic SHA-256, and focused negative tests.</li>
-        <li>Missing: production key/service provisioning and named owners, production export/load integration, complete hostile-input qualification, and independent review.</li>
-        <li>Current validation: twelve of thirteen related package tests pass; the pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains red and is tracked for CPCA-7.</li>
+        <li>Missing: production key/service provisioning and named owners, V3 product activation/load integration, complete hostile-input qualification, and independent review.</li>
+        <li>Current validation: the eight focused crypto, V3 reader/writer, production-export, signing, release-gate, and key-lifecycle tests pass. The legacy <code>drs.performance_package.export_lifecycle</code> suite now reaches its obsolete V2 metadata-reader expectation and is assigned to CPCA-5; the pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains tracked for CPCA-7.</li>
       </ul>
     </section>
 
@@ -190,7 +190,7 @@
             <tr><td class="id">CPCA-1</td><td>Complete, unambiguous, signed V3 byte contract</td><td>Existing V3 prototype</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-2</td><td>Bounded file-backed verification/decryption</td><td>CPCA-1</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">Provisioning required</span></td></tr>
-            <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status blocked">Provisioning required</span></td></tr>
             <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
             <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status ready">Ready</span></td></tr>
             <tr><td class="id">CPCA-7</td><td>Green suite and irreversible production cutover</td><td>CPCA-4 through CPCA-6</td><td><span class="status blocked">Gate blocked</span></td></tr>
@@ -277,16 +277,16 @@
     </section>
 
     <section class="workstream" id="step-4">
-      <div class="work-head"><div class="work-number">4</div><h2>Connect Production Export to V3</h2><span class="status ready">Ready</span></div>
+      <div class="work-head"><div class="work-number">4</div><h2>Connect Production Export to V3</h2><span class="status blocked">Provisioning required</span></div>
       <div class="work-body">
         <p class="work-intent">Make the existing playable-instrument record plan produce a complete signed V3 package.</p>
         <div class="grid-2">
-          <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Map manifest, runtime settings, UI definitions, artwork, license, stream metadata, sample heads, and sample pages into V3 records.</li>
-            <li>Strip source paths, original WAV names/chunks, authoring-only state, and unnecessary metadata before encryption.</li>
-            <li>Generate one random content key per export and unique random nonces per record.</li>
-            <li>Wrap the content key, request publisher signing, verify selected records, and atomically publish the final file.</li>
-            <li>Preserve cancellation, progress reporting, staging cleanup, and sensitive-key retirement on every exit path.</li>
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-4-T1</span> Map manifest, runtime settings, UI definitions, artwork, license, stream metadata, sample heads, and sample pages into V3 records.</li>
+            <li class="done"><span class="task-id">CPCA-4-T2</span> Strip source paths, original WAV names/chunks, authoring-only state, and unnecessary metadata before encryption.</li>
+            <li class="done"><span class="task-id">CPCA-4-T3</span> Generate one random content key per export and unique random nonces per record.</li>
+            <li class="done"><span class="task-id">CPCA-4-T4</span> Wrap the content key, request publisher signing, verify selected records, and atomically publish the final file.</li>
+            <li class="done"><span class="task-id">CPCA-4-T5</span> Preserve cancellation, progress reporting, staging cleanup, and sensitive-key retirement on every exit path.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
             <li>Export a real project twice: encrypted bytes differ while semantic digest and rendered playback match.</li>
@@ -296,7 +296,8 @@
           </ul></article>
         </div>
         <div class="files">Primary code: <code>PerformancePackageExportService.cpp</code>, V3 streaming writer, compiler/sanitizer, export lifecycle tests.</div>
-        <div class="exit"><h3>Exit gate</h3><p>The normal Export Playable Instrument workflow produces a verified signed V3 file and never invokes the deterministic provider.</p></div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> <code>drs.package_v3.streaming_export</code> and <code>drs.performance_package.v3_production_export</code> prove bounded record-at-a-time AEAD, fresh keys/nonces, stable semantic digests, protected-plaintext scans, file-backed controlled signing, staged signature/selected-record verification, cancellation cleanup, last-published-file preservation, asynchronous workflow injection, and fail-closed behavior with no deterministic/V2 writer reference in the production export service. The focused eight-test security/export matrix passes.</div>
+        <div class="exit"><h3>Exit gate</h3><p><strong>Engineering implementation complete; production provisioning required.</strong> Once CPCA-3 supplies the real active release-key provider, signing service, public trust entry, owners, and audited credentials, the normal Export Playable Instrument workflow produces a verified signed V3 file and never invokes the deterministic provider. Without those dependencies it publishes nothing. V3 activation is intentionally deferred to CPCA-5.</p></div>
       </div>
     </section>
 

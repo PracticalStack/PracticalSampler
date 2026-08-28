@@ -1,4 +1,5 @@
 #include "Phase1PerformancePackageSupport.h"
+#include "PerformancePackageExportSecurityTestSupport.h"
 #include "drs/engine/DspGraphPlan.h"
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PackageReaderDispatch.h"
@@ -184,6 +185,7 @@ drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPack
     request.projectId = request.project.projectId;
     request.baseRevision = 1;
     request.packagePath = outputPackagePath.generic_string();
+    request.securityContext = drs::tests::makePerformancePackageExportTestSecurityContext();
     return request;
 }
 

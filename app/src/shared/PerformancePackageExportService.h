@@ -1,6 +1,9 @@
 #pragma once
 
 #include "drs/engine/PackageWriter.h"
+#include "drs/engine/PackageKeys.h"
+#include "drs/engine/PackagePublisherSigning.h"
+#include "drs/engine/PackagePublisherTrustStore.h"
 #include "drs/engine/RuntimeCompiler.h"
 #include "drs/engine/RuntimeModel.h"
 #include "drs/engine/RuntimePresetState.h"
@@ -50,6 +53,27 @@ struct PerformancePackageExportRequestIdentity
     std::string packagePath;
 };
 
+inline constexpr const char* performancePackageV3CompatibilityId
+    = "practical-sampler.performance-package.v3";
+
+struct PerformancePackageExportSecurityContext
+{
+    std::string compatibilityId = performancePackageV3CompatibilityId;
+    std::string encryptionKeyId;
+    std::string signingKeyId;
+    std::shared_ptr<const drs::engine::PackageKeyProvider> keyProvider;
+    std::shared_ptr<const drs::engine::PackagePublisherSigningClient> publisherSigner;
+    std::shared_ptr<const drs::engine::PackagePublisherTrustStore> trustStore;
+
+    bool valid() const noexcept
+    {
+        return ! compatibilityId.empty() && ! encryptionKeyId.empty()
+            && ! signingKeyId.empty() && keyProvider != nullptr
+            && publisherSigner != nullptr && trustStore != nullptr
+            && trustStore->valid();
+    }
+};
+
 struct PerformancePackageExportRequest
 {
     drs::engine::RuntimeProjectModel project;
@@ -57,6 +81,7 @@ struct PerformancePackageExportRequest
     std::string projectId;
     std::size_t baseRevision = 0;
     std::string packagePath;
+    std::shared_ptr<const PerformancePackageExportSecurityContext> securityContext;
 };
 
 struct PerformancePackageExportOperationResult
@@ -73,6 +98,8 @@ struct PerformancePackageExportOperationResult
     std::uint64_t verificationBytesRead = 0;
     std::uint64_t totalDurationMicros = 0;
     double plaintextThroughputBytesPerSecond = 0.0;
+    std::vector<std::uint8_t> semanticDigest;
+    std::string signingAuditId;
 };
 
 struct PerformancePackageExportProgress
@@ -141,6 +168,7 @@ struct PerformancePackageExportServiceOptions
 {
     std::function<void(PerformancePackageExportStage)> stageObserver;
     std::function<void(PerformancePackageExportStage)> checkpointObserver;
+    std::shared_ptr<const PerformancePackageExportSecurityContext> securityContext;
 };
 
 PerformancePackageExportOperationResult executePerformancePackageExport(
@@ -206,6 +234,9 @@ public:
 
     Client openClient();
     PerformancePackageExportServiceMetrics getMetrics() const;
+    bool setSecurityContext(
+        std::shared_ptr<const PerformancePackageExportSecurityContext> securityContext);
+    std::shared_ptr<const PerformancePackageExportSecurityContext> getSecurityContext() const;
     std::shared_ptr<const PerformancePackageExportSnapshot> getSnapshot() const;
     std::shared_ptr<const PerformancePackageExportSnapshot> getSnapshot(std::uint64_t ownerId,
                                                                         std::uint64_t generation) const;
