@@ -29,6 +29,18 @@ namespace
 {
 namespace fs = std::filesystem;
 
+std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+makeV3ActivationSecurityContext(
+    const std::shared_ptr<const drs::app::PerformancePackageExportSecurityContext>& source)
+{
+    if (source == nullptr || ! source->valid()) return {};
+    auto context = std::make_shared<drs::engine::PerformancePackageV3ActivationSecurityContext>();
+    context->compatibilityId = source->compatibilityId;
+    context->keyProvider = source->keyProvider;
+    context->trustStore = source->trustStore;
+    return context;
+}
+
 static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
               "Realtime diagnostics require lock-free 64-bit atomics.");
 static_assert(std::atomic<std::size_t>::is_always_lock_free,
@@ -269,7 +281,9 @@ drs::engine::RuntimeProjectModel buildSuppressedAuthoringProjectState()
 }
 
 PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspaceInternal(
-    const std::string& packagePath)
+    const std::string& packagePath,
+    const std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>&
+        v3SecurityContext)
 {
     PreparedPerformancePackageWorkspaceLoadResult result;
     result.state = "Performance package open failed";
@@ -284,10 +298,27 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
     const auto dispatch = drs::engine::dispatchPerformancePackageReader(packagePath);
     drs::engine::PerformancePackageLoadResult packageLoad;
     drs::engine::PerformancePackageV2MetadataLoadResult packageV2;
+    drs::engine::PerformancePackageV3MetadataLoadResult packageV3;
     if (dispatch.format == drs::engine::PerformancePackageDiskFormat::version2)
     {
         packageV2 = drs::engine::loadPerformancePackageV2Metadata(packagePath);
         packageLoad = packageV2.metadata;
+    }
+    else if (dispatch.format == drs::engine::PerformancePackageDiskFormat::version3)
+    {
+        if (v3SecurityContext != nullptr)
+            packageV3 = drs::engine::loadPerformancePackageV3Metadata(
+                packagePath, *v3SecurityContext);
+        else
+        {
+            packageV3.state = "Performance package V3 activation rejected";
+            packageV3.issues = { "V3 activation rejected [configuration]." };
+            packageV3.metadata.state = packageV3.state;
+            packageV3.metadata.issues = packageV3.issues;
+            packageV3.metadata.failureCategory
+                = drs::engine::PerformancePackageFailureCategory::playbackCompatibilityFailure;
+        }
+        packageLoad = packageV3.metadata;
     }
     else if (dispatch.opened)
     {
@@ -318,7 +349,11 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
     auto activation = dispatch.format == drs::engine::PerformancePackageDiskFormat::version2
         ? drs::engine::preparePerformancePackageV2Activation(
             packageLoad, packageV2.package, packageV2.sampleDescriptors, result.timings)
-        : drs::engine::preparePerformancePackageActivation(packageLoad, result.timings);
+        : dispatch.format == drs::engine::PerformancePackageDiskFormat::version3
+            ? drs::engine::preparePerformancePackageV3Activation(
+                packageLoad, packageV3.package, packageV3.contentKey,
+                packageV3.sampleDescriptors, result.timings)
+            : drs::engine::preparePerformancePackageActivation(packageLoad, result.timings);
     result.timings = activation.timings;
     result.failureCategory = activation.failureCategory;
     result.state = activation.state;
@@ -329,7 +364,9 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
 }
 
 OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInternal(
-    const std::string& packagePath)
+    const std::string& packagePath,
+    const std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>&
+        v3SecurityContext)
 {
     OpenedPerformancePackageWorkspaceLoadResult result;
     result.state = "Performance package open failed";
@@ -346,6 +383,19 @@ OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInter
     {
         auto v2 = drs::engine::loadPerformancePackageV2Metadata(packagePath);
         result.packageLoad = std::move(v2.metadata);
+    }
+    else if (dispatch.format == drs::engine::PerformancePackageDiskFormat::version3)
+    {
+        if (v3SecurityContext != nullptr)
+            result.packageLoad = drs::engine::loadPerformancePackageV3Metadata(
+                packagePath, *v3SecurityContext).metadata;
+        else
+        {
+            result.packageLoad.state = "Performance package V3 activation rejected";
+            result.packageLoad.issues = { "V3 activation rejected [configuration]." };
+            result.packageLoad.failureCategory
+                = drs::engine::PerformancePackageFailureCategory::playbackCompatibilityFailure;
+        }
     }
     else if (dispatch.opened)
     {
@@ -921,6 +971,13 @@ Processor::Processor(drs::app::WaveformPreviewServiceOptions waveformPreviewServ
     : juce::AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       authoringSession(buildInitialAuthoringProject()),
       parameterState(*this, nullptr, "macroParameters", buildParameterLayout()),
+      projectRestoreCoordinator({
+          128,
+          {},
+          [this]
+          {
+              return getPerformancePackageActivationSecurityContext();
+          } }),
       waveformPreviewService(std::move(waveformPreviewServiceOptions))
 {
     primeRealtimeSafetyState(512);
@@ -961,6 +1018,25 @@ Processor::~Processor()
     performancePlaybackContext.serviceRetirements();
     authoringPreviewPlaybackContext.serviceRetirements();
     delete[] realtimeGuardTestAllocation;
+}
+
+bool Processor::setPerformancePackageActivationSecurityContext(
+    std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext> context)
+{
+    if (context != nullptr && ! context->valid()) return false;
+    std::atomic_store_explicit(&performancePackageActivationSecurityContext,
+                               std::move(context), std::memory_order_release);
+    return true;
+}
+
+std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+Processor::getPerformancePackageActivationSecurityContext() const
+{
+    auto context = std::atomic_load_explicit(
+        &performancePackageActivationSecurityContext, std::memory_order_acquire);
+    if (context != nullptr) return context;
+    return makeV3ActivationSecurityContext(
+        performancePackageExportService.getSecurityContext());
 }
 
 void Processor::timerCallback()
@@ -2154,13 +2230,17 @@ bool Processor::activatePerformancePackageWorkspace(
 PreparedPerformancePackageWorkspaceLoadResult Processor::preparePerformancePackageWorkspace(
     const std::string& packagePath) const
 {
-    return preparePerformancePackageWorkspaceInternal(packagePath);
+    return preparePerformancePackageWorkspaceInternal(
+        packagePath,
+        getPerformancePackageActivationSecurityContext());
 }
 
 OpenedPerformancePackageWorkspaceLoadResult Processor::openPerformancePackageWorkspace(
     const std::string& packagePath) const
 {
-    return openPerformancePackageWorkspaceInternal(packagePath);
+    return openPerformancePackageWorkspaceInternal(
+        packagePath,
+        getPerformancePackageActivationSecurityContext());
 }
 
 PerformancePackageWorkspaceLoadResult Processor::activatePreparedPerformancePackageWorkspace(
@@ -2277,15 +2357,19 @@ PerformancePackageWorkspaceLoadResult Processor::activateOpenedPerformancePackag
 }
 
 PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspaceInBackground(
-    const std::string& packagePath)
+    const std::string& packagePath,
+    std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+        v3SecurityContext)
 {
-    return preparePerformancePackageWorkspaceInternal(packagePath);
+    return preparePerformancePackageWorkspaceInternal(packagePath, v3SecurityContext);
 }
 
 OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInBackground(
-    const std::string& packagePath)
+    const std::string& packagePath,
+    std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+        v3SecurityContext)
 {
-    return openPerformancePackageWorkspaceInternal(packagePath);
+    return openPerformancePackageWorkspaceInternal(packagePath, v3SecurityContext);
 }
 
 PerformancePackageWorkspaceLoadResult Processor::loadPerformancePackageWorkspace(

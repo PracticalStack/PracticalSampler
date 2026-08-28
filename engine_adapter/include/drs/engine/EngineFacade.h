@@ -596,4 +596,11 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
     std::shared_ptr<const PackageV2OpenResult> package,
     const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
     const PerformancePackagePreparationTimings& priorTimings = {});
+
+PreparedPerformancePackageActivationResult preparePerformancePackageV3Activation(
+    const PerformancePackageLoadResult& packageLoad,
+    std::shared_ptr<const PackageV3FileOpenResult> package,
+    std::shared_ptr<const SecureBuffer> contentKey,
+    const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
+    const PerformancePackagePreparationTimings& priorTimings = {});
 } // namespace drs::engine

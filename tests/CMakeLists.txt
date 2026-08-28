@@ -4523,10 +4523,15 @@ juce_add_console_app(drs_performance_package_v3_production_export_tests
 target_sources(drs_performance_package_v3_production_export_tests
     PRIVATE src/PerformancePackageV3ProductionExportTests.cpp)
 target_link_libraries(drs_performance_package_v3_production_export_tests
-    PRIVATE drs_app_shared drs_engine_adapter drs_sampler_core drs_sample_import
-    PUBLIC juce::juce_audio_formats juce::juce_recommended_warning_flags
+    PRIVATE drs_plugin_shell drs_standalone_shell drs_app_shared drs_engine_adapter
+        drs_sampler_core drs_sample_import
+        juce::juce_audio_formats juce::juce_audio_processors_headless
+    PUBLIC juce::juce_recommended_warning_flags
 )
 target_compile_features(drs_performance_package_v3_production_export_tests PRIVATE cxx_std_17)
+if(MSVC)
+    target_link_options(drs_performance_package_v3_production_export_tests PRIVATE /STACK:8388608)
+endif()
 target_include_directories(drs_performance_package_v3_production_export_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/support
     ${CMAKE_SOURCE_DIR}/third_party/juce/modules)

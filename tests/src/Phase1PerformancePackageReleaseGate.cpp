@@ -15,6 +15,7 @@
 #include "shared/WorkspaceMenuPolicy.h"
 #include "standalone/MainComponent.h"
 #include "Phase1PerformancePackageSupport.h"
+#include "PerformancePackageExportSecurityTestSupport.h"
 #include "Sprint4OfflineRenderHarness.h"
 
 #include <juce_audio_processors_headless/juce_audio_processors_headless.h>
@@ -380,6 +381,7 @@ drs::app::PerformancePackageExportRequest buildFxRoutingParityRequest(
     request.projectId = request.project.projectId;
     request.baseRevision = 1;
     request.packagePath = (scratchDirectory / "fx-routing-parity.drpkg").generic_string();
+    request.securityContext = drs::tests::makePerformancePackageExportTestSecurityContext();
     return request;
 }
 
@@ -465,11 +467,16 @@ ordered_json buildFxRoutingParitySection(const fs::path& scratchDirectory)
     const auto exported = drs::app::executePerformancePackageExport(request);
     require(exported.exported,
             "FX/routing parity package export failed: " + summarizeIssues(exported.issues));
-    const auto package = drs::engine::loadPerformancePackageV2Metadata(request.packagePath);
+    drs::engine::PerformancePackageV3ActivationSecurityContext activationSecurity;
+    activationSecurity.compatibilityId = request.securityContext->compatibilityId;
+    activationSecurity.keyProvider = request.securityContext->keyProvider;
+    activationSecurity.trustStore = request.securityContext->trustStore;
+    const auto package = drs::engine::loadPerformancePackageV3Metadata(
+        request.packagePath, activationSecurity);
     require(package.loaded && package.package != nullptr,
             "FX/routing parity package metadata did not reopen: " + summarizeIssues(package.issues));
-    auto activation = drs::engine::preparePerformancePackageV2Activation(
-        package.metadata, package.package, package.sampleDescriptors);
+    auto activation = drs::engine::preparePerformancePackageV3Activation(
+        package.metadata, package.package, package.contentKey, package.sampleDescriptors);
     require(activation.prepared && activation.activationPayload != nullptr
                 && activation.activationPayload->snapshot != nullptr
                 && activation.renderModel != nullptr,
@@ -500,9 +507,8 @@ ordered_json buildFxRoutingParitySection(const fs::path& scratchDirectory)
     require(normalizedSourceModel.built && normalizedSourceModel.model != nullptr,
             "The source parity model could not apply the package performance options.");
 
-    const auto oldReader = drs::engine::loadPerformancePackageV2Metadata(
-        request.packagePath,
-        drs::engine::getDeterministicPackageCryptoProvider(),
+    const auto oldReader = drs::engine::loadPerformancePackageV3Metadata(
+        request.packagePath, activationSecurity,
         drs::engine::performancePackageLegacySchemaVersion);
     const auto oldReaderRejected = !oldReader.loaded
         && oldReader.metadata.failureCategory
@@ -630,25 +636,30 @@ ordered_json buildFxRoutingParitySection(const fs::path& scratchDirectory)
 
 ordered_json buildLicenseEvidenceSection(
     const fs::path& packagePath,
-    const drs::plugin::PerformancePackageExportResult& exportResult)
+    const drs::plugin::PerformancePackageExportResult& exportResult,
+    const std::shared_ptr<const drs::app::PerformancePackageExportSecurityContext>& security)
 {
-    const auto loaded = drs::engine::loadPerformancePackageV2Metadata(
-        packagePath.generic_string());
+    drs::engine::PerformancePackageV3ActivationSecurityContext activationSecurity;
+    activationSecurity.compatibilityId = security->compatibilityId;
+    activationSecurity.keyProvider = security->keyProvider;
+    activationSecurity.trustStore = security->trustStore;
+    const auto loaded = drs::engine::loadPerformancePackageV3Metadata(
+        packagePath.generic_string(), activationSecurity);
     require(loaded.loaded && loaded.package != nullptr,
             "The licensed release-gate package did not reopen.");
 
     const auto expectedBytes = package_support::buildLicenseTextFixture();
     const auto licenseRecordCount = std::count_if(
-        loaded.package->records.begin(), loaded.package->records.end(), [](const auto& record)
+        loaded.package->package.records.begin(), loaded.package->package.records.end(), [](const auto& record)
         {
-            return record.identity.kind == drs::engine::PackageV2RecordKind::licenseText;
+            return record.recordKind == "license-text";
         });
     const auto firstLicenseRecord = std::find_if(
-        loaded.package->records.begin(), loaded.package->records.end(), [](const auto& record)
+        loaded.package->package.records.begin(), loaded.package->package.records.end(), [](const auto& record)
         {
-            return record.identity.kind == drs::engine::PackageV2RecordKind::licenseText;
+            return record.recordKind == "license-text";
         });
-    require(firstLicenseRecord != loaded.package->records.end(),
+    require(firstLicenseRecord != loaded.package->package.records.end(),
             "The licensed release-gate package did not contain a license record.");
 
     const auto tamperedPath = packagePath.parent_path() / "release-gate-license-tampered.drpkg";
@@ -656,7 +667,7 @@ ordered_json buildLicenseEvidenceSection(
             "Could not copy the release-gate package for license corruption.");
     {
         std::fstream file(tamperedPath, std::ios::binary | std::ios::in | std::ios::out);
-        const auto offset = firstLicenseRecord->sealedOffsetBytes + 16u;
+        const auto offset = firstLicenseRecord->ciphertextOffset;
         file.seekg(static_cast<std::streamoff>(offset));
         char value = 0;
         file.read(&value, 1);
@@ -665,10 +676,10 @@ ordered_json buildLicenseEvidenceSection(
         file.write(&value, 1);
         require(file.good(), "Could not corrupt the authenticated license record.");
     }
-    const auto tampered = drs::engine::loadPerformancePackageV2Metadata(
-        tamperedPath.generic_string());
+    const auto tampered = drs::engine::loadPerformancePackageV3Metadata(
+        tamperedPath.generic_string(), activationSecurity);
     const auto corruptionRejected = !tampered.loaded
-        && package_support::containsIssue(tampered.issues, "authentication");
+        && tampered.failure == drs::engine::PerformancePackageV3ActivationFailure::signature;
 
     ordered_json section;
     section["declared"] = loaded.metadata.manifest.license.payloadId
@@ -687,7 +698,7 @@ ordered_json buildLicenseEvidenceSection(
         == drs::engine::performancePackageLegacySchemaVersion;
     section["corruptionRejected"] = corruptionRejected;
     section["corruptionFailureCategory"]
-        = drs::engine::toString(tampered.metadata.failureCategory);
+        = drs::engine::toString(tampered.failure);
     section["passed"] = section["declared"].get<bool>()
         && section["loaded"].get<bool>()
         && section["exactBytes"].get<bool>()
@@ -704,10 +715,22 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
 
     const auto exportedPackagePath = scratchDirectory / "release-gate-exported.drpkg";
     const auto packageFile = juce::File(juce::String::fromUTF8(exportedPackagePath.generic_string().c_str()));
+    const auto security = drs::tests::makePerformancePackageExportTestSecurityContext();
+    auto runtimeSecurity
+        = std::make_shared<drs::engine::PerformancePackageV3ActivationSecurityContext>();
+    runtimeSecurity->compatibilityId = security->compatibilityId;
+    runtimeSecurity->keyProvider = security->keyProvider;
+    runtimeSecurity->trustStore = security->trustStore;
 
     drs::standalone::MainComponent standalone(false);
     standalone.addToDesktop(0);
     standalone.setVisible(true);
+    require(standalone.getProcessor().getPerformancePackageExportService()
+                .setSecurityContext(security),
+            "Release gate standalone shell requires test-only V3 security provisioning.");
+    require(standalone.getProcessor().setPerformancePackageActivationSecurityContext(
+                runtimeSecurity),
+            "Release gate standalone shell requires test-only V3 reader provisioning.");
     require(standalone.getProcessor().replaceAuthoringProject(
                 buildLicensedAuthoringProjectFixture(scratchDirectory / "licensed-content")),
             "Release gate standalone shell should accept the authoring export fixture.");
@@ -720,7 +743,7 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
             "Release gate package export should succeed. state="
                 + exportResult.state + " issues=" + summarizeIssues(exportResult.issues));
     const auto licenseEvidence = buildLicenseEvidenceSection(
-        exportedPackagePath, exportResult);
+        exportedPackagePath, exportResult, security);
 
     const auto standaloneOpenStarted = Clock::now();
     const auto standaloneLoad = standalone.getProcessor().loadPerformancePackageWorkspace(packageFile);
@@ -746,6 +769,8 @@ ordered_json buildReopenAndUxSection(const fs::path& scratchDirectory)
         && hasEmptyProjectBindingAndPackageBinding(standalone.exportStateJson());
 
     drs::plugin::Processor processor;
+    require(processor.setPerformancePackageActivationSecurityContext(runtimeSecurity),
+            "Release gate plugin requires test-only V3 security provisioning.");
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     require(editor != nullptr, "Release gate plugin editor should construct.");
     editor->addToDesktop(0);

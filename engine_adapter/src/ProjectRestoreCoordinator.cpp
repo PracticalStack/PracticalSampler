@@ -338,6 +338,31 @@ void ProjectRestoreCoordinator::processRequest(const PendingRequest& pending)
                 activation.issues = metadata.issues;
             }
         }
+        else if (dispatch.format == PerformancePackageDiskFormat::version3)
+        {
+            const auto security = options.v3SecurityContextProvider
+                ? options.v3SecurityContextProvider() : nullptr;
+            if (security != nullptr)
+            {
+                const auto metadata = loadPerformancePackageV3Metadata(packagePath, *security);
+                if (metadata.loaded)
+                {
+                    activation = preparePerformancePackageV3Activation(
+                        metadata.metadata, metadata.package, metadata.contentKey,
+                        metadata.sampleDescriptors);
+                }
+                else
+                {
+                    activation.state = metadata.state;
+                    activation.issues = metadata.issues;
+                }
+            }
+            else
+            {
+                activation.state = "Performance package V3 activation rejected";
+                activation.issues = { "V3 activation rejected [configuration]." };
+            }
+        }
         else if (dispatch.opened)
         {
             const auto package = loadPerformancePackage(packagePath);

@@ -168,12 +168,12 @@
       <div class="heading"><h2>Reviewed Baseline</h2></div>
       <p>The cryptographic primitives are useful, but the current implementation is not yet a protected package product path.</p>
       <div class="callout warning">
-        <strong>Current boundary:</strong> normal exports now require an injected release-key provider, controlled publisher signer, and immutable trust store, then emit only a verified signed V3 package. Missing production provisioning fails closed without a V1/V2 fallback. The V3 activation/open path remains CPCA-5 scope.
+        <strong>Current boundary:</strong> normal exports emit only verified signed V3, and every product activation entry point now requires a runtime decrypt-key provider plus immutable publisher trust. Missing production provisioning fails closed without a V1/V2 fallback or replacement of last-known-good playback.
       </div>
       <ul>
         <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, versioned release-key policy/provider, immutable publisher trust store, isolated controlled signer, move-only zeroized secret buffers, semantic SHA-256, and focused negative tests.</li>
-        <li>Missing: production key/service provisioning and named owners, V3 product activation/load integration, complete hostile-input qualification, and independent review.</li>
-        <li>Current validation: the eight focused crypto, V3 reader/writer, production-export, signing, release-gate, and key-lifecycle tests pass. The legacy <code>drs.performance_package.export_lifecycle</code> suite now reaches its obsolete V2 metadata-reader expectation and is assigned to CPCA-5; the pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains tracked for CPCA-7.</li>
+        <li>Missing: production key/service provisioning and named owners, complete hostile-input/performance qualification, and independent review.</li>
+        <li>Current validation: the focused crypto, V3 reader/writer/export/activation, export-lifecycle, release-gate, and unchanged V1/V2 compatibility matrix passes. The pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains tracked for CPCA-7.</li>
       </ul>
     </section>
 
@@ -191,7 +191,7 @@
             <tr><td class="id">CPCA-2</td><td>Bounded file-backed verification/decryption</td><td>CPCA-1</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">Provisioning required</span></td></tr>
             <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status blocked">Provisioning required</span></td></tr>
-            <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status ready">Ready</span></td></tr>
             <tr><td class="id">CPCA-7</td><td>Green suite and irreversible production cutover</td><td>CPCA-4 through CPCA-6</td><td><span class="status blocked">Gate blocked</span></td></tr>
             <tr><td class="id">CPCA-8</td><td>Independent approval and release sign-off</td><td>CPCA-7</td><td><span class="status blocked">External review</span></td></tr>
@@ -297,31 +297,32 @@
         </div>
         <div class="files">Primary code: <code>PerformancePackageExportService.cpp</code>, V3 streaming writer, compiler/sanitizer, export lifecycle tests.</div>
         <div class="callout decision"><strong>Implementation evidence:</strong> <code>drs.package_v3.streaming_export</code> and <code>drs.performance_package.v3_production_export</code> prove bounded record-at-a-time AEAD, fresh keys/nonces, stable semantic digests, protected-plaintext scans, file-backed controlled signing, staged signature/selected-record verification, cancellation cleanup, last-published-file preservation, asynchronous workflow injection, and fail-closed behavior with no deterministic/V2 writer reference in the production export service. The focused eight-test security/export matrix passes.</div>
-        <div class="exit"><h3>Exit gate</h3><p><strong>Engineering implementation complete; production provisioning required.</strong> Once CPCA-3 supplies the real active release-key provider, signing service, public trust entry, owners, and audited credentials, the normal Export Playable Instrument workflow produces a verified signed V3 file and never invokes the deterministic provider. Without those dependencies it publishes nothing. V3 activation is intentionally deferred to CPCA-5.</p></div>
+        <div class="exit"><h3>Exit gate</h3><p><strong>Engineering implementation complete; production provisioning required.</strong> Once CPCA-3 supplies the real active release-key provider, signing service, public trust entry, owners, and audited credentials, the normal Export Playable Instrument workflow produces a verified signed V3 file and never invokes the deterministic provider. Without those dependencies it publishes nothing. The resulting V3 file is consumed by the authenticated CPCA-5 activation path.</p></div>
       </div>
     </section>
 
     <section class="workstream" id="step-5">
-      <div class="work-head"><div class="work-number">5</div><h2>Integrate V3 Product Activation</h2><span class="status ready">Ready</span></div>
+      <div class="work-head"><div class="work-number">5</div><h2>Integrate V3 Product Activation</h2><span class="status complete">Complete</span></div>
       <div class="work-body">
         <p class="work-intent">Carry authenticated V3 content through every open, restore, replacement, and playback path.</p>
         <div class="grid-2">
-          <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Add key-aware V3 metadata loading and activation preparation.</li>
-            <li>Integrate plugin, standalone, host restore, package replacement, license/artwork, and first-play flows.</li>
-            <li>Preserve V1/V2 as explicitly classified, bounded, read-only legacy paths with no rewrite-on-open.</li>
-            <li>Keep the active generation when replacement signature, key, compatibility, or AEAD checks fail.</li>
-            <li>Emit stable, redacted failure categories without package-controlled strings or secret material.</li>
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-5-T1</span> Add key-aware V3 metadata loading and activation preparation.</li>
+            <li class="done"><span class="task-id">CPCA-5-T2</span> Integrate plugin, standalone, host restore, package replacement, license/artwork, and first-play flows.</li>
+            <li class="done"><span class="task-id">CPCA-5-T3</span> Preserve V1/V2 as explicitly classified, bounded, read-only legacy paths with no rewrite-on-open.</li>
+            <li class="done"><span class="task-id">CPCA-5-T4</span> Keep the active generation when replacement signature, key, compatibility, or AEAD checks fail.</li>
+            <li class="done"><span class="task-id">CPCA-5-T5</span> Emit stable, redacted failure categories without package-controlled strings or secret material.</li>
           </ul></article>
-          <article class="panel"><h3>Validation</h3><ul>
-            <li>Open V3 through standalone, plugin, replacement, and host state restore.</li>
-            <li>Verify read-only behavior, published controls, preset overrides, artwork, license, and page streaming.</li>
-            <li>Inject every failure category during replacement and prove last-known-good playback remains active.</li>
-            <li>Run the complete unchanged V1/V2 compatibility corpus.</li>
+          <article class="panel"><h3>Validation</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-5-V1</span> Open V3 through standalone, plugin, replacement, and host state restore.</li>
+            <li class="done"><span class="task-id">CPCA-5-V2</span> Verify read-only behavior, published controls, preset/host-state continuity, artwork, license, first-play heads, and page streaming.</li>
+            <li class="done"><span class="task-id">CPCA-5-V3</span> Inject configuration, format, signature, key, compatibility, AEAD/envelope, authenticated-corruption, and I/O failures and prove last-known-good playback remains active.</li>
+            <li class="done"><span class="task-id">CPCA-5-V4</span> Run the unchanged V1/V2 compatibility corpus and the migrated production export lifecycle.</li>
           </ul></article>
         </div>
-        <div class="files">Primary code: <code>PluginProcessor.cpp</code>, <code>ProjectRestoreCoordinator.cpp</code>, V3 metadata/activation services, standalone shell.</div>
-        <div class="exit"><h3>Exit gate</h3><p>All supported product entry points activate authenticated V3 packages; security failures cannot publish plaintext or replace valid playback.</p></div>
+        <div class="files">Primary code: <code>PackageReaderDispatch.*</code>, <code>SampleDataSource.*</code>, <code>EngineFacade.cpp</code>, <code>PluginProcessor.cpp</code>, <code>ProjectRestoreCoordinator.cpp</code>, standalone shell, production-export and release-gate tests.</div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> signature-first V3 metadata reconstruction enforces aggregate bounds, product compatibility, release-key resolution, envelope/record authentication, identity agreement, and license validation before activation. A retained zeroizing content key services authenticated sample heads before publication and sample pages only on the existing background worker. <code>drs.performance_package.v3_production_export</code> covers plugin, standalone, failed replacement, host restore, artwork/license, page streaming, and all redacted failure categories; <code>drs.performance_package.export_lifecycle</code>, <code>drs.phase1.performance_package_release_gate</code>, and the V1/V2 compatibility matrix pass.</div>
+        <div class="exit"><h3>Exit gate</h3><p><strong>Complete in the provisioned test configuration.</strong> All supported product entry points activate authenticated V3 packages; security failures cannot publish unauthenticated plaintext or replace valid playback. Release deployment still depends on the real CPCA-3 runtime key provider and public trust provisioning.</p></div>
       </div>
     </section>
 

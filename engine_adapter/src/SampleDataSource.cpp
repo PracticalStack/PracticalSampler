@@ -1094,6 +1094,40 @@ PackagePagedSampleDataSource::PackagePagedSampleDataSource(
     }
 }
 
+PackagePagedSampleDataSource::PackagePagedSampleDataSource(
+    SampleDataSourceDescriptor descriptor,
+    std::shared_ptr<const PackageV3FileOpenResult> package,
+    std::shared_ptr<const SecureBuffer> contentKey)
+    : sourceDescriptor(std::move(descriptor)),
+      retainedV3Package(std::move(package)),
+      retainedV3ContentKey(std::move(contentKey))
+{
+    if (sourceDescriptor.kind != SampleDataSourceKind::packageRecord
+        || ! validateSampleDataSourceDescriptor(sourceDescriptor).valid
+        || retainedV3Package == nullptr || ! retainedV3Package->opened
+        || retainedV3ContentKey == nullptr
+        || retainedV3ContentKey->size() != securePackageKeySizeBytes)
+    {
+        failureState = "Package V3 paged source requires authenticated package state";
+        return;
+    }
+    const auto decodedBytesPerFrame = static_cast<std::uint64_t>(
+        sourceDescriptor.channelCount) * sizeof(float);
+    configuredHeadFrames = std::min<std::uint64_t>(
+        sourceDescriptor.frameCount,
+        std::max<std::uint64_t>(1, sourceDescriptor.headSizeBytes / decodedBytesPerFrame));
+    configuredPageFrames = std::max<std::uint64_t>(
+        1, sourceDescriptor.pageSizeBytes / decodedBytesPerFrame);
+    const auto remaining = sourceDescriptor.frameCount - configuredHeadFrames;
+    configuredPageCount = remaining == 0 ? 0 : 1 + (remaining - 1) / configuredPageFrames;
+    if (configuredPageCount != 0)
+    {
+        pageSlots = std::make_unique<std::atomic<PageStorage*>[]>(configuredPageCount);
+        for (std::uint64_t index = 0; index < configuredPageCount; ++index)
+            pageSlots[index].store(nullptr, std::memory_order_relaxed);
+    }
+}
+
 PackagePagedSampleDataSource::~PackagePagedSampleDataSource() = default;
 
 bool PackagePagedSampleDataSource::prepareHead(
@@ -1112,8 +1146,10 @@ bool PackagePagedSampleDataSource::prepareRecord(
     const bool head, const std::uint64_t pageIndex,
     const std::function<bool()>& cancellationProbe)
 {
+    const auto hasV2 = retainedPackage != nullptr && cryptoProvider != nullptr;
+    const auto hasV3 = retainedV3Package != nullptr && retainedV3ContentKey != nullptr;
     if (configuredHeadFrames == 0 || (!head && pageIndex >= configuredPageCount)
-        || retainedPackage == nullptr || cryptoProvider == nullptr)
+        || (! hasV2 && ! hasV3))
     {
         failureState = "Package page request is outside the source descriptor";
         return false;
@@ -1123,25 +1159,64 @@ bool PackagePagedSampleDataSource::prepareRecord(
     if (existing != nullptr)
         return true;
 
-    const PackageV2RecordIdentity identity {
-        sourceDescriptor.sourceId,
-        head ? PackageV2RecordKind::sampleHead : PackageV2RecordKind::samplePage,
-        head ? 0 : pageIndex,
-        sourceDescriptor.generation
-    };
-    auto opened = openPackageV2Record(*retainedPackage, identity,
-                                      *cryptoProvider, cancellationProbe);
-    sealedReadBytes.fetch_add(opened.metrics.bytesRead, std::memory_order_relaxed);
-    if (!opened.opened)
+    std::vector<std::uint8_t> plaintext;
+    if (hasV2)
     {
-        authenticationFailures.fetch_add(opened.metrics.authenticationFailures,
-                                         std::memory_order_relaxed);
-        checksumFailures.fetch_add(opened.metrics.checksumFailures, std::memory_order_relaxed);
-        cancellations.fetch_add(opened.metrics.cancellationCount, std::memory_order_relaxed);
-        failureState = opened.state;
-        if (!opened.issues.empty())
-            failureState += ": " + opened.issues.front();
-        return false;
+        const PackageV2RecordIdentity identity {
+            sourceDescriptor.sourceId,
+            head ? PackageV2RecordKind::sampleHead : PackageV2RecordKind::samplePage,
+            head ? 0 : pageIndex,
+            sourceDescriptor.generation
+        };
+        auto opened = openPackageV2Record(*retainedPackage, identity,
+                                          *cryptoProvider, cancellationProbe);
+        sealedReadBytes.fetch_add(opened.metrics.bytesRead, std::memory_order_relaxed);
+        if (! opened.opened)
+        {
+            authenticationFailures.fetch_add(opened.metrics.authenticationFailures,
+                                             std::memory_order_relaxed);
+            checksumFailures.fetch_add(opened.metrics.checksumFailures,
+                                       std::memory_order_relaxed);
+            cancellations.fetch_add(opened.metrics.cancellationCount,
+                                    std::memory_order_relaxed);
+            failureState = opened.state;
+            if (! opened.issues.empty()) failureState += ": " + opened.issues.front();
+            return false;
+        }
+        plaintext = std::move(opened.plaintextBytes);
+    }
+    else
+    {
+        if (cancellationProbe && cancellationProbe())
+        {
+            cancellations.fetch_add(1, std::memory_order_relaxed);
+            failureState = "Package V3 page request canceled";
+            return false;
+        }
+        const auto record = std::find_if(
+            retainedV3Package->package.records.begin(), retainedV3Package->package.records.end(),
+            [&](const auto& candidate)
+            {
+                return candidate.recordId == sourceDescriptor.sourceId
+                    && candidate.recordKind == (head ? "sample-head" : "sample-page")
+                    && candidate.pageIndex == (head ? 0 : pageIndex)
+                    && candidate.generation == sourceDescriptor.generation;
+            });
+        if (record == retainedV3Package->package.records.end())
+        {
+            failureState = "Package V3 sample record is missing";
+            return false;
+        }
+        auto opened = openPackageV3FileRecord(
+            *retainedV3Package, *retainedV3ContentKey, *record);
+        sealedReadBytes.fetch_add(opened.ciphertextBytesRead, std::memory_order_relaxed);
+        if (! opened.opened)
+        {
+            authenticationFailures.fetch_add(1, std::memory_order_relaxed);
+            failureState = "Package V3 sample authentication failed";
+            return false;
+        }
+        plaintext = std::move(opened.plaintext);
     }
     openedRecords.fetch_add(1, std::memory_order_relaxed);
     const auto firstFrame = head ? 0 : configuredHeadFrames + pageIndex * configuredPageFrames;
@@ -1149,7 +1224,7 @@ bool PackagePagedSampleDataSource::prepareRecord(
         head ? configuredHeadFrames : configuredPageFrames,
         sourceDescriptor.frameCount - firstFrame);
     const auto expectedBytes = frameCount * sourceDescriptor.channelCount * sizeof(float);
-    if (opened.plaintextBytes.size() != expectedBytes
+    if (plaintext.size() != expectedBytes
         || frameCount > std::numeric_limits<std::uint32_t>::max())
     {
         failureState = "Package sample record size does not match its frame mapping";
@@ -1168,7 +1243,7 @@ bool PackagePagedSampleDataSource::prepareRecord(
         float sample = 0.0f;
         const auto offset = (static_cast<std::size_t>(frame) * sourceDescriptor.channelCount
                              + channel) * sizeof(float);
-        std::memcpy(&sample, opened.plaintextBytes.data() + offset, sizeof(float));
+        std::memcpy(&sample, plaintext.data() + offset, sizeof(float));
         storage->channels[channel][frame] = sample;
     }
     auto* published = storage.get();

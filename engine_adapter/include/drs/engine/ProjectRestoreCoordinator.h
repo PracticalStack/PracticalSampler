@@ -17,6 +17,7 @@
 namespace drs::engine
 {
 struct PreparedPerformancePackageActivationResult;
+struct PerformancePackageV3ActivationSecurityContext;
 enum class ProjectRestoreState
 {
     idle,
@@ -82,6 +83,8 @@ struct ProjectRestoreCoordinatorOptions
 {
     std::size_t maximumSiblingEntries = 128;
     std::function<void(std::uint64_t, ProjectRestoreState)> stageObserver;
+    std::function<std::shared_ptr<const PerformancePackageV3ActivationSecurityContext>()>
+        v3SecurityContextProvider;
 };
 
 class ProjectRestoreCoordinator

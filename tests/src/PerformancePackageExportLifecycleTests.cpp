@@ -134,6 +134,54 @@ void writePackageV2Variant(
     require(written.written, "The mutated package-v2 integrity fixture must be writable.");
 }
 
+void writeLegacyV2CompatibilityFixtureFromV3(
+    const fs::path& sourcePath,
+    const fs::path& outputPath,
+    const std::shared_ptr<const drs::app::PerformancePackageExportSecurityContext>& security)
+{
+    require(security != nullptr && security->valid(),
+            "The V2 compatibility fixture requires test-only V3 credentials.");
+    drs::engine::PerformancePackageV3ActivationSecurityContext activationSecurity;
+    activationSecurity.compatibilityId = security->compatibilityId;
+    activationSecurity.keyProvider = security->keyProvider;
+    activationSecurity.trustStore = security->trustStore;
+    const auto source = drs::engine::loadPerformancePackageV3Metadata(
+        sourcePath.generic_string(), activationSecurity);
+    require(source.loaded && source.package != nullptr && source.contentKey != nullptr,
+            "The production V3 source must authenticate before deriving a legacy corpus fixture.");
+
+    const auto mapKind = [](const std::string& kind)
+    {
+        using Kind = drs::engine::PackageV2RecordKind;
+        if (kind == "manifest") return Kind::manifest;
+        if (kind == "runtime-instrument") return Kind::runtimeInstrument;
+        if (kind == "stream-index") return Kind::streamIndex;
+        if (kind == "sample-head") return Kind::sampleHead;
+        if (kind == "sample-page") return Kind::samplePage;
+        if (kind == "background-image") return Kind::backgroundImage;
+        if (kind == "license-text") return Kind::licenseText;
+        throw std::runtime_error("The V3 fixture contains an unmapped record kind.");
+    };
+
+    drs::engine::PackageV2WritePlan plan;
+    plan.packageId = source.package->package.packageId;
+    plan.outputPath = outputPath.generic_string();
+    for (const auto& descriptor : source.package->package.records)
+    {
+        const auto record = drs::engine::openPackageV3FileRecord(
+            *source.package, *source.contentKey, descriptor);
+        require(record.opened,
+                "Every V3 record must authenticate before test-only legacy conversion.");
+        drs::engine::PackageV2RecordSource legacy;
+        legacy.identity = { descriptor.recordId, mapKind(descriptor.recordKind),
+                            descriptor.pageIndex, descriptor.generation };
+        legacy.plaintextBytes = record.plaintext;
+        plan.records.push_back(std::move(legacy));
+    }
+    require(drs::engine::writePackageV2(plan).written,
+            "The explicit read-only V2 compatibility corpus fixture must be writable.");
+}
+
 drs::app::PerformancePackageExportRequest makeRequest(const fs::path& outputPackagePath)
 {
     drs::app::PerformancePackageExportRequest request;
@@ -474,9 +522,21 @@ int main()
         completionService.shutdown();
 
         const auto completedPackage = (tempRoot / "completed.drpkg").generic_string();
-        const auto packageV2 = drs::engine::loadPerformancePackageV2Metadata(completedPackage);
+        drs::engine::PerformancePackageV3ActivationSecurityContext completedSecurity;
+        completedSecurity.compatibilityId = completedRequest.securityContext->compatibilityId;
+        completedSecurity.keyProvider = completedRequest.securityContext->keyProvider;
+        completedSecurity.trustStore = completedRequest.securityContext->trustStore;
+        const auto productionV3 = drs::engine::loadPerformancePackageV3Metadata(
+            completedPackage, completedSecurity);
+        require(productionV3.loaded,
+                "The exported semantic package must reopen through the authenticated V3 metadata path.");
+        const auto legacyV2BasePath = tempRoot / "legacy-v2-compatibility-base.drpkg";
+        writeLegacyV2CompatibilityFixtureFromV3(
+            completedPackage, legacyV2BasePath, completedRequest.securityContext);
+        const auto packageV2 = drs::engine::loadPerformancePackageV2Metadata(
+            legacyV2BasePath.generic_string());
         require(packageV2.loaded && packageV2.package != nullptr,
-                "The exported semantic package must reopen through the package-v2 metadata path.");
+                "The explicit legacy corpus fixture must reopen through the package-v2 metadata path.");
         require(packageV2.metadata.manifest.notes
                     == std::vector<std::string> { currentPackageIdentityNote }
                     && packageV2.metadata.instrument.instrument.validationNotes
@@ -492,7 +552,7 @@ int main()
 
         const auto legacyIdentityPackagePath = tempRoot / "legacy-identity-note.drpkg";
         auto legacyIdentityInjected = false;
-        writePackageV2Variant(tempRoot / "completed.drpkg", legacyIdentityPackagePath,
+        writePackageV2Variant(legacyV2BasePath, legacyIdentityPackagePath,
                               [&](auto& records)
                               {
                                   for (auto& record : records)
@@ -562,8 +622,12 @@ int main()
         const auto noLicenseExport = executePerformancePackageExport(noLicenseRequest);
         require(noLicenseExport.exported,
                 "A project without LICENSE.txt must remain export-compatible.");
-        const auto noLicensePackage = drs::engine::loadPerformancePackageV2Metadata(
-            noLicenseRequest.packagePath);
+        drs::engine::PerformancePackageV3ActivationSecurityContext noLicenseSecurity;
+        noLicenseSecurity.compatibilityId = noLicenseRequest.securityContext->compatibilityId;
+        noLicenseSecurity.keyProvider = noLicenseRequest.securityContext->keyProvider;
+        noLicenseSecurity.trustStore = noLicenseRequest.securityContext->trustStore;
+        const auto noLicensePackage = drs::engine::loadPerformancePackageV3Metadata(
+            noLicenseRequest.packagePath, noLicenseSecurity);
         require(noLicensePackage.loaded
                     && noLicensePackage.metadata.manifest.license.payloadId.empty()
                     && !noLicensePackage.metadata.licenseText.loaded,
@@ -583,7 +647,7 @@ int main()
                 "Export must reject invalid authored license bytes without publishing a package.");
 
         const auto missingLicensePath = tempRoot / "missing-declared-license.drpkg";
-        writePackageV2Variant(tempRoot / "completed.drpkg", missingLicensePath,
+        writePackageV2Variant(legacyV2BasePath, missingLicensePath,
                               [](auto& records)
                               {
                                   records.erase(
@@ -601,7 +665,7 @@ int main()
                 "A declared missing package-v2 license must fail closed.");
 
         const auto wrongKindLicensePath = tempRoot / "wrong-kind-license.drpkg";
-        writePackageV2Variant(tempRoot / "completed.drpkg", wrongKindLicensePath,
+        writePackageV2Variant(legacyV2BasePath, wrongKindLicensePath,
                               [](auto& records)
                               {
                                   for (auto& record : records)
@@ -617,7 +681,7 @@ int main()
                 "A declared package-v2 license with the wrong record kind must fail closed.");
 
         const auto invalidUtf8LicensePath = tempRoot / "invalid-utf8-license.drpkg";
-        writePackageV2Variant(tempRoot / "completed.drpkg", invalidUtf8LicensePath,
+        writePackageV2Variant(legacyV2BasePath, invalidUtf8LicensePath,
                               [](auto& records)
                               {
                                   auto firstLicense = true;
@@ -645,7 +709,7 @@ int main()
                 "Authenticated package-v2 license bytes must still pass UTF-8 validation.");
 
         const auto oversizedLicensePath = tempRoot / "oversized-license.drpkg";
-        writePackageV2Variant(tempRoot / "completed.drpkg", oversizedLicensePath,
+        writePackageV2Variant(legacyV2BasePath, oversizedLicensePath,
                               [](auto& records)
                               {
                                   records.erase(
@@ -682,7 +746,7 @@ int main()
                 "A declared package-v2 license larger than 1 MiB must fail before activation.");
 
         const auto tamperedLicensePath = tempRoot / "tampered-license.drpkg";
-        require(fs::copy_file(tempRoot / "completed.drpkg", tamperedLicensePath,
+        require(fs::copy_file(legacyV2BasePath, tamperedLicensePath,
                               fs::copy_options::overwrite_existing),
                 "The license authentication fixture must copy the valid package.");
         const auto firstLicenseRecord = std::find_if(
@@ -816,8 +880,12 @@ int main()
         const auto targetOnlyExport = executePerformancePackageExport(targetOnlyRequest);
         require(targetOnlyExport.exported,
                 "A target-only Instrument macro must not block playable package export.");
-        const auto targetOnlyPackage = drs::engine::loadPerformancePackageV2Metadata(
-            (tempRoot / "completed-macro-target.drpkg").generic_string());
+        drs::engine::PerformancePackageV3ActivationSecurityContext targetOnlySecurity;
+        targetOnlySecurity.compatibilityId = targetOnlyRequest.securityContext->compatibilityId;
+        targetOnlySecurity.keyProvider = targetOnlyRequest.securityContext->keyProvider;
+        targetOnlySecurity.trustStore = targetOnlyRequest.securityContext->trustStore;
+        const auto targetOnlyPackage = drs::engine::loadPerformancePackageV3Metadata(
+            (tempRoot / "completed-macro-target.drpkg").generic_string(), targetOnlySecurity);
         require(targetOnlyPackage.loaded
                     && targetOnlyPackage.metadata.manifest.schemaVersion
                         == drs::engine::performancePackageFxRoutingSchemaVersion
@@ -829,8 +897,8 @@ int main()
                     && targetOnlyPackage.metadata.instrument.instrument.groups.front().routingBusId
                         == "master",
                 "Target-only macro export must promote compatibility and retain mappings without inventing FX slots.");
-        auto targetOnlyActivation = drs::engine::preparePerformancePackageV2Activation(
-            targetOnlyPackage.metadata, targetOnlyPackage.package,
+        auto targetOnlyActivation = drs::engine::preparePerformancePackageV3Activation(
+            targetOnlyPackage.metadata, targetOnlyPackage.package, targetOnlyPackage.contentKey,
             targetOnlyPackage.sampleDescriptors);
         require(targetOnlyActivation.prepared
                     && facade.activatePreparedPerformancePackageSession(
@@ -864,8 +932,12 @@ int main()
         const auto graphExport = executePerformancePackageExport(graphRequest);
         require(graphExport.exported,
                 "An authored FX/routing graph must export through the shared production path.");
-        const auto graphPackage = drs::engine::loadPerformancePackageV2Metadata(
-            (tempRoot / "completed-fx-routing.drpkg").generic_string());
+        drs::engine::PerformancePackageV3ActivationSecurityContext graphSecurity;
+        graphSecurity.compatibilityId = graphRequest.securityContext->compatibilityId;
+        graphSecurity.keyProvider = graphRequest.securityContext->keyProvider;
+        graphSecurity.trustStore = graphRequest.securityContext->trustStore;
+        const auto graphPackage = drs::engine::loadPerformancePackageV3Metadata(
+            (tempRoot / "completed-fx-routing.drpkg").generic_string(), graphSecurity);
         require(graphPackage.loaded
                     && graphPackage.metadata.manifest.schemaVersion
                         == drs::engine::performancePackageFxRoutingSchemaVersion
@@ -899,8 +971,9 @@ int main()
                     && graphInstrument.macros.front().targets.at(1).destinationMaximum == 12.0,
                 "Graph-bearing export must preserve generic and structured macro target mappings.");
 
-        auto graphActivation = drs::engine::preparePerformancePackageV2Activation(
-            graphPackage.metadata, graphPackage.package, graphPackage.sampleDescriptors);
+        auto graphActivation = drs::engine::preparePerformancePackageV3Activation(
+            graphPackage.metadata, graphPackage.package, graphPackage.contentKey,
+            graphPackage.sampleDescriptors);
         require(graphActivation.prepared
                     && graphActivation.activationPayload != nullptr
                     && graphActivation.activationPayload->snapshot != nullptr
@@ -962,11 +1035,14 @@ int main()
         auto malformedMetadata = graphPackage.metadata;
         malformedMetadata.instrument.instrument.routingBuses.front().fxSlotIds.push_back(
             "missing-slot");
-        auto malformedActivation = drs::engine::preparePerformancePackageV2Activation(
-            malformedMetadata, graphPackage.package, graphPackage.sampleDescriptors);
+        auto malformedActivation = drs::engine::preparePerformancePackageV3Activation(
+            malformedMetadata, graphPackage.package, graphPackage.contentKey,
+            graphPackage.sampleDescriptors);
         require(!malformedActivation.prepared
-                    && containsIssue(malformedActivation.issues, "unknown FX slot"),
-                "Malformed package graphs must fail before activation payload publication.");
+                    && malformedActivation.issues
+                        == std::vector<std::string> {
+                            "V3 activation rejected [corruption]." },
+                "Malformed package graphs must fail with a redacted category before publication.");
         const auto rejectedReplacement = facade.activatePreparedPerformancePackageSession(
             std::move(malformedActivation));
         require(!rejectedReplacement.activated
@@ -975,8 +1051,8 @@ int main()
                     && facade.getPerformancePackageLicenseText() == activeGraphLicense,
                 "A malformed replacement package must preserve the active generation and license.");
 
-        auto noLicenseActivation = drs::engine::preparePerformancePackageV2Activation(
-            noLicensePackage.metadata, noLicensePackage.package,
+        auto noLicenseActivation = drs::engine::preparePerformancePackageV3Activation(
+            noLicensePackage.metadata, noLicensePackage.package, noLicensePackage.contentKey,
             noLicensePackage.sampleDescriptors);
         require(noLicenseActivation.prepared
                     && facade.activatePreparedPerformancePackageSession(
@@ -1004,8 +1080,12 @@ int main()
                 "A FLAC-backed instrument must export as a playable package.");
         flacService.shutdown();
 
-        const auto flacPackage = drs::engine::loadPerformancePackageV2Metadata(
-            (tempRoot / "completed-flac.drpkg").generic_string());
+        drs::engine::PerformancePackageV3ActivationSecurityContext flacSecurity;
+        flacSecurity.compatibilityId = flacRequest.securityContext->compatibilityId;
+        flacSecurity.keyProvider = flacRequest.securityContext->keyProvider;
+        flacSecurity.trustStore = flacRequest.securityContext->trustStore;
+        const auto flacPackage = drs::engine::loadPerformancePackageV3Metadata(
+            (tempRoot / "completed-flac.drpkg").generic_string(), flacSecurity);
         require(flacPackage.loaded
                     && flacPackage.package != nullptr
                     && flacPackage.metadata.stream.loaded
@@ -1027,8 +1107,9 @@ int main()
                     && flacPackage.metadata.instrument.instrument.instrumentControls.front().id
                         == "imported-mixer-cc20",
                 "Playable-package projection must retain imported controls, targets, and MIDI CC bindings.");
-        auto flacActivation = drs::engine::preparePerformancePackageV2Activation(
-            flacPackage.metadata, flacPackage.package, flacPackage.sampleDescriptors);
+        auto flacActivation = drs::engine::preparePerformancePackageV3Activation(
+            flacPackage.metadata, flacPackage.package, flacPackage.contentKey,
+            flacPackage.sampleDescriptors);
         require(flacActivation.prepared && flacActivation.renderModel != nullptr
                     && flacActivation.activationPayload != nullptr
                     && flacActivation.activationPayload->snapshot != nullptr

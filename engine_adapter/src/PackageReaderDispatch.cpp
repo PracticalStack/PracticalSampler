@@ -308,4 +308,302 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     result.state = result.metadata.state;
     return result;
 }
+
+const char* toString(const PerformancePackageV3ActivationFailure failure) noexcept
+{
+    switch (failure)
+    {
+        case PerformancePackageV3ActivationFailure::none: return "none";
+        case PerformancePackageV3ActivationFailure::configuration: return "configuration";
+        case PerformancePackageV3ActivationFailure::format: return "format";
+        case PerformancePackageV3ActivationFailure::signature: return "signature";
+        case PerformancePackageV3ActivationFailure::keyUnavailable: return "key-unavailable";
+        case PerformancePackageV3ActivationFailure::compatibility: return "compatibility";
+        case PerformancePackageV3ActivationFailure::authentication: return "authentication";
+        case PerformancePackageV3ActivationFailure::corruption: return "corruption";
+        case PerformancePackageV3ActivationFailure::io: return "io";
+    }
+    return "format";
+}
+
+PerformancePackageV3MetadataLoadResult loadPerformancePackageV3Metadata(
+    const std::string& packagePath,
+    const PerformancePackageV3ActivationSecurityContext& securityContext,
+    const int supportedReaderSchemaVersion)
+{
+    namespace fs = std::filesystem;
+    constexpr std::uint64_t maximumMetadataBytes = 16ull * 1024ull * 1024ull;
+    constexpr std::uint64_t maximumBackgroundImageBytes = 16ull * 1024ull * 1024ull;
+    PerformancePackageV3MetadataLoadResult result;
+    result.state = "Performance package V3 activation rejected";
+    const auto reject = [&](const PerformancePackageV3ActivationFailure failure,
+                            const PerformancePackageFailureCategory metadataFailure
+                                = PerformancePackageFailureCategory::payloadCorruption)
+    {
+        result.failure = failure;
+        result.metadata.failureCategory = metadataFailure;
+        result.metadata.state = result.state;
+        result.issues = { std::string("V3 activation rejected [") + toString(failure) + "]." };
+        result.metadata.issues = result.issues;
+        return false;
+    };
+
+    if (! securityContext.valid())
+    {
+        reject(PerformancePackageV3ActivationFailure::configuration,
+               PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        return result;
+    }
+    std::error_code fileError;
+    if (! fs::is_regular_file(fs::path(packagePath), fileError) || fileError)
+    {
+        reject(PerformancePackageV3ActivationFailure::io);
+        return result;
+    }
+
+    auto opened = std::make_shared<PackageV3FileOpenResult>(
+        openPackageV3File(packagePath, *securityContext.trustStore));
+    if (! opened->opened)
+    {
+        reject(opened->package.opened
+                   ? PerformancePackageV3ActivationFailure::signature
+                   : PerformancePackageV3ActivationFailure::format);
+        return result;
+    }
+    if (opened->package.compatibilityId != securityContext.compatibilityId)
+    {
+        reject(PerformancePackageV3ActivationFailure::compatibility,
+               PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        return result;
+    }
+
+    SecureBuffer releaseKey;
+    std::string privateIssue;
+    if (! securityContext.keyProvider->resolvePackageKey(
+            opened->package.packageId, opened->package.encryptionKeyId,
+            PackageKeyUse::decryptExistingPackage, releaseKey, privateIssue))
+    {
+        reject(PerformancePackageV3ActivationFailure::keyUnavailable,
+               PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        return result;
+    }
+    SecureBuffer unwrappedContentKey;
+    if (! unwrapPackageV3ContentKey(opened->package, releaseKey,
+                                    unwrappedContentKey, privateIssue))
+    {
+        reject(PerformancePackageV3ActivationFailure::authentication);
+        return result;
+    }
+    auto contentKey = std::make_shared<SecureBuffer>(std::move(unwrappedContentKey));
+    result.package = opened;
+    result.contentKey = contentKey;
+
+    const auto openChunks = [&](const std::string& recordId,
+                                const std::string& recordKind,
+                                std::vector<std::uint8_t>& output,
+                                const std::uint64_t maximumBytes)
+    {
+        std::vector<const PackageV3RecordDescriptor*> chunks;
+        std::uint64_t totalBytes = 0;
+        for (const auto& record : opened->package.records)
+        {
+            if (record.recordId == recordId && record.recordKind == recordKind)
+            {
+                if (record.plaintextSize > maximumBytes - totalBytes)
+                    return reject(PerformancePackageV3ActivationFailure::corruption);
+                totalBytes += record.plaintextSize;
+                chunks.push_back(&record);
+            }
+        }
+        std::sort(chunks.begin(), chunks.end(), [](const auto* left, const auto* right)
+        {
+            return left->pageIndex < right->pageIndex;
+        });
+        if (chunks.empty())
+            return reject(PerformancePackageV3ActivationFailure::corruption);
+        output.reserve(static_cast<std::size_t>(totalBytes));
+        for (std::size_t index = 0; index < chunks.size(); ++index)
+        {
+            if (chunks[index]->pageIndex != index)
+                return reject(PerformancePackageV3ActivationFailure::corruption);
+            auto chunk = openPackageV3FileRecord(*opened, *contentKey, *chunks[index]);
+            if (! chunk.opened || chunk.plaintext.size() != chunks[index]->plaintextSize)
+                return reject(PerformancePackageV3ActivationFailure::authentication);
+            output.insert(output.end(), chunk.plaintext.begin(), chunk.plaintext.end());
+        }
+        return true;
+    };
+
+    std::vector<std::uint8_t> manifestBytes;
+    std::vector<std::uint8_t> instrumentBytes;
+    std::vector<std::uint8_t> streamBytes;
+    if (! openChunks("package-manifest", "manifest", manifestBytes, maximumMetadataBytes)
+        || ! openChunks("runtime-instrument", "runtime-instrument", instrumentBytes,
+                        maximumMetadataBytes)
+        || ! openChunks("runtime-stream-index", "stream-index", streamBytes,
+                        maximumMetadataBytes))
+        return result;
+
+    const auto manifest = parsePerformancePackageManifestJson(
+        std::string(manifestBytes.begin(), manifestBytes.end()));
+    if (! manifest.parsed)
+    {
+        reject(PerformancePackageV3ActivationFailure::corruption);
+        return result;
+    }
+    if (manifest.manifest.minimumReaderSchemaVersion > supportedReaderSchemaVersion)
+    {
+        reject(PerformancePackageV3ActivationFailure::compatibility,
+               PerformancePackageFailureCategory::playbackCompatibilityFailure);
+        return result;
+    }
+
+    result.metadata.packageFound = true;
+    result.metadata.packagePath = packagePath;
+    result.metadata.manifest = manifest.manifest;
+    result.metadata.instrument = parseRuntimeInstrumentManifest(
+        std::string(instrumentBytes.begin(), instrumentBytes.end()),
+        packagePath + "#runtime-instrument", false);
+    result.metadata.stream = parseRuntimeStreamContainer(
+        std::string(streamBytes.begin(), streamBytes.end()),
+        packagePath + "#runtime-stream-index", false, nullptr);
+    if (! result.metadata.instrument.loaded || ! result.metadata.stream.loaded
+        || result.metadata.manifest.packageId != opened->package.packageId
+        || result.metadata.manifest.instrumentId
+            != result.metadata.instrument.instrument.instrumentId
+        || result.metadata.stream.container.containerId
+            != result.metadata.instrument.instrument.instrumentId)
+    {
+        reject(PerformancePackageV3ActivationFailure::corruption);
+        return result;
+    }
+
+    if (! result.metadata.manifest.backgroundImage.payloadId.empty())
+    {
+        std::vector<std::uint8_t> bytes;
+        if (! openChunks(result.metadata.manifest.backgroundImage.payloadId,
+                         "background-image", bytes, maximumBackgroundImageBytes))
+            return result;
+        result.metadata.backgroundImage.found = true;
+        result.metadata.backgroundImage.loaded = true;
+        result.metadata.backgroundImage.state = "Performance package V3 artwork loaded";
+        result.metadata.backgroundImage.payload.payloadId
+            = result.metadata.manifest.backgroundImage.payloadId;
+        result.metadata.backgroundImage.payload.payloadKind = "backgroundImage";
+        result.metadata.backgroundImage.payload.logicalPath = "images/background.jpg";
+        result.metadata.backgroundImage.payload.mediaType = "image/jpeg";
+        result.metadata.backgroundImage.payload.plaintextSizeBytes = bytes.size();
+        result.metadata.backgroundImage.payload.plaintextBytes = std::move(bytes);
+    }
+    if (! result.metadata.manifest.license.payloadId.empty())
+    {
+        std::vector<std::uint8_t> bytes;
+        if (! openChunks(result.metadata.manifest.license.payloadId,
+                         "license-text", bytes, maximumPlayableInstrumentLicenseBytes))
+            return result;
+        if (! validatePlayableInstrumentLicenseBytes(bytes).valid)
+        {
+            reject(PerformancePackageV3ActivationFailure::corruption);
+            return result;
+        }
+        result.metadata.licenseText.found = true;
+        result.metadata.licenseText.loaded = true;
+        result.metadata.licenseText.state = "Performance package V3 license loaded";
+        result.metadata.licenseText.payload.payloadId
+            = result.metadata.manifest.license.payloadId;
+        result.metadata.licenseText.payload.payloadKind = "licenseText";
+        result.metadata.licenseText.payload.logicalPath = playableInstrumentLicenseLogicalPath;
+        result.metadata.licenseText.payload.mediaType = playableInstrumentLicenseMediaType;
+        result.metadata.licenseText.payload.plaintextSizeBytes = bytes.size();
+        result.metadata.licenseText.payload.plaintextBytes = std::move(bytes);
+    }
+
+    for (const auto& sample : result.metadata.stream.container.samples)
+    {
+        std::vector<const PackageV3RecordDescriptor*> heads;
+        std::vector<const PackageV3RecordDescriptor*> pages;
+        for (const auto& record : opened->package.records)
+        {
+            if (record.recordId != sample.sampleId) continue;
+            if (record.recordKind == "sample-head") heads.push_back(&record);
+            if (record.recordKind == "sample-page") pages.push_back(&record);
+        }
+        std::sort(pages.begin(), pages.end(), [](const auto* left, const auto* right)
+        {
+            return left->pageIndex < right->pageIndex;
+        });
+        if (heads.size() != 1 || heads.front()->pageIndex != 0
+            || heads.front()->generation == 0)
+        {
+            reject(PerformancePackageV3ActivationFailure::corruption);
+            return result;
+        }
+        const auto* head = heads.front();
+        const auto bytesPerFrame = static_cast<std::uint64_t>(sample.channelCount) * sizeof(float);
+        if (sample.channelCount == 0 || (sample.frameCount > 0
+            && bytesPerFrame > std::numeric_limits<std::uint64_t>::max() / sample.frameCount)
+            || sample.frameCount * bytesPerFrame != sample.payloadSizeBytes
+            || result.metadata.stream.container.pageSizeBytes == 0)
+        {
+            reject(PerformancePackageV3ActivationFailure::corruption);
+            return result;
+        }
+        const auto expectedHeadBytes = std::min<std::uint64_t>(
+            sample.prefetchBytes == 0 ? defaultSampleHeadBytes : sample.prefetchBytes,
+            sample.payloadSizeBytes);
+        const auto remainingBytes = sample.payloadSizeBytes - expectedHeadBytes;
+        const auto expectedPageCount = remainingBytes == 0 ? 0
+            : 1 + (remainingBytes - 1) / result.metadata.stream.container.pageSizeBytes;
+        if (head->plaintextSize != expectedHeadBytes || pages.size() != expectedPageCount)
+        {
+            reject(PerformancePackageV3ActivationFailure::corruption);
+            return result;
+        }
+        for (std::size_t pageIndex = 0; pageIndex < pages.size(); ++pageIndex)
+        {
+            const auto consumed = static_cast<std::uint64_t>(pageIndex)
+                * result.metadata.stream.container.pageSizeBytes;
+            const auto expectedBytes = std::min<std::uint64_t>(
+                result.metadata.stream.container.pageSizeBytes, remainingBytes - consumed);
+            if (pages[pageIndex]->pageIndex != pageIndex
+                || pages[pageIndex]->generation != head->generation
+                || pages[pageIndex]->plaintextSize != expectedBytes)
+            {
+                reject(PerformancePackageV3ActivationFailure::corruption);
+                return result;
+            }
+        }
+        SampleDataSourceDescriptor descriptor;
+        descriptor.kind = SampleDataSourceKind::packageRecord;
+        descriptor.sourceId = sample.sampleId;
+        descriptor.canonicalSourceIdentity = packagePath + "#" + sample.sampleId;
+        descriptor.provenanceIdentity = opened->package.packageId + ":" + sample.sampleId
+            + ":v3:g" + std::to_string(head->generation);
+        descriptor.formatName = "package-v3-float32";
+        descriptor.channelLayout = sample.channelLayout;
+        descriptor.generation = head->generation;
+        descriptor.sampleRate = sample.sampleRate;
+        descriptor.frameCount = sample.frameCount;
+        descriptor.channelCount = sample.channelCount;
+        descriptor.bytesPerFrame = bytesPerFrame;
+        descriptor.dataSizeBytes = sample.frameCount * bytesPerFrame;
+        descriptor.headSizeBytes = head->plaintextSize;
+        descriptor.pageSizeBytes = result.metadata.stream.container.pageSizeBytes;
+        if (! validateSampleDataSourceDescriptor(descriptor).valid)
+        {
+            reject(PerformancePackageV3ActivationFailure::corruption);
+            return result;
+        }
+        result.sampleDescriptors.push_back(std::move(descriptor));
+    }
+
+    result.metadata.loaded = true;
+    result.metadata.failureCategory = PerformancePackageFailureCategory::none;
+    result.metadata.state = "Performance package V3 metadata authenticated";
+    result.loaded = true;
+    result.failure = PerformancePackageV3ActivationFailure::none;
+    result.state = result.metadata.state;
+    result.issues.clear();
+    return result;
+}
 } // namespace drs::engine

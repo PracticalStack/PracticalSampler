@@ -2,6 +2,7 @@
 
 #include "drs/engine/PreparedPlayback.h"
 #include "drs/engine/PackageV2.h"
+#include "drs/engine/PackageV3FileReader.h"
 
 #include <array>
 #include <atomic>
@@ -379,6 +380,10 @@ public:
         SampleDataSourceDescriptor descriptor,
         std::shared_ptr<const PackageV2OpenResult> package,
         const PackageCryptoProvider& crypto = getDeterministicPackageCryptoProvider());
+    PackagePagedSampleDataSource(
+        SampleDataSourceDescriptor descriptor,
+        std::shared_ptr<const PackageV3FileOpenResult> package,
+        std::shared_ptr<const SecureBuffer> contentKey);
     ~PackagePagedSampleDataSource() override;
     const SampleDataSourceDescriptor& descriptor() const noexcept override { return sourceDescriptor; }
     SampleFrameView acquireFrameView(std::uint64_t firstFrame,
@@ -404,6 +409,8 @@ private:
 
     SampleDataSourceDescriptor sourceDescriptor;
     std::shared_ptr<const PackageV2OpenResult> retainedPackage;
+    std::shared_ptr<const PackageV3FileOpenResult> retainedV3Package;
+    std::shared_ptr<const SecureBuffer> retainedV3ContentKey;
     const PackageCryptoProvider* cryptoProvider = nullptr;
     std::uint64_t configuredHeadFrames = 0;
     std::uint64_t configuredPageFrames = 0;

@@ -4675,21 +4675,29 @@ PreparedPerformancePackageActivationResult preparePerformancePackageActivation(
     return buildPreparedPerformancePackageActivation(packageLoad, priorTimings);
 }
 
-PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation(
+static PreparedPerformancePackageActivationResult preparePackageRecordActivation(
     const PerformancePackageLoadResult& packageLoad,
     std::shared_ptr<const PackageV2OpenResult> package,
+    std::shared_ptr<const PackageV3FileOpenResult> packageV3,
+    std::shared_ptr<const SecureBuffer> contentKey,
     const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
     const PerformancePackagePreparationTimings& priorTimings)
 {
+    const auto isV3 = packageV3 != nullptr;
+    const auto packagePath = isV3 ? packageV3->packagePath
+                                  : (package == nullptr ? std::string {} : package->packagePath);
+    const auto versionLabel = isV3 ? std::string("v3") : std::string("v2");
     PreparedPerformancePackageActivationResult result;
     result.failureCategory = PerformancePackageFailureCategory::playbackCompatibilityFailure;
-    result.state = "Performance package v2 activation preparation failed";
+    result.state = "Performance package " + versionLabel + " activation preparation failed";
     result.packageLoad = packageLoad;
     result.timings = priorTimings;
-    if (!packageLoad.loaded || package == nullptr || !package->opened
+    if (! packageLoad.loaded
+        || (isV3 ? (! packageV3->opened || contentKey == nullptr)
+                 : (package == nullptr || ! package->opened))
         || sampleDescriptors.empty())
     {
-        result.issues.push_back("Package v2 metadata, TOC, and sample descriptors are required.");
+        result.issues.push_back("Authenticated package metadata, index, and sample descriptors are required.");
         return result;
     }
 
@@ -4718,13 +4726,13 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
     prepared.snapshotContentDigest = result.snapshotResult.snapshot.contentDigest;
     prepared.snapshotDspGraphDigest = result.snapshotResult.snapshot.dspGraphDigest;
     prepared.dspGraphDigest = result.snapshotResult.snapshot.dspGraphDigest;
-    prepared.compilerVersion = "package-v2-bounded-records";
+    prepared.compilerVersion = "package-" + versionLabel + "-bounded-records";
     prepared.draftRevision = result.snapshotResult.snapshot.draftRevision;
     prepared.selectedGroupId = result.snapshotResult.snapshot.selectedGroupId;
     prepared.masterGainDb = result.snapshotResult.snapshot.masterGainDb;
     prepared.containerId = packageLoad.stream.container.containerId;
-    prepared.containerPath = package->packagePath;
-    prepared.payloadEncoding = "package-v2-paged-float32";
+    prepared.containerPath = packagePath;
+    prepared.payloadEncoding = "package-" + versionLabel + "-paged-float32";
     prepared.pageSizeBytes = packageLoad.stream.container.pageSizeBytes;
 
     std::unordered_map<std::string, std::size_t> sampleIndices;
@@ -4739,15 +4747,27 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         if (descriptor == sampleDescriptors.end()
             || streamSample == packageLoad.stream.container.samples.end())
         {
-            result.issues.push_back("Package v2 sample metadata is missing: "
+            result.issues.push_back("Package " + versionLabel + " sample metadata is missing: "
                                     + identity.sampleSourceId + ".");
             return result;
         }
-        auto source = std::make_shared<PackagePagedSampleDataSource>(*descriptor, package);
+        auto source = isV3
+            ? std::make_shared<PackagePagedSampleDataSource>(
+                *descriptor, packageV3, contentKey)
+            : std::make_shared<PackagePagedSampleDataSource>(*descriptor, package);
         if (!source->prepareHead())
         {
-            result.issues.push_back("Package v2 head preparation failed for '"
-                                    + identity.sampleSourceId + "': " + source->lastFailure());
+            if (isV3)
+            {
+                result.state = "Performance package V3 activation rejected";
+                result.issues = { "V3 activation rejected [authentication]." };
+            }
+            else
+            {
+                result.issues.push_back("Package v2 head preparation failed for '"
+                                        + identity.sampleSourceId + "': "
+                                        + source->lastFailure());
+            }
             return result;
         }
         PreparedPlaybackSampleHandle sample;
@@ -4769,7 +4789,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         sample.loopStartFrame = streamSample->loopStartFrame;
         sample.loopEndFrame = streamSample->loopEndFrame;
         sample.dataSource = source;
-        sample.ownershipToken = "package-v2-generation:"
+        sample.ownershipToken = "package-" + versionLabel + "-generation:"
             + std::to_string(descriptor->generation);
         sample.cacheKey = descriptor->provenanceIdentity;
 
@@ -4777,9 +4797,9 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         stream.sampleSourceId = identity.sampleSourceId;
         stream.streamSampleId = streamSample->sampleId;
         stream.containerId = packageLoad.stream.container.containerId;
-        stream.containerPath = package->packagePath;
-        stream.payloadEncoding = "package-v2-paged-float32";
-        stream.topologyKind = "package-v2-records";
+        stream.containerPath = packagePath;
+        stream.payloadEncoding = "package-" + versionLabel + "-paged-float32";
+        stream.topologyKind = "package-" + versionLabel + "-records";
         stream.compiledStreamTopologyAvailable = true;
         stream.pageSizeBytes = descriptor->pageSizeBytes;
         stream.payloadOffsetBytes = streamSample->payloadOffsetBytes;
@@ -4809,7 +4829,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         ownership.cacheKey = sample.cacheKey;
         ownership.sampleSourceId = sample.sampleSourceId;
         ownership.streamSampleId = sample.streamSampleId;
-        ownership.lifetimeState = "active-package-v2-generation";
+        ownership.lifetimeState = "active-package-" + versionLabel + "-generation";
         ownership.retainedBytes = source->metrics().publishedHeadBytes;
         ownership.preparedBuildId = preparedResult.buildId;
         sample.ownershipRecordIndex = prepared.ownershipRecords.size();
@@ -4827,7 +4847,8 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         const auto stream = streamIndices.find(zone.sampleSourceId);
         if (sample == sampleIndices.end() || stream == streamIndices.end())
         {
-            result.issues.push_back("Package v2 zone sample binding failed: " + zone.id + ".");
+            result.issues.push_back("Package " + versionLabel
+                                    + " zone sample binding failed: " + zone.id + ".");
             return result;
         }
         prepared.zones.push_back({ zone.id, zone.sampleSourceId,
@@ -4871,7 +4892,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
     preparedResult.built = true;
     preparedResult.activationEligible = true;
     preparedResult.completionDisposition = PreparedPlaybackCompletionDisposition::completed;
-    preparedResult.state = "Package v2 prepared playback ready";
+    preparedResult.state = "Package " + versionLabel + " prepared playback ready";
     result.timings.preparedBuildMicros = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - preparedStarted).count());
 
@@ -4888,7 +4909,8 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
         + result.timings.activationPayloadMicros;
     if (result.activationPayload == nullptr)
     {
-        result.issues.push_back("Package v2 activation payload could not be built.");
+        result.issues.push_back("Package " + versionLabel
+                                + " activation payload could not be built.");
         return result;
     }
     const auto renderModelStarted = Clock::now();
@@ -4901,7 +4923,7 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
     if (!renderModel.built || renderModel.model == nullptr)
     {
         result.issues.push_back(renderModel.findings.empty()
-            ? std::string("Package v2 render model could not be built.")
+            ? std::string("Package ") + versionLabel + " render model could not be built."
             : renderModel.findings.front().message);
         return result;
     }
@@ -4912,7 +4934,36 @@ PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation
     result.preparedResult = {};
     result.prepared = true;
     result.failureCategory = PerformancePackageFailureCategory::none;
-    result.state = "Performance package v2 activation prepared";
+    result.state = "Performance package " + versionLabel + " activation prepared";
+    return result;
+}
+
+PreparedPerformancePackageActivationResult preparePerformancePackageV2Activation(
+    const PerformancePackageLoadResult& packageLoad,
+    std::shared_ptr<const PackageV2OpenResult> package,
+    const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
+    const PerformancePackagePreparationTimings& priorTimings)
+{
+    return preparePackageRecordActivation(packageLoad, std::move(package), {}, {},
+                                          sampleDescriptors, priorTimings);
+}
+
+PreparedPerformancePackageActivationResult preparePerformancePackageV3Activation(
+    const PerformancePackageLoadResult& packageLoad,
+    std::shared_ptr<const PackageV3FileOpenResult> package,
+    std::shared_ptr<const SecureBuffer> contentKey,
+    const std::vector<SampleDataSourceDescriptor>& sampleDescriptors,
+    const PerformancePackagePreparationTimings& priorTimings)
+{
+    auto result = preparePackageRecordActivation(packageLoad, {}, std::move(package),
+                                                 std::move(contentKey), sampleDescriptors,
+                                                 priorTimings);
+    if (! result.prepared && (result.issues.empty()
+        || result.issues.front() != "V3 activation rejected [authentication]."))
+    {
+        result.state = "Performance package V3 activation rejected";
+        result.issues = { "V3 activation rejected [corruption]." };
+    }
     return result;
 }
 } // namespace drs::engine

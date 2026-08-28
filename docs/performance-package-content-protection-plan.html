@@ -467,21 +467,21 @@ authenticated associated data
               <td>DRSPKG3 record format, encrypted export/open, and bounded page decryption</td>
               <td>7–10 days</td>
               <td>Phase 1 gate</td>
-              <td><span class="status in-progress">In progress</span></td>
+              <td><span class="status complete">Complete</span></td>
             </tr>
             <tr>
               <td class="id">3</td>
               <td>Publisher signatures, release-key pipeline, trust store, and key rotation</td>
               <td>5–8 days</td>
               <td>Signing-authority decision</td>
-              <td><span class="status in-progress">In progress</span></td>
+              <td><span class="status blocked">Provisioning required</span></td>
             </tr>
             <tr>
               <td class="id">4</td>
               <td>Exporter/reader cutover, legacy migration, diagnostics, host restore, and user-facing behavior</td>
               <td>4–6 days</td>
               <td>Phases 2 and 3</td>
-              <td><span class="status in-progress">In progress</span></td>
+              <td><span class="status blocked">Provisioning required</span></td>
             </tr>
             <tr>
               <td class="id">5</td>
@@ -594,7 +594,7 @@ authenticated associated data
         <div class="phase-number">2</div>
         <div><h2>Encrypted Package V3</h2></div>
         <div class="phase-meta">
-          <span class="status in-progress">In progress</span>
+          <span class="status complete">Complete</span>
           <span class="phase-focus">Focus: confidential runtime records and bounded paging</span>
         </div>
       </div>
@@ -635,7 +635,7 @@ authenticated associated data
         <div class="phase-number">3</div>
         <div><h2>Publisher Signatures and Release-Key Pipeline</h2></div>
         <div class="phase-meta">
-          <span class="status in-progress">In progress</span>
+          <span class="status blocked">Provisioning required</span>
           <span class="phase-focus">Focus: immutable origin and operational secrets</span>
         </div>
       </div>
@@ -674,7 +674,7 @@ authenticated associated data
         <div class="phase-number">4</div>
         <div><h2>Product Cutover and Compatibility</h2></div>
         <div class="phase-meta">
-          <span class="status in-progress">In progress</span>
+          <span class="status blocked">Provisioning required</span>
           <span class="phase-focus">Focus: safe adoption without breaking existing packages</span>
         </div>
       </div>
@@ -686,7 +686,7 @@ authenticated associated data
            <li class="done"><span class="task-id">CPS-P4-T2</span> Preserve read-only V1/V2 dispatch with explicit internal legacy security classification, size bounds, and no rewrite-on-open behavior.</li>
            <li class="done"><span class="task-id">CPS-P4-T3</span> Add explicit re-export guidance for creators who need to migrate existing packages; never imply that an old file was secured in place.</li>
            <li class="done"><span class="task-id">CPS-P4-T4</span> Add distinct diagnostics for unsupported format, unknown key, unavailable key, bad signature, AEAD failure, corruption, compatibility mismatch, cancellation, and I/O failure.</li>
-           <li class="blocked"><span class="task-id">CPS-P4-T5</span> Integrate V3 with deferred activation, package replacement, last-known-good playback, host state restore, plugin/standalone open flows, and package license/artwork viewing.</li>
+           <li class="done"><span class="task-id">CPS-P4-T5</span> Integrate V3 with deferred activation, package replacement, last-known-good playback, host state restore, plugin/standalone open flows, and package license/artwork viewing.</li>
            <li class="done"><span class="task-id">CPS-P4-T6</span> Update support, operator, compatibility, and customer-facing documentation with the approved promise and explicit non-goals.</li>
            <li class="done"><span class="task-id">CPS-P4-T7</span> Add telemetry that reports only non-sensitive suite/key identifiers and failure categories; prohibit keys, plaintext, nonces, tags, and protected metadata from logs.</li>
         </ul>
@@ -700,10 +700,11 @@ authenticated associated data
           <li>Confirm all normal production export entry points emit V3 and no hidden/test switch can emit the legacy format in release builds.</li>
         </ul>
 
-        <div class="files">Likely files: <code>PackageReaderDispatch.*</code>, <code>PluginProcessor.cpp</code>, standalone open flow, <code>ProjectRestoreCoordinator.cpp</code>, <code>PerformancePackageExportService.cpp</code>, diagnostics, compatibility/operator docs.</div>
+        <div class="files">Implemented in: <code>PackageReaderDispatch.*</code>, <code>SampleDataSource.*</code>, <code>EngineFacade.cpp</code>, <code>PluginProcessor.cpp</code>, standalone open flow, <code>ProjectRestoreCoordinator.cpp</code>, <code>PerformancePackageExportService.cpp</code>, diagnostics, compatibility/operator docs, and the V3 activation/release-gate tests.</div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> signed V3 now opens through standalone, plugin, replacement, first-play, and host restore using a signer-independent runtime key/trust context. Metadata, artwork, license, and sample heads authenticate before atomic activation; sample pages decrypt on the background service. The full redacted failure matrix preserves the prior engine revision and activation payload, and the unchanged V1/V2 compatibility corpus remains green.</div>
         <div class="exit">
           <h3>Exit Gate P4</h3>
-          <p>Every production export is signed V3; standalone, plugin, replacement, and restore paths open it correctly; V1/V2 remain bounded legacy-read only; failure diagnostics are actionable and non-sensitive; migration documentation is complete.</p>
+          <p><strong>Engineering gate passed with injected test credentials; production provisioning remains.</strong> Every production export is signed V3; standalone, plugin, replacement, and restore paths open it correctly; V1/V2 remain bounded legacy-read only; failure diagnostics are actionable and non-sensitive; migration documentation is complete.</p>
         </div>
       </div>
     </section>

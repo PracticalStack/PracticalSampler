@@ -7,6 +7,7 @@
 #include "drs/engine/HostStatePublicationService.h"
 #include "drs/engine/HostSessionState.h"
 #include "drs/engine/PerformancePackage.h"
+#include "drs/engine/PackageReaderDispatch.h"
 #include "drs/engine/PerformancePublishCommandAdapter.h"
 #include "drs/engine/ProjectRestoreCoordinator.h"
 #include "drs/engine/SampleImport.h"
@@ -68,9 +69,13 @@ struct OpenedPerformancePackageWorkspaceLoadResult
 };
 
 PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspaceInBackground(
-    const std::string& packagePath);
+    const std::string& packagePath,
+    std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+        v3SecurityContext = {});
 OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInBackground(
-    const std::string& packagePath);
+    const std::string& packagePath,
+    std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+        v3SecurityContext = {});
 
 struct PerformancePackageExportResult
 {
@@ -230,6 +235,10 @@ public:
     {
         return performancePackageExportService;
     }
+    bool setPerformancePackageActivationSecurityContext(
+        std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext> context);
+    std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+        getPerformancePackageActivationSecurityContext() const;
     bool requestAuthoringSourceValidation();
     bool cancelAuthoringSourceValidation();
     drs::app::AuthoringSourceValidationSnapshot getAuthoringSourceValidationSnapshot() const;
@@ -614,6 +623,8 @@ private:
     drs::engine::HostProjectBinding authoringProjectBinding;
     drs::engine::WorkspaceDocumentState workspaceDocumentState;
     std::optional<bool> instrumentControlsExpandedChoice;
+    mutable std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
+        performancePackageActivationSecurityContext;
     drs::engine::ProjectRestoreCoordinator projectRestoreCoordinator;
     drs::app::SfzImportReviewService sfzImportReviewService;
     drs::app::WavImportService wavImportService;
