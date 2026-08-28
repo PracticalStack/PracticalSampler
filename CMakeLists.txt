@@ -82,6 +82,7 @@ message(STATUS "  Runtime content root: ${CMAKE_CURRENT_SOURCE_DIR}/content/runt
 
 add_subdirectory(engine_adapter)
 add_subdirectory(app)
+add_subdirectory(tools/package_signer)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)

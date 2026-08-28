@@ -1,0 +1,8 @@
+#pragma once
+
+// Public verification material only. Private signing and symmetric release
+// keys must never be configured into this generated desktop header.
+#define DRS_PACKAGE_PUBLISHER_KEY_ID "@DRS_PACKAGE_PUBLISHER_KEY_ID@"
+#define DRS_PACKAGE_PUBLISHER_PUBLIC_KEY_HEX "@DRS_PACKAGE_PUBLISHER_PUBLIC_KEY_HEX@"
+#define DRS_PACKAGE_PUBLISHER_KEY_ACTIVATED_UTC "@DRS_PACKAGE_PUBLISHER_KEY_ACTIVATED_UTC@"
+#define DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES "@DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES@"

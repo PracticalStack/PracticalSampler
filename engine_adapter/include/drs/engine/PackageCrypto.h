@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drs/engine/SecureBuffer.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -20,9 +22,10 @@ struct PackageSealRequest
     std::string recordId;
     std::string additionalAuthenticatedData;
     std::string encryptionKeyId;
-    // A 32-byte key is required by the production AEAD provider.  Legacy
-    // deterministic callers intentionally leave this empty.
-    std::vector<std::uint8_t> encryptionKey;
+    // A 32-byte key is required by the production AEAD provider. Legacy
+    // deterministic callers intentionally leave this null.
+    const SecureBuffer* secureEncryptionKey = nullptr;
+    const SecureBuffer* securePlaintext = nullptr;
     std::vector<std::uint8_t> plaintext;
 };
 
@@ -32,7 +35,7 @@ struct PackageOpenRequest
     std::string recordId;
     std::string additionalAuthenticatedData;
     std::string encryptionKeyId;
-    std::vector<std::uint8_t> encryptionKey;
+    const SecureBuffer* secureEncryptionKey = nullptr;
     PackageSealedBlob sealed;
 };
 
@@ -64,6 +67,6 @@ const PackageCryptoProvider& getSecurePackageCryptoProvider();
 
 inline constexpr std::size_t securePackageKeySizeBytes = 32;
 
-bool generateSecurePackageKey(std::vector<std::uint8_t>& key,
+bool generateSecurePackageKey(SecureBuffer& key,
                               std::string& issue);
 } // namespace drs::engine

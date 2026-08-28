@@ -1,4 +1,5 @@
 #include <drs/engine/PackageV3FileReader.h>
+#include "PackageProtectionTestSupport.h"
 
 #include <algorithm>
 #include <chrono>
@@ -66,21 +67,22 @@ int main()
     using namespace drs::engine;
     bool ok = true;
     std::string issue;
-    std::vector<std::uint8_t> releaseKey;
+    SecureBuffer releaseKey;
     std::vector<std::uint8_t> signingPublicKey;
     std::vector<std::uint8_t> signingPrivateKey;
     ok &= check(generateSecurePackageKey(releaseKey, issue), "generate release key");
     ok &= check(generatePackageSigningKeyPair(
                     signingPublicKey, signingPrivateKey, issue),
                 "generate signing key pair");
+    PackageProtectionTestSigner signer("publisher-2026-08", signingPrivateKey);
 
     PackageV3WriteRequest request;
     request.packageId = "reader-package";
     request.compatibilityId = "sampler-runtime-1";
     request.encryptionKeyId = "release-2026-08";
-    request.releaseKey = releaseKey;
+    request.releaseKey = &releaseKey;
     request.signingKeyId = "publisher-2026-08";
-    request.signingPrivateKey = signingPrivateKey;
+    request.publisherSigner = &signer;
     request.records = {
         { "manifest", "metadata", 1u, 0u, { 'h', 'e', 'l', 'l', 'o' } },
         { "page-0", "sample-page", 1u, 0u, std::vector<std::uint8_t>(1024u * 1024u, 0x5au) },
@@ -100,7 +102,7 @@ int main()
     ok &= check(! error && writeFile(packagePath, written.packageBytes), "write file fixture");
 
     const std::vector<PackageSigningKey> trustStore {
-        { request.signingKeyId, signingPublicKey, false }
+        activeTestSigningKey(request.signingKeyId, signingPublicKey)
     };
     auto opened = openPackageV3File(packagePath.string(), trustStore);
     ok &= check(opened.opened && opened.package.signatureVerified,
@@ -119,7 +121,7 @@ int main()
                            [](const auto& record) { return record.sealed.ciphertext.empty(); }),
                 "file index retains no ciphertext payloads");
 
-    std::vector<std::uint8_t> contentKey;
+    SecureBuffer contentKey;
     ok &= check(unwrapPackageV3ContentKey(
                     opened.package, releaseKey, contentKey, issue),
                 "content key unwrap follows signature verification");
@@ -151,7 +153,7 @@ int main()
                     "one page open does not read unrelated records");
     }
 
-    std::vector<std::uint8_t> wrongContentKey;
+    SecureBuffer wrongContentKey;
     ok &= check(generateSecurePackageKey(wrongContentKey, issue), "generate wrong content key");
     if (manifest != nullptr)
     {
@@ -159,9 +161,9 @@ int main()
         ok &= check(! rejected.opened && rejected.plaintext.empty(),
                     "wrong content key returns no plaintext");
     }
-    std::vector<std::uint8_t> wrongReleaseKey;
+    SecureBuffer wrongReleaseKey;
     ok &= check(generateSecurePackageKey(wrongReleaseKey, issue), "generate wrong release key");
-    contentKey.assign(securePackageKeySizeBytes, 0xccu);
+    contentKey = SecureBuffer(std::vector<std::uint8_t>(securePackageKeySizeBytes, 0xccu));
     ok &= check(! unwrapPackageV3ContentKey(
                     opened.package, wrongReleaseKey, contentKey, issue)
                     && contentKey.empty(),
@@ -171,7 +173,8 @@ int main()
     ok &= check(! openPackageV3File(packagePath.string(), unknownStore).opened,
                 "unknown signing key rejected before key unwrap");
     const std::vector<PackageSigningKey> revokedStore {
-        { request.signingKeyId, signingPublicKey, true }
+        { request.signingKeyId, signingPublicKey, PackageSigningKeyState::revoked,
+          "2026-08-01T00:00:00Z", {}, "2026-08-28T00:00:00Z" }
     };
     ok &= check(! openPackageV3File(packagePath.string(), revokedStore).opened,
                 "revoked signing key rejected");
@@ -179,7 +182,7 @@ int main()
     ok &= check(generatePackageSigningKeyPair(otherPublicKey, otherPrivateKey, issue),
                 "generate unrelated signing key");
     ok &= check(! openPackageV3File(packagePath.string(), {
-                    { request.signingKeyId, otherPublicKey, false } }).opened,
+                    activeTestSigningKey(request.signingKeyId, otherPublicKey) }).opened,
                 "wrong publisher public key rejected");
 
     auto mutation = written.packageBytes;

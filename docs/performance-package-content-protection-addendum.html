@@ -144,7 +144,7 @@
         <div class="summary-card"><strong>8</strong><span>Ordered workstreams</span></div>
         <div class="summary-card"><strong>3–5</strong><span>Estimated engineer-weeks before external review</span></div>
         <div class="summary-card"><strong>2 / 8</strong><span>Format and reader gates complete</span></div>
-        <div class="summary-card"><strong>In progress</strong><span>Completion status</span></div>
+        <div class="summary-card"><strong>Phase 3</strong><span>Code complete; production provisioning gated</span></div>
       </div>
     </section>
 
@@ -171,9 +171,9 @@
         <strong>Current boundary:</strong> normal exports still call the V2 streaming writer with the deterministic compatibility provider. CPCA-1 and CPCA-2 now provide a canonical V3 container plus a bounded, signature-first file reader, but neither is connected to a production export/open path.
       </div>
       <ul>
-        <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, semantic SHA-256, and focused negative tests.</li>
-        <li>Missing: concrete production trust/key providers, production export/load integration, complete hostile-input qualification, and independent review.</li>
-        <li>Current validation: eleven of twelve related package tests pass; the pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains red and is tracked for CPCA-7.</li>
+        <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, versioned release-key policy/provider, immutable publisher trust store, isolated controlled signer, move-only zeroized secret buffers, semantic SHA-256, and focused negative tests.</li>
+        <li>Missing: production key/service provisioning and named owners, production export/load integration, complete hostile-input qualification, and independent review.</li>
+        <li>Current validation: twelve of thirteen related package tests pass; the pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains red and is tracked for CPCA-7.</li>
       </ul>
     </section>
 
@@ -189,7 +189,7 @@
           <tbody>
             <tr><td class="id">CPCA-1</td><td>Complete, unambiguous, signed V3 byte contract</td><td>Existing V3 prototype</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-2</td><td>Bounded file-backed verification/decryption</td><td>CPCA-1</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">External owner</span></td></tr>
+            <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">Provisioning required</span></td></tr>
             <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
             <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
             <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status ready">Ready</span></td></tr>
@@ -251,16 +251,16 @@
     </section>
 
     <section class="workstream" id="step-3">
-      <div class="work-head"><div class="work-number">3</div><h2>Operationalize Release Keys and Publisher Signing</h2><span class="status blocked">External owner</span></div>
+      <div class="work-head"><div class="work-number">3</div><h2>Operationalize Release Keys and Publisher Signing</h2><span class="status blocked">Provisioning required</span></div>
       <div class="work-body">
         <p class="work-intent">Turn helper APIs into an auditable key lifecycle without placing production secrets in desktop code.</p>
         <div class="grid-2">
-          <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Implement the concrete runtime <code>PackageKeyProvider</code> and versioned release-key lookup.</li>
-            <li>Embed a read-only public trust store with activation, retirement, and revocation metadata.</li>
-            <li>Build controlled CI/service signing that accepts canonical package bytes and returns an Ed25519ph signature.</li>
-            <li>Keep private signing material and release keys out of source, desktop binaries, fixtures, logs, symbols, crash reports, and artifacts.</li>
-            <li>Use move-only sensitive buffers and dependable zeroization such as <code>sodium_memzero</code> throughout key paths.</li>
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-3-T1</span> Implement the concrete runtime <code>PackageKeyProvider</code> and versioned release-key lookup.</li>
+            <li class="done"><span class="task-id">CPCA-3-T2</span> Embed a read-only public trust store with activation, retirement, and revocation metadata.</li>
+            <li class="done"><span class="task-id">CPCA-3-T3</span> Build controlled CI/service signing that accepts canonical package bytes and returns an Ed25519ph signature.</li>
+            <li class="done"><span class="task-id">CPCA-3-T4</span> Keep private signing material and release keys out of source, desktop binaries, fixtures, logs, symbols, crash reports, and artifacts.</li>
+            <li class="done"><span class="task-id">CPCA-3-T5</span> Use move-only sensitive buffers and dependable zeroization such as <code>sodium_memzero</code> throughout key paths.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
             <li>Exercise signing-key and release-key rotation, retirement, unknown-key, revoked-key, and outage scenarios.</li>
@@ -269,7 +269,9 @@
             <li>Prove an unauthorized desktop build cannot invoke production signing.</li>
           </ul></article>
         </div>
-        <div class="callout problem"><strong>Required decision:</strong> assign release-engineering/security owners and provision the controlled signing and key-storage environment.</div>
+        <div class="files">Primary code: <code>PackageKeys.*</code>, <code>PackagePublisherTrustStore.*</code>, <code>PackagePublisherSigning.h</code>, <code>SecureBuffer.*</code>, <code>tools/package_signer</code>, and <code>PackageKeyLifecycleTests.cpp</code>. Operations: <a href="performance-package-key-operations.md">key operations runbook</a>.</div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> <code>drs.package_keys.lifecycle</code> covers active/retired/revoked/unknown key behavior, release-key and audit-service outages, signing-key rotation, symmetric-key disclosure with failed publisher trust, canonical-input enforcement, immutable public-only trust configuration, signer target isolation, and <code>sodium_memzero</code> use. The opt-in controlled signing executable also builds successfully.</div>
+        <div class="callout problem"><strong>External exit-gate work:</strong> assign release-engineering/security owners; provision managed signing and release-key storage; inject real public trust entries; restrict production signing identity; and execute the rotation/recovery drill in the linked runbook. No production secret was created or embedded during this implementation.</div>
         <div class="exit"><h3>Exit gate</h3><p>The production publishing path is operational and auditable; shipped applications contain no private signing key; rotation and recovery are demonstrated.</p></div>
       </div>
     </section>

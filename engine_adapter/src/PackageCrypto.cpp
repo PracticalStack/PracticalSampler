@@ -37,10 +37,37 @@ bool ensureSodium(std::string& issue) noexcept
     return true;
 }
 
-bool validateSecureKey(const std::vector<std::uint8_t>& key,
+struct SecureBytesView
+{
+    const std::uint8_t* data = nullptr;
+    std::size_t size = 0;
+};
+
+SecureBytesView encryptionKeyView(const PackageSealRequest& request) noexcept
+{
+    if (request.secureEncryptionKey != nullptr)
+        return { request.secureEncryptionKey->data(), request.secureEncryptionKey->size() };
+    return {};
+}
+
+SecureBytesView encryptionKeyView(const PackageOpenRequest& request) noexcept
+{
+    if (request.secureEncryptionKey != nullptr)
+        return { request.secureEncryptionKey->data(), request.secureEncryptionKey->size() };
+    return {};
+}
+
+SecureBytesView plaintextView(const PackageSealRequest& request) noexcept
+{
+    if (request.securePlaintext != nullptr)
+        return { request.securePlaintext->data(), request.securePlaintext->size() };
+    return { request.plaintext.data(), request.plaintext.size() };
+}
+
+bool validateSecureKey(const SecureBytesView key,
                        std::string& issue) noexcept
 {
-    if (key.size() != crypto_aead_xchacha20poly1305_ietf_KEYBYTES)
+    if (key.size != crypto_aead_xchacha20poly1305_ietf_KEYBYTES)
     {
         issue = "Secure package crypto requires a 32-byte encryption key.";
         return false;
@@ -350,7 +377,9 @@ public:
             issue = "Secure package crypto seal requires a non-empty recordId.";
             return false;
         }
-        if (!validateSecureKey(request.encryptionKey, issue)
+        const auto encryptionKey = encryptionKeyView(request);
+        const auto plaintext = plaintextView(request);
+        if (!validateSecureKey(encryptionKey, issue)
             || !ensureSodium(issue))
             return false;
 
@@ -358,7 +387,7 @@ public:
         randombytes_buf(output.nonce.data(), output.nonce.size());
 
         std::vector<std::uint8_t> ciphertextWithTag(
-            request.plaintext.size() + tagSizeBytes());
+            plaintext.size + tagSizeBytes());
         unsigned long long ciphertextSize = 0;
         const auto* aad = reinterpret_cast<const unsigned char*>(
             request.additionalAuthenticatedData.data());
@@ -366,13 +395,13 @@ public:
             request.additionalAuthenticatedData.size());
         const auto result = crypto_aead_xchacha20poly1305_ietf_encrypt(
             ciphertextWithTag.data(), &ciphertextSize,
-            request.plaintext.data(),
-            static_cast<unsigned long long>(request.plaintext.size()),
+            plaintext.data,
+            static_cast<unsigned long long>(plaintext.size),
             request.additionalAuthenticatedData.empty() ? nullptr : aad,
             aadSize,
             nullptr,
             output.nonce.data(),
-            request.encryptionKey.data());
+            encryptionKey.data);
         if (result != 0 || ciphertextSize < tagSizeBytes())
         {
             issue = "Secure package crypto encryption failed.";
@@ -417,7 +446,8 @@ public:
             issue = "Secure package crypto open received an authentication tag with an unexpected size.";
             return false;
         }
-        if (!validateSecureKey(request.encryptionKey, issue)
+        const auto encryptionKey = encryptionKeyView(request);
+        if (!validateSecureKey(encryptionKey, issue)
             || !ensureSodium(issue))
             return false;
 
@@ -443,7 +473,7 @@ public:
             request.additionalAuthenticatedData.empty() ? nullptr : aad,
             aadSize,
             request.sealed.nonce.data(),
-            request.encryptionKey.data());
+            encryptionKey.data);
         if (result != 0)
         {
             plaintext.clear();
@@ -470,14 +500,16 @@ const PackageCryptoProvider& getSecurePackageCryptoProvider()
     return provider;
 }
 
-bool generateSecurePackageKey(std::vector<std::uint8_t>& key,
+bool generateSecurePackageKey(SecureBuffer& key,
                               std::string& issue)
 {
     key.clear();
-    if (!ensureSodium(issue))
+    if (! ensureSodium(issue))
         return false;
-    key.resize(securePackageKeySizeBytes);
-    randombytes_buf(key.data(), key.size());
+    std::vector<std::uint8_t> bytes;
+    bytes.resize(securePackageKeySizeBytes);
+    randombytes_buf(bytes.data(), bytes.size());
+    key = SecureBuffer(std::move(bytes));
     issue.clear();
     return true;
 }

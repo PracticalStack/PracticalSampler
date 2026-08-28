@@ -27,18 +27,18 @@ int main()
     ok &= check(crypto.nonceSizeBytes() == 24u, "XChaCha20 nonce size");
     ok &= check(crypto.tagSizeBytes() == 16u, "Poly1305 tag size");
 
-    std::vector<std::uint8_t> key;
+    SecureBuffer key;
     std::string issue;
     ok &= check(generateSecurePackageKey(key, issue), "random package key generation");
     ok &= check(key.size() == securePackageKeySizeBytes, "package key length");
-    std::vector<std::uint8_t> secondKey;
+    SecureBuffer secondKey;
     ok &= check(generateSecurePackageKey(secondKey, issue), "second random package key generation");
-    ok &= check(key != secondKey, "package keys are not deterministic");
+    ok &= check(key.bytes() != secondKey.bytes(), "package keys are not deterministic");
 
     PackageSealRequest request;
     request.packageId = "secure-test-package";
     request.recordId = "record-0001";
-    request.encryptionKey = key;
+    request.secureEncryptionKey = &key;
     request.additionalAuthenticatedData = "drs.package.v3|record|0|1|12";
     request.plaintext.assign({ 's', 'e', 'c', 'r', 'e', 't', '-', 's', 'a', 'm', 'p', 'l', 'e' });
 
@@ -52,7 +52,7 @@ int main()
     PackageOpenRequest open;
     open.packageId = request.packageId;
     open.recordId = request.recordId;
-    open.encryptionKey = key;
+    open.secureEncryptionKey = &key;
     open.additionalAuthenticatedData = request.additionalAuthenticatedData;
     open.sealed = sealed;
     std::vector<std::uint8_t> plaintext;
@@ -70,11 +70,11 @@ int main()
     tampered.additionalAuthenticatedData += "-changed";
     ok &= check(! crypto.open(tampered, plaintext, issue), "AAD tamper rejected");
     tampered = open;
-    tampered.encryptionKey = secondKey;
+    tampered.secureEncryptionKey = &secondKey;
     ok &= check(! crypto.open(tampered, plaintext, issue), "wrong key rejected");
 
-    std::vector<std::uint8_t> invalidKey(securePackageKeySizeBytes - 1u);
-    request.encryptionKey = invalidKey;
+    SecureBuffer invalidKey(std::vector<std::uint8_t>(securePackageKeySizeBytes - 1u));
+    request.secureEncryptionKey = &invalidKey;
     ok &= check(! crypto.seal(request, sealed, issue), "invalid key rejected");
 
     std::vector<std::uint8_t> signingPublicKey, signingPrivateKey, signature;
@@ -92,7 +92,7 @@ int main()
 
     // Repeated seals of the same record must not reuse a nonce or produce the
     // deterministic ciphertext behavior of the legacy provider.
-    request.encryptionKey = key;
+    request.secureEncryptionKey = &key;
     PackageSealedBlob repeated;
     ok &= check(crypto.seal(request, repeated, issue), "second seal succeeds");
     ok &= check(repeated.nonce != firstSealed.nonce || repeated.ciphertext != firstSealed.ciphertext,

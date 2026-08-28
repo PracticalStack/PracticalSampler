@@ -2,6 +2,7 @@
 
 #include "drs/engine/PackageCrypto.h"
 #include "drs/engine/PackageKeyEnvelope.h"
+#include "drs/engine/PackagePublisherSigning.h"
 
 #include <cstdint>
 #include <string>
@@ -34,9 +35,9 @@ struct PackageV3WriteRequest
     std::string packageId;
     std::string compatibilityId;
     std::string encryptionKeyId;
-    std::vector<std::uint8_t> releaseKey;
+    const SecureBuffer* releaseKey = nullptr;
     std::string signingKeyId;
-    std::vector<std::uint8_t> signingPrivateKey;
+    const PackagePublisherSigningClient* publisherSigner = nullptr;
     std::vector<PackageV3RecordInput> records;
 };
 
@@ -45,6 +46,7 @@ struct PackageV3WriteResult
     bool written = false;
     std::vector<std::uint8_t> packageBytes;
     std::vector<std::uint8_t> semanticDigest;
+    std::string signingAuditId;
     std::vector<std::string> issues;
 };
 
@@ -100,12 +102,17 @@ bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
                               PackageV3OpenResult& package,
                               std::string& issue);
 
+bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
+                              const PackagePublisherTrustStore& trustStore,
+                              PackageV3OpenResult& package,
+                              std::string& issue);
+
 bool unwrapPackageV3ContentKey(const PackageV3OpenResult& package,
-                               const std::vector<std::uint8_t>& releaseKey,
-                               std::vector<std::uint8_t>& contentKey,
+                               const SecureBuffer& releaseKey,
+                               SecureBuffer& contentKey,
                                std::string& issue);
 
-bool openPackageV3Record(const std::vector<std::uint8_t>& contentKey,
+bool openPackageV3Record(const SecureBuffer& contentKey,
                          const PackageV3OpenResult& package,
                          const PackageV3RecordDescriptor& record,
                          std::vector<std::uint8_t>& plaintext,

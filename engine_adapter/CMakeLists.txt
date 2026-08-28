@@ -8,6 +8,20 @@ configure_file(
     @ONLY
 )
 
+set(DRS_PACKAGE_PUBLISHER_KEY_ID "" CACHE STRING
+    "Public publisher signing-key ID embedded in the desktop trust store")
+set(DRS_PACKAGE_PUBLISHER_PUBLIC_KEY_HEX "" CACHE STRING
+    "Public 32-byte Ed25519 verification key as 64 hexadecimal characters")
+set(DRS_PACKAGE_PUBLISHER_KEY_ACTIVATED_UTC "" CACHE STRING
+    "Activation timestamp for the embedded public publisher key")
+set(DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES "" CACHE STRING
+    "Semicolon-separated public trust entries: keyId|publicKeyHex|active/retired/revoked|activatedUtc|retiredUtc|revokedUtc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageTrustStore.generated.h.in"
+    "${DRS_ENGINE_ADAPTER_GENERATED_DIR}/drs/engine/PackageTrustStore.generated.h"
+    @ONLY
+)
+
 add_library(drs_sample_import STATIC
     src/SampleImport.cpp
     include/drs/engine/SampleImport.h
@@ -88,15 +102,18 @@ add_library(drs_engine_adapter STATIC
     src/PerformanceRuleContract.cpp
     src/PlayableInstrumentLicense.cpp
     src/PackageCrypto.cpp
+    src/PackageKeys.cpp
     src/PackageSignature.cpp
     src/PackageV3.cpp
     src/PackageV3FileReader.cpp
     src/PackageKeyEnvelope.cpp
     src/PackageProtectionDiagnostics.cpp
+    src/PackagePublisherTrustStore.cpp
     src/PackageReader.cpp
     src/PackageReaderDispatch.cpp
     src/PackageV2.cpp
     src/PackageV2StreamingExport.cpp
+    src/SecureBuffer.cpp
     src/PackageWriter.cpp
     src/PublishedMacroBinding.cpp
     src/PreparedPlayback.cpp
@@ -133,6 +150,8 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PackageV3FileReader.h
     include/drs/engine/PackageKeyEnvelope.h
     include/drs/engine/PackageProtectionDiagnostics.h
+    include/drs/engine/PackagePublisherTrustStore.h
+    include/drs/engine/PackagePublisherSigning.h
     include/drs/engine/ControlLaw.h
     include/drs/engine/ContinuousDamper.h
     include/drs/engine/ContinuousDamperContract.h

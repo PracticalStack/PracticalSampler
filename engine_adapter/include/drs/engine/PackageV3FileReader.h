@@ -37,8 +37,12 @@ PackageV3FileOpenResult openPackageV3File(
     const std::string& packagePath,
     const std::vector<PackageSigningKey>& trustStore);
 
+PackageV3FileOpenResult openPackageV3File(
+    const std::string& packagePath,
+    const PackagePublisherTrustStore& trustStore);
+
 PackageV3FileRecordOpenResult openPackageV3FileRecord(
     const PackageV3FileOpenResult& file,
-    const std::vector<std::uint8_t>& contentKey,
+    const SecureBuffer& contentKey,
     const PackageV3RecordDescriptor& record);
 } // namespace drs::engine

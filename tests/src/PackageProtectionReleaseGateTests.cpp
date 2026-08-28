@@ -1,5 +1,6 @@
 #include <drs/engine/PackageProtectionDiagnostics.h>
 #include <drs/engine/PackageV3.h>
+#include "PackageProtectionTestSupport.h"
 
 #include <chrono>
 #include <iostream>
@@ -18,17 +19,19 @@ int main()
 {
     using namespace drs::engine;
     std::string issue;
-    std::vector<std::uint8_t> releaseKey, signingPublicKey, signingPrivateKey;
+    SecureBuffer releaseKey;
+    std::vector<std::uint8_t> signingPublicKey, signingPrivateKey;
     bool ok = check(generateSecurePackageKey(releaseKey, issue), "release key generation")
         && check(generatePackageSigningKeyPair(signingPublicKey, signingPrivateKey, issue),
                  "signing key generation");
+    PackageProtectionTestSigner signer("signing-key-1", signingPrivateKey);
     PackageV3WriteRequest request;
     request.packageId = "release-gate";
     request.compatibilityId = "drs.runtime.v1";
     request.encryptionKeyId = "release-key-1";
-    request.releaseKey = releaseKey;
+    request.releaseKey = &releaseKey;
     request.signingKeyId = "signing-key-1";
-    request.signingPrivateKey = signingPrivateKey;
+    request.publisherSigner = &signer;
     request.records = {
         { "settings", "runtime-settings", 1, 0, { 'g', 'a', 'i', 'n', '=', '1' } },
         { "sample", "sample-page", 1, 0, { 0x52, 0x49, 0x46, 0x46, 0x00, 0x01 } }
@@ -47,7 +50,7 @@ int main()
     ok &= check(elapsed < 2000, "small package crypto budget");
     auto opened = parsePackageV3(first.packageBytes);
     const std::vector<PackageSigningKey> trustStore {
-        { request.signingKeyId, signingPublicKey, false }
+        activeTestSigningKey(request.signingKeyId, signingPublicKey)
     };
     ok &= check(opened.opened
                     && verifyPackageV3Signature(first.packageBytes, trustStore, opened, issue),

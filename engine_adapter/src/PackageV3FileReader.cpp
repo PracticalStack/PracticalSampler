@@ -89,6 +89,14 @@ PackageV3FileOpenResult openPackageV3File(
     const std::string& packagePath,
     const std::vector<PackageSigningKey>& trustStore)
 {
+    const PackagePublisherTrustStore immutableStore(trustStore);
+    return openPackageV3File(packagePath, immutableStore);
+}
+
+PackageV3FileOpenResult openPackageV3File(
+    const std::string& packagePath,
+    const PackagePublisherTrustStore& trustStore)
+{
     namespace fs = std::filesystem;
     PackageV3FileOpenResult result;
     result.packagePath = packagePath;
@@ -224,7 +232,7 @@ PackageV3FileOpenResult openPackageV3File(
 
 PackageV3FileRecordOpenResult openPackageV3FileRecord(
     const PackageV3FileOpenResult& file,
-    const std::vector<std::uint8_t>& contentKey,
+    const SecureBuffer& contentKey,
     const PackageV3RecordDescriptor& record)
 {
     namespace fs = std::filesystem;

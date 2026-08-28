@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drs/engine/PackageCrypto.h"
+#include "drs/engine/PackagePublisherTrustStore.h"
 #include "drs/engine/PackageSignature.h"
 
 #include <cstdint>
@@ -17,23 +18,16 @@ struct PackageKeyEnvelope
 
 bool wrapPackageContentKey(const std::string& packageId,
                            const std::string& keyId,
-                           const std::vector<std::uint8_t>& contentKey,
-                           const std::vector<std::uint8_t>& releaseKey,
+                           const SecureBuffer& contentKey,
+                           const SecureBuffer& releaseKey,
                            PackageKeyEnvelope& envelope,
                            std::string& issue);
 
 bool unwrapPackageContentKey(const std::string& packageId,
                              const PackageKeyEnvelope& envelope,
-                             const std::vector<std::uint8_t>& releaseKey,
-                             std::vector<std::uint8_t>& contentKey,
+                             const SecureBuffer& releaseKey,
+                             SecureBuffer& contentKey,
                              std::string& issue);
-
-struct PackageSigningKey
-{
-    std::string keyId;
-    std::vector<std::uint8_t> publicKey;
-    bool revoked = false;
-};
 
 bool verifyPackageSignature(const std::vector<std::uint8_t>& packageBytes,
                             const std::vector<std::uint8_t>& signature,
@@ -43,6 +37,11 @@ bool verifyPackageSignature(const std::vector<std::uint8_t>& packageBytes,
 
 bool resolvePackageSigningPublicKey(const std::string& signingKeyId,
                                     const std::vector<PackageSigningKey>& trustStore,
+                                    std::vector<std::uint8_t>& publicKey,
+                                    std::string& issue);
+
+bool resolvePackageSigningPublicKey(const std::string& signingKeyId,
+                                    const PackagePublisherTrustStore& trustStore,
                                     std::vector<std::uint8_t>& publicKey,
                                     std::string& issue);
 } // namespace drs::engine

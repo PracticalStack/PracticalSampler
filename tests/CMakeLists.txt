@@ -4483,7 +4483,9 @@ target_link_libraries(drs_package_v3_tests
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
 )
 target_compile_features(drs_package_v3_tests PRIVATE cxx_std_17)
-target_include_directories(drs_package_v3_tests PRIVATE ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+target_include_directories(drs_package_v3_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/support
+    ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
 add_test(NAME drs.package_v3 COMMAND drs_package_v3_tests)
 
 juce_add_console_app(drs_package_v3_file_reader_tests
@@ -4495,7 +4497,9 @@ target_link_libraries(drs_package_v3_file_reader_tests
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
 )
 target_compile_features(drs_package_v3_file_reader_tests PRIVATE cxx_std_17)
-target_include_directories(drs_package_v3_file_reader_tests PRIVATE ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+target_include_directories(drs_package_v3_file_reader_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/support
+    ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
 add_test(NAME drs.package_v3.file_reader COMMAND drs_package_v3_file_reader_tests)
 
 juce_add_console_app(drs_package_signing_keys_tests
@@ -4519,8 +4523,25 @@ target_link_libraries(drs_package_protection_release_gate_tests
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
 )
 target_compile_features(drs_package_protection_release_gate_tests PRIVATE cxx_std_17)
-target_include_directories(drs_package_protection_release_gate_tests PRIVATE ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+target_include_directories(drs_package_protection_release_gate_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/support
+    ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
 add_test(NAME drs.package_protection.release_gate COMMAND drs_package_protection_release_gate_tests)
+
+juce_add_console_app(drs_package_key_lifecycle_tests
+    PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package Key Lifecycle Tests"
+)
+target_sources(drs_package_key_lifecycle_tests PRIVATE src/PackageKeyLifecycleTests.cpp)
+target_link_libraries(drs_package_key_lifecycle_tests
+    PRIVATE drs_engine_adapter drs_controlled_package_signing
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags
+)
+target_compile_features(drs_package_key_lifecycle_tests PRIVATE cxx_std_17)
+target_compile_definitions(drs_package_key_lifecycle_tests PRIVATE
+    DRS_PHASE3_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_include_directories(drs_package_key_lifecycle_tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
+add_test(NAME drs.package_keys.lifecycle COMMAND drs_package_key_lifecycle_tests)
 
 add_executable(drs_packaged_instrument_fx_routing_contract_tests
     src/PackagedInstrumentFxRoutingContractTests.cpp
@@ -5183,6 +5204,7 @@ add_dependencies(drs_all_tests
     drs_package_v3_file_reader_tests
     drs_package_signing_keys_tests
     drs_package_protection_release_gate_tests
+    drs_package_key_lifecycle_tests
     drs_host_session_state_contract_tests
     drs_host_project_recall_tests
     drs_host_state_recovery_ui_tests

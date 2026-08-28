@@ -1,4 +1,5 @@
 #include <drs/engine/PackageV3.h>
+#include "PackageProtectionTestSupport.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -14,7 +15,7 @@ bool check(const bool condition, const char* message)
 
 struct FixtureKeys
 {
-    std::vector<std::uint8_t> releaseKey;
+    drs::engine::SecureBuffer releaseKey;
     std::vector<std::uint8_t> signingPublicKey;
     std::vector<std::uint8_t> signingPrivateKey;
 };
@@ -26,15 +27,17 @@ bool makeKeys(FixtureKeys& keys, std::string& issue)
             keys.signingPublicKey, keys.signingPrivateKey, issue);
 }
 
-drs::engine::PackageV3WriteRequest makeRequest(const FixtureKeys& keys)
+drs::engine::PackageV3WriteRequest makeRequest(
+    const FixtureKeys& keys,
+    const drs::engine::PackagePublisherSigningClient& signer)
 {
     drs::engine::PackageV3WriteRequest request;
     request.packageId = "v3-fixture";
     request.compatibilityId = "drs.runtime.v1";
     request.encryptionKeyId = "release-key-test";
-    request.releaseKey = keys.releaseKey;
+    request.releaseKey = &keys.releaseKey;
     request.signingKeyId = "signing-key-test";
-    request.signingPrivateKey = keys.signingPrivateKey;
+    request.publisherSigner = &signer;
     // Deliberately non-canonical input order: the writer must canonicalize it.
     request.records = {
         { "sample-page-0", "sample-page", 4, 0, { 0x10, 0x20, 0x30, 0x40 } },
@@ -83,7 +86,8 @@ int main()
     std::string issue;
     FixtureKeys keys;
     ok &= check(makeKeys(keys, issue), "fixture keys generated");
-    const auto request = makeRequest(keys);
+    PackageProtectionTestSigner signer("signing-key-test", keys.signingPrivateKey);
+    const auto request = makeRequest(keys, signer);
 
     const auto written = writePackageV3(request);
     ok &= check(written.written, "V3 write");
@@ -105,11 +109,11 @@ int main()
     ok &= check(package.records[0].recordKind <= package.records[1].recordKind,
                 "writer uses canonical record ordering");
 
-    std::vector<std::uint8_t> contentKey;
+    SecureBuffer contentKey;
     ok &= check(! unwrapPackageV3ContentKey(package, keys.releaseKey, contentKey, issue),
                 "content key is unavailable before signature verification");
     const std::vector<PackageSigningKey> trustStore {
-        { request.signingKeyId, keys.signingPublicKey, false }
+        activeTestSigningKey(request.signingKeyId, keys.signingPublicKey)
     };
     ok &= check(verifyPackageV3Signature(written.packageBytes, trustStore, package, issue),
                 "publisher signature verifies");
@@ -139,8 +143,9 @@ int main()
         ok &= check(plaintext.empty(), "empty record remains empty");
     }
 
-    auto wrongReleaseKey = keys.releaseKey;
-    wrongReleaseKey[0] ^= 0x01u;
+    SecureBuffer wrongReleaseKey;
+    ok &= check(generateSecurePackageKey(wrongReleaseKey, issue),
+                "wrong release key generated");
     ok &= check(! unwrapPackageV3ContentKey(package, wrongReleaseKey, contentKey, issue),
                 "wrong release key rejected");
 

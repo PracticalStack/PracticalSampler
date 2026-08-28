@@ -6,7 +6,6 @@
 #include <tuple>
 
 #include <sodium/crypto_hash_sha256.h>
-#include <sodium/utils.h>
 
 namespace drs::engine
 {
@@ -281,8 +280,9 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
         || request.compatibilityId.size() > packageV3MaximumIdentityBytes
         || request.encryptionKeyId.size() > packageV3MaximumIdentityBytes
         || request.signingKeyId.size() > packageV3MaximumIdentityBytes
-        || request.releaseKey.size() != securePackageKeySizeBytes
-        || request.signingPrivateKey.size() != packageEd25519PrivateKeyBytes
+        || request.releaseKey == nullptr
+        || request.releaseKey->size() != securePackageKeySizeBytes
+        || request.publisherSigner == nullptr
         || request.records.empty() || request.records.size() > packageV3MaximumRecords)
     {
         result.issues.push_back("V3 package identity, key material, or record count is invalid");
@@ -312,18 +312,13 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
     }
 
     std::string issue;
-    std::vector<std::uint8_t> contentKey;
+    SecureBuffer contentKey;
     if (! generateSecurePackageKey(contentKey, issue))
     { result.issues.push_back(issue); return result; }
-    struct KeyWiper
-    {
-        std::vector<std::uint8_t>& bytes;
-        ~KeyWiper() { if (! bytes.empty()) sodium_memzero(bytes.data(), bytes.size()); }
-    } keyWiper { contentKey };
 
     PackageKeyEnvelope envelope;
     if (! wrapPackageContentKey(request.packageId, request.encryptionKeyId,
-                                contentKey, request.releaseKey, envelope, issue))
+                                contentKey, *request.releaseKey, envelope, issue))
     { result.issues.push_back(issue); return result; }
 
     std::vector<SealedRecord> sealedRecords;
@@ -342,7 +337,7 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
         seal.packageId = request.packageId;
         seal.recordId = records[index].recordId;
         seal.encryptionKeyId = request.encryptionKeyId;
-        seal.encryptionKey = contentKey;
+        seal.secureEncryptionKey = &contentKey;
         seal.additionalAuthenticatedData = asBinaryString(aad);
         seal.plaintext = records[index].plaintext;
         SealedRecord sealed;
@@ -400,10 +395,23 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
     for (const auto& record : sealedRecords)
         result.packageBytes.insert(result.packageBytes.end(), record.sealed.ciphertext.begin(),
                                    record.sealed.ciphertext.end());
-    std::vector<std::uint8_t> signature;
-    if (! packageSignEd25519ph(request.signingPrivateKey, result.packageBytes, signature, issue))
-    { result.issues.push_back(issue); result.packageBytes.clear(); return result; }
-    result.packageBytes.insert(result.packageBytes.end(), signature.begin(), signature.end());
+    PackagePublisherSigningRequest signingRequest;
+    signingRequest.signingKeyId = request.signingKeyId;
+    signingRequest.canonicalSignedBytes = &result.packageBytes;
+    PackagePublisherSigningResponse signingResponse;
+    if (! request.publisherSigner->signCanonicalPackage(
+            signingRequest, signingResponse, issue)
+        || signingResponse.signature.size() != packageEd25519SignatureBytes
+        || signingResponse.auditId.empty())
+    {
+        if (issue.empty()) issue = "publisher signing response is invalid";
+        result.issues.push_back(issue);
+        result.packageBytes.clear();
+        return result;
+    }
+    result.packageBytes.insert(result.packageBytes.end(), signingResponse.signature.begin(),
+                               signingResponse.signature.end());
+    result.signingAuditId = std::move(signingResponse.auditId);
     if (result.packageBytes.size() != totalSize)
     { result.issues.push_back("V3 package size does not match its canonical layout"); result.packageBytes.clear(); return result; }
 
@@ -567,6 +575,15 @@ bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
                               PackageV3OpenResult& package,
                               std::string& issue)
 {
+    const PackagePublisherTrustStore immutableStore(trustStore);
+    return verifyPackageV3Signature(packageBytes, immutableStore, package, issue);
+}
+
+bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
+                              const PackagePublisherTrustStore& trustStore,
+                              PackageV3OpenResult& package,
+                              std::string& issue)
+{
     package.signatureVerified = false;
     if (! package.opened || package.signatureOffset > packageBytes.size()
         || packageBytes.size() - static_cast<std::size_t>(package.signatureOffset) != package.signature.size())
@@ -584,8 +601,8 @@ bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
 }
 
 bool unwrapPackageV3ContentKey(const PackageV3OpenResult& package,
-                               const std::vector<std::uint8_t>& releaseKey,
-                               std::vector<std::uint8_t>& contentKey,
+                               const SecureBuffer& releaseKey,
+                               SecureBuffer& contentKey,
                                std::string& issue)
 {
     contentKey.clear();
@@ -595,7 +612,7 @@ bool unwrapPackageV3ContentKey(const PackageV3OpenResult& package,
                                    releaseKey, contentKey, issue);
 }
 
-bool openPackageV3Record(const std::vector<std::uint8_t>& contentKey,
+bool openPackageV3Record(const SecureBuffer& contentKey,
                          const PackageV3OpenResult& package,
                          const PackageV3RecordDescriptor& record,
                          std::vector<std::uint8_t>& plaintext,
@@ -620,7 +637,7 @@ bool openPackageV3Record(const std::vector<std::uint8_t>& contentKey,
     open.recordId = trustedRecord.recordId;
     open.encryptionKeyId = package.encryptionKeyId;
     open.additionalAuthenticatedData = asBinaryString(aad);
-    open.encryptionKey = contentKey;
+    open.secureEncryptionKey = &contentKey;
     open.sealed = trustedRecord.sealed;
     return getSecurePackageCryptoProvider().open(open, plaintext, issue);
 }

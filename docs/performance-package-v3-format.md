@@ -1,6 +1,6 @@
 # Performance Package V3 Format Contract
 
-Status: Implemented canonical contract and bounded reader for CPCA-1/CPCA-2
+Status: Implemented canonical contract, bounded reader, and CPCA-3 key/signing interfaces
 
 Date: 2026-08-27
 
@@ -149,6 +149,20 @@ unknown, retired, or unavailable key.
 
 The signing key is independent from the release encryption key. A signing-key
 rotation changes `signingKeyId` and does not require re-encrypting records.
+
+Release and content keys are held in move-only `SecureBuffer` instances and
+cleared with `sodium_memzero`. Runtime release-key lookup is exact by versioned
+`encryptionKeyId`: active keys may encrypt/decrypt, retired keys decrypt only,
+and revoked or unknown keys fail closed. The backing entitlement/OS secret
+source is outside package-controlled data.
+
+Publisher verification keys are public-only immutable trust-store entries with
+activation, retirement, and revocation metadata. Active and retired public
+keys verify packages; revoked and unknown keys fail closed. V3 writing invokes
+a `PackagePublisherSigningClient` and contains no private-key field. The
+controlled signer is an isolated opt-in CI/service target that validates the
+canonical signed region and requires a non-secret audit event before returning
+an Ed25519ph signature.
 
 Key-envelope AAD is also length-prefixed binary:
 

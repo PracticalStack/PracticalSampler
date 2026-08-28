@@ -1,6 +1,8 @@
 #include <drs/engine/PackageKeyEnvelope.h>
 
-#include <algorithm>
+#include <utility>
+
+#include <sodium/utils.h>
 
 namespace drs::engine
 {
@@ -32,24 +34,27 @@ std::string envelopeAad(const std::string& packageId, const std::string& keyId)
 
 bool wrapPackageContentKey(const std::string& packageId,
                            const std::string& keyId,
-                           const std::vector<std::uint8_t>& contentKey,
-                           const std::vector<std::uint8_t>& releaseKey,
+                           const SecureBuffer& contentKey,
+                           const SecureBuffer& releaseKey,
                            PackageKeyEnvelope& envelope,
                            std::string& issue)
 {
     envelope = {};
-    if (packageId.empty() || keyId.empty() || contentKey.size() != securePackageKeySizeBytes
+    if (packageId.empty() || keyId.empty()
+        || contentKey.size() != securePackageKeySizeBytes
         || releaseKey.size() != securePackageKeySizeBytes)
     { issue = "key envelope identity or key length is invalid"; return false; }
     PackageSealRequest request;
     request.packageId = packageId;
     request.recordId = "key-envelope";
-    request.encryptionKey = releaseKey;
+    request.secureEncryptionKey = &releaseKey;
+    request.securePlaintext = &contentKey;
     request.additionalAuthenticatedData = envelopeAad(packageId, keyId);
     if (request.additionalAuthenticatedData.empty())
     { issue = "key envelope identity is too long"; return false; }
-    request.plaintext = contentKey;
-    if (! getSecurePackageCryptoProvider().seal(request, envelope.sealedContentKey, issue)) return false;
+    if (! getSecurePackageCryptoProvider().seal(
+            request, envelope.sealedContentKey, issue))
+        return false;
     envelope.keyId = keyId;
     issue.clear();
     return true;
@@ -57,24 +62,32 @@ bool wrapPackageContentKey(const std::string& packageId,
 
 bool unwrapPackageContentKey(const std::string& packageId,
                              const PackageKeyEnvelope& envelope,
-                             const std::vector<std::uint8_t>& releaseKey,
-                             std::vector<std::uint8_t>& contentKey,
+                             const SecureBuffer& releaseKey,
+                             SecureBuffer& contentKey,
                              std::string& issue)
 {
     contentKey.clear();
-    if (packageId.empty() || envelope.keyId.empty() || releaseKey.size() != securePackageKeySizeBytes)
+    if (packageId.empty() || envelope.keyId.empty()
+        || releaseKey.size() != securePackageKeySizeBytes)
     { issue = "key envelope identity or release key length is invalid"; return false; }
     PackageOpenRequest request;
     request.packageId = packageId;
     request.recordId = "key-envelope";
-    request.encryptionKey = releaseKey;
+    request.secureEncryptionKey = &releaseKey;
     request.additionalAuthenticatedData = envelopeAad(packageId, envelope.keyId);
     if (request.additionalAuthenticatedData.empty())
     { issue = "key envelope identity is too long"; return false; }
     request.sealed = envelope.sealedContentKey;
-    if (! getSecurePackageCryptoProvider().open(request, contentKey, issue)) return false;
-    if (contentKey.size() != securePackageKeySizeBytes)
-    { contentKey.clear(); issue = "unwrapped content key has invalid length"; return false; }
+    std::vector<std::uint8_t> openedKey;
+    if (! getSecurePackageCryptoProvider().open(request, openedKey, issue))
+        return false;
+    if (openedKey.size() != securePackageKeySizeBytes)
+    {
+        if (! openedKey.empty()) sodium_memzero(openedKey.data(), openedKey.size());
+        issue = "unwrapped content key has invalid length";
+        return false;
+    }
+    contentKey = SecureBuffer(std::move(openedKey));
     issue.clear();
     return true;
 }
@@ -96,15 +109,15 @@ bool resolvePackageSigningPublicKey(const std::string& signingKeyId,
                                     std::vector<std::uint8_t>& publicKey,
                                     std::string& issue)
 {
-    publicKey.clear();
-    const auto found = std::find_if(trustStore.begin(), trustStore.end(), [&](const auto& key)
-    { return key.keyId == signingKeyId; });
-    if (found == trustStore.end()) { issue = "package signing key id is unknown"; return false; }
-    if (found->revoked) { issue = "package signing key is revoked"; return false; }
-    if (found->publicKey.size() != packageEd25519PublicKeyBytes)
-    { issue = "package signing public key length is invalid"; return false; }
-    publicKey = found->publicKey;
-    issue.clear();
-    return true;
+    const PackagePublisherTrustStore immutableStore(trustStore);
+    return immutableStore.resolvePublicKey(signingKeyId, publicKey, issue);
+}
+
+bool resolvePackageSigningPublicKey(const std::string& signingKeyId,
+                                    const PackagePublisherTrustStore& trustStore,
+                                    std::vector<std::uint8_t>& publicKey,
+                                    std::string& issue)
+{
+    return trustStore.resolvePublicKey(signingKeyId, publicKey, issue);
 }
 } // namespace drs::engine
