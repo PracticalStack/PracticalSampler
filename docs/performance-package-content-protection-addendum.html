@@ -143,7 +143,7 @@
       <div class="summary-grid">
         <div class="summary-card"><strong>8</strong><span>Ordered workstreams</span></div>
         <div class="summary-card"><strong>3–5</strong><span>Estimated engineer-weeks before external review</span></div>
-        <div class="summary-card"><strong>CPCA-1</strong><span>Canonical format gate complete</span></div>
+        <div class="summary-card"><strong>2 / 8</strong><span>Format and reader gates complete</span></div>
         <div class="summary-card"><strong>In progress</strong><span>Completion status</span></div>
       </div>
     </section>
@@ -168,12 +168,12 @@
       <div class="heading"><h2>Reviewed Baseline</h2></div>
       <p>The cryptographic primitives are useful, but the current implementation is not yet a protected package product path.</p>
       <div class="callout warning">
-        <strong>Current boundary:</strong> normal exports still call the V2 streaming writer with the deterministic compatibility provider. CPCA-1 now provides a canonical in-memory V3 container with a wrapped content key and publisher signature, but it is not yet connected to a bounded file reader or any product export/open path.
+        <strong>Current boundary:</strong> normal exports still call the V2 streaming writer with the deterministic compatibility provider. CPCA-1 and CPCA-2 now provide a canonical V3 container plus a bounded, signature-first file reader, but neither is connected to a production export/open path.
       </div>
       <ul>
-        <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519 adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, semantic SHA-256, and focused negative tests.</li>
-        <li>Missing: bounded file-backed reads, concrete trust/key providers, production export/load integration, complete hostile-input qualification, and independent review.</li>
-        <li>Current validation: seven of eight related tests pass; <code>drs.phase1.performance_package_host_validation</code> remains red.</li>
+        <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, semantic SHA-256, and focused negative tests.</li>
+        <li>Missing: concrete production trust/key providers, production export/load integration, complete hostile-input qualification, and independent review.</li>
+        <li>Current validation: eleven of twelve related package tests pass; the pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains red and is tracked for CPCA-7.</li>
       </ul>
     </section>
 
@@ -188,7 +188,7 @@
           <thead><tr><th>ID</th><th>Outcome</th><th>Dependency</th><th>Status</th></tr></thead>
           <tbody>
             <tr><td class="id">CPCA-1</td><td>Complete, unambiguous, signed V3 byte contract</td><td>Existing V3 prototype</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">CPCA-2</td><td>Bounded file-backed verification/decryption</td><td>CPCA-1</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-2</td><td>Bounded file-backed verification/decryption</td><td>CPCA-1</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">External owner</span></td></tr>
             <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
             <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status ready">Ready</span></td></tr>
@@ -226,16 +226,16 @@
     </section>
 
     <section class="workstream" id="step-2">
-      <div class="work-head"><div class="work-number">2</div><h2>Build the Bounded, Signature-First Reader</h2><span class="status ready">Ready</span></div>
+      <div class="work-head"><div class="work-number">2</div><h2>Build the Bounded, Signature-First Reader</h2><span class="status complete">Complete</span></div>
       <div class="work-body">
         <p class="work-intent">Make V3 a hostile-file boundary that never reads the whole package or publishes unauthenticated plaintext.</p>
         <div class="grid-2">
-          <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Parse only a fixed-size header and bounded envelope/TOC ranges from the file.</li>
-            <li>Verify publisher signature and all bounds before trusting package-owned structure.</li>
-            <li>Resolve and unwrap the content key only after signature validation.</li>
-            <li>Decrypt metadata, heads, and requested sample pages independently on worker threads.</li>
-            <li>Use checked offset arithmetic and explicit package, TOC, record, and allocation ceilings.</li>
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-2-T1</span> Parse only a fixed-size header and bounded envelope/TOC ranges from the file.</li>
+            <li class="done"><span class="task-id">CPCA-2-T2</span> Verify publisher signature and all bounds before trusting package-owned structure.</li>
+            <li class="done"><span class="task-id">CPCA-2-T3</span> Resolve and unwrap the content key only after signature validation.</li>
+            <li class="done"><span class="task-id">CPCA-2-T4</span> Provide blocking worker-side APIs that independently decrypt metadata, heads, and requested sample pages without resident package loading.</li>
+            <li class="done"><span class="task-id">CPCA-2-T5</span> Use checked offset arithmetic and explicit package, header, TOC, record, and allocation ceilings.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
             <li>Exercise sparse, oversized, truncated, reordered, duplicate, and adversarial-length files.</li>
@@ -244,7 +244,8 @@
             <li>Audit thread use: no crypto, allocation, seek, or file operation on the audio thread.</li>
           </ul></article>
         </div>
-        <div class="files">Primary code: <code>PackageReaderDispatch.*</code>, new V3 file reader, <code>SampleDataSource.*</code>, runtime streaming worker.</div>
+        <div class="files">Primary code: <code>PackageReaderDispatch.cpp</code>, <code>PackageV3FileReader.*</code>, <code>PackageV3.*</code>, <code>PackageSignature.*</code>, and <code>PackageV3FileReaderTests.cpp</code>.</div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> <code>drs.package_v3.file_reader</code> verifies the full signed region through Ed25519ph with a 64 KiB payload buffer, retains no payload ciphertext, reads only a requested record for AEAD open, and rejects unknown/revoked/wrong signing keys, wrong content/release keys, mutation, truncation, reordered/duplicate TOCs, adversarial lengths, and oversized declared sections without returning plaintext. Unkeyed dispatch now reads only the eight-byte format signature.</div>
         <div class="exit"><h3>Exit gate</h3><p>Reader memory is bounded independently of package size; signature verification precedes acceptance; requested records/pages open without resident package loading.</p></div>
       </div>
     </section>
@@ -257,7 +258,7 @@
           <article class="panel"><h3>Development tasks</h3><ul>
             <li>Implement the concrete runtime <code>PackageKeyProvider</code> and versioned release-key lookup.</li>
             <li>Embed a read-only public trust store with activation, retirement, and revocation metadata.</li>
-            <li>Build controlled CI/service signing that accepts canonical package bytes and returns an Ed25519 signature.</li>
+            <li>Build controlled CI/service signing that accepts canonical package bytes and returns an Ed25519ph signature.</li>
             <li>Keep private signing material and release keys out of source, desktop binaries, fixtures, logs, symbols, crash reports, and artifacts.</li>
             <li>Use move-only sensitive buffers and dependable zeroization such as <code>sodium_memzero</code> throughout key paths.</li>
           </ul></article>
@@ -327,7 +328,7 @@
         <p class="work-intent">Expand the focused smoke tests into reproducible evidence for every security and real-time invariant.</p>
         <div class="grid-2">
           <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Add official AEAD and Ed25519 vectors plus a one-million-nonce production-RNG test.</li>
+            <li>Add official AEAD and Ed25519ph vectors plus a one-million-nonce production-RNG test.</li>
             <li>Build complete positive/negative fixture generators and coverage-guided parser, envelope, signature, and framing fuzz targets.</li>
             <li>Add automated plaintext scans across packages, staging/temp directories, logs, host state, and crash artifacts.</li>
             <li>Run Accurate Salamander export/load/page/playback benchmarks against the frozen V2 and project baselines.</li>

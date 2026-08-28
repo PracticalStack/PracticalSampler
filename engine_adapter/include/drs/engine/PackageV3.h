@@ -11,7 +11,10 @@ namespace drs::engine
 {
 inline constexpr std::uint32_t packageV3FormatVersion = 3;
 inline constexpr std::uint16_t packageV3CryptoSuiteXChaCha20Poly1305 = 1;
-inline constexpr std::uint16_t packageV3SignatureSuiteEd25519 = 1;
+inline constexpr std::uint16_t packageV3SignatureSuiteEd25519ph = 1;
+inline constexpr std::size_t packageV3FixedHeaderBytes = 76;
+inline constexpr std::size_t packageV3MaximumHeaderBytes = 64u * 1024u;
+inline constexpr std::size_t packageV3MaximumTocBytes = 256u * 1024u * 1024u;
 inline constexpr std::size_t packageV3MaximumRecords = 16384;
 inline constexpr std::size_t packageV3MaximumRecordBytes = 64u * 1024u * 1024u;
 inline constexpr std::uint64_t packageV3MaximumPackageBytes = 16ull * 1024ull * 1024ull * 1024ull;
@@ -89,6 +92,8 @@ std::vector<std::uint8_t> buildPackageV3RecordAad(
 
 PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request);
 PackageV3OpenResult parsePackageV3(const std::vector<std::uint8_t>& packageBytes);
+PackageV3OpenResult parsePackageV3Index(const std::vector<std::uint8_t>& indexBytes,
+                                        std::uint64_t totalPackageBytes);
 
 bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
                               const std::vector<PackageSigningKey>& trustStore,

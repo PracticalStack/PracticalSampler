@@ -98,7 +98,7 @@ std::vector<std::uint8_t> serializeHeader(
     appendU32(bytes, headerSize);
     appendU32(bytes, kRequiredFlags);
     appendU16(bytes, packageV3CryptoSuiteXChaCha20Poly1305);
-    appendU16(bytes, packageV3SignatureSuiteEd25519);
+    appendU16(bytes, packageV3SignatureSuiteEd25519ph);
     appendU32(bytes, recordCount);
     appendU64(bytes, tocOffset);
     appendU64(bytes, tocSize);
@@ -401,7 +401,7 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
         result.packageBytes.insert(result.packageBytes.end(), record.sealed.ciphertext.begin(),
                                    record.sealed.ciphertext.end());
     std::vector<std::uint8_t> signature;
-    if (! packageSignEd25519(request.signingPrivateKey, result.packageBytes, signature, issue))
+    if (! packageSignEd25519ph(request.signingPrivateKey, result.packageBytes, signature, issue))
     { result.issues.push_back(issue); result.packageBytes.clear(); return result; }
     result.packageBytes.insert(result.packageBytes.end(), signature.begin(), signature.end());
     if (result.packageBytes.size() != totalSize)
@@ -417,11 +417,14 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
     return result;
 }
 
-PackageV3OpenResult parsePackageV3(const std::vector<std::uint8_t>& bytes)
+PackageV3OpenResult parsePackageV3Index(const std::vector<std::uint8_t>& bytes,
+                                        const std::uint64_t totalPackageBytes)
 {
     PackageV3OpenResult result;
-    if (bytes.size() > packageV3MaximumPackageBytes)
+    if (totalPackageBytes > packageV3MaximumPackageBytes)
     { result.issues.push_back("V3 package exceeds the format size limit"); return result; }
+    if (bytes.size() < packageV3FixedHeaderBytes)
+    { result.issues.push_back("V3 fixed header is truncated"); return result; }
     Reader header(bytes, 0u, bytes.size());
     std::vector<std::uint8_t> magic;
     std::uint32_t version = 0, headerSize = 0, flags = 0, recordCount = 0;
@@ -438,9 +441,13 @@ PackageV3OpenResult parsePackageV3(const std::vector<std::uint8_t>& bytes)
     { result.issues.push_back("V3 fixed header is truncated"); return result; }
     if (version != packageV3FormatVersion || flags != kRequiredFlags
         || cryptoSuite != packageV3CryptoSuiteXChaCha20Poly1305
-        || signatureSuite != packageV3SignatureSuiteEd25519 || reserved != 0u
+        || signatureSuite != packageV3SignatureSuiteEd25519ph || reserved != 0u
         || signatureSize != kSignatureSize || recordCount == 0u
-        || recordCount > packageV3MaximumRecords || headerSize > bytes.size())
+        || recordCount > packageV3MaximumRecords
+        || headerSize < packageV3FixedHeaderBytes
+        || headerSize > packageV3MaximumHeaderBytes
+        || tocSize > packageV3MaximumTocBytes
+        || headerSize > bytes.size())
     { result.issues.push_back("V3 fixed header contains unsupported or invalid values"); return result; }
 
     if (! header.readString(result.packageId) || ! header.readString(result.compatibilityId)
@@ -461,7 +468,9 @@ PackageV3OpenResult parsePackageV3(const std::vector<std::uint8_t>& bytes)
         || ! checkedAdd(payloadOffset, payloadSize, expectedSignatureOffset)
         || signatureOffset != expectedSignatureOffset
         || ! checkedAdd(signatureOffset, signatureSize, expectedEnd)
-        || expectedEnd != bytes.size())
+        || expectedEnd != totalPackageBytes
+        || payloadOffset > bytes.size()
+        || payloadOffset != bytes.size())
     { result.issues.push_back("V3 section offsets are non-canonical or out of bounds"); return result; }
 
     Reader toc(bytes, static_cast<std::size_t>(tocOffset),
@@ -497,21 +506,59 @@ PackageV3OpenResult parsePackageV3(const std::vector<std::uint8_t>& bytes)
         { result.issues.push_back("V3 TOC record identities are duplicate or not canonical"); return result; }
         previousIdentity = std::move(identity);
         hasPrevious = true;
-        record.sealed.ciphertext.assign(
-            bytes.begin() + static_cast<std::ptrdiff_t>(record.ciphertextOffset),
-            bytes.begin() + static_cast<std::ptrdiff_t>(ciphertextEnd));
         expectedCiphertextOffset = ciphertextEnd;
         result.records.push_back(std::move(record));
     }
     if (toc.position != toc.limit || expectedCiphertextOffset != signatureOffset)
     { result.issues.push_back("V3 TOC or payload coverage is incomplete"); return result; }
-    result.signature.assign(bytes.begin() + static_cast<std::ptrdiff_t>(signatureOffset), bytes.end());
     result.tocOffset = tocOffset;
     result.tocSize = tocSize;
     result.payloadOffset = payloadOffset;
     result.payloadSize = payloadSize;
     result.signatureOffset = signatureOffset;
     result.opened = true;
+    return result;
+}
+
+PackageV3OpenResult parsePackageV3(const std::vector<std::uint8_t>& bytes)
+{
+    PackageV3OpenResult result;
+    if (bytes.size() < packageV3FixedHeaderBytes
+        || bytes.size() > packageV3MaximumPackageBytes)
+    { result.issues.push_back("V3 package size is outside the format limits"); return result; }
+
+    Reader fixedHeader(bytes, 0u, bytes.size());
+    std::vector<std::uint8_t> magic;
+    std::uint32_t version = 0, headerSize = 0, flags = 0, recordCount = 0;
+    std::uint16_t cryptoSuite = 0, signatureSuite = 0;
+    std::uint64_t tocOffset = 0, tocSize = 0, payloadOffset = 0, payloadSize = 0;
+    std::uint64_t signatureOffset = 0;
+    std::uint32_t signatureSize = 0, reserved = 0;
+    if (! fixedHeader.readBytes(kMagic.size(), magic)
+        || ! fixedHeader.readU32(version) || ! fixedHeader.readU32(headerSize)
+        || ! fixedHeader.readU32(flags) || ! fixedHeader.readU16(cryptoSuite)
+        || ! fixedHeader.readU16(signatureSuite) || ! fixedHeader.readU32(recordCount)
+        || ! fixedHeader.readU64(tocOffset) || ! fixedHeader.readU64(tocSize)
+        || ! fixedHeader.readU64(payloadOffset) || ! fixedHeader.readU64(payloadSize)
+        || ! fixedHeader.readU64(signatureOffset) || ! fixedHeader.readU32(signatureSize)
+        || ! fixedHeader.readU32(reserved)
+        || payloadOffset > bytes.size())
+    { result.issues.push_back("V3 fixed header is truncated or out of bounds"); return result; }
+
+    std::vector<std::uint8_t> indexBytes(
+        bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(payloadOffset));
+    result = parsePackageV3Index(indexBytes, bytes.size());
+    if (! result.opened)
+        return result;
+    for (auto& record : result.records)
+    {
+        const auto begin = static_cast<std::size_t>(record.ciphertextOffset);
+        const auto end = begin + static_cast<std::size_t>(record.ciphertextSize);
+        record.sealed.ciphertext.assign(bytes.begin() + static_cast<std::ptrdiff_t>(begin),
+                                        bytes.begin() + static_cast<std::ptrdiff_t>(end));
+    }
+    result.signature.assign(
+        bytes.begin() + static_cast<std::ptrdiff_t>(result.signatureOffset), bytes.end());
     return result;
 }
 
@@ -526,8 +573,10 @@ bool verifyPackageV3Signature(const std::vector<std::uint8_t>& packageBytes,
     { issue = "V3 package is not structurally open for signature verification"; return false; }
     const std::vector<std::uint8_t> signedBytes(
         packageBytes.begin(), packageBytes.begin() + static_cast<std::ptrdiff_t>(package.signatureOffset));
-    if (! verifyPackageSignature(signedBytes, package.signature, package.signingKeyId,
-                                 trustStore, issue))
+    std::vector<std::uint8_t> publicKey;
+    if (! resolvePackageSigningPublicKey(
+            package.signingKeyId, trustStore, publicKey, issue)
+        || ! packageVerifyEd25519ph(publicKey, signedBytes, package.signature, issue))
         return false;
     package.signatureVerified = true;
     issue.clear();

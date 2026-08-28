@@ -90,6 +90,7 @@ add_library(drs_engine_adapter STATIC
     src/PackageCrypto.cpp
     src/PackageSignature.cpp
     src/PackageV3.cpp
+    src/PackageV3FileReader.cpp
     src/PackageKeyEnvelope.cpp
     src/PackageProtectionDiagnostics.cpp
     src/PackageReader.cpp
@@ -129,6 +130,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/SecureBuffer.h
     include/drs/engine/PackageKeys.h
     include/drs/engine/PackageV3.h
+    include/drs/engine/PackageV3FileReader.h
     include/drs/engine/PackageKeyEnvelope.h
     include/drs/engine/PackageProtectionDiagnostics.h
     include/drs/engine/ControlLaw.h

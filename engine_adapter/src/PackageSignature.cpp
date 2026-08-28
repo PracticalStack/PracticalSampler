@@ -90,4 +90,60 @@ bool packageVerifyEd25519(const std::vector<std::uint8_t>& publicKey,
     issue.clear();
     return true;
 }
+
+bool packageSignEd25519ph(const std::vector<std::uint8_t>& privateKey,
+                          const std::vector<std::uint8_t>& message,
+                          std::vector<std::uint8_t>& signature,
+                          std::string& issue)
+{
+    signature.clear();
+    if (! ensureSodium(issue) || privateKey.size() != packageEd25519PrivateKeyBytes)
+    {
+        if (issue.empty()) issue = "Ed25519ph private key must be 64 bytes";
+        return false;
+    }
+    crypto_sign_ed25519ph_state state;
+    signature.resize(packageEd25519SignatureBytes);
+    unsigned long long signatureLength = 0;
+    if (crypto_sign_ed25519ph_init(&state) != 0
+        || (! message.empty()
+            && crypto_sign_ed25519ph_update(
+                &state, message.data(), static_cast<unsigned long long>(message.size())) != 0)
+        || crypto_sign_ed25519ph_final_create(
+            &state, signature.data(), &signatureLength, privateKey.data()) != 0
+        || signatureLength != packageEd25519SignatureBytes)
+    {
+        signature.clear();
+        issue = "Ed25519ph signing failed";
+        return false;
+    }
+    issue.clear();
+    return true;
+}
+
+bool packageVerifyEd25519ph(const std::vector<std::uint8_t>& publicKey,
+                            const std::vector<std::uint8_t>& message,
+                            const std::vector<std::uint8_t>& signature,
+                            std::string& issue)
+{
+    if (! ensureSodium(issue) || publicKey.size() != packageEd25519PublicKeyBytes
+        || signature.size() != packageEd25519SignatureBytes)
+    {
+        if (issue.empty()) issue = "Ed25519ph public key/signature length is invalid";
+        return false;
+    }
+    crypto_sign_ed25519ph_state state;
+    if (crypto_sign_ed25519ph_init(&state) != 0
+        || (! message.empty()
+            && crypto_sign_ed25519ph_update(
+                &state, message.data(), static_cast<unsigned long long>(message.size())) != 0)
+        || crypto_sign_ed25519ph_final_verify(
+            &state, signature.data(), publicKey.data()) != 0)
+    {
+        issue = "Ed25519ph signature verification failed";
+        return false;
+    }
+    issue.clear();
+    return true;
+}
 } // namespace drs::engine

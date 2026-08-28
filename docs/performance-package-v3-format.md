@@ -1,6 +1,6 @@
 # Performance Package V3 Format Contract
 
-Status: Implemented canonical contract for CPCA-1
+Status: Implemented canonical contract and bounded reader for CPCA-1/CPCA-2
 
 Date: 2026-08-27
 
@@ -9,7 +9,7 @@ Date: 2026-08-27
 - Magic: `DRSPKG3`
 - Format version: `3`
 - Crypto suite: `xchacha20-poly1305-ietf`
-- Signature suite: `ed25519`
+- Signature suite: `ed25519ph` (RFC 8032 prehash variant)
 - Key identifiers: opaque `encryptionKeyId` and `signingKeyId`
 - Package identity: stable `packageId`
 - V1/V2 compatibility is selected by magic/format dispatch, never by
@@ -27,7 +27,7 @@ The fixed header is 76 bytes:
 | 12 | 4 | headerSize | fixed plus variable envelope |
 | 16 | 4 | flags | `0x00000007` (encrypted, authenticated, signed) |
 | 20 | 2 | cryptoSuite | `1` = XChaCha20-Poly1305-IETF |
-| 22 | 2 | signatureSuite | `1` = Ed25519 |
+| 22 | 2 | signatureSuite | `1` = Ed25519ph |
 | 24 | 4 | recordCount | `1..16384` |
 | 28 | 8 | tocOffset | exactly `headerSize` |
 | 36 | 8 | tocSize | exact serialized TOC size |
@@ -53,6 +53,11 @@ wrappedKeyTag[16]
 
 `headerSize` must equal the byte immediately following the envelope. Padding
 and unrecognized header extensions are rejected in V3.
+
+Reader ceilings are 64 KiB for the complete header, 256 MiB for the complete
+TOC, 64 MiB for one record, 16,384 records, and 16 GiB for one package. The
+fixed header and these section sizes are validated with checked arithmetic
+before any variable-size read or allocation.
 
 ## Cleartext envelope
 
@@ -119,7 +124,7 @@ construction is versioned and tested as a byte-exact contract.
 
 ## Signature coverage
 
-The 64-byte Ed25519 signature is the final file region and covers every byte
+The 64-byte Ed25519ph signature is the final file region and covers every byte
 from offset zero through `signatureOffset - 1`. This includes the fixed and
 variable header, wrapped content key, key identifiers, complete TOC, record
 order, every identity, nonce, ciphertext, and authentication tag. No mutable
@@ -127,6 +132,13 @@ V3 package byte is outside signature coverage.
 
 Structural parsing does not establish trust. Signature verification against
 the application trust store must succeed before key unwrap or record opening.
+
+The file-backed reader reads the fixed 76-byte header first, then only the
+bounded header/TOC index. It streams the complete signed region through the
+Ed25519ph verifier with a 64 KiB payload buffer. It does not retain resident
+ciphertext. After verification, a requested record is read by its verified
+offset and independently authenticated/decrypted. These are blocking worker-
+side APIs and are forbidden on the audio callback.
 
 ## Key envelope
 

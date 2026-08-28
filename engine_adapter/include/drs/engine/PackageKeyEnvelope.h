@@ -40,4 +40,9 @@ bool verifyPackageSignature(const std::vector<std::uint8_t>& packageBytes,
                             const std::string& signingKeyId,
                             const std::vector<PackageSigningKey>& trustStore,
                             std::string& issue);
+
+bool resolvePackageSigningPublicKey(const std::string& signingKeyId,
+                                    const std::vector<PackageSigningKey>& trustStore,
+                                    std::vector<std::uint8_t>& publicKey,
+                                    std::string& issue);
 } // namespace drs::engine

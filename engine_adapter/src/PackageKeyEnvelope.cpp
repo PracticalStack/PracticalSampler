@@ -85,10 +85,26 @@ bool verifyPackageSignature(const std::vector<std::uint8_t>& packageBytes,
                             const std::vector<PackageSigningKey>& trustStore,
                             std::string& issue)
 {
+    std::vector<std::uint8_t> publicKey;
+    if (! resolvePackageSigningPublicKey(signingKeyId, trustStore, publicKey, issue))
+        return false;
+    return packageVerifyEd25519(publicKey, packageBytes, signature, issue);
+}
+
+bool resolvePackageSigningPublicKey(const std::string& signingKeyId,
+                                    const std::vector<PackageSigningKey>& trustStore,
+                                    std::vector<std::uint8_t>& publicKey,
+                                    std::string& issue)
+{
+    publicKey.clear();
     const auto found = std::find_if(trustStore.begin(), trustStore.end(), [&](const auto& key)
     { return key.keyId == signingKeyId; });
     if (found == trustStore.end()) { issue = "package signing key id is unknown"; return false; }
     if (found->revoked) { issue = "package signing key is revoked"; return false; }
-    return packageVerifyEd25519(found->publicKey, packageBytes, signature, issue);
+    if (found->publicKey.size() != packageEd25519PublicKeyBytes)
+    { issue = "package signing public key length is invalid"; return false; }
+    publicKey = found->publicKey;
+    issue.clear();
+    return true;
 }
 } // namespace drs::engine
