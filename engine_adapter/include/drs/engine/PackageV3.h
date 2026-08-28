@@ -16,7 +16,9 @@ inline constexpr std::uint16_t packageV3SignatureSuiteEd25519ph = 1;
 inline constexpr std::size_t packageV3FixedHeaderBytes = 76;
 inline constexpr std::size_t packageV3MaximumHeaderBytes = 64u * 1024u;
 inline constexpr std::size_t packageV3MaximumTocBytes = 256u * 1024u * 1024u;
-inline constexpr std::size_t packageV3MaximumRecords = 16384;
+// Accurate Salamander requires roughly 41k bounded sample-head/page records.
+// Keep the parser finite while leaving room for larger supported instruments.
+inline constexpr std::size_t packageV3MaximumRecords = 131072;
 inline constexpr std::size_t packageV3MaximumRecordBytes = 64u * 1024u * 1024u;
 inline constexpr std::uint64_t packageV3MaximumPackageBytes = 16ull * 1024ull * 1024ull * 1024ull;
 inline constexpr std::size_t packageV3MaximumIdentityBytes = 4096;

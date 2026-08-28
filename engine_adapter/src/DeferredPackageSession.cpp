@@ -36,8 +36,9 @@ bool DeferredPackageSession::begin(DeferredPackageSessionPlan plan)
     currentPlan = std::move(plan);
     sessionSnapshot.requestGeneration = nextRequestGeneration++;
     sessionSnapshot.packagePath = currentPlan.packagePath;
-    sessionSnapshot.packageId = currentPlan.package == nullptr
-        ? std::string {} : currentPlan.package->packageId;
+    sessionSnapshot.packageId = ! currentPlan.authenticatedPackageId.empty()
+        ? currentPlan.authenticatedPackageId
+        : (currentPlan.package == nullptr ? std::string {} : currentPlan.package->packageId);
     sessionSnapshot.readyHeadCount = 0;
     sessionSnapshot.totalHeadCount = currentPlan.sources.size();
     sessionSnapshot.metadataAccepted = false;
@@ -47,7 +48,9 @@ bool DeferredPackageSession::begin(DeferredPackageSessionPlan plan)
     sessionSnapshot.retryable = false;
     sessionSnapshot.failureCategory.clear();
     sessionSnapshot.failureSourceId.clear();
-    if (currentPlan.package == nullptr || !currentPlan.package->opened
+    const auto hasAuthenticatedMetadata = ! currentPlan.authenticatedPackageId.empty()
+        || (currentPlan.package != nullptr && currentPlan.package->opened);
+    if (! hasAuthenticatedMetadata
         || currentPlan.packagePath.empty() || currentPlan.sources.empty()
         || !currentPlan.buildRenderModel)
     {

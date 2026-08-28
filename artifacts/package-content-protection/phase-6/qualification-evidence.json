@@ -1,0 +1,61 @@
+{
+  "schema": "drs.package-content-protection.phase-6.v1",
+  "result": "pass",
+  "date": "2026-08-28",
+  "platform": "Windows x64",
+  "toolchain": "Visual Studio 2022 MSVC 19.44.35228",
+  "traceability": [
+    "CPCA-6-T1", "CPCA-6-T2", "CPCA-6-T3", "CPCA-6-T4", "CPCA-6-T5",
+    "CPCA-6-V1", "CPCA-6-V2", "CPCA-6-V3", "CPCA-6-V4",
+    "CPS-P5-T2", "CPS-P5-T3", "CPS-P5-T4", "CPS-P5-T6"
+  ],
+  "crypto": {
+    "xchacha20_poly1305_official_vector": true,
+    "ed25519ph_rfc8032_vector": true,
+    "production_nonces_generated": 1000000,
+    "nonce_reuse_findings": 0
+  },
+  "adversarial": {
+    "complete_single_byte_valid_package_mutations_rejected": true,
+    "deterministic_arbitrary_input_cases_debug": 100000,
+    "deterministic_arbitrary_input_cases_release": 100000,
+    "libfuzzer_targets": ["parser", "framing", "signature", "envelope", "aad"],
+    "plaintext_artifacts_scanned": 6,
+    "plaintext_findings": 0,
+    "signature_bypass_findings": 0,
+    "crash_or_unbounded_allocation_findings": 0,
+    "repack_rejected": true
+  },
+  "accurate_salamander": {
+    "result": "pass",
+    "package_format": 3,
+    "records": 40783,
+    "frozen_v2_package_bytes": 2631961513,
+    "v3_package_bytes": 2623997763,
+    "v3_overhead_percent": -0.302579,
+    "export_micros": 31209722,
+    "export_plaintext_bytes_per_second": 83930720,
+    "metadata_open_micros": 8395509,
+    "warm_metadata_open_micros": 8349677,
+    "head_ready_micros": 5310768,
+    "maximum_page_read_micros": 12632,
+    "first_note_peak": 0.0463349707,
+    "maximum_callback_micros": 84,
+    "callback_budget_micros": 5333,
+    "sustained_page_misses": 0,
+    "sustained_underrun_frames": 0,
+    "cancel_to_return_micros": 339322,
+    "cancellation_total_operation_micros": 34927349,
+    "peak_working_set_bytes": 579149824,
+    "working_set_budget_bytes": 671088640
+  },
+  "builds": {
+    "debug_focused_security_tests": {"passed": 9, "failed": 0},
+    "release_focused_security_tests": {"passed": 9, "failed": 0},
+    "msvc_static_analysis_build": "pass",
+    "msvc_static_analysis_security_findings": 0,
+    "nonblocking_stack_usage_advisories": 6,
+    "clang_sanitizers_local": "not_available_on_qualification_host",
+    "clang_libfuzzer_ci_targets_available": true
+  }
+}

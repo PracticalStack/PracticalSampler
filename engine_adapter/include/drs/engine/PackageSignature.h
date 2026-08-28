@@ -30,6 +30,12 @@ bool packageSignEd25519ph(const std::vector<std::uint8_t>& privateKey,
                           std::vector<std::uint8_t>& signature,
                           std::string& issue);
 
+bool packageSignEd25519phFile(const std::vector<std::uint8_t>& privateKey,
+                              const std::string& path,
+                              std::uint64_t expectedBytes,
+                              std::vector<std::uint8_t>& signature,
+                              std::string& issue);
+
 bool packageVerifyEd25519ph(const std::vector<std::uint8_t>& publicKey,
                             const std::vector<std::uint8_t>& message,
                             const std::vector<std::uint8_t>& signature,

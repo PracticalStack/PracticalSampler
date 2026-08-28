@@ -28,7 +28,7 @@ The fixed header is 76 bytes:
 | 16 | 4 | flags | `0x00000007` (encrypted, authenticated, signed) |
 | 20 | 2 | cryptoSuite | `1` = XChaCha20-Poly1305-IETF |
 | 22 | 2 | signatureSuite | `1` = Ed25519ph |
-| 24 | 4 | recordCount | `1..16384` |
+| 24 | 4 | recordCount | `1..131072` |
 | 28 | 8 | tocOffset | exactly `headerSize` |
 | 36 | 8 | tocSize | exact serialized TOC size |
 | 44 | 8 | payloadOffset | exactly `tocOffset + tocSize` |
@@ -55,7 +55,7 @@ wrappedKeyTag[16]
 and unrecognized header extensions are rejected in V3.
 
 Reader ceilings are 64 KiB for the complete header, 256 MiB for the complete
-TOC, 64 MiB for one record, 16,384 records, and 16 GiB for one package. The
+TOC, 64 MiB for one record, 131,072 records, and 16 GiB for one package. The
 fixed header and these section sizes are validated with checked arithmetic
 before any variable-size read or allocation.
 

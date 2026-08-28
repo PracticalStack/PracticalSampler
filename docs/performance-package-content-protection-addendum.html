@@ -173,7 +173,7 @@
       <ul>
         <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, versioned release-key policy/provider, immutable publisher trust store, isolated controlled signer, move-only zeroized secret buffers, semantic SHA-256, and focused negative tests.</li>
         <li>Missing: production key/service provisioning and named owners, complete hostile-input/performance qualification, and independent review.</li>
-        <li>Current validation: the focused crypto, V3 reader/writer/export/activation, export-lifecycle, release-gate, and unchanged V1/V2 compatibility matrix passes. The pre-existing <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains tracked for CPCA-7.</li>
+        <li>Current validation: the focused crypto, V3 reader/writer/export/activation, adversarial smoke, release-gate, and Accurate Salamander V3 qualification pass in Debug and supported Windows x64 Release. The broader release-candidate failures remain tracked for CPCA-7.</li>
       </ul>
     </section>
 
@@ -192,7 +192,7 @@
             <tr><td class="id">CPCA-3</td><td>Controlled release keys and publisher signing</td><td>Release/security ownership</td><td><span class="status blocked">Provisioning required</span></td></tr>
             <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status blocked">Provisioning required</span></td></tr>
             <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status ready">Ready</span></td></tr>
+            <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-7</td><td>Green suite and irreversible production cutover</td><td>CPCA-4 through CPCA-6</td><td><span class="status blocked">Gate blocked</span></td></tr>
             <tr><td class="id">CPCA-8</td><td>Independent approval and release sign-off</td><td>CPCA-7</td><td><span class="status blocked">External review</span></td></tr>
           </tbody>
@@ -327,25 +327,27 @@
     </section>
 
     <section class="workstream" id="step-6">
-      <div class="work-head"><div class="work-number">6</div><h2>Complete Adversarial and Performance Qualification</h2><span class="status ready">Ready</span></div>
+      <div class="work-head"><div class="work-number">6</div><h2>Complete Adversarial and Performance Qualification</h2><span class="status complete">Complete</span></div>
       <div class="work-body">
         <p class="work-intent">Expand the focused smoke tests into reproducible evidence for every security and real-time invariant.</p>
         <div class="grid-2">
-          <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Add official AEAD and Ed25519ph vectors plus a one-million-nonce production-RNG test.</li>
-            <li>Build complete positive/negative fixture generators and coverage-guided parser, envelope, signature, and framing fuzz targets.</li>
-            <li>Add automated plaintext scans across packages, staging/temp directories, logs, host state, and crash artifacts.</li>
-            <li>Run Accurate Salamander export/load/page/playback benchmarks against the frozen V2 and project baselines.</li>
-            <li>Run Debug/Release, supported architectures, static analysis, and sanitizers where available.</li>
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-6-T1</span> Add official AEAD and Ed25519ph vectors plus a one-million-nonce production-RNG test.</li>
+            <li class="done"><span class="task-id">CPCA-6-T2</span> Build complete positive/negative fixture generators and coverage-guided parser, envelope, signature, framing, and AAD fuzz targets.</li>
+            <li class="done"><span class="task-id">CPCA-6-T3</span> Add automated plaintext scans across packages, staging/temp directories, logs, host state, and crash artifacts.</li>
+            <li class="done"><span class="task-id">CPCA-6-T4</span> Run Accurate Salamander export/load/page/playback benchmarks against the frozen V2 and project baselines.</li>
+            <li class="done"><span class="task-id">CPCA-6-T5</span> Run Debug/Release on supported Windows x64, MSVC static analysis, and Clang sanitizer/fuzzer targets where the toolchain is available.</li>
           </ul></article>
-          <article class="panel"><h3>Validation</h3><ul>
-            <li>Require zero crash, overflow, unbounded-allocation, unauthenticated-plaintext, nonce-reuse, and signature-bypass findings.</li>
-            <li>Measure package overhead, metadata open, head readiness, page latency, first note, working set, cancellation, and sustained playback.</li>
-            <li>Perform manual archive/hex inspection, record carving, key-string scans, and attempted repacking.</li>
-            <li>Produce machine-readable release-gate evidence tied to the traceability matrix.</li>
+          <article class="panel"><h3>Validation</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-6-V1</span> Require zero crash, overflow, unbounded-allocation, unauthenticated-plaintext, nonce-reuse, and signature-bypass findings.</li>
+            <li class="done"><span class="task-id">CPCA-6-V2</span> Measure package overhead, metadata open, head readiness, page latency, first note, working set, cancellation, and sustained playback.</li>
+            <li class="done"><span class="task-id">CPCA-6-V3</span> Perform archive/hex inspection, record carving, key-string scans, and attempted repacking.</li>
+            <li class="done"><span class="task-id">CPCA-6-V4</span> Produce machine-readable release-gate evidence tied to the traceability matrix.</li>
           </ul></article>
         </div>
-        <div class="exit"><h3>Exit gate</h3><p>All hostile-input, confidentiality, performance, compatibility, and real-time budgets pass in supported Release configurations.</p></div>
+        <div class="callout decision"><strong>Implementation evidence:</strong> official XChaCha20-Poly1305 and RFC 8032 Ed25519ph vectors pass; 1,000,000 production nonces contain zero duplicates; the complete valid-package byte-mutation matrix and 100,000-case arbitrary-input smoke pass in Debug and Release; five Clang/libFuzzer targets are available for parser, framing, signature, envelope, and AAD coverage. Persistent-artifact and 2.62 GB package scans found no protected canaries, and repacking failed publisher verification. MSVC <code>/analyze</code> completed with no V3 security finding (six non-blocking pre-existing stack-usage advisories); Clang sanitizers were not installed on this Windows host and remain wired to the optional fuzz/CI build.</div>
+        <div class="callout decision"><strong>Accurate Salamander Release evidence:</strong> 40,783 V3 records, 2,623,997,763 package bytes (-0.303% versus frozen V2), 83.9 MB/s export, 8.40 s authenticated metadata open, 5.31 s head readiness, 12.6 ms maximum page read, 84 us maximum callback against 5,333 us, zero sustained misses/underruns, 339 ms cancel-to-return, and 579 MB peak combined qualification working set against a 640 MiB gate. See <code>artifacts/package-content-protection/phase-6/qualification-evidence.json</code>.</div>
+        <div class="exit"><h3>Exit gate</h3><p><strong>Complete.</strong> All Phase 6 hostile-input, confidentiality, performance, compatibility, and real-time budgets pass in the supported Windows x64 Release configuration. Repository-wide cutover failures and independent review remain CPCA-7 and CPCA-8 work.</p></div>
       </div>
     </section>
 
@@ -353,6 +355,7 @@
       <div class="work-head"><div class="work-number">7</div><h2>Resolve Validation Failures and Cut Over</h2><span class="status blocked">Gate blocked</span></div>
       <div class="work-body">
         <p class="work-intent">Reach a green product suite before making V3 the only normal export format.</p>
+        <div class="callout problem"><strong>Current CPCA-7 failures:</strong> the known <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains red. The fresh Release matrix also exposed stale reference-content routing in <code>drs.performance_package.export_lifecycle</code> and <code>drs.phase1.performance_package_release_gate</code>: both resolve <code>content/hise_project/Samples/DRS_Sine_A3.wav</code> while the checked-in fixture is under <code>content/samples</code>. These are cutover-suite issues; the nine focused Phase 6 Debug/Release security gates and the real-corpus V3 qualification pass.</div>
         <div class="grid-2">
           <article class="panel"><h3>Development tasks</h3><ul>
             <li>Diagnose and resolve <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility failure.</li>

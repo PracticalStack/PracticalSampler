@@ -66,7 +66,14 @@ const PackageCryptoProvider& getDeterministicPackageCryptoProvider();
 const PackageCryptoProvider& getSecurePackageCryptoProvider();
 
 inline constexpr std::size_t securePackageKeySizeBytes = 32;
+inline constexpr std::size_t securePackageNonceSizeBytes = 24;
 
 bool generateSecurePackageKey(SecureBuffer& key,
                               std::string& issue);
+
+// Uses the same operating-system-backed CSPRNG as the production AEAD
+// provider. Exposed so release qualification can detect nonce-source
+// regressions without performing a million encryptions.
+bool generateSecurePackageNonce(std::vector<std::uint8_t>& nonce,
+                                std::string& issue);
 } // namespace drs::engine

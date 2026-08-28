@@ -3,7 +3,6 @@
 #include "drs/engine/EngineFacade.h"
 #include "drs/engine/PlaybackSnapshot.h"
 #include "drs/engine/PreparedPlayback.h"
-#include "drs/engine/PackageV2StreamingExport.h"
 #include "drs/engine/DeferredPackageSession.h"
 #include "drs/engine/SamplerPlaybackContext.h"
 #include "drs/engine/SamplerRenderModel.h"
@@ -11,6 +10,7 @@
 #include "drs/engine/SfzImportProjection.h"
 #include "drs/engine/PackageReaderDispatch.h"
 #include "shared/PerformancePackageExportService.h"
+#include "PerformancePackageExportSecurityTestSupport.h"
 
 #include <algorithm>
 #include <array>
@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -528,7 +529,14 @@ struct PackageQualificationResult
     std::uint64_t warmMetadataOpenMicros = 0;
     std::uint64_t playableMicros = 0;
     float firstNotePeak = 0.0f;
+    std::uint64_t maximumPageReadMicros = 0;
+    std::uint64_t maximumRenderMicros = 0;
+    std::uint64_t sustainedPageMisses = 0;
+    std::uint64_t sustainedUnderrunFrames = 0;
+    std::uint64_t sustainedRecoveries = 0;
+    std::uint64_t sustainedPlaybackMicros = 0;
     std::uint64_t cancellationMicros = 0;
+    std::uint64_t cancellationTotalMicros = 0;
     std::uint64_t cancellationPolls = 0;
     std::uint64_t cancellationBytesProcessed = 0;
 };
@@ -536,7 +544,6 @@ struct PackageQualificationResult
 PackageQualificationResult exportAndActivatePackage(
     const fs::path& packagePath,
     const drs::engine::RuntimeProjectModel& project,
-    const drs::engine::SfzImportProjectionResult& projection,
     const drs::engine::PlaybackSnapshotBuildResult& fullSnapshot,
     const drs::engine::PreparedPlaybackBuildResult& fullPrepared,
     const int note,
@@ -548,6 +555,7 @@ PackageQualificationResult exportAndActivatePackage(
     request.baseRevision = 1;
     request.packagePath = packagePath.generic_string();
     request.sessionState.loadProfileId = "balanced";
+    request.securityContext = drs::tests::makePerformancePackageExportTestSecurityContext();
     const auto operation = drs::app::executePerformancePackageExport(
         request,
         { [](const drs::app::PerformancePackageExportProgress& progress)
@@ -559,7 +567,7 @@ PackageQualificationResult exportAndActivatePackage(
                       << progress.totalBytes << std::endl;
     }, {} });
     require(operation.exported,
-            "Production actual-corpus v2 export failed: " + operation.state + " :: "
+            "Production actual-corpus v3 export failed: " + operation.state + " :: "
                 + joinIssues(operation.issues));
 
     PackageQualificationResult result;
@@ -572,31 +580,40 @@ PackageQualificationResult exportAndActivatePackage(
     result.throughput = operation.plaintextThroughputBytesPerSecond;
 
     const auto metadataStart = Clock::now();
-    const auto packageMetadata = drs::engine::loadPerformancePackageV2Metadata(
-        packagePath.generic_string());
+    drs::engine::PerformancePackageV3ActivationSecurityContext activationSecurity;
+    activationSecurity.compatibilityId = request.securityContext->compatibilityId;
+    activationSecurity.keyProvider = request.securityContext->keyProvider;
+    activationSecurity.trustStore = request.securityContext->trustStore;
+    const auto packageMetadata = drs::engine::loadPerformancePackageV3Metadata(
+        packagePath.generic_string(), activationSecurity);
     require(packageMetadata.loaded && packageMetadata.package != nullptr,
-            "Production package v2 metadata loader failed: "
+            "Production package v3 metadata loader failed: "
                 + joinIssues(packageMetadata.issues));
     auto opened = packageMetadata.package;
     result.metadataOpenMicros = elapsedMicros(metadataStart);
-    require(opened->opened && opened->records.size() == result.recordCount,
+    require(opened->opened && opened->package.signatureVerified
+                && opened->package.records.size() == result.recordCount,
             "Exported actual-corpus package failed structural reopen.");
+    drs::engine::SamplerRenderModelPtr packageRenderModel;
     {
-        auto productionActivation = drs::engine::preparePerformancePackageV2Activation(
+        auto productionActivation = drs::engine::preparePerformancePackageV3Activation(
             packageMetadata.metadata,
             opened,
+            packageMetadata.contentKey,
             packageMetadata.sampleDescriptors);
         require(productionActivation.prepared
                     && productionActivation.activationPayload != nullptr
                     && productionActivation.renderModel != nullptr,
-                "Exported actual-corpus package failed production package-v2 activation preparation: "
+                "Exported actual-corpus package failed production package-v3 activation preparation: "
                     + joinIssues(productionActivation.issues));
         static_cast<void>(qualifySalamanderSemantics(*productionActivation.renderModel));
+        packageRenderModel = productionActivation.renderModel;
     }
     const auto warmMetadataStart = Clock::now();
-    const auto warmOpened = drs::engine::openPackageV2(packagePath.generic_string());
+    const auto warmOpened = drs::engine::loadPerformancePackageV3Metadata(
+        packagePath.generic_string(), activationSecurity);
     result.warmMetadataOpenMicros = elapsedMicros(warmMetadataStart);
-    require(warmOpened.opened, "Warm package metadata reopen failed.");
+    require(warmOpened.loaded, "Warm package metadata reopen failed.");
     const auto& packageDescriptors = packageMetadata.sampleDescriptors;
 
     auto packagePrepared = fullPrepared;
@@ -608,29 +625,31 @@ PackageQualificationResult exportAndActivatePackage(
             [&](const auto& candidate) { return candidate.sourceId == preparedSample.sampleSourceId; });
         require(descriptor != packageDescriptors.end(),
                 "Exported package descriptor is missing a prepared sample source.");
-        auto source = std::make_shared<drs::engine::PackagePagedSampleDataSource>(*descriptor, opened);
+        auto source = std::make_shared<drs::engine::PackagePagedSampleDataSource>(
+            *descriptor, opened, packageMetadata.contentKey);
         preparedSample.dataSource = source;
         preparedSample.decodedSampleData.reset();
         sources.push_back(std::move(source));
     }
+    require(packageRenderModel != nullptr,
+            "Exported actual-corpus package did not build the common render model.");
     const auto payload = drs::engine::buildPlaybackActivationPayload(
         drs::engine::PlaybackActivationLane::performance,
-        fullSnapshot.requestedDraftRevision,
-        &fullSnapshot,
-        &packagePrepared);
+        fullSnapshot.requestedDraftRevision, &fullSnapshot, &packagePrepared);
     drs::engine::SamplerRenderModelBuildOptions packageModelOptions;
     packageModelOptions.selectedArticulationId = "sustain";
-    const auto model = drs::engine::buildSamplerRenderModel(payload, packageModelOptions);
-    require(model.built && model.model != nullptr,
-            "Exported actual-corpus package did not build the common render model.");
-    static_cast<void>(qualifySalamanderSemantics(*model.model));
+    const auto packageModel = drs::engine::buildSamplerRenderModel(payload, packageModelOptions);
+    require(packageModel.built && packageModel.model != nullptr,
+            "Exported actual-corpus package did not build the qualification render model.");
+    static_cast<void>(qualifySalamanderSemantics(*packageModel.model));
+    packageRenderModel.reset();
 
     drs::engine::DeferredPackageSession deferred;
     drs::engine::DeferredPackageSessionPlan plan;
     plan.packagePath = packagePath.generic_string();
-    plan.package = opened;
+    plan.authenticatedPackageId = opened->package.packageId;
     plan.sources = sources;
-    plan.buildRenderModel = [retained = model.model] { return retained; };
+    plan.buildRenderModel = [retained = packageModel.model] { return retained; };
     const auto playableStart = Clock::now();
     require(deferred.begin(std::move(plan)), "Deferred actual-corpus package begin failed.");
     while (deferred.snapshot().stage != drs::engine::DeferredPackageSessionStage::playable)
@@ -648,7 +667,8 @@ PackageQualificationResult exportAndActivatePackage(
         std::vector<float>(framesPerBlock), std::vector<float>(framesPerBlock)
     };
     std::array<float*, 2> channels { outputStorage[0].data(), outputStorage[1].data() };
-    for (std::size_t block = 0; block < 8; ++block)
+    const auto sustainedStart = Clock::now();
+    for (std::size_t block = 0; block < 375; ++block)
     {
         std::fill(outputStorage[0].begin(), outputStorage[0].end(), 0.0f);
         std::fill(outputStorage[1].begin(), outputStorage[1].end(), 0.0f);
@@ -661,18 +681,43 @@ PackageQualificationResult exportAndActivatePackage(
             events[0].velocity = static_cast<float>(velocity) / 127.0f;
             eventCount = 1;
         }
+        const auto renderStart = Clock::now();
         const auto rendered = context.renderBlock(
             { channels.data(), 2, framesPerBlock }, { events.data(), eventCount });
+        result.maximumRenderMicros = std::max(result.maximumRenderMicros,
+                                               elapsedMicros(renderStart));
         require(rendered.accepted, "Package first-note render block failed.");
+        result.sustainedPageMisses += rendered.voicePool.render.pageMissCount;
+        result.sustainedUnderrunFrames += rendered.voicePool.render.underrunFrameCount;
+        result.sustainedRecoveries += rendered.voicePool.render.pageRecoveryCount;
         if (block == 0)
             require(deferred.observeAudioCutover(context),
                     "Package callback cutover was not observed.");
         for (const auto& channel : outputStorage)
             for (const auto value : channel)
                 result.firstNotePeak = std::max(result.firstNotePeak, std::abs(value));
+        for (const auto& source : sources)
+        {
+            drs::engine::SamplePageRequestScheduler scheduler;
+            source->drainPageIntents(scheduler);
+            drs::engine::SamplePageRequest page;
+            while (scheduler.popNext(page))
+            {
+                const auto pageStart = Clock::now();
+                require(source->preparePage(page.pageIndex),
+                        "Authenticated package page preparation failed.");
+                result.maximumPageReadMicros = std::max(
+                    result.maximumPageReadMicros, elapsedMicros(pageStart));
+            }
+        }
     }
+    result.sustainedPlaybackMicros = elapsedMicros(sustainedStart);
     require(result.firstNotePeak > 1.0e-5f,
             "Exported actual-corpus package first note was inaudible.");
+    require(result.maximumRenderMicros < 5333,
+            "Authenticated package playback exceeded the callback budget.");
+    require(result.sustainedPageMisses == 0 && result.sustainedUnderrunFrames == 0,
+            "Authenticated package sustained playback reported a miss or underrun.");
 
     const auto canceledPath = packagePath.parent_path()
         / (packagePath.stem().generic_string() + "-cancelled.drpkg");
@@ -682,6 +727,7 @@ PackageQualificationResult exportAndActivatePackage(
     auto cancellationRequest = request;
     cancellationRequest.packagePath = canceledPath.generic_string();
     const auto cancellationStart = Clock::now();
+    std::optional<Clock::time_point> cancellationRequestedAt;
     const auto canceled = drs::app::executePerformancePackageExport(
         cancellationRequest,
         { [&](const drs::app::PerformancePackageExportProgress& progress)
@@ -694,9 +740,14 @@ PackageQualificationResult exportAndActivatePackage(
         }, [&]
         {
             ++result.cancellationPolls;
-            return result.cancellationBytesProcessed >= 64ull * 1024ull * 1024ull;
+            const auto requested = result.cancellationBytesProcessed >= 64ull * 1024ull * 1024ull;
+            if (requested && ! cancellationRequestedAt.has_value())
+                cancellationRequestedAt = Clock::now();
+            return requested;
         } });
-    result.cancellationMicros = elapsedMicros(cancellationStart);
+    result.cancellationTotalMicros = elapsedMicros(cancellationStart);
+    result.cancellationMicros = cancellationRequestedAt.has_value()
+        ? elapsedMicros(*cancellationRequestedAt) : result.cancellationTotalMicros;
     require(canceled.canceled && !canceled.exported,
             "Actual-corpus production export cancellation was not honored.");
     require(!fs::exists(canceledPath)
@@ -886,8 +937,12 @@ int main(int argc, char** argv)
                     == drs::engine::PreparedPlaybackReadinessState::playable,
                 "Actual Salamander full draft did not reach streaming playable readiness.");
         const auto fullSources = collectSourceMetrics(fullPrepared.step.result.prepared);
-        require(fullSources.headBytes <= 16ull * 1024ull * projection.sampleSources.size(),
-                "Prepared Salamander heads exceeded the configured 16 KiB-per-source ceiling.");
+        require(fullSources.headBytes
+                    <= 64ull * 1024ull * fullPrepared.step.result.prepared.samples.size(),
+                "Prepared Salamander heads exceeded the 64 KiB decoded-per-source ceiling: "
+                    + std::to_string(fullSources.headBytes) + " bytes across "
+                    + std::to_string(fullPrepared.step.result.prepared.samples.size())
+                    + " prepared samples.");
         const auto fullRenderModel = buildQualificationRenderModel(
             fullSnapshot, fullPrepared.step.result);
         const auto semanticQualification = qualifySalamanderSemantics(*fullRenderModel);
@@ -962,10 +1017,34 @@ int main(int argc, char** argv)
                     && groupPlayback.pageMisses == 0 && groupPlayback.underrunFrames == 0,
                 "Normal-storage Salamander playback reported a page miss or underrun.");
         const auto package = exportAndActivatePackage(
-            packagePath, session.getProject(), projection, fullSnapshot,
+            packagePath, session.getProject(), fullSnapshot,
             fullPrepared.step.result,
             std::clamp(anchorZone.rootKey, 0, 127),
             std::clamp((anchorZone.velocityLow + anchorZone.velocityHigh) / 2, 1, 127));
+        constexpr std::uint64_t frozenV2PackageBytes = 2631961513ull;
+        constexpr std::uint64_t maximumQualificationWorkingSet = 640ull * 1024ull * 1024ull;
+        const auto packageOverheadPercent = 100.0
+            * (static_cast<double>(package.packageBytes) / static_cast<double>(frozenV2PackageBytes) - 1.0);
+        const auto qualificationWorkingSet = peakWorkingSetBytes();
+        require(package.packageBytes <= frozenV2PackageBytes + frozenV2PackageBytes / 50u,
+                "Authenticated V3 package exceeded the frozen V2 size budget by more than 2%.");
+        require(package.throughput >= 50.0 * 1024.0 * 1024.0,
+                "Authenticated V3 export throughput fell below 50 MiB/s.");
+        require(package.metadataOpenMicros <= 30'000'000u
+                    && package.warmMetadataOpenMicros <= 30'000'000u,
+                "Authenticated V3 metadata/signature open exceeded 30 seconds.");
+        require(package.playableMicros <= 30'000'000u,
+                "Authenticated V3 head readiness exceeded 30 seconds: "
+                    + std::to_string(package.playableMicros) + " us.");
+        require(package.maximumPageReadMicros <= 100'000u,
+                "Authenticated V3 page read exceeded 100 ms.");
+        require(package.cancellationMicros <= 5'000'000u,
+                "Authenticated V3 cancel-to-return latency exceeded five seconds: "
+                    + std::to_string(package.cancellationMicros) + " us.");
+        require(qualificationWorkingSet == 0
+                    || qualificationWorkingSet <= maximumQualificationWorkingSet,
+                "Authenticated V3 qualification exceeded the 640 MiB working-set budget: "
+                    + std::to_string(qualificationWorkingSet) + " bytes.");
 
         fs::create_directories(reportPath.parent_path());
         std::ofstream report(reportPath, std::ios::binary | std::ios::trunc);
@@ -1067,9 +1146,11 @@ int main(int argc, char** argv)
                << "- Constrained page misses/underrun frames/recoveries: "
                << constrainedPlayback.pageMisses << "/" << constrainedPlayback.underrunFrames
                << "/" << constrainedPlayback.recoveries << "\n"
-               << "- Peak process working set: " << peakWorkingSetBytes() << " bytes\n\n"
-               << "## Package v2\n\n"
+               << "- Peak process working set: " << qualificationWorkingSet << " bytes\n\n"
+               << "## Authenticated package v3\n\n"
                << "- Package bytes: " << package.packageBytes << "\n"
+               << "- Frozen V2 package bytes: " << frozenV2PackageBytes << "\n"
+               << "- V3 package overhead versus V2: " << packageOverheadPercent << "%\n"
                << "- Records: " << package.recordCount << "\n"
                << "- Export elapsed: " << package.totalMicros << " us\n"
                << "- Export throughput: " << package.throughput << " plaintext bytes/s\n"
@@ -1081,13 +1162,55 @@ int main(int argc, char** argv)
                << "- Head-ready/playable: " << package.playableMicros << " us\n"
                << "- Package resident-head bytes: " << package.headBytes << "\n"
                << "- Package first-note peak: " << package.firstNotePeak << "\n"
+               << "- Package maximum page read latency: " << package.maximumPageReadMicros << " us\n"
+               << "- Package maximum callback duration/budget: "
+               << package.maximumRenderMicros << "/5333 us\n"
+               << "- Package sustained playback elapsed: "
+               << package.sustainedPlaybackMicros << " us\n"
+               << "- Package sustained page misses/underrun frames/recoveries: "
+               << package.sustainedPageMisses << "/" << package.sustainedUnderrunFrames
+               << "/" << package.sustainedRecoveries << "\n"
                << "- Actual-corpus cancellation latency/polls: "
                << package.cancellationMicros << " us/" << package.cancellationPolls << "\n"
+               << "- Actual-corpus work-before-cancel plus response: "
+               << package.cancellationTotalMicros << " us\n"
                << "- Actual-corpus cancellation bytes processed: "
                << package.cancellationBytesProcessed << "\n\n"
-               << "The run used real corpus WAV descriptors, bounded 16 KiB heads, the production "
+               << "The run used real corpus WAV descriptors, bounded 16 KiB source heads "
+                  "with a 64 KiB decoded-residency ceiling, the production "
                   "page-intent worker, the immutable render model, and callback-side activation.\n";
         require(report.good(), "Qualification report write failed.");
+
+        auto evidencePath = reportPath;
+        evidencePath.replace_extension(".json");
+        std::ofstream evidence(evidencePath, std::ios::binary | std::ios::trunc);
+        evidence << "{\n"
+                 << "  \"schema\": \"drs.package-performance.phase-6.v1\",\n"
+                 << "  \"result\": \"pass\",\n"
+                 << "  \"traceability\": [\"CPCA-6\", \"CPS-P5-T3\"],\n"
+                 << "  \"corpus\": \"Accurate Salamander V6.2 beta 2 48kHz/24-bit\",\n"
+                 << "  \"package_format\": 3,\n"
+                 << "  \"frozen_v2_package_bytes\": " << frozenV2PackageBytes << ",\n"
+                 << "  \"v3_package_bytes\": " << package.packageBytes << ",\n"
+                 << "  \"v3_overhead_percent\": " << packageOverheadPercent << ",\n"
+                 << "  \"export_micros\": " << package.totalMicros << ",\n"
+                 << "  \"export_plaintext_bytes_per_second\": " << package.throughput << ",\n"
+                 << "  \"metadata_open_micros\": " << package.metadataOpenMicros << ",\n"
+                 << "  \"warm_metadata_open_micros\": " << package.warmMetadataOpenMicros << ",\n"
+                 << "  \"head_ready_micros\": " << package.playableMicros << ",\n"
+                 << "  \"maximum_page_read_micros\": " << package.maximumPageReadMicros << ",\n"
+                 << "  \"first_note_peak\": " << package.firstNotePeak << ",\n"
+                 << "  \"maximum_callback_micros\": " << package.maximumRenderMicros << ",\n"
+                 << "  \"sustained_page_misses\": " << package.sustainedPageMisses << ",\n"
+                 << "  \"sustained_underrun_frames\": " << package.sustainedUnderrunFrames << ",\n"
+                 << "  \"cancellation_micros\": " << package.cancellationMicros << ",\n"
+                 << "  \"cancellation_total_operation_micros\": "
+                 << package.cancellationTotalMicros << ",\n"
+                 << "  \"working_set_budget_bytes\": "
+                 << maximumQualificationWorkingSet << ",\n"
+                 << "  \"peak_working_set_bytes\": " << qualificationWorkingSet << "\n"
+                 << "}\n";
+        require(evidence.good(), "Machine-readable qualification evidence write failed.");
 
         std::cout << "Accurate Salamander qualification passed: sources="
                   << projection.sampleSources.size() << " zones=" << projection.zones.size()
@@ -1095,7 +1218,7 @@ int main(int argc, char** argv)
                   << " headBytes=" << fullSources.headBytes
                   << " pagePrepared=" << zonePlayback.worker.pagePrepareCount
                   << " packageBytes=" << package.packageBytes
-                  << " peakWorkingSet=" << peakWorkingSetBytes() << std::endl;
+                  << " peakWorkingSet=" << qualificationWorkingSet << std::endl;
         return 0;
     }
     catch (const std::exception& error)

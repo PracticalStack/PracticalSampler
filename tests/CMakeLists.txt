@@ -293,7 +293,9 @@ if(WIN32)
 endif()
 target_compile_features(drs_large_instrument_qualification PRIVATE cxx_std_17)
 target_compile_definitions(drs_large_instrument_qualification PRIVATE NOMINMAX)
-target_include_directories(drs_large_instrument_qualification PRIVATE ${CMAKE_SOURCE_DIR}/app/src)
+target_include_directories(drs_large_instrument_qualification PRIVATE
+    ${CMAKE_SOURCE_DIR}/app/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/support)
 
 # Sprint 4 Entry Gate EG1 focused regression matrix.
 juce_add_console_app(drs_sprint4_entry_authored_input_tests
@@ -4455,6 +4457,7 @@ target_sources(drs_package_secure_crypto_tests
 target_link_libraries(drs_package_secure_crypto_tests
     PRIVATE
         drs_engine_adapter
+        drs_libsodium
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -4471,6 +4474,7 @@ target_include_directories(drs_package_secure_crypto_tests
 add_test(
     NAME drs.package_secure_crypto
     COMMAND drs_package_secure_crypto_tests
+        ${CMAKE_CURRENT_BINARY_DIR}/artifacts/package-protection/phase-6/crypto-evidence.json
 )
 
 juce_add_console_app(drs_package_v3_tests
@@ -4487,6 +4491,39 @@ target_include_directories(drs_package_v3_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/support
     ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
 add_test(NAME drs.package_v3 COMMAND drs_package_v3_tests)
+
+add_executable(drs_package_v3_fuzz_smoke_tests src/PackageV3FuzzSmokeTests.cpp)
+target_link_libraries(drs_package_v3_fuzz_smoke_tests PRIVATE drs_engine_adapter)
+target_compile_features(drs_package_v3_fuzz_smoke_tests PRIVATE cxx_std_17)
+add_test(NAME drs.package_v3.fuzz_smoke COMMAND drs_package_v3_fuzz_smoke_tests)
+
+if(DRS_BUILD_PACKAGE_FUZZERS)
+    if(MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "DRS_BUILD_PACKAGE_FUZZERS requires non-MSVC Clang with libFuzzer.")
+    endif()
+    foreach(DRS_FUZZER IN ITEMS parser framing signature envelope aad)
+        if(DRS_FUZZER STREQUAL "parser")
+            set(DRS_FUZZ_MODE 0)
+        elseif(DRS_FUZZER STREQUAL "framing")
+            set(DRS_FUZZ_MODE 1)
+        elseif(DRS_FUZZER STREQUAL "signature")
+            set(DRS_FUZZ_MODE 2)
+        elseif(DRS_FUZZER STREQUAL "envelope")
+            set(DRS_FUZZ_MODE 3)
+        else()
+            set(DRS_FUZZ_MODE 4)
+        endif()
+        add_executable(drs_package_v3_fuzz_${DRS_FUZZER} src/PackageV3FuzzTarget.cpp)
+        target_link_libraries(drs_package_v3_fuzz_${DRS_FUZZER} PRIVATE drs_engine_adapter)
+        target_compile_features(drs_package_v3_fuzz_${DRS_FUZZER} PRIVATE cxx_std_17)
+        target_compile_definitions(drs_package_v3_fuzz_${DRS_FUZZER}
+            PRIVATE DRS_PACKAGE_V3_FUZZ_MODE=${DRS_FUZZ_MODE})
+        target_compile_options(drs_package_v3_fuzz_${DRS_FUZZER}
+            PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
+        target_link_options(drs_package_v3_fuzz_${DRS_FUZZER}
+            PRIVATE -fsanitize=fuzzer,address,undefined)
+    endforeach()
+endif()
 
 juce_add_console_app(drs_package_v3_file_reader_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package V3 File Reader Tests"
@@ -4562,7 +4599,9 @@ target_compile_features(drs_package_protection_release_gate_tests PRIVATE cxx_st
 target_include_directories(drs_package_protection_release_gate_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/support
     ${CMAKE_SOURCE_DIR}/third_party/juce/modules)
-add_test(NAME drs.package_protection.release_gate COMMAND drs_package_protection_release_gate_tests)
+add_test(NAME drs.package_protection.release_gate
+    COMMAND drs_package_protection_release_gate_tests
+        ${CMAKE_CURRENT_BINARY_DIR}/artifacts/package-protection/phase-6)
 
 juce_add_console_app(drs_package_key_lifecycle_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Package Key Lifecycle Tests"

@@ -101,6 +101,8 @@ int main()
                 "V3 version fixed offset");
     ok &= check(readU32At(written.packageBytes, 68u) == packageEd25519SignatureBytes,
                 "V3 signature size fixed offset");
+    ok &= check(packageV3MaximumRecords == 131072u,
+                "V3 bounded record limit supports the qualified large corpus");
 
     auto package = parsePackageV3(written.packageBytes);
     ok &= check(package.opened, "V3 structural parse");

@@ -5,7 +5,6 @@
 #include <drs/engine/PackageSignature.h>
 
 #include <string>
-#include <fstream>
 #include <utility>
 #include <vector>
 
@@ -25,19 +24,16 @@ public:
         std::string& issue) const override
     {
         response = {};
-        std::vector<std::uint8_t> fileBytes;
         const std::vector<std::uint8_t>* signedBytes = request.canonicalSignedBytes;
         if (signedBytes == nullptr && ! request.canonicalSignedFilePath.empty())
         {
-            std::ifstream input(request.canonicalSignedFilePath, std::ios::binary);
-            fileBytes.assign(std::istreambuf_iterator<char>(input),
-                             std::istreambuf_iterator<char>());
-            if (input.bad() || fileBytes.size() != request.canonicalSignedBytesLength)
-            {
-                issue = "test signer could not read the canonical signed file";
+            if (request.signingKeyId != keyId_
+                || ! drs::engine::packageSignEd25519phFile(
+                    privateKey_, request.canonicalSignedFilePath,
+                    request.canonicalSignedBytesLength, response.signature, issue))
                 return false;
-            }
-            signedBytes = &fileBytes;
+            response.auditId = "test-signing:" + keyId_;
+            return true;
         }
         if (request.signingKeyId != keyId_ || signedBytes == nullptr
             || ! drs::engine::packageSignEd25519ph(

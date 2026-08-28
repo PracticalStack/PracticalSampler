@@ -383,8 +383,8 @@ public:
             || !ensureSodium(issue))
             return false;
 
-        output.nonce.resize(nonceSizeBytes());
-        randombytes_buf(output.nonce.data(), output.nonce.size());
+        if (! generateSecurePackageNonce(output.nonce, issue))
+            return false;
 
         std::vector<std::uint8_t> ciphertextWithTag(
             plaintext.size + tagSizeBytes());
@@ -510,6 +510,18 @@ bool generateSecurePackageKey(SecureBuffer& key,
     bytes.resize(securePackageKeySizeBytes);
     randombytes_buf(bytes.data(), bytes.size());
     key = SecureBuffer(std::move(bytes));
+    issue.clear();
+    return true;
+}
+
+bool generateSecurePackageNonce(std::vector<std::uint8_t>& nonce,
+                                std::string& issue)
+{
+    nonce.clear();
+    if (! ensureSodium(issue))
+        return false;
+    nonce.resize(securePackageNonceSizeBytes);
+    randombytes_buf(nonce.data(), nonce.size());
     issue.clear();
     return true;
 }

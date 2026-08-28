@@ -49,6 +49,9 @@ struct DeferredPackageSessionSnapshot
 struct DeferredPackageSessionPlan
 {
     std::string packagePath;
+    // V3 callers provide the already authenticated identity without retaining
+    // a legacy V2 index object. V2 callers may continue using package below.
+    std::string authenticatedPackageId;
     std::shared_ptr<const PackageV2OpenResult> package;
     std::vector<std::shared_ptr<PackagePagedSampleDataSource>> sources;
     std::function<SamplerRenderModelPtr()> buildRenderModel;

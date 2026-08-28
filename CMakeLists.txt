@@ -14,6 +14,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(DRS_ENABLE_THREAD_SANITIZER "Instrument supported builds with ThreadSanitizer" OFF)
+option(DRS_BUILD_PACKAGE_FUZZERS "Build Clang/libFuzzer package V3 security targets" OFF)
+option(DRS_ENABLE_STATIC_ANALYSIS "Enable compiler static analysis for qualification builds" OFF)
 
 # The package content-protection path uses a maintained, upstream crypto
 # implementation.  The release archive is hash-pinned because package
@@ -66,6 +68,18 @@ if(DRS_ENABLE_THREAD_SANITIZER)
 
     add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
     add_link_options(-fsanitize=thread)
+endif()
+
+if(DRS_ENABLE_STATIC_ANALYSIS)
+    if(MSVC)
+        add_compile_options(/analyze /analyze:external-)
+    else()
+        find_program(DRS_CLANG_TIDY_EXECUTABLE NAMES clang-tidy)
+        if(NOT DRS_CLANG_TIDY_EXECUTABLE)
+            message(FATAL_ERROR "DRS_ENABLE_STATIC_ANALYSIS requires MSVC /analyze or clang-tidy.")
+        endif()
+        set(CMAKE_CXX_CLANG_TIDY "${DRS_CLANG_TIDY_EXECUTABLE}")
+    endif()
 endif()
 
 set(JUCE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
