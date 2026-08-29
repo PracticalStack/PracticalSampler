@@ -1121,6 +1121,9 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
         restoreAudioSilenceApplied.store(false, std::memory_order_release);
     }
 
+    if (performanceCloseRequested.exchange(false, std::memory_order_acq_rel))
+        performancePlaybackContext.closeAtBlockBoundary();
+
     drs::engine::SamplerEventBlock performanceEvents;
     drs::engine::SamplerEventBlock authoringPreviewEvents;
     const auto frameCount = buffer.getNumSamples();
@@ -2370,6 +2373,8 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
     std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
         v3SecurityContext)
 {
+    if (v3SecurityContext == nullptr)
+        v3SecurityContext = drs::app::makeOfflinePerformancePackageActivationSecurityContext();
     return preparePerformancePackageWorkspaceInternal(packagePath, v3SecurityContext);
 }
 
@@ -2378,6 +2383,8 @@ OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInBac
     std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
         v3SecurityContext)
 {
+    if (v3SecurityContext == nullptr)
+        v3SecurityContext = drs::app::makeOfflinePerformancePackageActivationSecurityContext();
     return openPerformancePackageWorkspaceInternal(packagePath, v3SecurityContext);
 }
 
@@ -2448,6 +2455,8 @@ PerformancePackageExportResult Processor::exportPerformancePackage(
 void Processor::closePerformancePackageWorkspace(drs::engine::RuntimeProjectModel unloadedProject)
 {
     projectSourceValidationService.cancel("Performance package closed");
+    engineFacade.cancelPreviewPreparation("Performance package closed");
+    requestPerformancePlaybackClose();
     engineFacade.restoreBundledReferenceRuntimeSession();
     engineFacade.closeDraftPlaybackProject();
     performancePlaybackContext.cancelPendingActivation();
@@ -2487,7 +2496,10 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     }
 
     if (workspaceDocumentState.kind == drs::engine::WorkspaceDocumentKind::performancePackage)
+    {
+        requestPerformancePlaybackClose();
         engineFacade.restoreBundledReferenceRuntimeSession();
+    }
 
     // A deliberate project replacement supersedes a queued or failed host recall before
     // the new project is permitted to publish.
@@ -3836,6 +3848,18 @@ void Processor::clearAuthoringWaveformPreviewCache()
     authoringWaveformDetailRequestEndFrameExclusive = 0;
 }
 
+void Processor::requestPerformancePlaybackClose() noexcept
+{
+    performancePlaybackContext.cancelPendingActivation();
+
+    // A context that has not been prepared has no concurrent audio owner, so close it
+    // immediately.  Prepared contexts are closed by processBlock at the next safe boundary.
+    if (!performancePlaybackContext.getSnapshot().prepared)
+        performancePlaybackContext.closeAtBlockBoundary();
+    else
+        performanceCloseRequested.store(true, std::memory_order_release);
+}
+
 void Processor::resetAuthoringPreviewPreparationAuthorization() noexcept
 {
     authoringPreviewPreparationAuthorized = false;
@@ -3958,6 +3982,11 @@ bool Processor::stageAuthoringPreviewActivation(const drs::engine::AuthoringPrev
 
 bool Processor::synchronizePerformanceActivation(bool installImmediately)
 {
+    // A package/project transition has requested an audio-boundary retirement. Do not stage
+    // the replacement generation until the old performance context has been closed.
+    if (performanceCloseRequested.load(std::memory_order_acquire))
+        return false;
+
     const auto reclaimed = performancePlaybackContext.serviceRetirements();
     diagnosticsRetiredActivationCount.fetch_add(reclaimed, std::memory_order_relaxed);
     diagnosticsReclaimedActivationPayloadCount.fetch_add(reclaimed, std::memory_order_relaxed);

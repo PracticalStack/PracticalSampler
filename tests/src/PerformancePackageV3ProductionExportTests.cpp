@@ -130,6 +130,27 @@ int main()
                     && ! contains(firstBytes, "RIFF") && ! contains(firstBytes, "WAVE"),
                 "V3 package bytes must not expose protected settings, paths, filenames, or WAV data.");
 
+        if (builtInExportSecurity != nullptr)
+        {
+            auto builtInRequest = makeRequest(
+                root, root / "built-in-profile.drpkg", builtInExportSecurity);
+            const auto builtInExport = app::executePerformancePackageExport(builtInRequest);
+            require(builtInExport.exported,
+                    builtInExport.issues.empty() ? builtInExport.state
+                                                  : builtInExport.issues.front());
+            plugin::Processor builtInProcessor;
+            const auto builtInLoad = builtInProcessor.loadPerformancePackageWorkspace(
+                juce::File(juce::String::fromUTF8(builtInExport.packagePath.c_str())));
+            require(builtInLoad.loaded && builtInProcessor.getWorkspaceDocumentState().playable,
+                    builtInLoad.issues.empty() ? builtInLoad.state
+                                               : builtInLoad.issues.front());
+            const auto builtInBackground = plugin::preparePerformancePackageWorkspaceInBackground(
+                builtInExport.packagePath);
+            require(builtInBackground.prepared,
+                    builtInBackground.issues.empty() ? builtInBackground.state
+                                                     : builtInBackground.issues.front());
+        }
+
         const auto opened = engine::openPackageV3File(first.packagePath, *security->trustStore);
         require(opened.opened && opened.package.signatureVerified,
                 opened.issues.empty() ? "V3 production export did not verify"

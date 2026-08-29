@@ -1793,10 +1793,12 @@ bool Editor::loadPerformancePackageFromFile(const juce::File& file)
     const auto packagePath = file.getFullPathName().toStdString();
     const auto ready = task.ready;
     const auto result = task.result;
+    const auto securityContext = processor.getPerformancePackageActivationSecurityContext();
     pendingPerformancePackageOpenTask = task;
-    std::thread([packagePath, ready, result]()
+    std::thread([packagePath, ready, result, securityContext]()
     {
-        *result = drs::plugin::preparePerformancePackageWorkspaceInBackground(packagePath);
+        *result = drs::plugin::preparePerformancePackageWorkspaceInBackground(
+            packagePath, securityContext);
         ready->store(true, std::memory_order_release);
     }).detach();
     updateProjectStatusLabel();

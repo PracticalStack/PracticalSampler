@@ -288,6 +288,10 @@ public:
     PerformancePackageExportResult exportPerformancePackage(
         const juce::File& resolvedPackageFile);
     void closePerformancePackageWorkspace(drs::engine::RuntimeProjectModel unloadedProject);
+    drs::engine::SamplerPlaybackContextSnapshot getPerformancePlaybackContextSnapshot() const noexcept
+    {
+        return performancePlaybackContext.getSnapshot();
+    }
     const drs::engine::HostProjectBinding& getAuthoringProjectBinding() const
     {
         return authoringProjectBinding;
@@ -643,6 +647,9 @@ private:
     std::optional<drs::engine::HostPublishedCheckpoint> expectedRestoredPublishedState;
     std::atomic<bool> pendingRestoreAudioSilence { false };
     std::atomic<bool> restoreAudioSilenceApplied { false };
+    // Playback activations are audio-owned.  UI/project transitions request the close and
+    // processBlock applies it at a safe block boundary.
+    std::atomic<bool> performanceCloseRequested { false };
     std::shared_ptr<const ProcessorRealtimeSafetySnapshot> publishedRealtimeSafetySnapshot;
     AudioDiagnosticsPublication audioDiagnosticsPublication;
     std::atomic<std::size_t> diagnosticsProcessBlockCount { 0 };
@@ -689,6 +696,8 @@ private:
         = drs::engine::AuthoringPreviewScope::selectedZone;
     std::string pendingAuthoringPreviewZoneId;
     std::string pendingAuthoringPreviewGroupId;
+
+    void requestPerformancePlaybackClose() noexcept;
     double currentSampleRate = 44100.0;
     bool isSynchronizingParameterState = false;
     RealtimeGuardState realtimeGuardState;

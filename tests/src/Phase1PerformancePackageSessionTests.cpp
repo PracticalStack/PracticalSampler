@@ -171,6 +171,20 @@ drs::engine::RuntimeProjectModel buildAuthoringProjectFixture()
     return project;
 }
 
+drs::engine::RuntimeProjectModel buildUnloadedProjectState()
+{
+    drs::engine::RuntimeProjectModel project;
+    project.schemaName = "drs.project";
+    project.schemaVersion = drs::engine::layerContractProjectSchemaVersion;
+    project.displayName = "No Project Loaded";
+    project.authoring.schemaName = "drs.authoring";
+    project.authoring.schemaVersion = drs::engine::layerContractAuthoringSchemaVersion;
+    project.authoring.articulations = { { "default", "Default", true, 0, std::nullopt } };
+    project.authoring.notes = { "Open a project or create a new one to begin authoring." };
+    project.notes = { "This session starts without loading the checked-in reference project." };
+    return project;
+}
+
 void addAuthoredFxRoutingGraph(drs::engine::RuntimeProjectModel& project)
 {
     project.authoring.groups.front().routingBusId = "bus-group-pad-core";
@@ -394,6 +408,22 @@ int main()
         processor.serviceMessageThreadWork();
         require(renderQueuedPerformanceSurfaceMagnitude(processor, 69, 0.8f) > 0.0001f,
                 "Plugin package sessions should remain playable through the performance surface.");
+
+        processor.closePerformancePackageWorkspace(buildUnloadedProjectState());
+        juce::AudioBuffer<float> closeBuffer(2, 512);
+        closeBuffer.clear();
+        juce::MidiBuffer closeMidi;
+        processor.processBlock(closeBuffer, closeMidi);
+        const auto closedPerformanceContext = processor.getPerformancePlaybackContextSnapshot();
+        require(processor.getWorkspaceDocumentState().kind
+                    == drs::engine::WorkspaceDocumentKind::authoringProject
+                    && processor.getWorkspaceDocumentState().authoringAvailable,
+                "Closing a playable package should restore the authoring workspace.");
+        require(processor.getEngineFacade().getPerformancePackageActivationPayload() == nullptr
+                    && processor.getEngineFacade().getPerformancePackageRenderModel() == nullptr,
+                "Closing a playable package should release package activation and render-model payloads.");
+        require(!closedPerformanceContext.hasActiveActivation,
+                "Closing a playable package must not leave its package activation active after the next audio block.");
 
         std::cout << "Phase 1 performance package session tests passed." << std::endl;
         return 0;
