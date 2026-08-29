@@ -22,6 +22,27 @@ configure_file(
     @ONLY
 )
 
+set(DRS_OFFLINE_PACKAGE_PROFILE_HEADER "" CACHE FILEPATH
+    "Generated offline package profile header; omit to build without the offline production profile")
+if(DRS_OFFLINE_PACKAGE_PROFILE_HEADER)
+    if(NOT EXISTS "${DRS_OFFLINE_PACKAGE_PROFILE_HEADER}")
+        message(FATAL_ERROR
+            "DRS_OFFLINE_PACKAGE_PROFILE_HEADER does not exist: ${DRS_OFFLINE_PACKAGE_PROFILE_HEADER}")
+    endif()
+    configure_file(
+        "${DRS_OFFLINE_PACKAGE_PROFILE_HEADER}"
+        "${DRS_ENGINE_ADAPTER_GENERATED_DIR}/drs/engine/PackageOfflineProtection.generated.h"
+        COPYONLY
+    )
+else()
+    set(DRS_OFFLINE_PACKAGE_PROFILE_ID "")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageOfflineProtection.generated.h.in"
+        "${DRS_ENGINE_ADAPTER_GENERATED_DIR}/drs/engine/PackageOfflineProtection.generated.h"
+        @ONLY
+    )
+endif()
+
 add_library(drs_sample_import STATIC
     src/SampleImport.cpp
     include/drs/engine/SampleImport.h
@@ -103,6 +124,7 @@ add_library(drs_engine_adapter STATIC
     src/PlayableInstrumentLicense.cpp
     src/PackageCrypto.cpp
     src/PackageKeys.cpp
+    src/OfflinePackageKeys.cpp
     src/PackageSignature.cpp
     src/PackageV3.cpp
     src/PackageV3FileReader.cpp

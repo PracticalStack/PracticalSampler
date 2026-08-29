@@ -89,6 +89,75 @@ int main()
 
     bool ok = true;
     std::string issue;
+
+    OfflinePackageReleaseKeySource offlineSource;
+    ok &= check(offlineSource.isConfigured() == offlinePackageProtectionProfileConfigured(),
+                "offline package profile reports its generated configuration state");
+    const auto& offlinePolicies = offlinePackageReleaseKeyPolicies();
+    ok &= check(offlinePolicies.empty() == ! offlinePackageProtectionProfileConfigured(),
+                "offline package profile exposes policy metadata only when configured");
+    SecureBuffer offlineKey;
+    if (offlinePackageProtectionProfileConfigured())
+    {
+        ok &= check(std::string(offlinePackageProtectionProfileId()).size() > 0
+                        && std::string(offlinePackageReleaseKeyId()).size() > 0,
+                    "configured offline package profile exposes stable non-secret IDs");
+        const auto activePolicy = std::find_if(offlinePolicies.begin(), offlinePolicies.end(),
+            [](const auto& policy) { return policy.state == PackageReleaseKeyState::active; });
+        ok &= check(activePolicy != offlinePolicies.end()
+                        && activePolicy->keyId == offlinePackageReleaseKeyId(),
+                    "configured offline package profile exposes the active key policy");
+        ok &= check(offlineSource.loadReleaseKey(
+                        "offline-package", offlinePackageReleaseKeyId(), offlineKey)
+                        && offlineKey.size() == securePackageKeySizeBytes,
+                    "configured offline package profile reconstructs a valid release key");
+        for (const auto& policy : offlinePolicies)
+        {
+            SecureBuffer policyKey;
+            const bool loaded = offlineSource.loadReleaseKey(
+                "offline-package", policy.keyId, policyKey);
+            if (policy.state == PackageReleaseKeyState::revoked)
+            {
+                ok &= check(! loaded && policyKey.empty(),
+                            "configured offline package profile rejects revoked keys");
+            }
+            else
+            {
+                ok &= check(loaded && policyKey.size() == securePackageKeySizeBytes,
+                            "configured offline package profile loads active and retired keys");
+            }
+        }
+        VersionedPackageKeyProvider offlineProvider(offlinePolicies, offlineSource);
+        std::string offlineSelectedKeyId;
+        std::string offlineIssue;
+        ok &= check(offlineProvider.valid()
+                        && offlineProvider.selectActiveEncryptionKeyId(
+                            offlineSelectedKeyId, offlineIssue)
+                        && offlineSelectedKeyId == offlinePackageReleaseKeyId(),
+                    "configured offline package profile selects its active key for export");
+        SecureBuffer offlineResolved;
+        ok &= check(offlineProvider.resolvePackageKey(
+                        "offline-package", offlinePackageReleaseKeyId(),
+                        PackageKeyUse::encryptNewPackage, offlineResolved, offlineIssue)
+                        && offlineResolved.size() == securePackageKeySizeBytes,
+                    "configured offline package profile resolves the active export key");
+        ok &= check(! offlineSource.loadReleaseKey(
+                        "", offlinePackageReleaseKeyId(), offlineKey)
+                        && offlineKey.empty(),
+                    "offline package profile rejects an empty package identity and clears output");
+        ok &= check(! offlineSource.loadReleaseKey(
+                        "offline-package", "offline-unknown-key", offlineKey)
+                        && offlineKey.empty(),
+                    "offline package profile rejects an unknown key ID and clears output");
+    }
+    else
+    {
+        ok &= check(! offlineSource.loadReleaseKey(
+                        "offline-package", "offline-unknown-key", offlineKey)
+                        && offlineKey.empty(),
+                    "unconfigured offline package profile fails closed without a key");
+    }
+
     SecureBuffer activeReleaseKey, retiredReleaseKey, revokedReleaseKey;
     ok &= check(generateSecurePackageKey(activeReleaseKey, issue), "generate active release key");
     ok &= check(generateSecurePackageKey(retiredReleaseKey, issue), "generate retired release key");

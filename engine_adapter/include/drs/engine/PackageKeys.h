@@ -70,6 +70,25 @@ private:
     Resolver resolver_;
 };
 
+// Offline portable-profile source. The release build contains obfuscated
+// fragments because every compatible installation must publish and open
+// packages without a service. Recovery by deliberate reverse engineering is
+// outside this profile's guarantee. The raw key exists only in SecureBuffer
+// storage after reconstruction and is zeroized after each load.
+class OfflinePackageReleaseKeySource final : public PackageReleaseKeySource
+{
+public:
+    bool isConfigured() const noexcept;
+    bool loadReleaseKey(const std::string& packageId,
+                        const std::string& keyId,
+                        SecureBuffer& key) const override;
+};
+
+const char* offlinePackageProtectionProfileId() noexcept;
+const char* offlinePackageReleaseKeyId() noexcept;
+const std::vector<PackageReleaseKeyPolicy>& offlinePackageReleaseKeyPolicies() noexcept;
+bool offlinePackageProtectionProfileConfigured() noexcept;
+
 class VersionedPackageKeyProvider final : public PackageKeyProvider
 {
 public:

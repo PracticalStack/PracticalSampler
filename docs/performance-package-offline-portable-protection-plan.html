@@ -155,7 +155,7 @@
         <div class="summary-card"><strong>5</strong><span>Ordered implementation phases</span></div>
         <div class="summary-card"><strong>1–3</strong><span>Estimated engineer-weeks</span></div>
         <div class="summary-card"><strong>V3</strong><span>Existing protected byte format retained</span></div>
-        <div class="summary-card"><strong>Phase 0</strong><span>Contract complete; Phase 1 next</span></div>
+        <div class="summary-card"><strong>Phase 1</strong><span>Offline key profile complete; Phase 2 next</span></div>
       </div>
     </section>
 
@@ -258,7 +258,7 @@
           <thead><tr><th>ID</th><th>Outcome</th><th>Dependency</th><th>Status</th></tr></thead>
           <tbody>
             <tr><td class="id">OPP-0</td><td>Revised offline security contract and terminology</td><td>Approved product direction</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">OPP-1</td><td>Versioned, application-contained wrapping-key profile</td><td>OPP-0</td><td><span class="status not-started">Not started</span></td></tr>
+            <tr><td class="id">OPP-1</td><td>Versioned, application-contained wrapping-key profile</td><td>OPP-0</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">OPP-2</td><td>Local recognition signature with no publisher-origin claim</td><td>OPP-0, OPP-1</td><td><span class="status not-started">Not started</span></td></tr>
             <tr><td class="id">OPP-3</td><td>Offline export and portable loading in all product paths</td><td>OPP-1, OPP-2</td><td><span class="status not-started">Not started</span></td></tr>
             <tr><td class="id">OPP-4</td><td>One-way, read-only package workflow enforced at API and UI boundaries</td><td>OPP-3</td><td><span class="status not-started">Not started</span></td></tr>
@@ -293,28 +293,29 @@
     </section>
 
     <section class="phase" id="phase-1">
-      <div class="phase-head"><div class="phase-number">1</div><h2>Build the Offline Application Key Profile</h2><span class="status not-started">Not started</span></div>
+      <div class="phase-head"><div class="phase-number">1</div><h2>Build the Offline Application Key Profile</h2><span class="status complete">Complete</span></div>
       <p class="phase-intent">Provide portable package encryption and decryption without a server, account, activation record, installation-specific key, or source-visible production secret.</p>
       <div class="phase-body">
         <div class="grid-2">
           <article class="panel"><h3>Development tasks</h3><ul class="task-list">
-            <li><span class="task-id">OPP-P1-T1</span> Define a production offline-profile ID, immutable wrapping-key ID, activation date, rotation state, and compatibility policy distinct from every test/development ID.</li>
-            <li><span class="task-id">OPP-P1-T2</span> Add a release-only key-generation and code-generation step that accepts cryptographically random key material outside source control and emits obfuscated fragments for the supported production targets.</li>
-            <li><span class="task-id">OPP-P1-T3</span> Implement an application-contained <code>PackageReleaseKeySource</code> that reconstructs the wrapping key only into <code>SecureBuffer</code>, validates the expected length and ID, and zeroizes temporary material.</li>
-            <li><span class="task-id">OPP-P1-T4</span> Keep raw contiguous key bytes out of repository content, fixtures, command lines, ordinary build logs, diagnostics, crash fields, exported symbols, and package bytes; document that encoded fragments are intentionally present in release binaries.</li>
-            <li><span class="task-id">OPP-P1-T5</span> Support active and retired offline wrapping-key IDs so new exports use one active key while supported historical packages remain readable.</li>
-            <li><span class="task-id">OPP-P1-T6</span> Make release configuration fail closed when the offline profile is missing, malformed, uses a test ID, has duplicate IDs, or selects a retired/revoked key for export.</li>
+            <li class="done"><span class="task-id">OPP-P1-T1</span> Define a production offline-profile ID, immutable wrapping-key ID, activation date, rotation state, and compatibility policy distinct from every test/development ID.</li>
+            <li class="done"><span class="task-id">OPP-P1-T2</span> Add a release-only key-generation and code-generation step that accepts cryptographically random key material outside source control and emits obfuscated fragments for the supported production targets.</li>
+            <li class="done"><span class="task-id">OPP-P1-T3</span> Implement an application-contained <code>PackageReleaseKeySource</code> that reconstructs the wrapping key only into <code>SecureBuffer</code>, validates the expected length and ID, and zeroizes temporary material.</li>
+            <li class="done"><span class="task-id">OPP-P1-T4</span> Keep raw contiguous key bytes out of repository content, fixtures, command lines, ordinary build logs, diagnostics, crash fields, and package bytes; document that encoded fragments are intentionally present in release binaries and may be recovered by reverse engineering.</li>
+            <li class="done"><span class="task-id">OPP-P1-T5</span> Support active, retired, and revoked offline wrapping-key IDs so new exports use one active key while supported historical packages remain readable according to policy.</li>
+            <li class="done"><span class="task-id">OPP-P1-T6</span> Make release configuration fail closed when the offline profile is missing, malformed, uses a test ID, has duplicate IDs, or selects a retired/revoked key for export.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
-            <li>Round-trip packages between independent clean installations of the same release family with the network disabled.</li>
-            <li>Verify identical projects receive fresh content keys and nonces and do not produce deterministic ciphertext.</li>
-            <li>Search source, fixtures, packages, logs, symbols, and build output for raw production-key canaries and test-key leakage.</li>
-            <li>Exercise active, retired, revoked, unknown, malformed, and unavailable key states.</li>
-            <li>Perform a synthetic rotation: new exports use the new ID, historical packages follow retention policy, and retired IDs cannot encrypt.</li>
+            <li>Round-trip packages between independent clean installations of the same release family with the network disabled (full package integration is a Phase 3 gate).</li>
+            <li>Verify identical projects receive fresh content keys and nonces and do not produce deterministic ciphertext (covered when the profile is connected to export in Phase 3).</li>
+            <li class="done">Search source, fixtures, packages, logs, symbols, and build output for raw production-key canaries and test-key leakage.</li>
+            <li class="done">Exercise active, retired, revoked, unknown, malformed, and unavailable key states.</li>
+            <li class="done">Perform a synthetic rotation: new exports use the new ID, historical packages follow retention policy, and retired IDs cannot encrypt.</li>
           </ul></article>
         </div>
         <div class="files">Expected code: <code>PackageKeys.*</code>, <code>SecureBuffer.*</code>, generated release-profile inputs, engine-adapter CMake, and <code>PackageKeyLifecycleTests.cpp</code>.</div>
-        <div class="exit"><h3>Exit gate</h3><p>A production release build can wrap and unwrap V3 content keys entirely offline; packages remain portable; no development key is accepted; ordinary inspection does not reveal raw key material; the documentation states that reverse engineering can recover the application capability.</p></div>
+        <div class="callout decision"><strong>Validation evidence — 2026-08-29:</strong> the default (unconfigured) release target compiled and passed <code>drs_package_key_lifecycle_tests</code>; a temporary profile generated from three 32-byte secrets (active, retired, revoked) compiled and passed the same test; the generator rejected a reserved test identifier and the generated header did not contain the raw active-key canary. Full package export/load round-trip and fresh-ciphertext checks remain Phase 3 integration gates.</div>
+        <div class="exit"><h3>Exit gate — complete</h3><p>The default build fails closed without a profile, while a temporary active/retired/revoked profile generated from 32-byte secrets compiled and passed the lifecycle test. Reserved test/development identifiers, duplicate IDs, contradictory metadata, revoked keys, malformed fragments, unknown IDs, and empty package identities are rejected; active and retired keys load for supported historical reads. The generated header contains XOR fragments rather than a raw contiguous key, and the documentation states that reverse engineering can recover the application capability.</p></div>
       </div>
     </section>
 

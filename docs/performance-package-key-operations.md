@@ -60,6 +60,34 @@ security must record named owners for:
 No production private or symmetric key is generated or stored by this
 repository.
 
+## Portable offline profile generation
+
+The portable profile is generated outside the repository from a managed raw
+32-byte secret file. The generator creates a fresh random mask and writes only
+XOR fragments plus non-secret profile/key lifecycle metadata to the generated
+header. The source secret and generated header are build inputs, not checked-in
+files.
+
+```text
+pwsh -NoProfile -File tools/generate-offline-package-profile.ps1 \
+  -SecretFile <managed-secret-path> \
+  -OutputHeader <private-build-path>/PackageOfflineProtection.generated.h \
+  -ProfileId practical-sampler.offline.v1 \
+  -ReleaseKeyId ps-offline-release-2026-01
+
+cmake -S . -B build/release \
+  -DDRS_OFFLINE_PACKAGE_PROFILE_HEADER=<private-build-path>/PackageOfflineProtection.generated.h
+```
+
+The secret path must not be echoed into ordinary logs, and the generated
+header must not be archived as a source artifact. To retain historical package
+readability during a planned rotation, pass retired or revoked slot specs as
+`keyId|secretFile|activatedUtc|retiredUtc` or
+`keyId|secretFile|activatedUtc|revokedUtc`. The application profile remains
+recoverable by a determined reverse engineer; this mechanism is deliberate
+friction, not a hardware-backed secret boundary. Profile and key IDs containing
+test/development tokens are rejected by the generator and runtime.
+
 ## Publisher trust-store provisioning
 
 Configure `DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES` at desktop build time. It is a

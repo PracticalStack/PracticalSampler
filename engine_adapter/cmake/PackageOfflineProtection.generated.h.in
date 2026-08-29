@@ -1,0 +1,25 @@
+#pragma once
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+
+// Generated offline package protection profile. The portable profile may
+// contain retired key slots so supported historical packages remain readable.
+// The raw key is never represented as one contiguous initializer.
+namespace drs::engine::offline_generated
+{
+struct ReleaseKeySlot
+{
+    const char* keyId;
+    const char* state;
+    const char* activatedUtc;
+    const char* retiredUtc;
+    const char* revokedUtc;
+    std::array<std::uint8_t, 32> mask;
+    std::array<std::uint8_t, 32> xorFragment;
+};
+
+inline constexpr const char* profileId = "@DRS_OFFLINE_PACKAGE_PROFILE_ID@";
+inline constexpr std::array<ReleaseKeySlot, 0> releaseKeys {};
+} // namespace drs::engine::offline_generated
