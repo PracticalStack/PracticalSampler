@@ -104,12 +104,12 @@ bool PackagePublisherTrustStore::resolvePublicKey(
         [&](const auto& key) { return key.keyId == keyId; });
     if (found == keys_.end())
     {
-        issue = "package signing key id is unknown";
+        issue = "package-recognition key id is unknown";
         return false;
     }
     if (found->state == PackageSigningKeyState::revoked)
     {
-        issue = "package signing key is revoked";
+        issue = "package-recognition key is revoked";
         return false;
     }
     publicKey = found->publicKey;

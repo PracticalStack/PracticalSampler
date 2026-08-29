@@ -1,5 +1,6 @@
 #include <drs/engine/PackageCrypto.h>
 #include <drs/engine/PackageKeys.h>
+#include <drs/engine/PackageOfflineRecognitionSigner.h>
 #include <drs/engine/PackagePublisherTrustStore.h>
 #include <drs/engine/PackageV3.h>
 #include <drs/signing/ControlledPackageSigner.h>
@@ -156,6 +157,109 @@ int main()
                         "offline-package", "offline-unknown-key", offlineKey)
                         && offlineKey.empty(),
                     "unconfigured offline package profile fails closed without a key");
+    }
+
+    OfflinePackageRecognitionSigner recognitionSigner;
+    ok &= check(recognitionSigner.isConfigured()
+                    == offlinePackageRecognitionSigningConfigured(),
+                "offline recognition signer reports its generated configuration state");
+    if (recognitionSigner.isConfigured())
+    {
+        SecureBuffer signingReleaseKey;
+        const bool releaseKeyLoaded = offlineSource.loadReleaseKey(
+            "recognition-package", offlinePackageReleaseKeyId(), signingReleaseKey);
+        PackageV3WriteRequest recognitionPackageRequest;
+        recognitionPackageRequest.packageId = "recognition-package";
+        recognitionPackageRequest.compatibilityId = "drs.runtime.v1";
+        recognitionPackageRequest.encryptionKeyId = offlinePackageReleaseKeyId();
+        recognitionPackageRequest.releaseKey = &signingReleaseKey;
+        recognitionPackageRequest.signingKeyId = offlinePackageRecognitionSigningKeyId();
+        recognitionPackageRequest.publisherSigner = &recognitionSigner;
+        recognitionPackageRequest.records = {
+            { "settings", "metadata", 1u, 0u, { 'r', 'e', 'c', 'o', 'g', 'n', 'i', 'z', 'e', 'd' } }
+        };
+        const auto recognitionPackage = releaseKeyLoaded
+            ? writePackageV3(recognitionPackageRequest) : PackageV3WriteResult {};
+        ok &= check(releaseKeyLoaded && recognitionPackage.written
+                        && recognitionPackage.packageBytes.size() > packageEd25519SignatureBytes,
+                    "configured offline recognition profile creates a canonical V3 package");
+        std::vector<std::uint8_t> canonicalBytes;
+        if (recognitionPackage.packageBytes.size() > packageEd25519SignatureBytes)
+        {
+            canonicalBytes.assign(
+                recognitionPackage.packageBytes.begin(),
+                recognitionPackage.packageBytes.end()
+                    - static_cast<std::ptrdiff_t>(packageEd25519SignatureBytes));
+        }
+        PackagePublisherSigningRequest signingRequest;
+        signingRequest.signingKeyId = offlinePackageRecognitionSigningKeyId();
+        signingRequest.canonicalSignedBytes = &canonicalBytes;
+        PackagePublisherSigningResponse signingResponse;
+        ok &= check(recognitionSigner.signCanonicalPackage(
+                        signingRequest, signingResponse, issue)
+                        && signingResponse.signature.size() == packageEd25519SignatureBytes
+                        && signingResponse.auditId.rfind("offline-recognition:", 0) == 0,
+                    "configured offline recognition signer signs canonical bytes locally");
+        const auto canonicalFile = std::filesystem::temp_directory_path()
+            / "drs-offline-recognition-canonical.bin";
+        {
+            std::ofstream output(canonicalFile, std::ios::binary);
+            output.write(reinterpret_cast<const char*>(canonicalBytes.data()),
+                         static_cast<std::streamsize>(canonicalBytes.size()));
+        }
+        PackagePublisherSigningRequest fileSigningRequest;
+        fileSigningRequest.signingKeyId = offlinePackageRecognitionSigningKeyId();
+        fileSigningRequest.canonicalSignedFilePath = canonicalFile.string();
+        fileSigningRequest.canonicalSignedBytesLength = canonicalBytes.size();
+        PackagePublisherSigningResponse fileSigningResponse;
+        ok &= check(recognitionSigner.signCanonicalPackage(
+                        fileSigningRequest, fileSigningResponse, issue)
+                        && fileSigningResponse.signature.size() == packageEd25519SignatureBytes,
+                    "configured offline recognition signer signs staged canonical files locally");
+        std::error_code removeError;
+        std::filesystem::remove(canonicalFile, removeError);
+        std::vector<std::uint8_t> recognitionPublicKey;
+        const auto& builtInRecognitionStore = builtInPackagePublisherTrustStore();
+        if (builtInRecognitionStore.resolvePublicKey(
+                offlinePackageRecognitionSigningKeyId(), recognitionPublicKey, issue))
+        {
+            ok &= check(packageVerifyEd25519ph(
+                            recognitionPublicKey, canonicalBytes,
+                            signingResponse.signature, issue),
+                        "built-in recognition store verifies the local signature");
+        }
+        signingRequest.signingKeyId = "offline-unknown-signing-key";
+        signingResponse = {};
+        ok &= check(! recognitionSigner.signCanonicalPackage(
+                        signingRequest, signingResponse, issue)
+                        && signingResponse.signature.empty(),
+                    "offline recognition signer rejects an unknown key ID");
+        signingRequest.signingKeyId = offlinePackageRecognitionSigningKeyId();
+        signingRequest.canonicalSignedBytes = nullptr;
+        signingResponse = {};
+        ok &= check(! recognitionSigner.signCanonicalPackage(
+                        signingRequest, signingResponse, issue)
+                        && signingResponse.signature.empty(),
+                    "offline recognition signer rejects missing canonical input");
+        signingRequest.canonicalSignedBytes = &canonicalBytes;
+        signingRequest.canonicalSignedFilePath = "ambiguous-canonical-input";
+        signingResponse = {};
+        ok &= check(! recognitionSigner.signCanonicalPackage(
+                        signingRequest, signingResponse, issue)
+                        && signingResponse.signature.empty(),
+                    "offline recognition signer rejects ambiguous canonical input");
+    }
+    else
+    {
+        PackagePublisherSigningRequest signingRequest;
+        signingRequest.signingKeyId = "offline-recognition-signing-key";
+        const std::vector<std::uint8_t> canonicalBytes { 1u, 2u, 3u };
+        signingRequest.canonicalSignedBytes = &canonicalBytes;
+        PackagePublisherSigningResponse signingResponse;
+        ok &= check(! recognitionSigner.signCanonicalPackage(
+                        signingRequest, signingResponse, issue)
+                        && signingResponse.signature.empty(),
+                    "unconfigured offline recognition signer fails closed");
     }
 
     SecureBuffer activeReleaseKey, retiredReleaseKey, revokedReleaseKey;

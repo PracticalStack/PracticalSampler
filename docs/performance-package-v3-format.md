@@ -70,7 +70,7 @@ cryptoSuite, signatureSuite
 packageId, encryptionKeyId, signingKeyId
 wrappedPackageContentKey
 bounded TOC offsets and encrypted sizes
-publisher signature
+package-recognition signature
 ```
 
 Display name, authoring metadata, UI controls, artwork, sample identities,
@@ -165,9 +165,10 @@ Package-recognition verification keys are public-only immutable trust-store
 entries with activation, retirement, and revocation metadata. Active and
 retired public keys recognize packages; revoked and unknown keys fail closed.
 V3 writing invokes a `PackagePublisherSigningClient` for wire/API compatibility.
-The planned portable offline profile will provide a local implementation; its
-signature will not establish author identity or publisher origin. The
-controlled signer remains available as a future licensed-publishing profile.
+The portable offline profile provides a local implementation; its signature
+means only that the package is recognized and internally consistent, and does
+not establish author identity or publisher origin. The controlled signer
+remains available as a future licensed-publishing profile.
 
 Key-envelope AAD is also length-prefixed binary:
 
@@ -196,7 +197,7 @@ V1/V2 writer or the deterministic compatibility crypto provider.
 The V3 writer loads, hashes, seals, and writes one bounded record at a time.
 Only non-secret record descriptors, nonces, and tags remain resident while the
 payload is staged. It then finalizes the canonical header/TOC, asks the
-publisher client to sign the staged file-backed signed region, appends the
+local recognition signer to sign the staged file-backed signed region, appends the
 detached signature, verifies the complete signature with the immutable trust
 store, opens selected records with AEAD, and atomically replaces the output.
 Cancellation or any key, signing, verification, or I/O failure removes the
@@ -205,8 +206,8 @@ staging file and preserves the last published package.
 The export service requires an injected
 `PerformancePackageExportSecurityContext`. An absent or invalid context fails
 closed before compilation and cannot select a legacy writer. The portable
-offline profile will supply this context from the application-contained key
-and recognition implementations; test signers and test keys are not accepted
+Phase 3 will wire the portable offline profile into this context from the
+application-contained key and recognition implementations; test signers and test keys are not accepted
 by the release profile. A future licensed profile may inject managed provider,
 signer, and trust objects as described in the key-operations runbook.
 

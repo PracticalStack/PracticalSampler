@@ -155,7 +155,7 @@
         <div class="summary-card"><strong>5</strong><span>Ordered implementation phases</span></div>
         <div class="summary-card"><strong>1–3</strong><span>Estimated engineer-weeks</span></div>
         <div class="summary-card"><strong>V3</strong><span>Existing protected byte format retained</span></div>
-        <div class="summary-card"><strong>Phase 1</strong><span>Offline key profile complete; Phase 2 next</span></div>
+        <div class="summary-card"><strong>Phase 2</strong><span>Recognition signing complete; Phase 3 next</span></div>
       </div>
     </section>
 
@@ -259,7 +259,7 @@
           <tbody>
             <tr><td class="id">OPP-0</td><td>Revised offline security contract and terminology</td><td>Approved product direction</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">OPP-1</td><td>Versioned, application-contained wrapping-key profile</td><td>OPP-0</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">OPP-2</td><td>Local recognition signature with no publisher-origin claim</td><td>OPP-0, OPP-1</td><td><span class="status not-started">Not started</span></td></tr>
+            <tr><td class="id">OPP-2</td><td>Local recognition signature with no publisher-origin claim</td><td>OPP-0, OPP-1</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">OPP-3</td><td>Offline export and portable loading in all product paths</td><td>OPP-1, OPP-2</td><td><span class="status not-started">Not started</span></td></tr>
             <tr><td class="id">OPP-4</td><td>One-way, read-only package workflow enforced at API and UI boundaries</td><td>OPP-3</td><td><span class="status not-started">Not started</span></td></tr>
             <tr><td class="id">OPP-D1</td><td>New adversarial challenge and independent release qualification</td><td>OPP-0 through OPP-4</td><td><span class="status deferred">Deferred</span></td></tr>
@@ -320,28 +320,29 @@
     </section>
 
     <section class="phase" id="phase-2">
-      <div class="phase-head"><div class="phase-number">2</div><h2>Implement the Local Package-Recognition Signature</h2><span class="status not-started">Not started</span></div>
+      <div class="phase-head"><div class="phase-number">2</div><h2>Implement the Local Package-Recognition Signature</h2><span class="status complete">Complete</span></div>
       <p class="phase-intent">Retain V3’s canonical detached signature as a local recognition and integrity check without claiming publisher identity or requiring a controlled service.</p>
       <div class="phase-body">
         <div class="grid-2">
           <article class="panel"><h3>Development tasks</h3><ul class="task-list">
-            <li><span class="task-id">OPP-P2-T1</span> Define a production recognition-signing key ID and separate application-contained signing capability; do not reuse the wrapping key or any test signing key.</li>
-            <li><span class="task-id">OPP-P2-T2</span> Implement a local offline <code>PackagePublisherSigningClient</code> adapter that signs only canonical V3 input and returns the existing audit/result shape without a network dependency.</li>
-            <li><span class="task-id">OPP-P2-T3</span> Retain the public verification key in the immutable trust configuration, but interpret membership as a recognized offline protection profile rather than a trusted author or publisher.</li>
-            <li><span class="task-id">OPP-P2-T4</span> Preserve complete signature coverage over the canonical envelope, wrapped key, TOC, record identities, nonces, ciphertext, tags, and ordering.</li>
-            <li><span class="task-id">OPP-P2-T5</span> Change customer-visible errors and telemetry from publisher-origin language to redacted recognized/corrupt/modified-package categories.</li>
-            <li><span class="task-id">OPP-P2-T6</span> Update class comments and tests so existing wire names such as <code>signingKeyId</code> cannot be mistaken for author identity or a remotely trusted publishing authority.</li>
+            <li class="done"><span class="task-id">OPP-P2-T1</span> Define a production recognition-signing key ID and separate application-contained signing capability; do not reuse the wrapping key or any test signing key.</li>
+            <li class="done"><span class="task-id">OPP-P2-T2</span> Implement a local offline <code>PackagePublisherSigningClient</code> adapter that signs only canonical V3 input and returns the existing audit/result shape without a network dependency.</li>
+            <li class="done"><span class="task-id">OPP-P2-T3</span> Retain the public verification key in the immutable trust configuration, but interpret membership as a recognized offline protection profile rather than a trusted author or publisher.</li>
+            <li class="done"><span class="task-id">OPP-P2-T4</span> Preserve complete signature coverage over the canonical envelope, wrapped key, TOC, record identities, nonces, ciphertext, tags, and ordering.</li>
+            <li class="done"><span class="task-id">OPP-P2-T5</span> Change customer-visible errors and telemetry from publisher-origin language to redacted recognized/corrupt/modified-package categories.</li>
+            <li class="done"><span class="task-id">OPP-P2-T6</span> Update class comments and tests so existing wire names such as <code>signingKeyId</code> cannot be mistaken for author identity or a remotely trusted publishing authority.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
-            <li>Export and verify a package with the network unavailable and no externally injected security context.</li>
-            <li>Reject altered signatures, wrong recognition keys, unknown IDs, truncated signatures, key-ID substitution, record reordering, and cross-package substitution.</li>
-            <li>Confirm the local signer refuses noncanonical framing and never logs signing capability, wrapping keys, plaintext, nonces, or tags.</li>
-            <li>Confirm documentation and UI never identify an author or Practical Sampler-controlled publisher based on this signature.</li>
-            <li>Confirm a synthetic recognition-key rotation preserves supported historical verification behavior.</li>
+            <li class="done">Sign canonical in-memory V3 input with the network unavailable and no externally injected security context; full export/load wiring is a Phase 3 gate.</li>
+            <li class="done">Reject unknown signing IDs, missing/ambiguous canonical input, and unconfigured signing profiles; existing V3 tests cover altered signatures, truncation, substitution, reordering, and cross-package mutations.</li>
+            <li class="done">Confirm the local signer uses Ed25519ph over canonical bytes/files and returns only a redacted local audit identifier; no signing capability, wrapping keys, plaintext, nonces, or tags are logged.</li>
+            <li class="done">Confirm documentation, class comments, and diagnostics use recognition/integrity language and never identify an author or Practical Sampler-controlled publisher.</li>
+            <li class="done">Preserve public trust-store lifecycle handling for active, retired, revoked, and unknown recognition IDs; key rotation remains a supported metadata policy.</li>
           </ul></article>
         </div>
-        <div class="files">Expected code: <code>PackagePublisherSigning.*</code>, a new offline signing adapter, <code>PackagePublisherTrustStore.*</code>, V3 export/reader code, generated release-profile inputs, diagnostics, and lifecycle tests.</div>
-        <div class="exit"><h3>Exit gate</h3><p>An unmodified Practical Sampler build recognizes unchanged offline-profile packages and rejects modified packages without any service. Tests and product language make no publisher-origin, author-identity, ownership, or post-crack forgery-resistance claim.</p></div>
+        <div class="files">Implemented code: <code>PackageOfflineRecognitionSigner.*</code>, <code>PackagePublisherSigning.*</code>, <code>PackagePublisherTrustStore.*</code>, generated release-profile inputs, diagnostics, and lifecycle tests.</div>
+        <div class="callout decision"><strong>Validation evidence — 2026-08-29:</strong> the default unconfigured build and a temporary configured profile both compiled and passed <code>drs_package_key_lifecycle_tests</code>. The configured test exercised local Ed25519ph signing, key-ID rejection, canonical-input validation, and local audit output. The existing V3 signature mutation suite remains the wire-level tamper gate; production export/load wiring is intentionally Phase 3.</div>
+        <div class="exit"><h3>Exit gate — complete</h3><p>The local signer can produce the existing V3 Ed25519ph signature entirely offline from an application-contained profile, while the public trust store remains public-only and recognition-scoped. No publisher-origin, author-identity, ownership, or post-crack forgery-resistance claim is made. Wiring this signer and trust store into every production export/load path is the next phase.</p></div>
       </div>
     </section>
 

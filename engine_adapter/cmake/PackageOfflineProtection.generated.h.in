@@ -20,6 +20,20 @@ struct ReleaseKeySlot
     std::array<std::uint8_t, 32> xorFragment;
 };
 
+struct RecognitionSigningKey
+{
+    const char* keyId;
+    const char* state;
+    const char* activatedUtc;
+    const char* retiredUtc;
+    const char* revokedUtc;
+    std::array<std::uint8_t, 64> mask;
+    std::array<std::uint8_t, 64> xorFragment;
+};
+
 inline constexpr const char* profileId = "@DRS_OFFLINE_PACKAGE_PROFILE_ID@";
 inline constexpr std::array<ReleaseKeySlot, 0> releaseKeys {};
+inline constexpr RecognitionSigningKey recognitionSigningKey {
+    "", "", nullptr, nullptr, nullptr, {}, {}
+};
 } // namespace drs::engine::offline_generated

@@ -125,6 +125,7 @@ add_library(drs_engine_adapter STATIC
     src/PackageCrypto.cpp
     src/PackageKeys.cpp
     src/OfflinePackageKeys.cpp
+    src/PackageOfflineRecognitionSigner.cpp
     src/PackageSignature.cpp
     src/PackageV3.cpp
     src/PackageV3FileReader.cpp
@@ -175,6 +176,7 @@ add_library(drs_engine_adapter STATIC
     include/drs/engine/PackageProtectionDiagnostics.h
     include/drs/engine/PackagePublisherTrustStore.h
     include/drs/engine/PackagePublisherSigning.h
+    include/drs/engine/PackageOfflineRecognitionSigner.h
     include/drs/engine/ControlLaw.h
     include/drs/engine/ContinuousDamper.h
     include/drs/engine/ContinuousDamperContract.h

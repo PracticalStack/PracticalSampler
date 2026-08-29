@@ -73,7 +73,9 @@ pwsh -NoProfile -File tools/generate-offline-package-profile.ps1 \
   -SecretFile <managed-secret-path> \
   -OutputHeader <private-build-path>/PackageOfflineProtection.generated.h \
   -ProfileId practical-sampler.offline.v1 \
-  -ReleaseKeyId ps-offline-release-2026-01
+  -ReleaseKeyId ps-offline-release-2026-01 \
+  -SigningSecretFile <managed-ed25519-private-key-path> \
+  -SigningKeyId ps-recognition-signing-2026-01
 
 cmake -S . -B build/release \
   -DDRS_OFFLINE_PACKAGE_PROFILE_HEADER=<private-build-path>/PackageOfflineProtection.generated.h
@@ -87,11 +89,16 @@ readability during a planned rotation, pass retired or revoked slot specs as
 recoverable by a determined reverse engineer; this mechanism is deliberate
 friction, not a hardware-backed secret boundary. Profile and key IDs containing
 test/development tokens are rejected by the generator and runtime.
+The optional signing secret is a 64-byte Ed25519 private-key representation;
+its matching public key must be supplied separately through the public-only
+recognition trust-store configuration.
 
-## Publisher trust-store provisioning
+## Recognition trust-store provisioning
 
-Configure `DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES` at desktop build time. It is a
-semicolon-separated list of public-only entries:
+Configure `DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES` at desktop build time. The
+historical variable name is retained for wire/build compatibility; its entries
+are a public-only recognition allow-list, not a list of trusted authors. It is a
+semicolon-separated list of entries:
 
 ```text
 keyId|64-hex-character-public-key|active|activatedUtc|retiredUtc|revokedUtc
@@ -105,9 +112,10 @@ missing lifecycle metadata invalidate the complete store.
 
 The older single-key public CMake fields remain a compatibility input when the
 multi-entry value is empty. They must not be used for private or release-key
-material.
+material. A matching private recognition key is consumed only by the local
+offline signer and is never placed in this trust-store header.
 
-## Controlled signing
+## Future controlled signing (licensed profile)
 
 Build the isolated tool only in the controlled signing environment:
 
@@ -137,8 +145,8 @@ signing job or read its key.
 
 ## Release-key resolution
 
-Production supplies a `PackageReleaseKeySource` backed by the entitlement
-service or OS-protected store. `VersionedPackageKeyProvider` applies the
+The portable profile supplies `PackageReleaseKeySource` from the application-
+contained offline fragments. `VersionedPackageKeyProvider` applies the
 compiled/configured lifecycle policy:
 
 - active: may encrypt new packages and decrypt existing packages;
@@ -146,16 +154,18 @@ compiled/configured lifecycle policy:
 - revoked: may not encrypt or decrypt;
 - unknown, unavailable, duplicate, or wrong-length: fail closed with no key.
 
-Source-specific errors must not flow to UI, logs, or package diagnostics.
+Source-specific errors must not flow to UI, logs, or package diagnostics. An
+entitlement service or OS-protected store is reserved for a future licensed
+profile.
 
 ## Desktop export injection
 
-The desktop and plug-in shells contain no private signing key and no release
-key. Authorized publishing bootstrap code supplies a valid
+The desktop and plug-in shells contain no raw private key or raw release key.
+Phase 3 will supply a valid
 `PerformancePackageExportSecurityContext` to
 `PerformancePackageExportService::setSecurityContext` before export. The
 context names the active encryption/signing key IDs and owns references to the
-managed `PackageKeyProvider`, remote or controlled
+offline `PackageKeyProvider`, local
 `PackagePublisherSigningClient`, and public-only
 `PackagePublisherTrustStore`.
 
@@ -167,9 +177,9 @@ publishes no V1, V2, partial V3, or staging file.
 
 ## Rotation procedure
 
-1. Provision the new signing public/private pair and release key under new,
-   immutable IDs.
-2. Add the new publisher public key as active while retaining the old public
+1. Generate the new recognition public/private pair and release key under new,
+   immutable IDs, outside source control.
+2. Add the new recognition public key as active while retaining the old public
    key as retired.
 3. Mark the old release key retired; keep decryption available during the
    supported package lifetime.

@@ -9,6 +9,9 @@ param(
     [string] $ProfileId = 'practical-sampler.offline.v1',
     [string] $ReleaseKeyId = 'ps-offline-release-2026-01',
     [string] $ActivatedUtc = '2026-09-01T00:00:00Z',
+    [string] $SigningSecretFile = '',
+    [string] $SigningKeyId = 'ps-recognition-signing-2026-01',
+    [string] $SigningActivatedUtc = '',
     [string[]] $RetiredKey = @(),
     [string[]] $RevokedKey = @()
 )
@@ -101,6 +104,46 @@ Test-KeyIdentifier $ReleaseKeyId 'ReleaseKeyId'
 Test-ProductionIdentifier $ReleaseKeyId 'ReleaseKeyId'
 Test-Timestamp $ActivatedUtc 'ActivatedUtc'
 
+$signingKey = $null
+if (-not [string]::IsNullOrWhiteSpace($SigningSecretFile)) {
+    Test-KeyIdentifier $SigningKeyId 'SigningKeyId'
+    Test-ProductionIdentifier $SigningKeyId 'SigningKeyId'
+    if ([string]::IsNullOrWhiteSpace($SigningActivatedUtc)) {
+        $SigningActivatedUtc = $ActivatedUtc
+    }
+    Test-Timestamp $SigningActivatedUtc 'SigningActivatedUtc'
+    if (-not (Test-Path -LiteralPath $SigningSecretFile -PathType Leaf)) {
+        throw "Signing secret file does not exist: $SigningSecretFile"
+    }
+    $signingSecretBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $SigningSecretFile))
+    if ($signingSecretBytes.Length -ne 64) {
+        Clear-ByteArray $signingSecretBytes
+        throw "Signing secret files must contain exactly 64 raw bytes; received $($signingSecretBytes.Length)."
+    }
+    $signingMask = [byte[]]::new(64)
+    $signingXor = [byte[]]::new(64)
+    $signingSuccess = $false
+    try {
+        $signingRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $signingRng.GetBytes($signingMask) } finally { $signingRng.Dispose() }
+        for ($index = 0; $index -lt 64; $index++) {
+            $signingXor[$index] = $signingMask[$index] -bxor $signingSecretBytes[$index]
+        }
+        $signingSuccess = $true
+        $signingKey = [pscustomobject]@{
+            KeyId = $SigningKeyId; State = 'active'; ActivatedUtc = $SigningActivatedUtc
+            Mask = $signingMask; Xor = $signingXor
+        }
+    }
+    finally {
+        Clear-ByteArray $signingSecretBytes
+        if (-not $signingSuccess) {
+            Clear-ByteArray $signingMask
+            Clear-ByteArray $signingXor
+        }
+    }
+}
+
 $slots = [System.Collections.Generic.List[object]]::new()
 $slots.Add((Read-KeySlot $ReleaseKeyId 'active' $ActivatedUtc '' '' $SecretFile))
 
@@ -129,6 +172,12 @@ $slotText = foreach ($slot in $slots) {
     "    ReleaseKeySlot{ $quote$($slot.KeyId)$quote, $quote$($slot.State)$quote, $quote$($slot.ActivatedUtc)$quote, $retired, $revoked, std::array<std::uint8_t, 32>{ $(Format-ByteArray $slot.Mask) }, std::array<std::uint8_t, 32>{ $(Format-ByteArray $slot.Xor) } },"
 }
 
+$signingKeyText = if ($null -eq $signingKey) {
+    '    "", "", nullptr, nullptr, nullptr, {}, {}'
+} else {
+    "    $quote$($signingKey.KeyId)$quote, $quote$($signingKey.State)$quote, $quote$($signingKey.ActivatedUtc)$quote, nullptr, nullptr, std::array<std::uint8_t, 64>{ $(Format-ByteArray $signingKey.Mask) }, std::array<std::uint8_t, 64>{ $(Format-ByteArray $signingKey.Xor) }"
+}
+
 $header = @"
 #pragma once
 
@@ -152,9 +201,23 @@ struct ReleaseKeySlot
     std::array<std::uint8_t, 32> xorFragment;
 };
 
+struct RecognitionSigningKey
+{
+    const char* keyId;
+    const char* state;
+    const char* activatedUtc;
+    const char* retiredUtc;
+    const char* revokedUtc;
+    std::array<std::uint8_t, 64> mask;
+    std::array<std::uint8_t, 64> xorFragment;
+};
+
 inline constexpr const char* profileId = "$ProfileId";
 inline constexpr std::array<ReleaseKeySlot, $($slots.Count)> releaseKeys = {
 $($slotText -join [Environment]::NewLine)
+};
+inline constexpr RecognitionSigningKey recognitionSigningKey {
+$signingKeyText
 };
 } // namespace drs::engine::offline_generated
 "@
@@ -170,5 +233,9 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 foreach ($slot in $slots) {
     Clear-ByteArray $slot.Mask
     Clear-ByteArray $slot.Xor
+}
+if ($null -ne $signingKey) {
+    Clear-ByteArray $signingKey.Mask
+    Clear-ByteArray $signingKey.Xor
 }
 Write-Output "Generated offline package profile header: $outputPath"
