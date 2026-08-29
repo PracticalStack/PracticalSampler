@@ -2,6 +2,7 @@
 #include "PerformancePackageExportSecurityTestSupport.h"
 #include "plugin/PluginProcessor.h"
 #include "shared/PerformancePackageExportService.h"
+#include "shared/PerformancePackageOfflineSecurity.h"
 #include "standalone/MainComponent.h"
 
 #include <drs/engine/PackageReaderDispatch.h>
@@ -88,6 +89,17 @@ int main()
     try
     {
         using namespace drs;
+        const auto builtInExportSecurity = app::makeOfflinePerformancePackageExportSecurityContext();
+        const auto builtInActivationSecurity = app::makeOfflinePerformancePackageActivationSecurityContext();
+        require(drs::engine::offlinePackageProtectionProfileConfigured()
+                    || (builtInExportSecurity == nullptr && builtInActivationSecurity == nullptr),
+                "An unconfigured offline profile must not manufacture production security contexts.");
+        if (builtInExportSecurity != nullptr)
+        {
+            require(builtInExportSecurity->valid() && builtInActivationSecurity != nullptr
+                        && builtInActivationSecurity->valid(),
+                    "Configured offline profile must provide valid export and activation contexts.");
+        }
         juce::ScopedJuceInitialiser_GUI gui;
         const auto root = fs::temp_directory_path() / "drs-production-v3-export-tests";
         std::error_code error;

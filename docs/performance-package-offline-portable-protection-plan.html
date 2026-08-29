@@ -155,7 +155,7 @@
         <div class="summary-card"><strong>5</strong><span>Ordered implementation phases</span></div>
         <div class="summary-card"><strong>1–3</strong><span>Estimated engineer-weeks</span></div>
         <div class="summary-card"><strong>V3</strong><span>Existing protected byte format retained</span></div>
-        <div class="summary-card"><strong>Phase 2</strong><span>Recognition signing complete; Phase 3 next</span></div>
+        <div class="summary-card"><strong>Phase 3</strong><span>Offline export/loading connected; release qualification pending</span></div>
       </div>
     </section>
 
@@ -260,7 +260,7 @@
             <tr><td class="id">OPP-0</td><td>Revised offline security contract and terminology</td><td>Approved product direction</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">OPP-1</td><td>Versioned, application-contained wrapping-key profile</td><td>OPP-0</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">OPP-2</td><td>Local recognition signature with no publisher-origin claim</td><td>OPP-0, OPP-1</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">OPP-3</td><td>Offline export and portable loading in all product paths</td><td>OPP-1, OPP-2</td><td><span class="status not-started">Not started</span></td></tr>
+            <tr><td class="id">OPP-3</td><td>Offline export and portable loading in all product paths</td><td>OPP-1, OPP-2</td><td><span class="status in-progress">Implementation complete; release qualification pending</span></td></tr>
             <tr><td class="id">OPP-4</td><td>One-way, read-only package workflow enforced at API and UI boundaries</td><td>OPP-3</td><td><span class="status not-started">Not started</span></td></tr>
             <tr><td class="id">OPP-D1</td><td>New adversarial challenge and independent release qualification</td><td>OPP-0 through OPP-4</td><td><span class="status deferred">Deferred</span></td></tr>
           </tbody>
@@ -306,8 +306,8 @@
             <li class="done"><span class="task-id">OPP-P1-T6</span> Make release configuration fail closed when the offline profile is missing, malformed, uses a test ID, has duplicate IDs, or selects a retired/revoked key for export.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
-            <li>Round-trip packages between independent clean installations of the same release family with the network disabled (full package integration is a Phase 3 gate).</li>
-            <li>Verify identical projects receive fresh content keys and nonces and do not produce deterministic ciphertext (covered when the profile is connected to export in Phase 3).</li>
+            <li>Round-trip packages between independent clean installations of the same release family with the network disabled (pending Phase 3 release qualification).</li>
+            <li>Verify identical projects receive fresh content keys and nonces and do not produce deterministic ciphertext (the implementation is connected; built-in-profile qualification remains pending).</li>
             <li class="done">Search source, fixtures, packages, logs, symbols, and build output for raw production-key canaries and test-key leakage.</li>
             <li class="done">Exercise active, retired, revoked, unknown, malformed, and unavailable key states.</li>
             <li class="done">Perform a synthetic rotation: new exports use the new ID, historical packages follow retention policy, and retired IDs cannot encrypt.</li>
@@ -347,28 +347,29 @@
     </section>
 
     <section class="phase" id="phase-3">
-      <div class="phase-head"><div class="phase-number">3</div><h2>Connect Offline Export and Portable Loading</h2><span class="status not-started">Not started</span></div>
+      <div class="phase-head"><div class="phase-number">3</div><h2>Connect Offline Export and Portable Loading</h2><span class="status in-progress">Implementation complete; release qualification pending</span></div>
       <p class="phase-intent">Make the built-in offline profile the normal product path so any author can export and every compatible installation can load a package without provisioning.</p>
       <div class="phase-body">
         <div class="grid-2">
           <article class="panel"><h3>Development tasks</h3><ul class="task-list">
-            <li><span class="task-id">OPP-P3-T1</span> Add a production bootstrap that constructs the existing export security context from the offline key provider, local recognition signer, active IDs, and public verification store.</li>
-            <li><span class="task-id">OPP-P3-T2</span> Install the same offline read context into standalone, plug-in, replacement, first-play, host-restore, and background sample-page paths.</li>
-            <li><span class="task-id">OPP-P3-T3</span> Make <em>Export Playable Instrument</em> available to every author without an account, activation, entitlement, credential prompt, service request, or network check.</li>
-            <li><span class="task-id">OPP-P3-T4</span> Preserve streaming record-at-a-time AEAD, bounded memory, atomic final publication, selected-record verification, cancellation cleanup, and last-known-good playback behavior.</li>
-            <li><span class="task-id">OPP-P3-T5</span> Retain V1/V2 as bounded legacy-read-only formats and ensure no release switch, hidden command, or fallback writes them.</li>
-            <li><span class="task-id">OPP-P3-T6</span> Remove the hosted-signer and entitlement-key prerequisites from portable-profile startup and export diagnostics while retaining fail-closed behavior for genuinely invalid profile configuration.</li>
+            <li class="done"><span class="task-id">OPP-P3-T1</span> Add a production bootstrap that constructs the existing export security context from the offline key provider, local recognition signer, active IDs, and public verification store.</li>
+            <li class="done"><span class="task-id">OPP-P3-T2</span> Install the same offline read context into standalone, plug-in, replacement, first-play, host-restore, and background sample-page paths.</li>
+            <li class="done"><span class="task-id">OPP-P3-T3</span> Make <em>Export Playable Instrument</em> available to every author without an account, activation, entitlement, credential prompt, service request, or network check.</li>
+            <li class="done"><span class="task-id">OPP-P3-T4</span> Preserve streaming record-at-a-time AEAD, bounded memory, atomic final publication, selected-record verification, cancellation cleanup, and last-known-good playback behavior.</li>
+            <li class="done"><span class="task-id">OPP-P3-T5</span> Retain V1/V2 as bounded legacy-read-only formats and ensure no release switch, hidden command, or fallback writes them.</li>
+            <li class="done"><span class="task-id">OPP-P3-T6</span> Remove the hosted-signer and entitlement-key prerequisites from portable-profile startup and export diagnostics while retaining fail-closed behavior for genuinely invalid profile configuration.</li>
           </ul></article>
           <article class="panel"><h3>Validation</h3><ul>
-            <li>Export offline from a clean standalone installation and load on a second clean installation.</li>
-            <li>Repeat export/load through standalone, plug-in, replacement, first-play, project restore, artwork, license text, sample heads, and background page streaming.</li>
-            <li>Verify synchronous and asynchronous export paths inherit the same built-in profile and emit only V3.</li>
-            <li>Verify missing/malformed profile data publishes no partial package and cannot replace last-known-good playback.</li>
-            <li>Run existing production-export, activation, compatibility, release-gate, and lifecycle tests under the offline production profile.</li>
+            <li>Provision a temporary non-production offline profile with a matching public recognition key, then export from a clean standalone installation and load on a second clean installation.</li>
+            <li class="done">Repeat export/load through standalone, plug-in, replacement, first-play, project restore, artwork, license text, sample heads, and background page streaming using the existing injected-profile production fixture.</li>
+            <li>Repeat the synchronous/asynchronous export check with the generated built-in profile (the injected-profile V3 paths are covered today).</li>
+            <li class="done">Verify missing/malformed profile data publishes no partial package and cannot replace last-known-good playback.</li>
+            <li>Run existing production-export, activation, compatibility, release-gate, and lifecycle tests under the offline production profile after key provisioning.</li>
           </ul></article>
         </div>
-        <div class="files">Expected code: <code>PerformancePackageExportService.*</code>, application bootstrap/composition roots, <code>PluginProcessor.cpp</code>, standalone shell, <code>EngineFacade.cpp</code>, reader dispatch, activation/restore coordinators, and production export tests.</div>
-        <div class="exit"><h3>Exit gate</h3><p>Any user can create a verified signed-and-encrypted V3 package offline, and that package loads through every supported product entry point on another compatible installation without Practical Sampler infrastructure.</p></div>
+        <div class="files">Implemented code: <code>PerformancePackageOfflineSecurity.*</code>, <code>PerformancePackageExportService.cpp</code>, <code>PluginProcessor.cpp</code>, owned offline key-source lifetime in <code>PackageKeys.*</code>, and production export/lifecycle tests.</div>
+        <div class="callout decision"><strong>Validation evidence — 2026-08-29:</strong> the Debug and Release engine lifecycle targets and V3 production-export targets compiled under the Visual Studio 2022 environment and exited successfully. The production export suite covered synchronous and asynchronous V3 export, fresh ciphertext, bounded buffers, staging cleanup, plug-in replacement, standalone loading, host restore, and fail-closed unconfigured export using its explicit fixture context. The new bootstrap returns no production context when the profile is empty or malformed. Final clean-install round-trip under the built-in profile is intentionally pending release-key/public-key provisioning.</div>
+        <div class="exit"><h3>Implementation gate — complete; release gate pending</h3><p>The application now composes one offline profile for export and portable V3 loading. Export service startup selects the active release key, local recognition signer, and matching public verification key without accounts, services, or network access; plug-in and standalone package activation derive the same read context. Existing V3 streaming, AEAD, atomic publication, cleanup, and legacy read-only boundaries remain intact, and invalid/unconfigured profile data fails closed. Before marking this phase fully complete, provision a non-production validation profile and run the clean-install round trip plus the full release suite against it.</p></div>
       </div>
     </section>
 

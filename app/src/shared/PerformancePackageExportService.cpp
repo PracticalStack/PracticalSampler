@@ -1,4 +1,5 @@
 #include "shared/PerformancePackageExportService.h"
+#include "shared/PerformancePackageOfflineSecurity.h"
 #include "shared/PerformancePackageProjection.h"
 
 #include "drs/engine/PackageReader.h"
@@ -828,6 +829,8 @@ PerformancePackageExportService::PerformancePackageExportService(
     PerformancePackageExportServiceOptions optionsIn)
     : options(std::move(optionsIn))
 {
+    if (options.securityContext == nullptr)
+        options.securityContext = makeOfflinePerformancePackageExportSecurityContext();
     auto initial = std::make_shared<const PerformancePackageExportSnapshot>();
     std::atomic_store_explicit(&snapshot, std::move(initial), std::memory_order_release);
     metrics.liveWorkerCount = 1;

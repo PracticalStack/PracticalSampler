@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -95,6 +96,12 @@ public:
     VersionedPackageKeyProvider(std::vector<PackageReleaseKeyPolicy> policies,
                                 const PackageReleaseKeySource& source);
 
+    // Production/offline callers can transfer ownership of the source to the
+    // provider.  The provider still exposes the same lookup boundary, while
+    // ensuring the referenced source remains alive for the provider lifetime.
+    VersionedPackageKeyProvider(std::vector<PackageReleaseKeyPolicy> policies,
+                                std::shared_ptr<const PackageReleaseKeySource> source);
+
     bool valid() const noexcept { return valid_; }
     const std::string& configurationIssue() const noexcept { return configurationIssue_; }
     const std::vector<PackageReleaseKeyPolicy>& policies() const noexcept { return policies_; }
@@ -110,6 +117,7 @@ public:
 
 private:
     std::vector<PackageReleaseKeyPolicy> policies_;
+    std::shared_ptr<const PackageReleaseKeySource> ownedSource_;
     const PackageReleaseKeySource& source_;
     bool valid_ = false;
     std::string configurationIssue_;

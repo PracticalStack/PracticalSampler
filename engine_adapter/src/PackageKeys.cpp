@@ -8,6 +8,47 @@
 
 namespace drs::engine
 {
+namespace
+{
+const PackageReleaseKeySource& unavailableReleaseKeySource() noexcept
+{
+    static const CallbackPackageReleaseKeySource source(
+        [](const std::string&, const std::string&, SecureBuffer&) { return false; });
+    return source;
+}
+
+bool validatePolicies(const std::vector<PackageReleaseKeyPolicy>& policies,
+                      std::string& issue)
+{
+    std::set<std::string> keyIds;
+    for (const auto& policy : policies)
+    {
+        if (policy.keyId.empty() || ! keyIds.insert(policy.keyId).second)
+        {
+            issue = "release key policy contains an empty or duplicate key id";
+            return false;
+        }
+        if (policy.activatedUtc.empty())
+        {
+            issue = "release key policy is missing activation metadata";
+            return false;
+        }
+        if (policy.state == PackageReleaseKeyState::retired && policy.retiredUtc.empty())
+        {
+            issue = "retired release key policy is missing retirement metadata";
+            return false;
+        }
+        if (policy.state == PackageReleaseKeyState::revoked && policy.revokedUtc.empty())
+        {
+            issue = "revoked release key policy is missing revocation metadata";
+            return false;
+        }
+    }
+    issue.clear();
+    return true;
+}
+} // namespace
+
 CallbackPackageReleaseKeySource::CallbackPackageReleaseKeySource(Resolver resolver)
     : resolver_(std::move(resolver))
 {
@@ -25,33 +66,23 @@ bool CallbackPackageReleaseKeySource::loadReleaseKey(
 VersionedPackageKeyProvider::VersionedPackageKeyProvider(
     std::vector<PackageReleaseKeyPolicy> policies,
     const PackageReleaseKeySource& source)
-    : policies_(std::move(policies)), source_(source)
+    : policies_(std::move(policies)), ownedSource_(), source_(source)
 {
-    std::set<std::string> keyIds;
-    for (const auto& policy : policies_)
+    valid_ = validatePolicies(policies_, configurationIssue_);
+}
+
+VersionedPackageKeyProvider::VersionedPackageKeyProvider(
+    std::vector<PackageReleaseKeyPolicy> policies,
+    std::shared_ptr<const PackageReleaseKeySource> source)
+    : policies_(std::move(policies)), ownedSource_(std::move(source)),
+      source_(ownedSource_ != nullptr ? *ownedSource_ : unavailableReleaseKeySource())
+{
+    if (ownedSource_ == nullptr)
     {
-        if (policy.keyId.empty() || ! keyIds.insert(policy.keyId).second)
-        {
-            configurationIssue_ = "release key policy contains an empty or duplicate key id";
-            return;
-        }
-        if (policy.activatedUtc.empty())
-        {
-            configurationIssue_ = "release key policy is missing activation metadata";
-            return;
-        }
-        if (policy.state == PackageReleaseKeyState::retired && policy.retiredUtc.empty())
-        {
-            configurationIssue_ = "retired release key policy is missing retirement metadata";
-            return;
-        }
-        if (policy.state == PackageReleaseKeyState::revoked && policy.revokedUtc.empty())
-        {
-            configurationIssue_ = "revoked release key policy is missing revocation metadata";
-            return;
-        }
+        configurationIssue_ = "release key source is unavailable";
+        return;
     }
-    valid_ = true;
+    valid_ = validatePolicies(policies_, configurationIssue_);
 }
 
 bool VersionedPackageKeyProvider::selectActiveEncryptionKeyId(

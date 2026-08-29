@@ -28,6 +28,8 @@ set(DRS_APP_SHARED_SOURCES
     src/shared/PerformancePanel.h
     src/shared/PerformancePackageExportService.cpp
     src/shared/PerformancePackageExportService.h
+    src/shared/PerformancePackageOfflineSecurity.cpp
+    src/shared/PerformancePackageOfflineSecurity.h
     src/shared/PerformancePackageProjection.cpp
     src/shared/PerformancePackageProjection.h
     src/shared/PlayableInstrumentLicenseViewer.cpp

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -322,6 +323,34 @@ int main()
                     resolved, issue) && resolved.empty(),
                 "release-key source outage returns no key");
     sourceAvailable = true;
+
+    // The production bootstrap transfers ownership of its offline source to
+    // the provider; verify the provider remains usable after the local source
+    // variable goes out of scope.
+    std::shared_ptr<const PackageKeyProvider> ownedProvider;
+    {
+        auto ownedSource = std::make_shared<CallbackPackageReleaseKeySource>(
+            [&](const std::string&, const std::string& keyId, SecureBuffer& key)
+            {
+                const auto found = externalKeys.find(keyId);
+                if (found == externalKeys.end()) return false;
+                key = SecureBuffer(found->second);
+                return true;
+            });
+        auto concreteProvider = std::make_shared<VersionedPackageKeyProvider>(
+            std::vector<PackageReleaseKeyPolicy> {
+                { "release-active", PackageReleaseKeyState::active,
+                  "2026-08-01T00:00:00Z", {}, {} }
+            }, std::move(ownedSource));
+        ok &= check(concreteProvider->valid(),
+                    "owned release-key source provider is valid");
+        ownedProvider = std::move(concreteProvider);
+    }
+    ok &= check(ownedProvider->resolvePackageKey(
+                    "pkg", "release-active", PackageKeyUse::decryptExistingPackage,
+                    resolved, issue)
+                    && resolved.size() == securePackageKeySizeBytes,
+                "owned release-key source remains available after bootstrap scope");
 
     VersionedPackageKeyProvider duplicatePolicy({
         { "duplicate", PackageReleaseKeyState::active, "2026-01-01", {}, {} },

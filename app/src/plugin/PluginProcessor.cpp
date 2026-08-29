@@ -10,6 +10,7 @@
 #include "drs/engine/RuntimeLoader.h"
 #include "shared/ProjectStorage.h"
 #include "shared/MessageThreadMetrics.h"
+#include "shared/PerformancePackageOfflineSecurity.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1041,8 +1042,10 @@ Processor::getPerformancePackageActivationSecurityContext() const
     auto context = std::atomic_load_explicit(
         &performancePackageActivationSecurityContext, std::memory_order_acquire);
     if (context != nullptr) return context;
-    return makeV3ActivationSecurityContext(
-        performancePackageExportService.getSecurityContext());
+    if (const auto exportContext = performancePackageExportService.getSecurityContext();
+        exportContext != nullptr)
+        return makeV3ActivationSecurityContext(exportContext);
+    return drs::app::makeOfflinePerformancePackageActivationSecurityContext();
 }
 
 void Processor::timerCallback()
