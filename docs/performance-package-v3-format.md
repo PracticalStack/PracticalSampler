@@ -130,8 +130,12 @@ variable header, wrapped content key, key identifiers, complete TOC, record
 order, every identity, nonce, ciphertext, and authentication tag. No mutable
 V3 package byte is outside signature coverage.
 
-Structural parsing does not establish trust. Signature verification against
-the application trust store must succeed before key unwrap or record opening.
+Structural parsing does not establish package recognition. Signature
+verification against the application recognition store must succeed before
+key unwrap or record opening. In the portable offline profile, recognition
+means that the package matches the Practical Sampler format and protection
+profile; it does not identify an author, establish ownership, or prove
+issuance by a controlled publisher.
 
 The file-backed reader reads the fixed 76-byte header first, then only the
 bounded header/TOC index. It streams the complete signed region through the
@@ -153,16 +157,17 @@ rotation changes `signingKeyId` and does not require re-encrypting records.
 Release and content keys are held in move-only `SecureBuffer` instances and
 cleared with `sodium_memzero`. Runtime release-key lookup is exact by versioned
 `encryptionKeyId`: active keys may encrypt/decrypt, retired keys decrypt only,
-and revoked or unknown keys fail closed. The backing entitlement/OS secret
-source is outside package-controlled data.
+and revoked or unknown keys fail closed. The offline profile may reconstruct
+its application protection capability locally; a future licensed profile may
+resolve it through an entitlement or OS-protected source.
 
-Publisher verification keys are public-only immutable trust-store entries with
-activation, retirement, and revocation metadata. Active and retired public
-keys verify packages; revoked and unknown keys fail closed. V3 writing invokes
-a `PackagePublisherSigningClient` and contains no private-key field. The
-controlled signer is an isolated opt-in CI/service target that validates the
-canonical signed region and requires a non-secret audit event before returning
-an Ed25519ph signature.
+Package-recognition verification keys are public-only immutable trust-store
+entries with activation, retirement, and revocation metadata. Active and
+retired public keys recognize packages; revoked and unknown keys fail closed.
+V3 writing invokes a `PackagePublisherSigningClient` for wire/API compatibility.
+The planned portable offline profile will provide a local implementation; its
+signature will not establish author identity or publisher origin. The
+controlled signer remains available as a future licensed-publishing profile.
 
 Key-envelope AAD is also length-prefixed binary:
 
@@ -199,10 +204,11 @@ staging file and preserves the last published package.
 
 The export service requires an injected
 `PerformancePackageExportSecurityContext`. An absent or invalid context fails
-closed before compilation and cannot select a legacy writer. Production must
-inject the managed provider/signer/trust objects described in the key
-operations runbook; test signers and ephemeral test keys are not compiled into
-the release path.
+closed before compilation and cannot select a legacy writer. The portable
+offline profile will supply this context from the application-contained key
+and recognition implementations; test signers and test keys are not accepted
+by the release profile. A future licensed profile may inject managed provider,
+signer, and trust objects as described in the key-operations runbook.
 
 ## Compatibility policy
 

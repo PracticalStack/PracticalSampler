@@ -93,7 +93,7 @@ PackageV3StreamingExportBuildResult buildPerformancePackageV3StreamingExportPlan
         return reject("Runtime compilation must succeed before package V3 export.");
     if (manifest.packageId.empty() || outputPath.empty() || compatibilityId.empty()
         || encryptionKeyId.empty() || signingKeyId.empty() || ! trustStore.valid())
-        return reject("V3 export identities and publisher trust configuration are required.");
+        return reject("V3 export identities and package-recognition configuration are required.");
 
     const auto licensePayloadCount = std::count_if(
         additionalPayloads.begin(), additionalPayloads.end(), [](const auto& payload)

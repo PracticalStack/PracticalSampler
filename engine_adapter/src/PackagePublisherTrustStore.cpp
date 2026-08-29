@@ -66,23 +66,23 @@ PackagePublisherTrustStore::PackagePublisherTrustStore(
     {
         if (key.keyId.empty() || ! keyIds.insert(key.keyId).second)
         {
-            configurationIssue_ = "publisher trust store contains an empty or duplicate key id";
+            configurationIssue_ = "package-recognition store contains an empty or duplicate key id";
             return;
         }
         if (key.publicKey.size() != packageEd25519PublicKeyBytes
             || key.activatedUtc.empty())
         {
-            configurationIssue_ = "publisher trust store key material or activation metadata is invalid";
+            configurationIssue_ = "package-recognition store key material or activation metadata is invalid";
             return;
         }
         if (key.state == PackageSigningKeyState::retired && key.retiredUtc.empty())
         {
-            configurationIssue_ = "retired publisher key is missing retirement metadata";
+            configurationIssue_ = "retired package-recognition key is missing retirement metadata";
             return;
         }
         if (key.state == PackageSigningKeyState::revoked && key.revokedUtc.empty())
         {
-            configurationIssue_ = "revoked publisher key is missing revocation metadata";
+            configurationIssue_ = "revoked package-recognition key is missing revocation metadata";
             return;
         }
     }
@@ -97,7 +97,7 @@ bool PackagePublisherTrustStore::resolvePublicKey(
     publicKey.clear();
     if (! valid_)
     {
-        issue = "publisher trust store configuration is invalid";
+        issue = "package-recognition store configuration is invalid";
         return false;
     }
     const auto found = std::find_if(keys_.begin(), keys_.end(),

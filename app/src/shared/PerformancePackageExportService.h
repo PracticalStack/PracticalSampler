@@ -61,6 +61,9 @@ struct PerformancePackageExportSecurityContext
     std::string compatibilityId = performancePackageV3CompatibilityId;
     std::string encryptionKeyId;
     std::string signingKeyId;
+    // The field and interface names remain compatible with the original V3
+    // contract. In the portable offline profile these objects recognize and
+    // integrity-check a package; they do not establish author identity.
     std::shared_ptr<const drs::engine::PackageKeyProvider> keyProvider;
     std::shared_ptr<const drs::engine::PackagePublisherSigningClient> publisherSigner;
     std::shared_ptr<const drs::engine::PackagePublisherTrustStore> trustStore;

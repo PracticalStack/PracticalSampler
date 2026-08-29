@@ -25,6 +25,9 @@ struct PackageSigningKey
     std::string revokedUtc;
 };
 
+// The historical type name is retained for V3 wire/API compatibility. For
+// portable offline packages this is a recognition store, not an author or
+// publisher identity registry.
 class PackagePublisherTrustStore
 {
 public:
@@ -45,6 +48,7 @@ private:
 };
 
 // Compiled from public-only CMake configuration. An empty store is valid for
-// development builds but cannot authenticate a production package.
+// development builds but cannot recognize a production package. A future
+// licensed profile may use a separately governed trust policy.
 const PackagePublisherTrustStore& builtInPackagePublisherTrustStore();
 } // namespace drs::engine

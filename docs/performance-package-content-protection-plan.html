@@ -238,9 +238,10 @@
         inspection, unauthorized editing, and ordinary WAV extraction.
       </p>
       <div class="meta">
+        <span class="chip"><a href="performance-package-offline-portable-protection-plan.html" style="color:#fff">Active offline implementation plan</a></span>
         <span class="chip">Target format: <code>DRSPKG3</code></span>
         <span class="chip">AEAD: XChaCha20-Poly1305</span>
-        <span class="chip">Publisher signature: Ed25519</span>
+        <span class="chip">Package-recognition signature: Ed25519</span>
         <span class="chip">V1/V2 read compatibility</span>
         <span class="chip">No licensing or machine binding</span>
       </div>
@@ -264,6 +265,16 @@
       </div>
     </section>
 
+    <section class="callout decision">
+      <strong>Product-model update — August 29, 2026:</strong>
+      Practical Sampler will first implement portable offline community packages that anybody may publish without a
+      Practical Sampler service, activation, entitlement, or publisher identity. The V3 signature means a recognized,
+      internally consistent Practical Sampler package rather than issuance by a controlled publisher. The active work
+      and revised release gates are defined in the
+      <a href="performance-package-offline-portable-protection-plan.html">Offline Portable Package Protection Plan</a>.
+      Controlled signing and licensed-instrument provisioning are retained only as possible future profiles.
+    </section>
+
     <section class="toc">
       <h2>Contents</h2>
       <ol>
@@ -279,6 +290,7 @@
         <li><a href="#phase-5">Phase 5: Qualification</a></li>
         <li><a href="#release-gates">Release Gates</a></li>
         <li><a href="#risks">Risks and Decisions</a></li>
+        <li><a href="performance-package-offline-portable-protection-plan.html">Active Plan: Offline Portable Protection</a></li>
         <li><a href="performance-package-content-protection-addendum.html">Completion Addendum: Remaining Work</a></li>
       </ol>
     </section>
@@ -301,7 +313,7 @@
       </div>
       <div class="callout decision">
         <strong>Defensible product statement:</strong>
-        playable-instrument settings and samples are protected using authenticated encryption, and packages are signed to detect unauthorized modification and verify publishing origin. The design prevents direct inspection, editing, repacking, and ordinary extraction without claiming resistance to determined runtime reverse engineering.
+        playable-instrument settings and samples are protected using authenticated encryption, and packages are signed to detect unauthorized modification and verify package recognition. The design prevents direct inspection, editing, repacking, and ordinary extraction without claiming resistance to determined runtime reverse engineering.
       </div>
       <div class="callout warning">
         <strong>Immutability rule:</strong>
@@ -387,7 +399,7 @@
         </div>
         <div class="flow-step">
           <strong>5. Publish Signature</strong>
-          <span>Sign the header, key envelope, TOC, ordering, nonces, ciphertext, and tags with an offline publisher key.</span>
+          <span>Sign the header, key envelope, TOC, ordering, nonces, ciphertext, and tags with an offline package-recognition key.</span>
         </div>
         <div class="flow-step">
           <strong>6. Verified Open</strong>

@@ -221,7 +221,7 @@ PackageV3FileOpenResult openPackageV3File(
     if (crypto_sign_ed25519ph_final_verify(
             &signatureState, result.package.signature.data(), publicKey.data()) != 0)
     {
-        result.issues.push_back("V3 Ed25519ph publisher signature verification failed");
+        result.issues.push_back("V3 package-recognition signature verification failed");
         return result;
     }
 

@@ -30,9 +30,10 @@ struct PackageReleaseKeyPolicy
     std::string revokedUtc;
 };
 
-// Runtime key lookup boundary. Implementations may resolve through an
-// entitlement service, an OS-protected store, or a test fixture; callers never
-// derive keys from package metadata and never need to know the backing store.
+// Runtime key lookup boundary. Implementations may resolve through the
+// offline application protection profile, a future entitlement service, an
+// OS-protected store, or a test fixture. Callers never derive keys from
+// package metadata and never need to know the backing store.
 class PackageKeyProvider
 {
 public:

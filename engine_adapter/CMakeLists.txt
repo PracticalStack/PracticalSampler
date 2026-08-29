@@ -9,13 +9,13 @@ configure_file(
 )
 
 set(DRS_PACKAGE_PUBLISHER_KEY_ID "" CACHE STRING
-    "Public publisher signing-key ID embedded in the desktop trust store")
+    "Public package-recognition signing-key ID embedded in the desktop trust store")
 set(DRS_PACKAGE_PUBLISHER_PUBLIC_KEY_HEX "" CACHE STRING
     "Public 32-byte Ed25519 verification key as 64 hexadecimal characters")
 set(DRS_PACKAGE_PUBLISHER_KEY_ACTIVATED_UTC "" CACHE STRING
-    "Activation timestamp for the embedded public publisher key")
+    "Activation timestamp for the embedded public package-recognition key")
 set(DRS_PACKAGE_PUBLISHER_TRUST_ENTRIES "" CACHE STRING
-    "Semicolon-separated public trust entries: keyId|publicKeyHex|active/retired/revoked|activatedUtc|retiredUtc|revokedUtc")
+    "Semicolon-separated public package-recognition entries: keyId|publicKeyHex|active/retired/revoked|activatedUtc|retiredUtc|revokedUtc")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackageTrustStore.generated.h.in"
     "${DRS_ENGINE_ADAPTER_GENERATED_DIR}/drs/engine/PackageTrustStore.generated.h"

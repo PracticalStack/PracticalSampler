@@ -1,12 +1,19 @@
 # Performance Package Key Operations
 
-Status: Engineering implementation complete; production provisioning required
+Status: Controlled-service profile retained for future licensed publishing;
+portable offline profile is specified in
+`performance-package-offline-portable-protection-plan.html`
 
 Date: 2026-08-28
 
-## Security boundary
+## Security boundary for the controlled-service profile
 
-Practical Sampler desktop targets contain public publisher verification keys
+This runbook describes the stronger, future controlled-service profile.
+Portable offline packages intentionally use a separate application-contained
+protection profile; that profile does not claim publisher identity and is not
+covered by the “private key never ships” boundary below.
+
+Controlled-service desktop targets contain public publisher verification keys
 only. Symmetric release keys are resolved at runtime through
 `PackageReleaseKeySource`; publisher private keys are accepted only by the
 opt-in `drs_controlled_package_signer` CI/service executable through raw

@@ -20,8 +20,12 @@ struct PackagePublisherSigningResponse
     std::string auditId;
 };
 
-// Desktop/export code sees only this request boundary. Production private keys
-// live behind the controlled implementation and never enter this interface.
+// The historical type name is retained for V3 wire/API compatibility. In the
+// planned offline portable profile this client will be local and its signature
+// will mean only that the package is recognized and internally consistent; it
+// does not prove author identity or issuance by a controlled publisher. A
+// future licensed profile may provide a controlled implementation behind the
+// same boundary.
 class PackagePublisherSigningClient
 {
 public:

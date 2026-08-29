@@ -421,7 +421,7 @@ PackageV3WriteResult writePackageV3(const PackageV3WriteRequest& request)
         || signingResponse.signature.size() != packageEd25519SignatureBytes
         || signingResponse.auditId.empty())
     {
-        if (issue.empty()) issue = "publisher signing response is invalid";
+        if (issue.empty()) issue = "package-recognition signing response is invalid";
         result.issues.push_back(issue);
         result.packageBytes.clear();
         return result;
@@ -780,13 +780,13 @@ PackageV3StreamingWriteResult writePackageV3Streaming(
 
     if (cancelled())
         return fail(PackageV3StreamingFailure::cancelled,
-                    "Package V3 export was cancelled before publisher signing");
+                    "Package V3 export was cancelled before package-recognition signing");
     publish(PackageV3StreamingWriteStage::signing, records.size(),
-            result.processedPlaintextBytes, nullptr, "Requesting publisher signature",
+            result.processedPlaintextBytes, nullptr, "Creating package-recognition signature",
             totalPlaintextBytes);
     if (cancelled())
         return fail(PackageV3StreamingFailure::cancelled,
-                    "Package V3 export was cancelled before publisher signing");
+                    "Package V3 export was cancelled before package-recognition signing");
     PackagePublisherSigningRequest signingRequest;
     signingRequest.signingKeyId = plan.signingKeyId;
     signingRequest.canonicalSignedFilePath = result.stagingPath;
@@ -797,10 +797,10 @@ PackageV3StreamingWriteResult writePackageV3Streaming(
         || signingResponse.signature.size() != packageEd25519SignatureBytes
         || signingResponse.auditId.empty())
         return fail(PackageV3StreamingFailure::signing,
-                    issue.empty() ? "Publisher signing response is invalid" : issue);
+                    issue.empty() ? "Package-recognition signing response is invalid" : issue);
     if (cancelled())
         return fail(PackageV3StreamingFailure::cancelled,
-                    "Package V3 export was cancelled after publisher signing");
+                    "Package V3 export was cancelled after package-recognition signing");
     result.signingAuditId = std::move(signingResponse.auditId);
     std::ofstream append(fs::path(result.stagingPath), std::ios::binary | std::ios::app);
     append.write(reinterpret_cast<const char*>(signingResponse.signature.data()),
@@ -809,7 +809,7 @@ PackageV3StreamingWriteResult writePackageV3Streaming(
     append.close();
     if (! append)
         return fail(PackageV3StreamingFailure::io,
-                    "Could not append the publisher signature to the V3 package");
+                    "Could not append the package-recognition signature to the V3 package");
 
     publish(PackageV3StreamingWriteStage::verifying, records.size(),
             result.processedPlaintextBytes, nullptr, "Verifying staged signed V3 package",
@@ -824,7 +824,7 @@ PackageV3StreamingWriteResult writePackageV3Streaming(
         || verified.package.signingKeyId != plan.signingKeyId
         || verified.package.records.size() != records.size())
         return fail(PackageV3StreamingFailure::signing,
-                    verified.issues.empty() ? "Staged V3 publisher verification failed"
+                    verified.issues.empty() ? "Staged V3 package-recognition verification failed"
                                             : verified.issues.front());
     result.verificationBytesRead = verified.verificationBytesRead
         + verified.indexBytesRead + verified.signatureBytesRead;

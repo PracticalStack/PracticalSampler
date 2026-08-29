@@ -437,8 +437,8 @@ PerformancePackageExportOperationResult executePerformancePackageExport(
     {
         result.state = "Playable package V3 export security is unavailable";
         result.issues.push_back(
-            "V3 export requires an active release-key provider, controlled publisher signer, "
-            "and publisher trust store. No legacy package was written.");
+            "V3 export requires a valid Practical Sampler package-protection profile. "
+            "No legacy package was written.");
         return result;
     }
 
