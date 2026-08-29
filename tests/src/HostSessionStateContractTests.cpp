@@ -59,8 +59,8 @@ int main()
 {
     try
     {
-        static_assert(drs::engine::hostSessionStateMaxBytes == 8u * 1024u * 1024u);
-        static_assert(drs::engine::hostSessionStateMaxProjectSnapshotBytes == 7680u * 1024u);
+        static_assert(drs::engine::hostSessionStateMaxBytes == 16u * 1024u * 1024u);
+        static_assert(drs::engine::hostSessionStateMaxProjectSnapshotBytes == 15u * 1024u * 1024u);
         static_assert(drs::engine::hostSessionStateMaxJsonDepth == 64u);
         static_assert(drs::engine::hostSessionStateMaxStringBytes == 64u * 1024u);
         static_assert(drs::engine::hostSessionStateMaxPathBytes == 32u * 1024u);
@@ -233,8 +233,8 @@ int main()
                                        drs::engine::HostSessionStateFindingCode::fieldTypeInvalid),
                 "Wrong required-field type must be rejected.");
 
-        require(budgetDescriptor.find("\"targetUtf8Bytes\": 8388609") != std::string::npos,
-                "Over-budget fixture descriptor must target exactly one byte above 8 MiB.");
+        require(budgetDescriptor.find("\"targetUtf8Bytes\": 16777217") != std::string::npos,
+                "Over-budget fixture descriptor must target exactly one byte above 16 MiB.");
         const auto oversized = drs::engine::parseHostSessionState(
             std::string(drs::engine::hostSessionStateMaxBytes + 1u, 'x'));
         require(oversized.disposition == drs::engine::HostSessionStateParseDisposition::invalid
@@ -302,7 +302,7 @@ int main()
         {
             if (index != 0)
                 largeNotes += ",";
-            largeNotes += "\"" + std::string(2050u, 'n') + "\"";
+            largeNotes += "\"" + std::string(4100u, 'n') + "\"";
         }
         largeNotes += "]";
         const auto largeSnapshotText = replaceFirst(
@@ -316,7 +316,7 @@ int main()
         const auto snapshotRejected = drs::engine::parseHostSessionState(largeSnapshotText);
         require(containsFinding(snapshotRejected,
                                 drs::engine::HostSessionStateFindingCode::projectSnapshotTooLarge),
-                "An embedded snapshot above 7.5 MiB must fail before project parsing.");
+                "An embedded snapshot above 15 MiB must fail before project parsing.");
 
         auto invalidForSerialization = *saved.hostState;
         invalidForSerialization.projectBinding.manifestPath.assign(
@@ -343,7 +343,7 @@ int main()
             firstProject.project, firstLocation);
         const auto secondDigest = drs::engine::computeHostProjectManifestDigest(
             secondProject.project, secondLocation);
-        require(firstDigest == "fnv1a64:9e6eebf6797fab37"
+        require(firstDigest == "fnv1a64:cd3ad5a57f2ba52f"
                     && secondDigest == firstDigest,
                 "Equivalent relocated project models must produce the checked-in canonical digest; first="
                     + firstDigest + ", second=" + secondDigest + ".");

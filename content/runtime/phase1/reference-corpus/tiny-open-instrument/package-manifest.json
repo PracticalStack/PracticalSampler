@@ -15,20 +15,20 @@
     {
       "role": "projectManifest",
       "path": "tiny-open-instrument.drsproj",
-      "sizeBytes": 758,
-      "checksumHex": "b1d52e563d5ecd4b"
+      "sizeBytes": 727,
+      "checksumHex": "bbcfffd7b23a087f"
     },
     {
       "role": "instrumentManifest",
       "path": "tiny-open-instrument.drinst",
-      "sizeBytes": 3595,
-      "checksumHex": "0588512e1ed36cdc"
+      "sizeBytes": 3613,
+      "checksumHex": "cc3dbe31e2932391"
     },
     {
       "role": "streamContainer",
       "path": "tiny-open-instrument.drstrm",
-      "sizeBytes": 2962,
-      "checksumHex": "ebc4e8381af1b1c1"
+      "sizeBytes": 2936,
+      "checksumHex": "7bd3439f6c1702d9"
     },
     {
       "role": "streamPayload",

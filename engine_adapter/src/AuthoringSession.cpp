@@ -3630,7 +3630,10 @@ RuntimeProjectDocumentActionResult AuthoringSession::appendImportedContent(
     if (!authoringNotes.empty())
         changedPaths.push_back("authoring.notes");
 
-    return documentController.commitSnapshot(project, label, changedPaths);
+    auto result = documentController.commitSnapshot(project, label, changedPaths);
+    if (result.applied)
+        recoverWorkspaceSelection(true);
+    return result;
 }
 
 RuntimeProjectDocumentActionResult AuthoringSession::createMacro(const RuntimeProjectMacroDefinition& macro,

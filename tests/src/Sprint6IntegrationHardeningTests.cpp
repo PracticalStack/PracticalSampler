@@ -182,7 +182,8 @@ void runIntegratedPublishSoak(const drs::engine::RuntimeProjectModel& sourceProj
 
     auto project = sourceProject;
     project.authoring.selectedZoneId = "pad-a3-high";
-    drs::plugin::Processor processor;
+    auto processorOwner = std::make_unique<drs::plugin::Processor>();
+    auto& processor = *processorOwner;
     processor.prepareToPlay(48000.0, 1024);
     processor.replaceAuthoringProject(project);
     processor.serviceMessageThreadWork();

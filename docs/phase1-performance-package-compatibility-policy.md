@@ -12,26 +12,30 @@ The playable package format is now frozen at:
 - `schemaMinorVersion`: `0`
 - `compatibilityPolicyId`: `drs.performancePackage.policy.v1.0`
 
-The current reader contract also assumes:
+The current protected-package reader contract also assumes:
 
 - the sealed package extension remains `.drpkg`
-- the runtime-only payload set remains exactly:
+- the required runtime-only payload set remains:
   - `packageManifest`
   - `runtimeInstrument`
   - `runtimeStreamIndex`
   - `runtimeStreamPayload`
+- optional authenticated artwork and license payloads may be present
 - package sessions never fall back to nearby raw samples or authored project manifests
+- new production exports use signed `DRSPKG3` only
 
 ## Reader behavior
 
-### Current package
+### Current protected package
 
-Readers must load packages when all of the following are true:
+V3 readers must load packages only when all of the following are true:
 
 - `schemaName` matches `drs.performancePackage`
 - `formatVersion` is supported by the current reader
 - `minimumReaderSchemaVersion` is less than or equal to the current reader schema version
-- all required payloads decrypt, validate, and remain runtime-compatible
+- the publisher signature verifies before protected record plaintext is used
+- the release-key provider resolves the declared key and the content-key envelope authenticates
+- all required records decrypt, validate, and remain runtime-compatible
 
 ### Future minor changes
 
@@ -71,8 +75,24 @@ Phase 1 support and QA should classify failures using the package loader’s exp
 
 These categories are part of the frozen support contract for Sprint 8 release gating.
 
-## Large-instrument extension
+## Disk-format and migration policy
 
-Package v2 (`DRSPKG2`) is the bounded streaming format. It uses a clear fixed header/TOC and independently authenticated records with 64-bit offsets and identities. Package v1 remains readable only under the 64 MiB resident compatibility ceiling; a larger v1 package is rejected with explicit v2 re-export guidance. Loading never rewrites a package or resolves adjacent raw samples.
+Package V3 (`DRSPKG3`) is the only protected production export format. It uses
+bounded, independently authenticated XChaCha20-Poly1305 records, a wrapped
+content key, 64-bit offsets, and a publisher signature covering the canonical
+package representation.
+
+Package V1 (`DRSPKG1`) and V2 (`DRSPKG2`) are unprotected legacy compatibility
+inputs. They remain readable within their existing bounds so customer sessions
+continue to open, but the application never rewrites them, upgrades them on
+open, or describes them as encrypted, authenticated, sealed, or protected.
+V1 remains subject to the 64 MiB resident ceiling. A legacy creator migrates by
+opening the original editable project and explicitly exporting a new V3
+package; there is no supported in-place conversion when the source project is
+unavailable.
+
+Production application targets do not link V1/V2 writer entry points. The
+legacy writers and deterministic compatibility crypto are available only to an
+explicit test-fixture target used to preserve reader coverage.
 
 See `docs/large-instrument-streaming-support.md` for budgets, lifecycle states, recovery, and qualification status.

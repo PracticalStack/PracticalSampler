@@ -12,6 +12,10 @@
 #include <type_traits>
 #include <unordered_set>
 
+#if defined(DRS_PRODUCTION_PACKAGE_READERS_ONLY) && defined(DRS_ENABLE_LEGACY_PACKAGE_WRITERS)
+#error Production package targets must not compile legacy V2 writer entry points.
+#endif
+
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -194,6 +198,7 @@ void fail(PackageV2RecordOpenResult& result, const PackageV2Failure failure,
 }
 } // namespace
 
+#if !defined(DRS_LEGACY_PACKAGE_WRITERS_ONLY)
 const char* toString(const PackageV2RecordKind kind) noexcept
 {
     switch (kind)
@@ -227,7 +232,9 @@ const char* toString(const PackageV2Failure failure) noexcept
     }
     return "unknown";
 }
+#endif
 
+#if defined(DRS_ENABLE_LEGACY_PACKAGE_WRITERS)
 PackageV2WriteResult writePackageV2(const PackageV2WritePlan& plan,
                                     const PackageCryptoProvider& crypto,
                                     const std::function<bool()>& cancellationProbe)
@@ -649,6 +656,9 @@ PackageV2StreamingWriteResult writePackageV2Streaming(
     return result;
 }
 
+#endif
+
+#if !defined(DRS_LEGACY_PACKAGE_WRITERS_ONLY)
 PackageV2OpenResult openPackageV2(const std::string& packagePath)
 {
     PackageV2OpenResult result;
@@ -823,4 +833,5 @@ PackageV2RecordOpenResult openPackageV2Record(
     result.state = "Package v2 record opened";
     return result;
 }
+#endif
 } // namespace drs::engine

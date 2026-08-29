@@ -8,6 +8,7 @@
 #include <fstream>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -50,13 +51,26 @@ void serviceRestore(drs::plugin::Processor& processor, const std::string& contex
         const auto restore = processor.getProjectRestoreSnapshot();
         if (restore != nullptr
             && (restore->state == drs::engine::ProjectRestoreState::active
-                || restore->state == drs::engine::ProjectRestoreState::ready
                 || restore->state == drs::engine::ProjectRestoreState::needsLocation
                 || restore->state == drs::engine::ProjectRestoreState::failed))
             return;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     throw std::runtime_error(context + " timed out.");
+}
+
+void drainProcessorBackgroundWork(drs::plugin::Processor& processor)
+{
+    processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::seconds(10));
+    for (auto pass = 0; pass < 8; ++pass)
+    {
+        processor.serviceMessageThreadWork();
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::seconds(10));
+    processor.serviceMessageThreadWork();
+    processor.waitForHostStatePublication();
+    processor.serviceMessageThreadWork();
 }
 
 void requireSessionMatchesLeadPerformance(const drs::engine::RuntimeSessionStateSnapshot& sessionState,
@@ -116,12 +130,12 @@ int main()
         require(phase2ProjectLoad.loaded,
                 "The authored-project binding test requires the Phase 2 reference project.");
 
-        drs::plugin::Processor bindingProcessor;
-        require(bindingProcessor.replaceAuthoringProject(
+        auto bindingProcessor = std::make_unique<drs::plugin::Processor>();
+        require(bindingProcessor->replaceAuthoringProject(
                     phase2ProjectLoad.project,
                     juce::File(juce::String::fromUTF8(phase2ProjectPath.c_str()))),
                 "The processor must accept a manifest that matches the authored project.");
-        const auto acceptedBinding = bindingProcessor.getAuthoringProjectBinding();
+        const auto acceptedBinding = bindingProcessor->getAuthoringProjectBinding();
         require(acceptedBinding.projectId == phase2ProjectLoad.project.projectId,
                 "The accepted binding must preserve the authored project identity.");
         require(juce::File(juce::String::fromUTF8(acceptedBinding.manifestPath.c_str()))
@@ -133,78 +147,78 @@ int main()
                         acceptedBinding.manifestPath),
                 "The accepted binding must preserve the canonical manifest digest.");
 
-        const auto previousBoundProject = bindingProcessor.getAuthoringSession().getProject();
-        const auto previousBinding = bindingProcessor.getAuthoringProjectBinding();
+        const auto previousBoundProject = bindingProcessor->getAuthoringSession().getProject();
+        const auto previousBinding = bindingProcessor->getAuthoringProjectBinding();
         const auto phase1ProjectPath = drs::engine::getPhase1ReferenceProjectManifestPath();
-        require(!bindingProcessor.bindAuthoringProjectFile(
+        require(!bindingProcessor->bindAuthoringProjectFile(
                     juce::File(juce::String::fromUTF8(phase1ProjectPath.c_str()))),
                 "A manifest with a different project identity must be rejected.");
-        require(bindingProcessor.getAuthoringProjectBinding().manifestPath
+        require(bindingProcessor->getAuthoringProjectBinding().manifestPath
                     == previousBinding.manifestPath,
                 "A rejected identity mismatch must preserve the previous binding.");
 
         const auto missingProjectPath = (fs::temp_directory_path()
                                          / "drs-host-state-missing-project.drsproj").string();
-        require(!bindingProcessor.bindAuthoringProjectFile(
+        require(!bindingProcessor->bindAuthoringProjectFile(
                     juce::File(juce::String::fromUTF8(missingProjectPath.c_str()))),
                 "A missing manifest must be rejected.");
-        require(bindingProcessor.getAuthoringProjectBinding().manifestDigest
+        require(bindingProcessor->getAuthoringProjectBinding().manifestDigest
                     == previousBinding.manifestDigest,
                 "A rejected missing manifest must preserve the previous binding.");
 
         auto mismatchedContent = phase2ProjectLoad.project;
         mismatchedContent.displayName += " mismatched";
-        require(!bindingProcessor.replaceAuthoringProject(
+        require(!bindingProcessor->replaceAuthoringProject(
                     mismatchedContent,
                     juce::File(juce::String::fromUTF8(phase2ProjectPath.c_str()))),
                 "A manifest whose canonical content differs from the candidate project must be rejected.");
-        require(bindingProcessor.getAuthoringSession().getProject().displayName
+        require(bindingProcessor->getAuthoringSession().getProject().displayName
                     == previousBoundProject.displayName,
                 "A rejected content mismatch must preserve the authored project.");
-        require(bindingProcessor.getAuthoringProjectBinding().manifestDigest
+        require(bindingProcessor->getAuthoringProjectBinding().manifestDigest
                     == previousBinding.manifestDigest,
                 "A rejected content mismatch must preserve the authored-project binding.");
 
-        drs::standalone::MainComponent standaloneSource;
-        const auto standaloneRestore = standaloneSource.restoreStateJson(leadPresetJson);
+        auto standaloneSource = std::make_unique<drs::standalone::MainComponent>(false);
+        const auto standaloneRestore = standaloneSource->restoreStateJson(leadPresetJson);
         require(standaloneRestore.restored, "Standalone shell must restore the lead/performance preset fixture.");
-        serviceRestore(standaloneSource.getProcessor(), "Standalone legacy restore");
-        require(standaloneSource.getProcessor().waitForHostStatePublication(),
+        serviceRestore(standaloneSource->getProcessor(), "Standalone legacy restore");
+        require(standaloneSource->getProcessor().waitForHostStatePublication(),
                 "Standalone legacy state did not reach background host-state publication.");
 
-        const auto exportedStandaloneState = standaloneSource.exportStateJson();
+        const auto exportedStandaloneState = standaloneSource->exportStateJson();
         const auto parsedStandaloneState = drs::engine::parseHostSessionState(exportedStandaloneState);
         require(parsedStandaloneState.isLegacyPreset(),
                 "An unloaded standalone shell must preserve the unbound legacy preset contract.");
         requirePresetMatchesLeadPerformance(*parsedStandaloneState.legacyPreset,
                                             "Standalone unbound state");
 
-        drs::standalone::MainComponent standaloneReloaded;
-        const auto standaloneReload = standaloneReloaded.restoreStateJson(exportedStandaloneState);
+        auto standaloneReloaded = std::make_unique<drs::standalone::MainComponent>(false);
+        const auto standaloneReload = standaloneReloaded->restoreStateJson(exportedStandaloneState);
         require(standaloneReload.restored, "Standalone shell must restore its exported state.");
-        serviceRestore(standaloneReloaded.getProcessor(), "Standalone host-state restore");
-        requireSessionMatchesLeadPerformance(standaloneReloaded.getEngineFacade().getCurrentSessionState(),
+        serviceRestore(standaloneReloaded->getProcessor(), "Standalone host-state restore");
+        requireSessionMatchesLeadPerformance(standaloneReloaded->getEngineFacade().getCurrentSessionState(),
                                             "Standalone shell");
-        require(findMacroDescriptor(standaloneReloaded.getEngineFacade(), "tone").currentEffect == "Balanced attack",
+        require(findMacroDescriptor(standaloneReloaded->getEngineFacade(), "tone").currentEffect == "Balanced attack",
                 "Standalone shell tone macro effect did not restore with the lead fixture.");
-        require(findMacroDescriptor(standaloneReloaded.getEngineFacade(), "motion").currentEffect == "+7 st",
+        require(findMacroDescriptor(standaloneReloaded->getEngineFacade(), "motion").currentEffect == "+7 st",
                 "Standalone shell motion macro effect did not restore with the lead fixture.");
 
-        const auto standaloneRejected = standaloneReloaded.restoreStateJson(negativePresetJson);
+        const auto standaloneRejected = standaloneReloaded->restoreStateJson(negativePresetJson);
         require(!standaloneRejected.restored, "Standalone shell must reject the transient-diagnostics leak fixture.");
-        requireSessionMatchesLeadPerformance(standaloneReloaded.getEngineFacade().getCurrentSessionState(),
+        requireSessionMatchesLeadPerformance(standaloneReloaded->getEngineFacade().getCurrentSessionState(),
                                             "Standalone shell after rejected restore");
 
-        drs::plugin::Processor sourceProcessor;
-        sourceProcessor.setStateInformation(leadPresetJson.data(), static_cast<int>(leadPresetJson.size()));
-        serviceRestore(sourceProcessor, "Plugin legacy restore");
-        requireSessionMatchesLeadPerformance(sourceProcessor.getEngineFacade().getCurrentSessionState(),
+        auto sourceProcessor = std::make_unique<drs::plugin::Processor>();
+        sourceProcessor->setStateInformation(leadPresetJson.data(), static_cast<int>(leadPresetJson.size()));
+        serviceRestore(*sourceProcessor, "Plugin legacy restore");
+        requireSessionMatchesLeadPerformance(sourceProcessor->getEngineFacade().getCurrentSessionState(),
                                             "Plugin processor source state");
 
         juce::MemoryBlock processorState;
-        require(sourceProcessor.waitForHostStatePublication(),
+        require(sourceProcessor->waitForHostStatePublication(),
                 "Plugin legacy state did not reach the background host-state publication.");
-        sourceProcessor.getStateInformation(processorState);
+        sourceProcessor->getStateInformation(processorState);
         const auto processorStateText = std::string(
             static_cast<const char*>(processorState.getData()), processorState.getSize());
         const auto parsedProcessorState = drs::engine::parseHostSessionState(processorStateText);
@@ -213,30 +227,41 @@ int main()
         requirePresetMatchesLeadPerformance(*parsedProcessorState.legacyPreset,
                                             "Plugin unbound state");
 
-        drs::plugin::Processor restoredProcessor;
-        restoredProcessor.setStateInformation(processorState.getData(), static_cast<int>(processorState.getSize()));
-        serviceRestore(restoredProcessor, "Plugin host-state restore");
-        requireSessionMatchesLeadPerformance(restoredProcessor.getEngineFacade().getCurrentSessionState(),
+        auto restoredProcessor = std::make_unique<drs::plugin::Processor>();
+        restoredProcessor->setStateInformation(processorState.getData(), static_cast<int>(processorState.getSize()));
+        serviceRestore(*restoredProcessor, "Plugin host-state restore");
+        requireSessionMatchesLeadPerformance(restoredProcessor->getEngineFacade().getCurrentSessionState(),
                                             "Plugin processor");
-        require(findMacroDescriptor(restoredProcessor.getEngineFacade(), "tone").currentEffect == "Balanced attack",
+        require(findMacroDescriptor(restoredProcessor->getEngineFacade(), "tone").currentEffect == "Balanced attack",
                 "Plugin tone macro effect did not restore with the lead fixture.");
-        require(findMacroDescriptor(restoredProcessor.getEngineFacade(), "motion").currentEffect == "+7 st",
+        require(findMacroDescriptor(restoredProcessor->getEngineFacade(), "motion").currentEffect == "+7 st",
                 "Plugin motion macro effect did not restore with the lead fixture.");
-        require(restoredProcessor.getEngineFacade().getCurrentSessionState().transientMetrics.lastFailure.empty(),
+        require(restoredProcessor->getEngineFacade().getCurrentSessionState().transientMetrics.lastFailure.empty(),
                 "Plugin processor must not retain a restore failure after a valid round-trip.");
 
-        const auto previousPluginState = restoredProcessor.getEngineFacade().exportPresetStateJson();
-        restoredProcessor.setStateInformation(negativePresetJson.data(), static_cast<int>(negativePresetJson.size()));
-        serviceRestore(restoredProcessor, "Plugin rejected restore");
-        require(restoredProcessor.getEngineFacade().exportPresetStateJson() == previousPluginState,
+        const auto previousPluginState = restoredProcessor->getEngineFacade().exportPresetStateJson();
+        restoredProcessor->setStateInformation(negativePresetJson.data(), static_cast<int>(negativePresetJson.size()));
+        serviceRestore(*restoredProcessor, "Plugin rejected restore");
+        require(restoredProcessor->getEngineFacade().exportPresetStateJson() == previousPluginState,
                 "Plugin processor must preserve the previous session state when restore input is invalid.");
-        require(restoredProcessor.getProjectRestoreSnapshot()->state
+        require(restoredProcessor->getProjectRestoreSnapshot()->state
                     == drs::engine::ProjectRestoreState::failed,
                 "Plugin processor must publish a typed coordinator failure for invalid state.");
 
-        bindingProcessor.closeAuthoringProject({});
-        require(bindingProcessor.getAuthoringProjectFile() == juce::File(),
+        bindingProcessor->closeAuthoringProject({});
+        require(bindingProcessor->getAuthoringProjectFile() == juce::File(),
                 "Closing an authored project must clear its validated file binding.");
+
+        drainProcessorBackgroundWork(*restoredProcessor);
+        restoredProcessor.reset();
+        drainProcessorBackgroundWork(*sourceProcessor);
+        sourceProcessor.reset();
+        drainProcessorBackgroundWork(standaloneReloaded->getProcessor());
+        standaloneReloaded.reset();
+        drainProcessorBackgroundWork(standaloneSource->getProcessor());
+        standaloneSource.reset();
+        drainProcessorBackgroundWork(*bindingProcessor);
+        bindingProcessor.reset();
 
         std::cout << "Phase 1 state recall tests passed." << std::endl;
         return 0;

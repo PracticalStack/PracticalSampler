@@ -20,7 +20,7 @@ void require(bool condition, const std::string& message)
 
 std::string readTextFile(const fs::path& path)
 {
-    std::ifstream input(path, std::ios::binary);
+    std::ifstream input(path);
     return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 }
 

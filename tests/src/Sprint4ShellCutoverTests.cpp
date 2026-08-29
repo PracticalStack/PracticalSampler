@@ -49,7 +49,8 @@ void settleAuthoringPreview(drs::plugin::Processor& processor,
                             const std::string& shellLabel)
 {
     processor.requestAuthoringPreview(drs::engine::AuthoringPreviewScope::selectedZone);
-    for (int attempt = 0; attempt < 80; ++attempt)
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline)
     {
         processor.serviceMessageThreadWork();
         processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::milliseconds(50));
@@ -66,6 +67,7 @@ void settleAuthoringPreview(drs::plugin::Processor& processor,
 
         if (controller.activationState == drs::engine::AuthoringPreviewActivationState::active)
             return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
 
     require(false, shellLabel + " should activate the requested authored Preview.");

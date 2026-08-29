@@ -1,6 +1,7 @@
 #include "plugin/PluginEditor.h"
 #include "plugin/PluginProcessor.h"
 #include "standalone/MainComponent.h"
+#include "PerformancePackageExportSecurityTestSupport.h"
 
 #include "drs/engine/PackageReaderDispatch.h"
 #include "drs/engine/NativeContent.h"
@@ -207,6 +208,14 @@ int main()
         drs::standalone::MainComponent standalone(false);
         standalone.addToDesktop(0);
         standalone.setVisible(true);
+        const auto exportSecurity = drs::tests::makePerformancePackageExportTestSecurityContext();
+        require(standalone.getProcessor().getPerformancePackageExportService().setSecurityContext(
+                    exportSecurity),
+                "Standalone shell should accept the qualified V3 export security fixture.");
+        drs::engine::PerformancePackageV3ActivationSecurityContext activationSecurity;
+        activationSecurity.compatibilityId = exportSecurity->compatibilityId;
+        activationSecurity.keyProvider = exportSecurity->keyProvider;
+        activationSecurity.trustStore = exportSecurity->trustStore;
 
         auto graphProject = buildAuthoringProjectFixture();
         addAuthoredFxRoutingGraph(graphProject);
@@ -219,8 +228,9 @@ int main()
         require(graphExport.exported,
                 "The shell export adapter should delegate graph-bearing export to the shared pipeline. state="
                     + graphExport.state + " issues=" + summarizeIssues(graphExport.issues));
-        const auto graphPackage = drs::engine::loadPerformancePackageV2Metadata(graphPackagePath);
-        require(graphPackage.loaded
+        const auto graphPackage = drs::engine::loadPerformancePackageV3Metadata(
+            graphPackagePath, activationSecurity);
+        require(graphPackage.loaded && graphPackage.metadata.loaded
                     && graphPackage.metadata.manifest.schemaVersion
                         == drs::engine::performancePackageFxRoutingSchemaVersion
                     && graphPackage.metadata.instrument.instrument.fxSlots.size() == 1
@@ -306,6 +316,10 @@ int main()
                 "Standalone package sessions should remain playable through the performance surface.");
 
         drs::plugin::Processor processor;
+        require(processor.setPerformancePackageActivationSecurityContext(
+                    std::make_shared<const drs::engine::PerformancePackageV3ActivationSecurityContext>(
+                        activationSecurity)),
+                "Plugin shell should accept the qualified V3 activation security fixture.");
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         require(editor != nullptr, "Plugin editor should construct for package-session tests.");
         editor->addToDesktop(0);

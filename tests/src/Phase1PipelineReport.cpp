@@ -21,6 +21,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -47,7 +48,6 @@ void serviceRestore(drs::plugin::Processor& processor)
         const auto restore = processor.getProjectRestoreSnapshot();
         if (restore != nullptr
             && (restore->state == drs::engine::ProjectRestoreState::active
-                || restore->state == drs::engine::ProjectRestoreState::ready
                 || restore->state == drs::engine::ProjectRestoreState::needsLocation
                 || restore->state == drs::engine::ProjectRestoreState::failed))
             return;
@@ -144,6 +144,55 @@ bool legacyPresetMatchesLeadPerformance(const std::string& serializedState)
         && motionIterator != preset.macroValues.end()
         && nearlyEqual(toneIterator->value, 0.62)
         && nearlyEqual(motionIterator->value, 0.78);
+}
+
+void drainProcessorBackgroundWork(drs::plugin::Processor& processor)
+{
+    processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::seconds(10));
+    for (auto pass = 0; pass < 8; ++pass)
+    {
+        processor.serviceMessageThreadWork();
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    processor.getEngineFacade().waitForPreparedPlaybackIdle(std::chrono::seconds(10));
+    processor.serviceMessageThreadWork();
+}
+
+struct StandaloneStateRecallQualification
+{
+    bool fixtureRestored = false;
+    bool exportMatchesFixture = false;
+    bool reloadMatchesFixture = false;
+};
+
+StandaloneStateRecallQualification qualifyStandaloneStateRecall()
+{
+    const auto presetRoot = fs::path(drs::engine::getPhase1RuntimeRootPath()) / "preset-state";
+    const auto leadPresetJson = readTextFile(
+        presetRoot / "reference" / "lead-performance-state.drpreset.json");
+
+    StandaloneStateRecallQualification result;
+    auto source = std::make_unique<drs::standalone::MainComponent>(false);
+    const auto restore = source->restoreStateJson(leadPresetJson);
+    serviceRestore(source->getProcessor());
+    const auto statePublished = source->getProcessor().waitForHostStatePublication();
+    result.fixtureRestored = restore.restored && statePublished;
+
+    const auto exportedState = source->exportStateJson();
+    result.exportMatchesFixture = legacyPresetMatchesLeadPerformance(exportedState);
+    drainProcessorBackgroundWork(source->getProcessor());
+    source.reset();
+
+    auto reloaded = std::make_unique<drs::standalone::MainComponent>(false);
+    const auto reload = reloaded->restoreStateJson(exportedState);
+    serviceRestore(reloaded->getProcessor());
+    const auto reloadPublished = reloaded->getProcessor().waitForHostStatePublication();
+    result.reloadMatchesFixture = reload.restored
+        && reloadPublished
+        && sessionMatchesLeadPerformance(reloaded->getEngineFacade().getCurrentSessionState());
+    drainProcessorBackgroundWork(reloaded->getProcessor());
+    reloaded.reset();
+    return result;
 }
 
 drs::engine::RuntimeStreamingServiceOptions makeStreamingOptions(
@@ -379,6 +428,7 @@ int main(int argc, char* argv[])
     try
     {
         juce::ScopedJuceInitialiser_GUI gui;
+        const auto standaloneStateRecall = qualifyStandaloneStateRecall();
 
         const auto referenceProject = drs::engine::loadPhase1ReferenceProjectManifest();
         const auto referenceInstrument = drs::engine::loadPhase1ReferenceInstrumentManifest();
@@ -1099,9 +1149,9 @@ int main(int argc, char* argv[])
         const auto negativePresetJson = readTextFile(negativePresetPath);
 
         ordered_json stateRecallSection;
-        bool standaloneFixtureRestored = false;
-        bool standaloneExportMatchesFixture = false;
-        bool standaloneReloadMatchesFixture = false;
+        const auto standaloneFixtureRestored = standaloneStateRecall.fixtureRestored;
+        const auto standaloneExportMatchesFixture = standaloneStateRecall.exportMatchesFixture;
+        const auto standaloneReloadMatchesFixture = standaloneStateRecall.reloadMatchesFixture;
         bool pluginFixtureRestored = false;
         bool pluginExportMatchesFixture = false;
         bool pluginReloadMatchesFixture = false;
@@ -1109,50 +1159,36 @@ int main(int argc, char* argv[])
         bool macroStateComparePassed = false;
         bool invalidRestorePreservedLastGoodState = false;
 
-        drs::standalone::MainComponent standaloneSource;
-        const auto standaloneRestore = standaloneSource.restoreStateJson(leadPresetJson);
-        serviceRestore(standaloneSource.getProcessor());
-        standaloneFixtureRestored = standaloneRestore.restored;
-
-        const auto standaloneExportedState = standaloneSource.exportStateJson();
-        standaloneExportMatchesFixture = legacyPresetMatchesLeadPerformance(standaloneExportedState);
-
-        drs::standalone::MainComponent standaloneReloaded;
-        const auto standaloneReload = standaloneReloaded.restoreStateJson(standaloneExportedState);
-        serviceRestore(standaloneReloaded.getProcessor());
-        standaloneReloadMatchesFixture = standaloneReload.restored
-            && sessionMatchesLeadPerformance(standaloneReloaded.getEngineFacade().getCurrentSessionState());
-
-        drs::plugin::Processor sourceProcessor;
-        sourceProcessor.setStateInformation(leadPresetJson.data(), static_cast<int>(leadPresetJson.size()));
-        serviceRestore(sourceProcessor);
-        pluginFixtureRestored = sessionMatchesLeadPerformance(sourceProcessor.getEngineFacade().getCurrentSessionState());
+        auto sourceProcessor = std::make_unique<drs::plugin::Processor>();
+        sourceProcessor->setStateInformation(leadPresetJson.data(), static_cast<int>(leadPresetJson.size()));
+        serviceRestore(*sourceProcessor);
+        pluginFixtureRestored = sessionMatchesLeadPerformance(sourceProcessor->getEngineFacade().getCurrentSessionState());
 
         juce::MemoryBlock pluginState;
-        sourceProcessor.waitForHostStatePublication();
-        sourceProcessor.getStateInformation(pluginState);
+        sourceProcessor->waitForHostStatePublication();
+        sourceProcessor->getStateInformation(pluginState);
         const auto pluginStateJson = std::string(static_cast<const char*>(pluginState.getData()), pluginState.getSize());
         pluginExportMatchesFixture = legacyPresetMatchesLeadPerformance(pluginStateJson);
 
-        drs::plugin::Processor restoredProcessor;
-        restoredProcessor.setStateInformation(pluginState.getData(), static_cast<int>(pluginState.getSize()));
-        serviceRestore(restoredProcessor);
-        pluginReloadMatchesFixture = sessionMatchesLeadPerformance(restoredProcessor.getEngineFacade().getCurrentSessionState());
+        auto restoredProcessor = std::make_unique<drs::plugin::Processor>();
+        restoredProcessor->setStateInformation(pluginState.getData(), static_cast<int>(pluginState.getSize()));
+        serviceRestore(*restoredProcessor);
+        pluginReloadMatchesFixture = sessionMatchesLeadPerformance(restoredProcessor->getEngineFacade().getCurrentSessionState());
 
-        const auto restoredToneValue = findMacroValue(restoredProcessor.getEngineFacade(), "tone");
-        const auto restoredMotionValue = findMacroValue(restoredProcessor.getEngineFacade(), "motion");
+        const auto restoredToneValue = findMacroValue(restoredProcessor->getEngineFacade(), "tone");
+        const auto restoredMotionValue = findMacroValue(restoredProcessor->getEngineFacade(), "motion");
         auto* restoredToneParameter = dynamic_cast<juce::RangedAudioParameter*>(
-            restoredProcessor.getParameterState().getParameter("macro.tone"));
+            restoredProcessor->getParameterState().getParameter("macro.tone"));
         auto* restoredMotionParameter = dynamic_cast<juce::RangedAudioParameter*>(
-            restoredProcessor.getParameterState().getParameter("macro.motion"));
+            restoredProcessor->getParameterState().getParameter("macro.motion"));
 
         pluginParameterSurfaceMatchesMacros = restoredToneParameter != nullptr
             && restoredMotionParameter != nullptr
-            && restoredProcessor.getParameterState().getRawParameterValue("macro.tone") != nullptr
-            && restoredProcessor.getParameterState().getRawParameterValue("macro.motion") != nullptr
-            && nearlyEqual(static_cast<double>(restoredProcessor.getParameterState().getRawParameterValue("macro.tone")->load()),
+            && restoredProcessor->getParameterState().getRawParameterValue("macro.tone") != nullptr
+            && restoredProcessor->getParameterState().getRawParameterValue("macro.motion") != nullptr
+            && nearlyEqual(static_cast<double>(restoredProcessor->getParameterState().getRawParameterValue("macro.tone")->load()),
                            0.62)
-            && nearlyEqual(static_cast<double>(restoredProcessor.getParameterState().getRawParameterValue("macro.motion")->load()),
+            && nearlyEqual(static_cast<double>(restoredProcessor->getParameterState().getRawParameterValue("macro.motion")->load()),
                            0.78);
         macroStateComparePassed = restoredToneValue.has_value()
             && restoredMotionValue.has_value()
@@ -1160,13 +1196,18 @@ int main(int argc, char* argv[])
             && nearlyEqual(*restoredMotionValue, 0.78)
             && pluginParameterSurfaceMatchesMacros;
 
-        const auto previousPluginState = restoredProcessor.getEngineFacade().exportPresetStateJson();
-        restoredProcessor.setStateInformation(negativePresetJson.data(), static_cast<int>(negativePresetJson.size()));
-        serviceRestore(restoredProcessor);
-        const auto rejectedRestore = restoredProcessor.getProjectRestoreSnapshot();
-        invalidRestorePreservedLastGoodState = restoredProcessor.getEngineFacade().exportPresetStateJson() == previousPluginState
+        const auto previousPluginState = restoredProcessor->getEngineFacade().exportPresetStateJson();
+        restoredProcessor->setStateInformation(negativePresetJson.data(), static_cast<int>(negativePresetJson.size()));
+        serviceRestore(*restoredProcessor);
+        const auto rejectedRestore = restoredProcessor->getProjectRestoreSnapshot();
+        invalidRestorePreservedLastGoodState = restoredProcessor->getEngineFacade().exportPresetStateJson() == previousPluginState
             && rejectedRestore != nullptr
             && rejectedRestore->state == drs::engine::ProjectRestoreState::failed;
+
+        drainProcessorBackgroundWork(*restoredProcessor);
+        drainProcessorBackgroundWork(*sourceProcessor);
+        restoredProcessor.reset();
+        sourceProcessor.reset();
 
         stateRecallSection["standaloneFixtureRestored"] = standaloneFixtureRestored;
         stateRecallSection["standaloneExportMatchesFixture"] = standaloneExportMatchesFixture;

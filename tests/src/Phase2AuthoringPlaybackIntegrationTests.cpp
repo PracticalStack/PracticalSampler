@@ -193,11 +193,9 @@ bool waitForButtonEnabled(juce::Component& root,
 
 std::string buildDraftPlaybackSummary(const drs::engine::DraftPlaybackStatus& playbackStatus)
 {
-    return "Draft playback: draft r" + std::to_string(playbackStatus.draftRevision)
-        + " | preview r" + std::to_string(playbackStatus.preview.revision)
-        + " (" + playbackStatus.preview.state + ")"
-        + " | published r" + std::to_string(playbackStatus.performance.revision)
-        + " (" + playbackStatus.performance.state + ")";
+    return "Preview: " + playbackStatus.preview.state
+        + " | Draft r" + std::to_string(playbackStatus.draftRevision)
+        + " | Publish: " + playbackStatus.performance.state;
 }
 
 void refreshAuthoringWorkspace(juce::Component& root)
@@ -233,13 +231,13 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
 
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
-                                 "authoringPlaybackBannerLabel",
+                                 "authoringSummaryStatusLabel",
                                  "playback blocked: Import a sample and create at least one playable zone."),
-            shellName + " should surface draft-playback guidance inside the workspace banner when migrated projects still lack playable zones.");
-    require(!requireButton(root, "authoringPlaybackBannerPrepareButton").isVisible(),
-            shellName + " should hide prepare-draft banner actions until the migrated project has a playable zone.");
-    require(!requireButton(root, "authoringPlaybackBannerPublishButton").isVisible(),
-            shellName + " should hide publish-draft banner actions until the migrated project has a ready draft.");
+            shellName + " should surface draft-playback guidance in the summary strip when migrated projects still lack playable zones.");
+    require(!requireButton(root, "authoringPrepareDraftButton").isEnabled(),
+            shellName + " should disable prepare-draft actions until the migrated project has a playable zone.");
+    require(!requireButton(root, "authoringPublishDraftButton").isEnabled(),
+            shellName + " should disable publish-draft actions until the migrated project has a ready draft.");
 
     drs::engine::RuntimeProjectSampleSource importedSampleSource;
     importedSampleSource.id = shellName + "-migrated-sine-a3";
@@ -267,7 +265,7 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
     require(processor.serviceMessageThreadWork(),
             shellName + " should sync imported authoring content into the draft-playback facade.");
     refreshAuthoringWorkspace(root);
-    auto& prepareButton = requireButton(root, "authoringPlaybackBannerPrepareButton");
+    auto& prepareButton = requireButton(root, "authoringPrepareDraftButton");
     require(prepareButton.isVisible() && prepareButton.isEnabled()
                 && static_cast<bool>(prepareButton.onClick),
             shellName + " should offer explicit first-preview preparation after importing the first playable zone.");
@@ -277,29 +275,29 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",
-                                 "Draft playback: draft r1 | preview r1 (Ready) | published r0 (Idle)"),
+                                 "Preview: Ready | Draft r1 | Publish: Idle"),
             shellName + " should surface the ready-but-unpublished draft state after preparing the imported migrated preview. Text: "
                 + getLabelText(root, "authoringSummaryPlaybackLabel"));
-    require(waitForButtonEnabled(root, "authoringPlaybackBannerPublishButton"),
-            shellName + " should enable publish-draft banner actions once the latest draft preview is ready.");
+    require(waitForButtonEnabled(root, "authoringPublishDraftButton"),
+            shellName + " should enable the summary-strip publish action once the latest draft preview is ready.");
     require(waitForLabelContains(root,
-                                 "authoringPlaybackBannerLabel",
+                                 "authoringSummaryStatusLabel",
                                  "playback action: Publish the ready draft to the performance path."),
-            shellName + " should guide the user to publish the ready migrated draft from the workspace banner.");
-    require(static_cast<bool>(requireButton(root, "authoringPlaybackBannerPublishButton").onClick),
-            shellName + " should expose a workspace banner publish-draft action.");
-    requireButton(root, "authoringPlaybackBannerPublishButton").onClick();
+            shellName + " should guide the user to publish the ready migrated draft from the summary strip.");
+    require(static_cast<bool>(requireButton(root, "authoringPublishDraftButton").onClick),
+            shellName + " should expose a summary-strip publish-draft action.");
+    requireButton(root, "authoringPublishDraftButton").onClick();
     require(waitForWorkerToSettle(processor.getEngineFacade(), std::chrono::milliseconds(1500)),
             shellName + " should let imported migrated publish settle through the prepared-playback worker.");
     processor.serviceMessageThreadWork();
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",
-                                 "Draft playback: draft r1 | preview r1 (Ready) | published r1 (Active)"),
+                                 "Preview: Ready | Draft r1 | Publish: Active"),
             shellName + " should surface the recovered migrated ready/active state in the authoring summary strip. Text: "
                 + getLabelText(root, "authoringSummaryPlaybackLabel"));
-    require(!findDescendantById(root, "authoringPlaybackBanner")->isVisible(),
-            shellName + " should hide the workspace banner once the latest draft is active on the performance path.");
+    require(!requireButton(root, "authoringPublishDraftButton").isEnabled(),
+            shellName + " should disable Publish once the latest draft is active on the performance path.");
 
     auto selectedZone = processor.getAuthoringSession().getSelectedZone();
     require(selectedZone.has_value(), shellName + " should keep the imported migrated zone selected for edit coverage.");
@@ -314,7 +312,7 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",
-                                 "Draft playback: draft r2 | preview r1 (Stale) | published r1 (Active)"),
+                                 "Preview: Stale | Draft r2 | Publish: Active"),
             shellName + " should surface the stale-preview edited-draft state in the authoring summary strip. Text: "
                 + getLabelText(root, "authoringSummaryPlaybackLabel"));
     require(waitForAutomaticPreview(processor, 2),
@@ -322,19 +320,19 @@ void exerciseHostedAuthoringPlaybackIntegration(juce::Component& root,
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",
-                                 "Draft playback: draft r2 | preview r2 (Ready) | published r1 (Active)"),
+                                 "Preview: Ready | Draft r2 | Publish: Active"),
             shellName + " should surface the ready-but-unpublished edited draft state after preview preparation. Text: "
                 + getLabelText(root, "authoringSummaryPlaybackLabel"));
-    require(waitForButtonEnabled(root, "authoringPlaybackBannerPublishButton"),
-            shellName + " should re-enable publish-draft banner actions once the edited draft preview is ready.");
-    requireButton(root, "authoringPlaybackBannerPublishButton").onClick();
+    require(waitForButtonEnabled(root, "authoringPublishDraftButton"),
+            shellName + " should re-enable the summary-strip publish action once the edited draft preview is ready.");
+    requireButton(root, "authoringPublishDraftButton").onClick();
     require(waitForWorkerToSettle(processor.getEngineFacade(), std::chrono::milliseconds(1500)),
             shellName + " should let edited migrated publish settle through the prepared-playback worker.");
     processor.serviceMessageThreadWork();
     refreshAuthoringWorkspace(root);
     require(waitForLabelContains(root,
                                  "authoringSummaryPlaybackLabel",
-                                 "Draft playback: draft r2 | preview r2 (Ready) | published r2 (Active)"),
+                                 "Preview: Ready | Draft r2 | Publish: Active"),
             shellName + " should surface the republished edited-draft state in the authoring summary strip. Text: "
                 + getLabelText(root, "authoringSummaryPlaybackLabel"));
 }
@@ -347,7 +345,8 @@ int main()
         juce::ScopedJuceInitialiser_GUI gui;
 
         {
-            drs::plugin::Processor pluginProcessor;
+            auto pluginProcessorOwner = std::make_unique<drs::plugin::Processor>();
+            auto& pluginProcessor = *pluginProcessorOwner;
             pluginProcessor.prepareToPlay(44100.0, 512);
             drs::plugin::Editor pluginEditor(pluginProcessor);
             DesktopHostedComponent pluginHost(pluginEditor);
@@ -355,7 +354,8 @@ int main()
         }
 
         {
-            drs::standalone::MainComponent standalone(false);
+            auto standaloneOwner = std::make_unique<drs::standalone::MainComponent>(false);
+            auto& standalone = *standaloneOwner;
             standalone.getProcessor().prepareToPlay(44100.0, 512);
             DesktopHostedComponent standaloneHost(standalone);
             exerciseHostedAuthoringPlaybackIntegration(standalone, standalone.getProcessor(), "Standalone shell");

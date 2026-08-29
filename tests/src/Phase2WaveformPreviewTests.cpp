@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -64,7 +65,8 @@ bool hasVisibleWaveform(const drs::app::AuthoringWaveformPreview& preview)
 
 std::vector<float> renderSelectedZonePreview(const std::string& zoneId)
 {
-    drs::plugin::Processor processor;
+    auto processorOwner = std::make_unique<drs::plugin::Processor>();
+    auto& processor = *processorOwner;
     const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
     require(projectLoad.loaded, "Phase 2 reference project must load for waveform preview playback validation.");
     processor.replaceAuthoringProject(projectLoad.project);
@@ -378,7 +380,8 @@ int main()
     {
         juce::ScopedJuceInitialiser_GUI gui;
 
-        drs::plugin::Processor processor;
+        auto processorOwner = std::make_unique<drs::plugin::Processor>();
+        auto& processor = *processorOwner;
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "Phase 2 reference project must load for waveform preview validation.");
         drs::engine::resetSampleImportIoCounters();
@@ -419,7 +422,9 @@ int main()
                 waveformCondition.wait(lock, [&] { return releaseWaveformBuild; });
             };
 
-            drs::plugin::Processor pausedPreviewProcessor(previewOptions);
+            auto pausedPreviewProcessorOwner
+                = std::make_unique<drs::plugin::Processor>(previewOptions);
+            auto& pausedPreviewProcessor = *pausedPreviewProcessorOwner;
             require(pausedPreviewProcessor.replaceAuthoringProject(projectLoad.project),
                     "Paused preview processor must accept the Phase 2 reference project.");
             drs::engine::resetSampleImportIoCounters();
@@ -597,7 +602,8 @@ int main()
             const auto scratchSamplePath = scratch / "Samples" / "scratch-preview.wav";
             writeAudioFile(scratchSamplePath, buildPreviewFixtureBuffer(2, 4096, 0.25f));
 
-            drs::plugin::Processor scratchProcessor;
+            auto scratchProcessorOwner = std::make_unique<drs::plugin::Processor>();
+            auto& scratchProcessor = *scratchProcessorOwner;
             require(scratchProcessor.replaceAuthoringProject(makeScratchProject(scratch, scratchSamplePath)),
                     "Waveform preview scratch processor must accept the temporary project.");
 

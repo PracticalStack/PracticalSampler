@@ -179,8 +179,17 @@ int main(int argc, char** argv)
         require(hostStateInteractionMicros < 16667,
                 "Interaction while host-state serialization was active exceeded one 60 Hz frame: "
                     + std::to_string(hostStateInteractionMicros) + " us.");
-        require(processor.waitForHostStatePublication(30000),
-                "Salamander host-state serialization did not publish the newest checkpoint.");
+        const auto hostStatePublished = processor.waitForHostStatePublication(30000);
+        const auto hostStateWaitStatus = processor.getHostStatePublicationStatus();
+        require(hostStatePublished,
+                "Salamander host-state serialization did not publish the newest checkpoint. "
+                    "submitted=" + std::to_string(hostStateWaitStatus.latestSubmittedRequestId)
+                    + " completed=" + std::to_string(hostStateWaitStatus.latestCompletedRequestId)
+                    + " failures=" + std::to_string(hostStateWaitStatus.failedCount)
+                    + " durationUs=" + std::to_string(hostStateWaitStatus.lastDurationMicros)
+                    + " projectBytes=" + std::to_string(
+                        drs::engine::serializeRuntimeProjectManifest(
+                            session.getProject(), "ui-baseline.drsproj").size()));
         const auto hostStateStatus = processor.getHostStatePublicationStatus();
         juce::MemoryBlock salamanderHostState;
         processor.getStateInformation(salamanderHostState);
@@ -338,7 +347,6 @@ int main(int argc, char** argv)
                     processor.processBlock(playbackBlock, playbackMidi);
                     concurrentAudioBlockCount.store(blockIndex + 1,
                                                     std::memory_order_release);
-                    std::this_thread::sleep_for(std::chrono::microseconds(250));
                 }
             }
             catch (...)
@@ -350,7 +358,10 @@ int main(int argc, char** argv)
         auto nextGestureBlock = 0;
         auto notesHeld = false;
         std::uint64_t maximumConcurrentDispatchMicros = 0;
-        const auto concurrentDeadline = Clock::now() + std::chrono::seconds(240);
+        // This deadline detects a stuck render worker; callback and message-thread
+        // latency have their own explicit gates below. Do not add synthetic pacing
+        // to this accelerated three-minute audio-time qualification.
+        const auto concurrentDeadline = Clock::now() + std::chrono::seconds(270);
         while (concurrentAudioBlockCount.load(std::memory_order_acquire)
                    < continuousBlockCount
                && Clock::now() < concurrentDeadline)

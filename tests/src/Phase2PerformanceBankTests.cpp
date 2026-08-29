@@ -142,7 +142,8 @@ int main()
         require(roundTripLoad.project.authoring.performanceBanks[0].triggerSlots[0].phraseAssetId == "writer-bank-imported",
                 "Saved Sprint 6 project must preserve trigger-slot phrase wiring.");
 
-        drs::plugin::Processor processor;
+        auto processorOwner = std::make_unique<drs::plugin::Processor>();
+        auto& processor = *processorOwner;
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         require(editor != nullptr, "Plugin editor creation failed during Sprint 6 validation.");
         auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
@@ -161,7 +162,8 @@ int main()
         require(findDescendantById(*editor, "authoringPhraseImportButton") != nullptr,
                 "Plugin authoring shell should expose the Sprint 6 phrase import action.");
 
-        drs::standalone::MainComponent standalone(false);
+        auto standaloneOwner = std::make_unique<drs::standalone::MainComponent>(false);
+        auto& standalone = *standaloneOwner;
         auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(standalone, "workspaceTabs"));
         require(standaloneTabs != nullptr, "Standalone shell should expose workspace tabs during Sprint 6 validation.");
         standaloneTabs->setCurrentTabIndex(1);

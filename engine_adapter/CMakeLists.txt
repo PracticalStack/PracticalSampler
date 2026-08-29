@@ -113,7 +113,6 @@ add_library(drs_engine_adapter STATIC
     src/PackageReader.cpp
     src/PackageReaderDispatch.cpp
     src/PackageV2.cpp
-    src/PackageV2StreamingExport.cpp
     src/SecureBuffer.cpp
     src/PackageWriter.cpp
     src/PublishedMacroBinding.cpp
@@ -217,7 +216,43 @@ target_link_libraries(drs_engine_adapter
         drs_libsodium
 )
 
-target_compile_definitions(drs_engine_adapter PRIVATE SODIUM_STATIC=1)
+target_compile_definitions(drs_engine_adapter PRIVATE
+    SODIUM_STATIC=1
+    DRS_PRODUCTION_PACKAGE_READERS_ONLY=1
+)
+
+get_target_property(DRS_ENGINE_ADAPTER_PRODUCT_SOURCES drs_engine_adapter SOURCES)
+foreach(DRS_LEGACY_WRITER_ONLY_SOURCE src/PackageV2StreamingExport.cpp)
+    list(FIND DRS_ENGINE_ADAPTER_PRODUCT_SOURCES
+        "${DRS_LEGACY_WRITER_ONLY_SOURCE}" DRS_LEGACY_WRITER_SOURCE_INDEX)
+    if(NOT DRS_LEGACY_WRITER_SOURCE_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Legacy package writer-only source is linked into drs_engine_adapter: ${DRS_LEGACY_WRITER_ONLY_SOURCE}")
+    endif()
+endforeach()
+
+# V1/V2 writers remain available solely to deterministic compatibility-fixture
+# tests. Production consumers link drs_engine_adapter, whose legacy writer entry
+# points are compiled out.
+add_library(drs_legacy_package_writers STATIC
+    src/PackageV2.cpp
+    src/PackageV2StreamingExport.cpp
+    src/PackageWriter.cpp
+)
+
+target_include_directories(drs_legacy_package_writers
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${DRS_ENGINE_ADAPTER_GENERATED_DIR}
+        ${CMAKE_SOURCE_DIR}/third_party/nlohmann
+)
+
+target_compile_features(drs_legacy_package_writers PUBLIC cxx_std_17)
+target_compile_definitions(drs_legacy_package_writers PRIVATE
+    DRS_ENABLE_LEGACY_PACKAGE_WRITERS=1
+    DRS_LEGACY_PACKAGE_WRITERS_ONLY=1
+)
+target_link_libraries(drs_legacy_package_writers PUBLIC drs_engine_adapter)
 
 target_link_libraries(drs_sampler_core
     PUBLIC

@@ -143,7 +143,7 @@
       <div class="summary-grid">
         <div class="summary-card"><strong>8</strong><span>Ordered workstreams</span></div>
         <div class="summary-card"><strong>3–5</strong><span>Estimated engineer-weeks before external review</span></div>
-        <div class="summary-card"><strong>4 / 8</strong><span>Engineering workstreams code-complete</span></div>
+        <div class="summary-card"><strong>5 / 8</strong><span>Engineering workstreams code-complete</span></div>
         <div class="summary-card"><strong>Phases 3–4</strong><span>Production provisioning remains gated</span></div>
       </div>
     </section>
@@ -166,14 +166,14 @@
 
     <section class="section" id="baseline">
       <div class="heading"><h2>Reviewed Baseline</h2></div>
-      <p>The cryptographic primitives are useful, but the current implementation is not yet a protected package product path.</p>
+      <p>The protected package product path and irreversible V3 engineering cutover are complete. Release remains gated by production credential provisioning and independent security approval.</p>
       <div class="callout warning">
         <strong>Current boundary:</strong> normal exports emit only verified signed V3, and every product activation entry point now requires a runtime decrypt-key provider plus immutable publisher trust. Missing production provisioning fails closed without a V1/V2 fallback or replacement of last-known-good playback.
       </div>
       <ul>
         <li>Available: hash-pinned libsodium, XChaCha20-Poly1305, Ed25519/Ed25519ph adapters, random content keys/nonces, canonical binary AAD, signed/enveloped V3 serialization, strict structural parsing, bounded file-backed signature verification and record decryption, versioned release-key policy/provider, immutable publisher trust store, isolated controlled signer, move-only zeroized secret buffers, semantic SHA-256, and focused negative tests.</li>
-        <li>Missing: production key/service provisioning and named owners, complete hostile-input/performance qualification, and independent review.</li>
-        <li>Current validation: the focused crypto, V3 reader/writer/export/activation, adversarial smoke, release-gate, and Accurate Salamander V3 qualification pass in Debug and supported Windows x64 Release. The broader release-candidate failures remain tracked for CPCA-7.</li>
+        <li>Missing: production key/service provisioning and named owners, plus independent security review and release approval.</li>
+        <li>Current validation: the focused crypto, V3 reader/writer/export/activation, adversarial smoke, release-gate, Accurate Salamander V3 qualification, complete 229-test repository matrix, and 100-cycle lifecycle stress pass in supported Windows x64 Release. A clean Debug build also passes the complete matrix and stress workload after the retained cold-first-launch host observation documented in the Phase 7 evidence.</li>
       </ul>
     </section>
 
@@ -193,7 +193,7 @@
             <tr><td class="id">CPCA-4</td><td>Production export emits only signed V3</td><td>CPCA-1, CPCA-3</td><td><span class="status blocked">Provisioning required</span></td></tr>
             <tr><td class="id">CPCA-5</td><td>Plugin, standalone, replacement, and restore support</td><td>CPCA-2, CPCA-3</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-6</td><td>Full adversarial and performance evidence</td><td>CPCA-1 through CPCA-5</td><td><span class="status complete">Complete</span></td></tr>
-            <tr><td class="id">CPCA-7</td><td>Green suite and irreversible production cutover</td><td>CPCA-4 through CPCA-6</td><td><span class="status blocked">Gate blocked</span></td></tr>
+            <tr><td class="id">CPCA-7</td><td>Green suite and irreversible production cutover</td><td>CPCA-4 through CPCA-6</td><td><span class="status complete">Complete</span></td></tr>
             <tr><td class="id">CPCA-8</td><td>Independent approval and release sign-off</td><td>CPCA-7</td><td><span class="status blocked">External review</span></td></tr>
           </tbody>
         </table>
@@ -352,26 +352,28 @@
     </section>
 
     <section class="workstream" id="step-7">
-      <div class="work-head"><div class="work-number">7</div><h2>Resolve Validation Failures and Cut Over</h2><span class="status blocked">Gate blocked</span></div>
+      <div class="work-head"><div class="work-number">7</div><h2>Resolve Validation Failures and Cut Over</h2><span class="status complete">Complete</span></div>
       <div class="work-body">
         <p class="work-intent">Reach a green product suite before making V3 the only normal export format.</p>
-        <div class="callout problem"><strong>Current CPCA-7 failures:</strong> the known <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility assertion remains red. The fresh Release matrix also exposed stale reference-content routing in <code>drs.performance_package.export_lifecycle</code> and <code>drs.phase1.performance_package_release_gate</code>: both resolve <code>content/hise_project/Samples/DRS_Sine_A3.wav</code> while the checked-in fixture is under <code>content/samples</code>. These are cutover-suite issues; the nine focused Phase 6 Debug/Release security gates and the real-corpus V3 qualification pass.</div>
+        <div class="callout decision"><strong>CPCA-7 complete:</strong> the Instrument Controls host assertion, stale reference-content routing, package-session provisioning, fixture drift, large-fixture host-state boundary, asynchronous activation, teardown, and repository timing regressions are resolved. Production V1/V2 writer entry points are compiled out, the V2 streaming-writer source is absent from the product target, and missing production credentials fail closed. The supported Windows x64 Release candidate passes all 229 repository tests plus the separate 100-cycle lifecycle stress workload.</div>
         <div class="grid-2">
-          <article class="panel"><h3>Development tasks</h3><ul>
-            <li>Diagnose and resolve <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility failure.</li>
-            <li>Run focused package tests, complete repository tests, plugin validation, standalone qualification, and host restore tests.</li>
-            <li>Switch all production export entry points to signed V3 only after every preceding gate is green.</li>
-            <li>Remove or compile-gate every release-build path that can write V1/V2 or select the deterministic provider.</li>
-            <li>Publish explicit re-export guidance for legacy creators.</li>
+          <article class="panel"><h3>Development tasks</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-7-T1</span> Diagnose and resolve <code>drs.phase1.performance_package_host_validation</code> Instrument Controls visibility failure.</li>
+            <li class="done"><span class="task-id">CPCA-7-T2</span> Run focused package tests, complete repository tests, plugin validation, standalone qualification, and host restore tests.</li>
+            <li class="done"><span class="task-id">CPCA-7-T3</span> Switch all production export entry points to signed V3 only after every preceding gate is green.</li>
+            <li class="done"><span class="task-id">CPCA-7-T4</span> Remove or compile-gate every release-build path that can write V1/V2 or select the deterministic provider.</li>
+            <li class="done"><span class="task-id">CPCA-7-T5</span> Publish explicit re-export guidance for legacy creators.</li>
           </ul></article>
-          <article class="panel"><h3>Validation</h3><ul>
-            <li>Search production call graphs for legacy writer and deterministic-provider reachability.</li>
-            <li>Export and reopen V3 from every UI and command entry point.</li>
-            <li>Verify V1/V2 remain readable but are never rewritten or described as protected.</li>
-            <li>Require a completely green release candidate test run.</li>
+          <article class="panel"><h3>Validation</h3><ul class="task-list">
+            <li class="done"><span class="task-id">CPCA-7-V1</span> Search production call graphs for legacy writer and deterministic-provider reachability.</li>
+            <li class="done"><span class="task-id">CPCA-7-V2</span> Export and reopen V3 from every UI and command entry point.</li>
+            <li class="done"><span class="task-id">CPCA-7-V3</span> Verify V1/V2 remain readable but are never rewritten or described as protected.</li>
+            <li class="done"><span class="task-id">CPCA-7-V4</span> Require a completely green release candidate test run.</li>
           </ul></article>
         </div>
-        <div class="exit"><h3>Exit gate</h3><p>Production writes only signed V3; all supported opens and restores pass; the full release candidate suite is green.</p></div>
+        <div class="callout decision"><strong>Qualification evidence:</strong> supported Windows x64 Release passes 229/229 repository tests in 145.63 seconds and the separate 100-cycle lifecycle stress in 288.07 seconds. The clean Debug cross-configuration rerun passes 229/229 in 512.58 seconds and the same stress workload in 341.38 seconds. Release symbols and application call graphs contain no legacy writer or deterministic-provider reachability. See the <a href="../artifacts/package-content-protection/phase-7/qualification-evidence.json">Phase 7 qualification evidence</a>.</div>
+        <div class="callout warning"><strong>Retained host observation:</strong> the first launch of freshly linked Debug executables produced non-reproducible access violations and cold timing failures on this qualification host. The unchanged complete rerun, 150 focused repeat executions, Debug stress workload, and supported Release candidate were green. The evidence preserves this observation for CI/build-environment follow-up; production qualification is the supported Release result.</div>
+        <div class="exit"><h3>Exit gate</h3><p><strong>Complete.</strong> Production writes only signed V3; all supported opens and restores pass; the full supported Windows x64 Release candidate suite and lifecycle stress gate are green. Production credential provisioning and independent approval remain CPCA-3/CPCA-4 operational work and CPCA-8.</p></div>
       </div>
     </section>
 

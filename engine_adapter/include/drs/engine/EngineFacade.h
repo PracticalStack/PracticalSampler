@@ -564,6 +564,8 @@ private:
     std::shared_ptr<const std::string> packageLicenseText;
     RuntimeSessionStateSnapshot currentSessionState;
     EngineDiagnosticsSnapshot diagnosticsSnapshot;
+    std::string referenceDiagnosticsProbeKey;
+    std::optional<EngineDiagnosticsSnapshot> referenceDiagnosticsProbe;
     EnginePreviewPlaybackSnapshot previewPlaybackSnapshot;
     EngineContentFailureProbeResult lastContentFailureProbe;
     DraftPlaybackContract draftPlaybackContract;

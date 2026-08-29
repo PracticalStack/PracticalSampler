@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -37,7 +38,6 @@ void serviceRestore(drs::plugin::Processor& processor, const std::string& contex
         const auto restore = processor.getProjectRestoreSnapshot();
         if (restore != nullptr
             && (restore->state == drs::engine::ProjectRestoreState::active
-                || restore->state == drs::engine::ProjectRestoreState::ready
                 || restore->state == drs::engine::ProjectRestoreState::needsLocation
                 || restore->state == drs::engine::ProjectRestoreState::failed))
             return;
@@ -447,17 +447,23 @@ int main(int argc, char* argv[])
 
         ordered_json presetReloadSection;
         {
-            drs::standalone::MainComponent sourceComponent;
+            auto sourceComponent = std::make_unique<drs::standalone::MainComponent>(false);
             const auto presetJson = readTextFile(scene.referencePresetStatePath);
-            const auto restored = sourceComponent.restoreStateJson(presetJson);
-            serviceRestore(sourceComponent.getProcessor(), "Benchmark source preset restore");
-            const auto exportedStateJson = sourceComponent.exportStateJson();
+            const auto restored = sourceComponent->restoreStateJson(presetJson);
+            serviceRestore(sourceComponent->getProcessor(), "Benchmark source preset restore");
+            require(sourceComponent->getProcessor().waitForHostStatePublication(),
+                    "Benchmark source preset did not reach host-state publication.");
+            const auto exportedStateJson = sourceComponent->exportStateJson();
+            sourceComponent.reset();
 
-            drs::standalone::MainComponent reloadedComponent;
-            const auto reloaded = reloadedComponent.restoreStateJson(exportedStateJson);
-            serviceRestore(reloadedComponent.getProcessor(), "Benchmark reloaded preset restore");
-            const auto& reloadedSession = reloadedComponent.getEngineFacade().getCurrentSessionState();
+            auto reloadedComponent = std::make_unique<drs::standalone::MainComponent>(false);
+            const auto reloaded = reloadedComponent->restoreStateJson(exportedStateJson);
+            serviceRestore(reloadedComponent->getProcessor(), "Benchmark reloaded preset restore");
+            require(reloadedComponent->getProcessor().waitForHostStatePublication(),
+                    "Benchmark reloaded preset did not reach host-state publication.");
+            const auto reloadedSession = reloadedComponent->getEngineFacade().getCurrentSessionState();
             const bool sessionMatches = reloaded.restored && sessionMatchesExpected(reloadedSession, scene);
+            reloadedComponent.reset();
 
             presetReloadSection["restored"] = restored.restored;
             presetReloadSection["reloaded"] = reloaded.restored;

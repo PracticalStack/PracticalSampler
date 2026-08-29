@@ -442,7 +442,21 @@ int main(int argc, char** argv)
         require(initialControlsToggle->getButtonText() == "Hide Controls"
                     && packageMixer != nullptr && packageMixer->isVisible()
                     && packageMixer->getControlCount() >= 3,
-                "Loading a package with exposed controls should automatically show Instrument Controls.");
+                "Loading a package with exposed controls should automatically show Instrument Controls. "
+                    "button=" + initialControlsToggle->getButtonText().toStdString()
+                    + " mixer=" + (packageMixer != nullptr ? "present" : "missing")
+                    + " visible=" + (packageMixer != nullptr && packageMixer->isVisible()
+                                         ? "true" : "false")
+                    + " controls=" + std::to_string(packageMixer != nullptr
+                                                         ? packageMixer->getControlCount() : 0)
+                    + " snapshotLoaded="
+                    + (processor->getEngineFacade().getPerformanceSnapshot().loaded
+                           ? "true" : "false")
+                    + " userChoice="
+                    + (processor->getInstrumentControlsExpandedChoice().has_value()
+                           ? (*processor->getInstrumentControlsExpandedChoice()
+                                  ? "expanded" : "collapsed")
+                           : "unset"));
         const auto performanceControlDescriptors = processor->getEngineFacade().getMacroDescriptors();
         require(std::any_of(performanceControlDescriptors.begin(), performanceControlDescriptors.end(),
                             [](const auto& descriptor)

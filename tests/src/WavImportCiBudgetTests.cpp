@@ -58,6 +58,16 @@ struct StagePause
     }
 };
 
+struct StagePauseReleaseGuard
+{
+    StagePause& pause;
+
+    ~StagePauseReleaseGuard()
+    {
+        pause.release();
+    }
+};
+
 struct RequestFixture
 {
     fs::path root;
@@ -278,6 +288,7 @@ int main()
         };
 
         drs::app::WavImportService importService(std::move(importOptions));
+        StagePauseReleaseGuard importPauseRelease { importPause };
         auto importClient = importService.openClient();
         const auto importFixture = makeLargeBatchFixture("wav-ci-budget-import", CiBudgetThresholds::largeBatchItemCount);
         drs::engine::resetSampleImportIoCounters();
@@ -335,6 +346,7 @@ int main()
         };
 
         drs::app::WaveformPreviewService previewService(std::move(previewOptions));
+        StagePauseReleaseGuard previewPauseRelease { previewPause };
         drs::app::WaveformPreviewRequest previewRequest;
         previewRequest.projectId = "wav-ci-budget-preview";
         previewRequest.baseRevision = 11;

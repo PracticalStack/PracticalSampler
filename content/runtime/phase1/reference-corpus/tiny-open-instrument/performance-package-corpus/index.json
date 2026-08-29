@@ -12,8 +12,8 @@
     {
       "id": "valid",
       "path": "valid.drpkg",
-      "sizeBytes": 797145,
-      "checksumHex": "d0bd0b56b7911e9c",
+      "sizeBytes": 797653,
+      "checksumHex": "2031ebfc6cf3d186",
       "expectedState": "loaded",
       "expectedFailureCategory": "none",
       "expectedIssueSubstring": ""
@@ -21,8 +21,8 @@
     {
       "id": "truncated",
       "path": "truncated.drpkg",
-      "sizeBytes": 797113,
-      "checksumHex": "4473b0f0049f5e1a",
+      "sizeBytes": 797621,
+      "checksumHex": "5666c81067081eb0",
       "expectedState": "load-failed",
       "expectedFailureCategory": "payload-corruption",
       "expectedIssueSubstring": "exceeded file bounds"
@@ -30,8 +30,8 @@
     {
       "id": "tampered",
       "path": "tampered.drpkg",
-      "sizeBytes": 797145,
-      "checksumHex": "812bd4c854bf33da",
+      "sizeBytes": 797653,
+      "checksumHex": "c2c29a9ed533eec8",
       "expectedState": "read-failed",
       "expectedFailureCategory": "decryption-failure",
       "expectedIssueSubstring": "authentication failed"
@@ -39,8 +39,8 @@
     {
       "id": "wrong-version",
       "path": "wrong-version.drpkg",
-      "sizeBytes": 797145,
-      "checksumHex": "89403dfac3bc6ea7",
+      "sizeBytes": 797653,
+      "checksumHex": "514caf8190c18f97",
       "expectedState": "read-failed",
       "expectedFailureCategory": "package-format-failure",
       "expectedIssueSubstring": "requires reader schema version"
@@ -48,8 +48,8 @@
     {
       "id": "missing-payload",
       "path": "missing-payload.drpkg",
-      "sizeBytes": 793839,
-      "checksumHex": "a5cae4bf62c36945",
+      "sizeBytes": 794347,
+      "checksumHex": "251971a89b9871f2",
       "expectedState": "load-failed",
       "expectedFailureCategory": "payload-corruption",
       "expectedIssueSubstring": "runtimeStreamIndex payload"
@@ -57,8 +57,8 @@
     {
       "id": "checksum-mismatch",
       "path": "checksum-mismatch.drpkg",
-      "sizeBytes": 797145,
-      "checksumHex": "731efd44ac329f9b",
+      "sizeBytes": 797653,
+      "checksumHex": "9216ba690dc66ebf",
       "expectedState": "load-failed",
       "expectedFailureCategory": "payload-corruption",
       "expectedIssueSubstring": "payload checksum mismatch"

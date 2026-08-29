@@ -62,7 +62,7 @@ PerformancePackageDispatchResult dispatchPerformancePackageReader(
         result.migrationRequired = true;
         result.state = "Performance package v1 exceeds the resident compatibility ceiling";
         result.issues.push_back(
-            "This v1 package is larger than the 64 MiB resident compatibility ceiling; re-export it as package v2.");
+            "This v1 package is larger than the 64 MiB resident compatibility ceiling; re-export the original authoring project as package V3.");
         return result;
     }
     result.version1 = readPerformancePackage(packagePath, crypto,
@@ -307,6 +307,24 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     result.loaded = true;
     result.state = result.metadata.state;
     return result;
+}
+
+PerformancePackageLoadResult loadLegacyPerformancePackageV1(
+    const std::string& packagePath,
+    const int supportedReaderSchemaVersion)
+{
+    return loadPerformancePackage(packagePath,
+                                  getDeterministicPackageCryptoProvider(),
+                                  supportedReaderSchemaVersion);
+}
+
+PerformancePackageLoadResult loadLegacyPerformancePackageV1MetadataOnly(
+    const std::string& packagePath,
+    const int supportedReaderSchemaVersion)
+{
+    return loadPerformancePackageMetadataOnly(packagePath,
+                                              getDeterministicPackageCryptoProvider(),
+                                              supportedReaderSchemaVersion);
 }
 
 const char* toString(const PerformancePackageV3ActivationFailure failure) noexcept

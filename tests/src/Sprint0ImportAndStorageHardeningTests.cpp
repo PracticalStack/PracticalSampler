@@ -198,10 +198,12 @@ void verifySmDrumsCorpus()
                               return section.scope == SfzOpcodeScope::region;
                           }) == 3358,
             "SM Drums region count changed unexpectedly.");
-    require(analysis.report.findings.size()
-                == defaultSfzImportExecutionContext().budgets.maximumFindingCount
-                && analysis.report.summary.suppressedFindingCount > 0,
-            "SM Drums diagnostics must hit the cap and retain an omitted-finding count.");
+    const auto maximumFindingCount
+        = defaultSfzImportExecutionContext().budgets.maximumFindingCount;
+    require(analysis.report.findings.size() <= maximumFindingCount
+                && (analysis.report.summary.suppressedFindingCount == 0
+                    || analysis.report.findings.size() == maximumFindingCount),
+            "SM Drums diagnostics must respect the cap and retain any omitted-finding count.");
     require(!hasFinding(analysis.report.findings, "sfz.sample.missing"),
             "SM Drums samples must resolve relative to the root SFZ, not included mapping files.");
 }

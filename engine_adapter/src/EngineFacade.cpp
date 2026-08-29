@@ -2562,6 +2562,28 @@ std::vector<EngineMacroDescriptor> EngineFacade::getMacroDescriptors() const
     return descriptors;
 }
 
+void copyReferenceStreamingProbe(const EngineDiagnosticsSnapshot& source,
+                                 EngineDiagnosticsSnapshot& destination)
+{
+    destination.cacheHitCount = source.cacheHitCount;
+    destination.cacheMissCount = source.cacheMissCount;
+    destination.pageMissCount = source.pageMissCount;
+    destination.backgroundReadCount = source.backgroundReadCount;
+    destination.residentPageCount = source.residentPageCount;
+    destination.pendingPageCount = source.pendingPageCount;
+    destination.activeVoiceCount = source.activeVoiceCount;
+    destination.peakActiveVoiceCount = source.peakActiveVoiceCount;
+    destination.purgePassCount = source.purgePassCount;
+    destination.dormantPurgeCount = source.dormantPurgeCount;
+    destination.evictedPageCount = source.evictedPageCount;
+    destination.lastPurgeEvictedPageCount = source.lastPurgeEvictedPageCount;
+    destination.averageReadLatencyMicros = source.averageReadLatencyMicros;
+    destination.maxReadLatencyMicros = source.maxReadLatencyMicros;
+    destination.headFramesRead = source.headFramesRead;
+    destination.headBytesRead = source.headBytesRead;
+    destination.routedZones = source.routedZones;
+}
+
 std::vector<EngineInstrumentControlDescriptor> EngineFacade::getInstrumentControlDescriptors() const
 {
     std::vector<EngineInstrumentControlDescriptor> descriptors;
@@ -4533,7 +4555,16 @@ void EngineFacade::refreshDiagnosticsSnapshot()
         return;
     }
 
-    try
+    const auto referenceProbeKey = referenceManifest.manifestPath + "\n"
+        + currentSessionState.presetId + "\n"
+        + currentSessionState.loadProfileId + "\n"
+        + currentSessionState.selectedArticulationId;
+    if (referenceDiagnosticsProbe.has_value()
+        && referenceDiagnosticsProbeKey == referenceProbeKey)
+    {
+        copyReferenceStreamingProbe(*referenceDiagnosticsProbe, diagnosticsSnapshot);
+    }
+    else try
     {
         RuntimeStreamingService service(
             referenceStream.container,
@@ -4646,6 +4677,8 @@ void EngineFacade::refreshDiagnosticsSnapshot()
         diagnosticsSnapshot.maxReadLatencyMicros = metrics.maxReadLatencyMicros;
         diagnosticsSnapshot.headFramesRead = metrics.headFramesRead;
         diagnosticsSnapshot.headBytesRead = metrics.headBytesRead;
+        referenceDiagnosticsProbeKey = referenceProbeKey;
+        referenceDiagnosticsProbe = diagnosticsSnapshot;
     }
     catch (const std::exception& exception)
     {

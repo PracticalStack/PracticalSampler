@@ -257,7 +257,8 @@ int main()
                                    }),
                 "Project validation should reject macros whose defaultValue falls outside the declared range.");
 
-        drs::plugin::Processor processor;
+        auto processorOwner = std::make_unique<drs::plugin::Processor>();
+        auto& processor = *processorOwner;
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         require(editor != nullptr, "Plugin editor creation failed during Sprint 5 validation.");
         auto* pluginTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(*editor, "workspaceTabs"));
@@ -276,7 +277,8 @@ int main()
         require(findDescendantById(*editor, "authoringRoutingSelector") != nullptr,
                 "Plugin authoring shell should expose the Sprint 5 routing selector.");
 
-        drs::standalone::MainComponent standalone(false);
+        auto standaloneOwner = std::make_unique<drs::standalone::MainComponent>(false);
+        auto& standalone = *standaloneOwner;
         auto* standaloneTabs = dynamic_cast<juce::TabbedComponent*>(findDescendantById(standalone, "workspaceTabs"));
         require(standaloneTabs != nullptr,
                 "Standalone shell should expose the workspace tabs during Sprint 5 validation.");

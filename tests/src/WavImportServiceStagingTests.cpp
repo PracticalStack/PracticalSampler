@@ -2,9 +2,12 @@
 #include "../support/WavImportTestSupport.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -66,16 +69,35 @@ int main()
     try
     {
         const auto fixture = makeFixture();
+        std::atomic<bool> sawIntermediateProgress { false };
+        std::function<std::shared_ptr<const WavImportBatchSnapshot>()> readSnapshot;
         WavImportServiceOptions options;
         options.copyChunkBytes = 1;
+        options.checkpointObserver = [&](const WavImportBatchStage stage)
+        {
+            if (stage != WavImportBatchStage::staging || !readSnapshot)
+                return;
+            const auto snapshot = readSnapshot();
+            if (snapshot == nullptr)
+                return;
+            for (const auto& item : snapshot->items)
+            {
+                if (item.totalBytes > 0 && item.bytesProcessed > 0
+                    && item.bytesProcessed < item.totalBytes)
+                {
+                    sawIntermediateProgress.store(true, std::memory_order_release);
+                    return;
+                }
+            }
+        };
         WavImportService service(std::move(options));
         auto client = service.openClient();
+        readSnapshot = [&client] { return client.getSnapshot(); };
 
         const auto accepted = client.submit(fixture.request);
         require(accepted.disposition == WavImportSubmitDisposition::accepted,
                 "The staging request must be accepted.");
 
-        auto sawIntermediateProgress = false;
         const auto deadline = std::chrono::steady_clock::now() + 10s;
         while (std::chrono::steady_clock::now() < deadline)
         {
@@ -86,7 +108,7 @@ int main()
                 {
                     if (item.totalBytes > 0 && item.bytesProcessed > 0 && item.bytesProcessed < item.totalBytes)
                     {
-                        sawIntermediateProgress = true;
+                        sawIntermediateProgress.store(true, std::memory_order_release);
                         break;
                     }
                 }
@@ -110,7 +132,7 @@ int main()
                     && completed->completion->items.size() == 2,
                 "The staging request must publish a completed immutable payload. Current snapshot: "
                     + completedStatus);
-        require(sawIntermediateProgress,
+        require(sawIntermediateProgress.load(std::memory_order_acquire),
                 "Chunked staging copies must publish visible intermediate byte progress.");
 
         const auto occupiedFinalPath = fixture.contentRoot / "Samples" / fixture.sourceLargePath.filename();

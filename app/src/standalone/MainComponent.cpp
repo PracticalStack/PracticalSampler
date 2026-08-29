@@ -706,6 +706,7 @@ MainComponent::~MainComponent()
         sfzImportClient->waitForTerminal(std::chrono::seconds(10));
     }
     menuBar.setModel(nullptr);
+    setApplicationCommandManagerToWatch(nullptr);
     removeKeyListener(commandManager.getKeyMappings());
     commandManager.setFirstCommandTarget(nullptr);
     appProperties.saveIfNeeded();
@@ -1048,6 +1049,7 @@ void MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
 
 void MainComponent::initializeAudioOutput()
 {
+    audioOutputInitialized = true;
     audioDeviceManager.addChangeListener(this);
     audioProcessorPlayer.setProcessor(&processor);
     audioDeviceManager.addMidiInputDeviceCallback({}, &audioProcessorPlayer);
@@ -1079,6 +1081,9 @@ void MainComponent::synchronizeAudioOutputRegistration()
 
 void MainComponent::shutdownAudioOutput()
 {
+    if (!audioOutputInitialized)
+        return;
+
     saveAudioDeviceSettings();
 
     if (audioOutputEnabled)
@@ -1088,6 +1093,7 @@ void MainComponent::shutdownAudioOutput()
     audioDeviceManager.removeChangeListener(this);
     audioDeviceManager.closeAudioDevice();
     audioProcessorPlayer.setProcessor(nullptr);
+    audioOutputInitialized = false;
     audioOutputEnabled = false;
 }
 

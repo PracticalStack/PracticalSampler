@@ -171,6 +171,7 @@ private:
     mutable juce::ApplicationProperties appProperties;
     std::unique_ptr<juce::FileChooser> activeFileChooser;
     juce::File currentProjectFile;
+    bool audioOutputInitialized = false;
     bool audioOutputEnabled = false;
     juce::String audioDeviceError;
     std::optional<PendingPerformancePackageOpenTask> pendingPerformancePackageOpenTask;

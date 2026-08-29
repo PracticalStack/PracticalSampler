@@ -1,0 +1,78 @@
+{
+  "schema": "drs.package-content-protection.phase-7.v1",
+  "result": "pass",
+  "date": "2026-08-28",
+  "platform": "Windows x64",
+  "toolchain": "Visual Studio 2022 MSVC 19.44.35228",
+  "traceability": [
+    "CPCA-7-T1", "CPCA-7-T2", "CPCA-7-T3", "CPCA-7-T4", "CPCA-7-T5",
+    "CPCA-7-V1", "CPCA-7-V2", "CPCA-7-V3", "CPCA-7-V4"
+  ],
+  "production_cutover": {
+    "normal_export_format": 3,
+    "signed_v3_only": true,
+    "legacy_v1_v2_read_only": true,
+    "legacy_v1_v2_rewrite_enabled": false,
+    "legacy_writer_symbols_in_release_engine_library": false,
+    "legacy_writer_calls_in_application_sources": false,
+    "deterministic_crypto_provider_calls_in_application_sources": false,
+    "missing_production_credentials_fail_closed": true
+  },
+  "release_candidate": {
+    "build": "build/vs2022-release",
+    "repository_tests_excluding_lifecycle_stress": {
+      "passed": 229,
+      "failed": 0,
+      "elapsed_seconds": 145.63
+    },
+    "wav_import_lifecycle_stress": {
+      "cycles": 100,
+      "passed": 1,
+      "failed": 0,
+      "elapsed_seconds": 288.07
+    },
+    "standalone": {
+      "path": "build/vs2022-release/app/DecentRhapsodyStudioApp_artefacts/Release/Practical Sampler.exe",
+      "bytes": 10520576,
+      "built": true
+    },
+    "vst3": {
+      "path": "build/vs2022-release/app/drs_plugin_bundle_artefacts/Release/VST3/Practical Sampler.vst3/Contents/x86_64-win/Practical Sampler.vst3",
+      "bytes": 10217472,
+      "built": true
+    }
+  },
+  "debug_cross_configuration": {
+    "clean_build": "build/vs2022-debug-final",
+    "clean_build_result": "pass",
+    "test_stack_reserve_bytes": 134217728,
+    "repository_tests_excluding_lifecycle_stress": {
+      "passed": 229,
+      "failed": 0,
+      "elapsed_seconds": 512.58
+    },
+    "wav_import_lifecycle_stress": {
+      "cycles": 100,
+      "passed": 1,
+      "failed": 0,
+      "elapsed_seconds": 341.38
+    },
+    "focused_repeat_executions": 150,
+    "focused_repeat_failures": 0,
+    "cold_first_launch_observation": {
+      "observed": true,
+      "first_repository_inventory_passed": 201,
+      "first_repository_inventory_failed": 28,
+      "unchanged_complete_rerun_passed": 229,
+      "unchanged_complete_rerun_failed": 0,
+      "description": "Freshly linked Debug executables showed non-reproducible first-launch access violations and cold timing failures on this qualification host. Unchanged warm reruns, focused repeats, the full stress workload, and the supported Release candidate were green. This observation is retained for CI/build-environment follow-up and is not used as the production release result."
+    }
+  },
+  "operational_dependencies": {
+    "production_release_key_provider": "provisioning_required",
+    "production_publisher_signing_service": "provisioning_required",
+    "production_public_trust_entries": "provisioning_required",
+    "named_release_and_security_owners": "required",
+    "independent_security_review": "pending_cpca_8"
+  }
+}

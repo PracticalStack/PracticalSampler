@@ -29,6 +29,17 @@ namespace
 {
 namespace fs = std::filesystem;
 
+bool hasNetworkBackedSampleSource(const drs::engine::RuntimeProjectModel& project)
+{
+    return std::any_of(project.sampleSources.begin(), project.sampleSources.end(),
+                       [](const auto& source)
+                       {
+                           return source.path.size() >= 2
+                               && ((source.path[0] == '/' && source.path[1] == '/')
+                                   || (source.path[0] == '\\' && source.path[1] == '\\'));
+                       });
+}
+
 std::shared_ptr<const drs::engine::PerformancePackageV3ActivationSecurityContext>
 makeV3ActivationSecurityContext(
     const std::shared_ptr<const drs::app::PerformancePackageExportSecurityContext>& source)
@@ -274,7 +285,7 @@ drs::engine::RuntimeProjectModel buildSuppressedAuthoringProjectState()
         "Authoring is intentionally unavailable in this read-only session."
     };
     project.notes = {
-        "This workspace is backed by a sealed performance package.",
+        "This workspace is backed by a read-only playable package.",
         "Open a project to return to the authoring workflow."
     };
     return project;
@@ -322,10 +333,7 @@ PreparedPerformancePackageWorkspaceLoadResult preparePerformancePackageWorkspace
     }
     else if (dispatch.opened)
     {
-        packageLoad = drs::engine::loadPerformancePackage(
-            packagePath,
-            drs::engine::getDeterministicPackageCryptoProvider(),
-            drs::engine::performancePackageSchemaVersion);
+        packageLoad = drs::engine::loadLegacyPerformancePackageV1(packagePath);
     }
     else
     {
@@ -399,10 +407,8 @@ OpenedPerformancePackageWorkspaceLoadResult openPerformancePackageWorkspaceInter
     }
     else if (dispatch.opened)
     {
-        result.packageLoad = drs::engine::loadPerformancePackageMetadataOnly(
-            packagePath,
-            drs::engine::getDeterministicPackageCryptoProvider(),
-            drs::engine::performancePackageSchemaVersion);
+        result.packageLoad = drs::engine::loadLegacyPerformancePackageV1MetadataOnly(
+            packagePath);
     }
     else
     {
@@ -2506,11 +2512,13 @@ bool Processor::replaceAuthoringProject(drs::engine::RuntimeProjectModel project
     engineFacade.reopenDraftPlaybackProject(authoringSession.getDocumentState().revision, true);
     clearAuthoringWaveformPreviewCache();
     resetAuthoringPreviewPreparationAuthorization();
-    // Opening an authored project authorizes one bounded selected-zone preparation. The worker
-    // now receives the scoped snapshot, so this does not imply full-draft decode or message-thread I/O.
+    // Opening an authored project authorizes one bounded selected-zone preparation. Do not
+    // passively touch a network share: an unavailable UNC provider can block inside the OS and
+    // cannot be interrupted by worker cancellation during project close or plug-in teardown.
     authoringPreviewPreparationAuthorized
         = !authoringSession.getProject().sampleSources.empty()
-        && authoringSession.getSelectedZone().has_value();
+        && authoringSession.getSelectedZone().has_value()
+        && !hasNetworkBackedSampleSource(authoringSession.getProject());
     resetAuthoringWaveformPreviewAuthorization();
     if (replacingDifferentProject)
     {

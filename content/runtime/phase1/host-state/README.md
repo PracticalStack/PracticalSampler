@@ -22,7 +22,7 @@ preset.
 `dirty-project.hoststate.json` adds the conditional `projectSnapshot` field. Its snapshot includes
 all required project and authoring collections while intentionally containing no sample bytes.
 
-`over-budget.fixture.json` is a compact generator descriptor rather than an 8 MiB checked-in blob.
+`over-budget.fixture.json` is a compact generator descriptor rather than a 16 MiB checked-in blob.
 The contract test reads `baseFixture`, adds a top-level unknown `padding` string, and grows it until
 the complete serialized input is exactly `targetUtf8Bytes`. It asserts rejection occurs on the
 total byte budget before JSON field validation. This keeps repository size bounded while defining

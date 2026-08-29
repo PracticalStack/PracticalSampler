@@ -176,7 +176,8 @@ void runContractLifetimeMatrix(const drs::engine::RuntimeProjectModel& project,
 void runFacadeRetentionMatrix()
 {
     drs::engine::EngineFacade facade;
-    require(facade.getPreviewActivationPayload() != nullptr,
+    facade.resetSessionStateToDefault();
+    require(settleFacade(facade) && facade.getPreviewActivationPayload() != nullptr,
             "Facade completion must retain the preview payload after worker results drain.");
     require(facade.stageDraftRevision(1), "Facade EG2 matrix should stage revision 1.");
     require(facade.refreshPreviewToCurrentDraft() && settleFacade(facade),

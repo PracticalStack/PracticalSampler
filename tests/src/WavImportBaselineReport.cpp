@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -219,14 +220,15 @@ int main(int argc, char* argv[])
 
         const auto constructorMetrics = measureTimedCounters([&]
         {
-            drs::plugin::Processor processor;
+            auto processor = std::make_unique<drs::plugin::Processor>();
             juce::ignoreUnused(processor);
         });
 
         const auto projectLoad = drs::engine::loadPhase2ReferenceProjectManifest();
         require(projectLoad.loaded, "WAV baseline report requires the Phase 2 reference project.");
 
-        drs::plugin::Processor replaceProcessor;
+        auto replaceProcessorOwner = std::make_unique<drs::plugin::Processor>();
+        auto& replaceProcessor = *replaceProcessorOwner;
         const auto projectReplaceMetrics = measureTimedCounters([&]
         {
             replaceProcessor.replaceAuthoringProject(projectLoad.project);
@@ -234,7 +236,8 @@ int main(int argc, char* argv[])
         const auto projectReplaceSnapshot = replaceProcessor.getAuthoringImportResponsivenessSnapshot();
 
         const auto projectPath = drs::engine::getPhase2ReferenceProjectManifestPath();
-        drs::plugin::Processor restoreSource;
+        auto restoreSourceOwner = std::make_unique<drs::plugin::Processor>();
+        auto& restoreSource = *restoreSourceOwner;
         restoreSource.prepareToPlay(44100.0, 64);
         require(restoreSource.replaceAuthoringProject(projectLoad.project, juce::File(projectPath)),
                 "WAV baseline report source processor must bind the Phase 2 reference project.");
@@ -243,7 +246,8 @@ int main(int argc, char* argv[])
                 "WAV baseline report checkpoint did not reach background host-state publication.");
         restoreSource.getStateInformation(stateBlock);
 
-        drs::plugin::Processor restoreTarget;
+        auto restoreTargetOwner = std::make_unique<drs::plugin::Processor>();
+        auto& restoreTarget = *restoreTargetOwner;
         restoreTarget.prepareToPlay(44100.0, 64);
         drs::engine::resetSampleImportIoCounters();
         const auto restoreStart = std::chrono::steady_clock::now();

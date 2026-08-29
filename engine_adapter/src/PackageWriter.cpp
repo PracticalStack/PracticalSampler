@@ -17,6 +17,10 @@
 #include <type_traits>
 #include <unordered_map>
 
+#if defined(DRS_PRODUCTION_PACKAGE_READERS_ONLY) && defined(DRS_ENABLE_LEGACY_PACKAGE_WRITERS)
+#error Production package targets must not compile legacy V1 writer entry points.
+#endif
+
 namespace drs::engine
 {
 namespace
@@ -703,6 +707,7 @@ bool parseCleartextManifest(const ordered_json& metadataRoot,
 
 } // namespace
 
+#if !defined(DRS_LEGACY_PACKAGE_WRITERS_ONLY)
 const char* toString(const PerformancePackagePayloadKind kind) noexcept
 {
     switch (kind)
@@ -733,7 +738,9 @@ std::string serializePerformancePackageManifest(const PerformancePackageManifest
 {
     return serializePackageManifestJson(manifest);
 }
+#endif
 
+#if defined(DRS_ENABLE_LEGACY_PACKAGE_WRITERS)
 PerformancePackageWritePlan buildPerformancePackageWritePlan(const PerformancePackageCompileWritePlan& plan,
                                                              const PerformancePackageWriteOptions& options)
 {
@@ -1075,6 +1082,9 @@ PerformancePackageWriteResult writePerformancePackage(const PerformancePackageCo
     return writePerformancePackage(writePlan, cryptoProvider, options);
 }
 
+#endif
+
+#if !defined(DRS_LEGACY_PACKAGE_WRITERS_ONLY)
 std::size_t getPerformancePackageHeaderSizeBytes() noexcept
 {
     return sizeof(FileHeader);
@@ -1100,7 +1110,7 @@ PerformancePackageInspectionResult inspectPerformancePackage(const std::string& 
     {
         result.packageFound = true;
         addIssue(result,
-                 "This v1 package exceeds the 64 MiB resident compatibility ceiling; re-export it as package v2.");
+                 "This v1 package exceeds the 64 MiB resident compatibility ceiling; re-export the original authoring project as package V3.");
         result.state = "Performance package v1 requires re-export";
         return result;
     }
@@ -1361,4 +1371,5 @@ PerformancePackageInspectionResult inspectPerformancePackage(const std::string& 
     result.state = "Performance package validated";
     return result;
 }
+#endif
 } // namespace drs::engine

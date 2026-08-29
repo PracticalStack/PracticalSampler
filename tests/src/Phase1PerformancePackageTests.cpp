@@ -96,8 +96,9 @@ int main()
         require(inspection.valid, "Reference performance package should inspect successfully.");
         require(inspection.cleartextManifest.displayName == "DRS Tiny Open Instrument Package",
                 "Cleartext package display name changed unexpectedly.");
-        require(inspection.header.payloadCount == 5, "Reference performance package payload count changed unexpectedly.");
-        require(inspection.payloads.size() == 5, "Reference performance package should expose five decrypted payloads.");
+        require(inspection.header.payloadCount == 6, "Reference performance package payload count changed unexpectedly.");
+        require(inspection.payloads.size() == 6,
+                "Reference performance package should expose six decrypted payloads, including artwork and license text.");
         require(inspection.cryptoAlgorithm == cryptoProvider.algorithmId(),
                 "Reference performance package crypto algorithm changed unexpectedly.");
         require(inspection.minimumCompatibleAppVersion == "0.5.0-internal",

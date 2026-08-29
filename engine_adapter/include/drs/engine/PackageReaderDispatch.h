@@ -56,6 +56,17 @@ PerformancePackageV2MetadataLoadResult loadPerformancePackageV2Metadata(
     const PackageCryptoProvider& crypto = getDeterministicPackageCryptoProvider(),
     int supportedReaderSchemaVersion = performancePackageFxRoutingMinimumReaderSchemaVersion);
 
+// Read-only V1 compatibility entry points. The legacy deterministic provider
+// is intentionally selected inside the reader boundary and is never exposed
+// to production export code.
+PerformancePackageLoadResult loadLegacyPerformancePackageV1(
+    const std::string& packagePath,
+    int supportedReaderSchemaVersion = performancePackageSchemaVersion);
+
+PerformancePackageLoadResult loadLegacyPerformancePackageV1MetadataOnly(
+    const std::string& packagePath,
+    int supportedReaderSchemaVersion = performancePackageSchemaVersion);
+
 inline constexpr const char* performancePackageV3CompatibilityId
     = "practical-sampler.performance-package.v3";
 

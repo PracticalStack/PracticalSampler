@@ -4,6 +4,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -61,6 +62,27 @@ int main()
     // a failed activation; the post-soak snapshot asserts both contexts live.
     processor.serviceMessageThreadWork();
 
+    juce::AudioBuffer<float> primingBuffer(2, 64);
+    juce::MidiBuffer primingMidi;
+    auto primingBlockCount = 0;
+    auto initialPreviewActivated = false;
+    const auto primingDeadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < primingDeadline)
+    {
+        processor.serviceMessageThreadWork();
+        primingBuffer.clear();
+        processor.processBlock(primingBuffer, primingMidi);
+        ++primingBlockCount;
+        processor.serviceMessageThreadWork();
+        if (processor.getRealtimeSafetySnapshot().authoringPreviewActivationCount >= 1)
+        {
+            initialPreviewActivated = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
     constexpr int audioBlockCount = 5000;
     constexpr int messageIterationCount = 480;
     std::atomic<bool> start { false };
@@ -95,6 +117,7 @@ int main()
              iteration < messageIterationCount && !failed.load(std::memory_order_acquire);
              ++iteration)
         {
+            auto previewRefreshRequested = false;
             processor.getEngineFacade().setMacroValue(
                 "tone", static_cast<double>(iteration % 101) / 100.0);
             processor.getEngineFacade().setMacroValue(
@@ -120,6 +143,31 @@ int main()
                     : "pad-a3-high";
                 if (!processor.getAuthoringSession().selectZone(zoneId).applied)
                     failed.store(true, std::memory_order_release);
+                else
+                {
+                    auto zone = processor.getAuthoringSession().getSelectedZone();
+                    if (!zone.has_value())
+                        failed.store(true, std::memory_order_release);
+                    else
+                    {
+                        zone->pan = ((iteration / 40) & 1) == 0 ? -0.25 : 0.25;
+                        if (!processor.getAuthoringSession().updateSelectedZone(
+                                *zone, "Concurrency soak Preview edit").applied)
+                            failed.store(true, std::memory_order_release);
+                        else
+                        {
+                            drs::engine::AuthoringPreviewCommand audition;
+                            audition.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+                            audition.source = drs::engine::AuthoringPreviewAuditionSource::authoringKeyboard;
+                            audition.midiNote = zone->rootKey;
+                            audition.velocity = 0.68f;
+                            audition.selectedZoneId = zone->id;
+                            previewRefreshRequested = processor.submitAuthoringPreviewCommand(audition);
+                            if (!previewRefreshRequested)
+                                failed.store(true, std::memory_order_release);
+                        }
+                    }
+                }
             }
 
             processor.serviceMessageThreadWork();
@@ -157,11 +205,58 @@ int main()
     messageThread.join();
     uiThread.join();
 
-    processor.queuePerformanceSurfaceNoteOff(60);
-    processor.queueAuthoringPreviewNoteOff(60);
+    // The Release build can coalesce every in-flight draft change back to the
+    // initially selected zone before the preparation worker publishes an
+    // intermediate preview. Make the retirement portion of this test
+    // deterministic instead of depending on Debug/Release scheduling speed.
+    const auto postSoakPreviewSelected =
+        processor.getAuthoringSession().selectZone("pad-a3-low").applied;
+    auto postSoakZone = processor.getAuthoringSession().getSelectedZone();
+    auto postSoakPreviewEdited = false;
+    if (postSoakPreviewSelected && postSoakZone.has_value())
+    {
+        postSoakZone->pan = postSoakZone->pan >= 0.0 ? -0.375 : 0.375;
+        postSoakPreviewEdited = processor.getAuthoringSession().updateSelectedZone(
+            *postSoakZone, "Post-soak retirement edit").applied;
+    }
+    drs::engine::AuthoringPreviewCommand postSoakAudition;
+    postSoakAudition.type = drs::engine::AuthoringPreviewCommandType::auditionSelectedZone;
+    postSoakAudition.source = drs::engine::AuthoringPreviewAuditionSource::authoringKeyboard;
+    postSoakAudition.midiNote = postSoakZone.has_value() ? postSoakZone->rootKey : 60;
+    postSoakAudition.velocity = 0.68f;
+    postSoakAudition.selectedZoneId = postSoakZone.has_value() ? postSoakZone->id : std::string {};
+    const auto postSoakPreviewRequested = postSoakPreviewEdited
+        && processor.submitAuthoringPreviewCommand(postSoakAudition);
+    processor.serviceMessageThreadWork();
     juce::AudioBuffer<float> retirementBuffer(2, 1024);
     juce::MidiBuffer emptyMidi;
-    for (int block = 0; block < 32; ++block)
+    auto postSoakBlockCount = 0;
+    auto postSoakPreviewActivated = false;
+    const auto activationDeadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < activationDeadline)
+    {
+        processor.serviceMessageThreadWork();
+        retirementBuffer.clear();
+        processor.processBlock(retirementBuffer, emptyMidi);
+        ++postSoakBlockCount;
+        processor.serviceMessageThreadWork();
+        if (processor.getRealtimeSafetySnapshot().authoringPreviewActivationCount > 1)
+        {
+            postSoakPreviewActivated = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    processor.queuePerformanceSurfaceNoteOff(60);
+    drs::engine::AuthoringPreviewCommand stopPreview;
+    stopPreview.type = drs::engine::AuthoringPreviewCommandType::stopAll;
+    stopPreview.source = drs::engine::AuthoringPreviewAuditionSource::authoringKeyboard;
+    const auto postSoakPreviewStopped = processor.submitAuthoringPreviewCommand(stopPreview);
+    processor.serviceMessageThreadWork();
+    constexpr int retirementBlockCount = 64;
+    for (int block = 0; block < retirementBlockCount; ++block)
     {
         retirementBuffer.clear();
         processor.processBlock(retirementBuffer, emptyMidi);
@@ -170,8 +265,15 @@ int main()
 
     const auto snapshot = processor.getRealtimeSafetySnapshot();
     const auto passed = !failed.load(std::memory_order_acquire)
+        && initialPreviewActivated
+        && postSoakPreviewSelected
+        && postSoakPreviewEdited
+        && postSoakPreviewRequested
+        && postSoakPreviewActivated
+        && postSoakPreviewStopped
         && uiPollCount.load(std::memory_order_acquire) > 0
-        && snapshot.processBlockCount == audioBlockCount + 32
+        && snapshot.processBlockCount
+            == primingBlockCount + audioBlockCount + postSoakBlockCount + retirementBlockCount
         // Draft macro edits exercise Preview only. Performance must remain on the
         // controller-authorized last-known-good activation until a newer Publish.
         && snapshot.performanceActivationCount == 1
@@ -188,6 +290,8 @@ int main()
 
     if (!passed)
     {
+        const auto previewStatus = processor.getAuthoringPreviewStatusSnapshot();
+        const auto previewController = processor.getAuthoringPreviewControllerSnapshot();
         std::cerr << "Sprint 4 concurrency soak failed: polls="
                   << uiPollCount.load(std::memory_order_acquire)
                   << ", blocks=" << snapshot.processBlockCount
@@ -202,6 +306,15 @@ int main()
                   << ", performance dropped notes=" << snapshot.performanceDroppedNoteCount
                   << ", preview dropped notes=" << snapshot.authoringPreviewDroppedNoteCount
                   << ", violations=" << snapshot.getAudioThreadViolationCount()
+                  << ", preview state=" << previewStatus.stateLabel
+                  << ", preview failure=" << previewStatus.failureState
+                  << ", draft revision=" << previewStatus.draftRevision
+                  << ", requested revision=" << previewStatus.requestedRevision
+                  << ", active revision=" << previewStatus.activeRevision
+                  << ", controller requested=" << previewController.requestedCount
+                  << ", controller launched=" << previewController.launchedCount
+                  << ", controller accepted=" << previewController.acceptedCount
+                  << ", controller activations=" << previewController.activationCount
                   << std::endl;
         return 1;
     }

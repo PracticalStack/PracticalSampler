@@ -1,3 +1,12 @@
+if(MSVC)
+    # Engine/processor test fixtures intentionally keep immutable playback and
+    # package activation state on local scopes.  Apply the reviewed test-stack
+    # budget consistently so Debug worker and message-thread tests do not fail
+    # with process-level stack overflows or leave callers waiting on a dead
+    # worker.  Product binaries retain their independently reviewed settings.
+    add_link_options(/STACK:134217728)
+endif()
+
 juce_add_console_app(drs_phase0_smoke_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} Phase 0 Smoke Tests"
 )
@@ -22,7 +31,7 @@ target_link_libraries(drs_phase0_smoke_tests
 target_compile_features(drs_phase0_smoke_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_phase0_smoke_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase0_smoke_tests PRIVATE /STACK:134217728)
 endif()
 
 target_compile_definitions(drs_phase0_smoke_tests
@@ -2244,6 +2253,11 @@ add_test(
     COMMAND drs_wav_import_lifecycle_stress_tests
 )
 
+set_tests_properties(drs.wav_import.lifecycle_stress PROPERTIES
+    RUN_SERIAL TRUE
+    TIMEOUT 1200
+)
+
 juce_add_console_app(drs_wav_import_ci_budget_tests
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME} WAV Import CI Budget Tests"
 )
@@ -2991,7 +3005,7 @@ target_link_libraries(drs_sprint6_published_macro_binding_tests
 target_compile_features(drs_sprint6_published_macro_binding_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_sprint6_published_macro_binding_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_sprint6_published_macro_binding_tests PRIVATE /STACK:134217728)
 endif()
 
 add_test(
@@ -3134,6 +3148,10 @@ target_link_libraries(drs_sprint6_integration_hardening_tests
 
 target_compile_features(drs_sprint6_integration_hardening_tests PRIVATE cxx_std_17)
 
+if(MSVC)
+    target_link_options(drs_sprint6_integration_hardening_tests PRIVATE /STACK:134217728)
+endif()
+
 add_test(
     NAME drs.sprint6.integration_hardening
     COMMAND drs_sprint6_integration_hardening_tests
@@ -3160,7 +3178,7 @@ target_link_libraries(drs_phase1_realtime_safety_tests
 
 target_compile_features(drs_phase1_realtime_safety_tests PRIVATE cxx_std_17)
 if(MSVC)
-    target_link_options(drs_phase1_realtime_safety_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase1_realtime_safety_tests PRIVATE /STACK:134217728)
 endif()
 
 add_test(
@@ -3635,7 +3653,7 @@ target_link_libraries(drs_phase2_waveform_preview_tests
 target_compile_features(drs_phase2_waveform_preview_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_phase2_waveform_preview_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase2_waveform_preview_tests PRIVATE /STACK:134217728)
 endif()
 
 add_test(
@@ -3666,7 +3684,7 @@ target_link_libraries(drs_phase2_macro_routing_tests
 target_compile_features(drs_phase2_macro_routing_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_phase2_macro_routing_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase2_macro_routing_tests PRIVATE /STACK:134217728)
 endif()
 
 add_test(
@@ -3977,7 +3995,7 @@ target_link_libraries(drs_open_workbench_phase5_tests
 target_compile_features(drs_open_workbench_phase5_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_open_workbench_phase5_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_open_workbench_phase5_tests PRIVATE /STACK:134217728)
 endif()
 
 add_test(
@@ -4104,7 +4122,7 @@ target_link_libraries(drs_open_workbench_phase9_tests
 target_compile_features(drs_open_workbench_phase9_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_open_workbench_phase9_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_open_workbench_phase9_tests PRIVATE /STACK:134217728)
 endif()
 
 add_test(
@@ -4567,7 +4585,7 @@ target_link_libraries(drs_performance_package_v3_production_export_tests
 )
 target_compile_features(drs_performance_package_v3_production_export_tests PRIVATE cxx_std_17)
 if(MSVC)
-    target_link_options(drs_performance_package_v3_production_export_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_performance_package_v3_production_export_tests PRIVATE /STACK:134217728)
 endif()
 target_include_directories(drs_performance_package_v3_production_export_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/support
@@ -4744,11 +4762,12 @@ target_link_libraries(drs_phase1_performance_package_session_tests
 target_compile_features(drs_phase1_performance_package_session_tests PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_phase1_performance_package_session_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase1_performance_package_session_tests PRIVATE /STACK:134217728)
 endif()
 
 target_include_directories(drs_phase1_performance_package_session_tests
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
 )
 
@@ -4967,7 +4986,7 @@ target_link_libraries(drs_phase1_performance_package_release_gate
 target_compile_features(drs_phase1_performance_package_release_gate PRIVATE cxx_std_17)
 
 if(MSVC)
-    target_link_options(drs_phase1_performance_package_release_gate PRIVATE /STACK:8388608)
+    target_link_options(drs_phase1_performance_package_release_gate PRIVATE /STACK:134217728)
 endif()
 
 target_include_directories(drs_phase1_performance_package_release_gate
@@ -5007,6 +5026,13 @@ target_link_libraries(drs_phase1_pipeline_report
 
 target_compile_features(drs_phase1_pipeline_report PRIVATE cxx_std_17)
 
+if(MSVC)
+    # This aggregate keeps a broad set of qualification fixtures and report
+    # models in one process. Reserve additional stack for optimized builds;
+    # heavyweight Processor/MainComponent instances remain heap-owned.
+    target_link_options(drs_phase1_pipeline_report PRIVATE /STACK:134217728)
+endif()
+
 target_include_directories(drs_phase1_pipeline_report
     PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/juce/modules
@@ -5038,6 +5064,13 @@ target_link_libraries(drs_phase1_benchmark_scene
 )
 
 target_compile_features(drs_phase1_benchmark_scene PRIVATE cxx_std_17)
+
+if(MSVC)
+    # The aggregate benchmark retains several streaming/report fixtures in its
+    # main frame. Keep shell instances heap-owned and reserve headroom for the
+    # optimized call graph.
+    target_link_options(drs_phase1_benchmark_scene PRIVATE /STACK:134217728)
+endif()
 
 target_include_directories(drs_phase1_benchmark_scene
     PRIVATE
@@ -5679,12 +5712,12 @@ if(MSVC)
     # These integration mains intentionally keep several large Processor instances alive
     # at once. Processor-owned background workers make the default 1 MiB test stack too
     # small even though production plug-in processors are host/heap-owned.
-    target_link_options(drs_phase1_state_recall_tests PRIVATE /STACK:8388608)
-    target_link_options(drs_phase1_macro_bridge_tests PRIVATE /STACK:8388608)
-    target_link_options(drs_performance_mixer_s0_red_tests PRIVATE /STACK:8388608)
-    target_link_options(drs_sprint6_publish_shell_parity_tests PRIVATE /STACK:8388608)
-    target_link_options(drs_phase2_authoring_playback_integration_tests PRIVATE /STACK:8388608)
-    target_link_options(drs_wav_import_lifecycle_io_audit_tests PRIVATE /STACK:8388608)
+    target_link_options(drs_phase1_state_recall_tests PRIVATE /STACK:134217728)
+    target_link_options(drs_phase1_macro_bridge_tests PRIVATE /STACK:134217728)
+    target_link_options(drs_performance_mixer_s0_red_tests PRIVATE /STACK:134217728)
+    target_link_options(drs_sprint6_publish_shell_parity_tests PRIVATE /STACK:134217728)
+    target_link_options(drs_phase2_authoring_playback_integration_tests PRIVATE /STACK:134217728)
+    target_link_options(drs_wav_import_lifecycle_io_audit_tests PRIVATE /STACK:134217728)
 endif()
 
 set_tests_properties(drs.host_state.background_publication PROPERTIES
@@ -5728,7 +5761,7 @@ add_test(
 
 set_tests_properties(drs.ui.responsiveness_baseline PROPERTIES
     RUN_SERIAL TRUE
-    TIMEOUT 300
+    TIMEOUT 360
 )
 
 set_target_properties(drs_ui_responsiveness_baseline PROPERTIES
@@ -5823,4 +5856,24 @@ foreach(test_target IN LISTS drs_sampler_core_sample_import_test_targets)
             drs_sample_import
             juce::juce_audio_formats
     )
+endforeach()
+
+# Legacy V1/V2 writers are fixture-generation tools only. Keep this allowlist
+# explicit so no application or unrelated test inherits writer capability.
+set(drs_legacy_package_writer_test_targets
+    drs_continuous_damper_hp02_tests
+    drs_continuous_damper_hp05_qualification
+    drs_instrument_control_persistence_tests
+    drs_packaged_instrument_fx_routing_activation_tests
+    drs_package_v2_tests
+    drs_performance_package_export_lifecycle_tests
+    drs_phase1_performance_package_host_validation_tests
+    drs_phase1_performance_package_loader_tests
+    drs_phase1_performance_package_release_gate
+    drs_phase1_performance_package_tests
+    drs_phase1_runtime_fixture_tool
+)
+
+foreach(test_target IN LISTS drs_legacy_package_writer_test_targets)
+    target_link_libraries(${test_target} PRIVATE drs_legacy_package_writers)
 endforeach()

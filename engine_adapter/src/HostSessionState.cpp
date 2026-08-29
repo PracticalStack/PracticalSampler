@@ -488,7 +488,7 @@ void parseAuthoringState(const json& object,
                 addFinding(result,
                            HostSessionStateFindingCode::projectSnapshotTooLarge,
                            "/authoringState/projectSnapshot",
-                           "Embedded project snapshot exceeds the 7.5 MiB version 1 limit.");
+                           "Embedded project snapshot exceeds the 15 MiB version 1 limit.");
                 return;
             }
 
@@ -625,7 +625,7 @@ HostSessionStateParseResult parseHostSessionState(const std::string& text,
         addFinding(result,
                    HostSessionStateFindingCode::payloadTooLarge,
                    "/",
-                   "Host-state payload exceeds the 8 MiB version 1 limit.");
+                   "Host-state payload exceeds the 16 MiB version 1 limit.");
         return result;
     }
 

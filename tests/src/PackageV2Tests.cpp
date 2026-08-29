@@ -178,7 +178,15 @@ void runRecordAddressabilityAndCorruptionMatrix()
     require(written.written && written.failure == drs::engine::PackageV2Failure::none,
             "Package v2 writer should emit independently sealed bounded records.");
 
-    const auto opened = drs::engine::openPackageV2(path.generic_string());
+    const auto sizeBeforeOpen = fs::file_size(path);
+    const auto timeBeforeOpen = fs::last_write_time(path);
+    const auto dispatched = drs::engine::dispatchPerformancePackageReader(path.generic_string());
+    require(dispatched.opened
+                && dispatched.format == drs::engine::PerformancePackageDiskFormat::version2
+                && fs::file_size(path) == sizeBeforeOpen
+                && fs::last_write_time(path) == timeBeforeOpen,
+            "Package v2 compatibility dispatch must remain read-only and never rewrite the input.");
+    const auto& opened = dispatched.version2;
     require(opened.opened && opened.records.size() == writePlan.records.size()
                 && opened.tocBytes < opened.packageBytes / 10
                 && std::all_of(opened.records.begin(), opened.records.end(), [](const auto& record)

@@ -63,7 +63,6 @@ std::shared_ptr<const drs::engine::ProjectRestoreSnapshot> waitForRestore(
         const auto snapshot = processor.getProjectRestoreSnapshot();
         if (snapshot != nullptr
             && (snapshot->state == drs::engine::ProjectRestoreState::active
-                || snapshot->state == drs::engine::ProjectRestoreState::ready
                 || snapshot->state == drs::engine::ProjectRestoreState::failed
                 || snapshot->state == drs::engine::ProjectRestoreState::needsLocation))
         {
@@ -73,6 +72,38 @@ std::shared_ptr<const drs::engine::ProjectRestoreSnapshot> waitForRestore(
     }
 
     throw std::runtime_error(context + " timed out while waiting for restore.");
+}
+
+bool waitForPublishedPerformance(drs::plugin::Processor& processor,
+                                 const std::size_t revision,
+                                 const std::chrono::milliseconds timeout = 10s)
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        processor.serviceMessageThreadWork();
+        processBlock(processor);
+        processor.serviceMessageThreadWork();
+        const auto published = processor.getPerformancePublishControllerSnapshot();
+        if (published.activationState == drs::engine::PerformancePublishActivationState::active
+            && published.activeRequestIdentity.draftRevision == revision)
+        {
+            return true;
+        }
+        std::this_thread::sleep_for(2ms);
+    }
+    const auto published = processor.getPerformancePublishControllerSnapshot();
+    const auto playback = processor.getEngineFacade().getDraftPlaybackStatus();
+    std::cerr << "Publish checkpoint diagnostics: preparation="
+              << static_cast<int>(published.preparationState)
+              << ", activation=" << static_cast<int>(published.activationState)
+              << ", failed=" << published.hasFailedRequest
+              << ", failure=" << published.failureFinding.message
+              << ", playback=" << playback.performance.state;
+    if (!playback.performance.findings.empty())
+        std::cerr << ", finding=" << playback.performance.findings.front().message;
+    std::cerr << std::endl;
+    return false;
 }
 
 bool waitForWaveformPreviewReady(drs::plugin::Processor& processor,
@@ -474,6 +505,20 @@ int main()
                 processor.serviceMessageThreadWork();
             }
 
+            auto restorableProject = hookedProject;
+            for (auto& sampleSource : restorableProject.sampleSources)
+            {
+                const auto referenceSource = std::find_if(
+                    projectLoad.project.sampleSources.begin(),
+                    projectLoad.project.sampleSources.end(),
+                    [&](const auto& candidate) { return candidate.id == sampleSource.id; });
+                require(referenceSource != projectLoad.project.sampleSources.end(),
+                        "Restore stress source could not resolve its reference sample fixture.");
+                sampleSource.path = referenceSource->path;
+            }
+            require(processor.replaceAuthoringProject(restorableProject),
+                    "Restore stress source could not install its on-disk sample fixture.");
+
             auto editedZone = processor.getAuthoringSession().getSelectedZone();
             require(editedZone.has_value(), "Restore stress source lost the selected zone before state capture.");
             editedZone->gainDb += 0.25;
@@ -483,6 +528,12 @@ int main()
             require(processor.getAuthoringSession().getDocumentState().dirty,
                     "Restore stress source did not produce a dirty project before host-state capture.");
             processor.serviceMessageThreadWork();
+            const auto publishedRevision = processor.getAuthoringSession().getDocumentState().revision;
+            require(processor.submitPerformancePublishCommand(
+                        {}, drs::engine::PerformancePublishCommandSource::externalApi),
+                    "Restore stress source could not submit its published Performance checkpoint.");
+            require(waitForPublishedPerformance(processor, publishedRevision),
+                    "Restore stress source Performance checkpoint did not activate.");
             require(processor.waitForHostStatePublication(),
                     "Restore stress source checkpoint did not reach background host-state publication.");
             processor.getStateInformation(stateBlock);
@@ -518,10 +569,9 @@ int main()
             restored.serviceMessageThreadWork();
             processBlock(restored);
             restored.serviceMessageThreadWork();
-            require(restore->state == drs::engine::ProjectRestoreState::ready
-                        || restore->state == drs::engine::ProjectRestoreState::active,
+            require(restore->state == drs::engine::ProjectRestoreState::active,
                     "Restore stress cycle " + std::to_string(cycle)
-                        + " did not restore to a ready or active state.");
+                        + " did not restore to an active state.");
             require(restored.getAuthoringSession().getProject().projectId == restoredProject.projectId,
                     "Restore stress cycle " + std::to_string(cycle) + " restored the wrong project identity.");
         }

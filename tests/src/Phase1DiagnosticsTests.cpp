@@ -29,6 +29,10 @@ int main()
     try
     {
         drs::engine::EngineFacade engineFacade;
+        engineFacade.resetSessionStateToDefault();
+        require(engineFacade.waitForPreparedPlaybackIdle(),
+                "Default diagnostics fixture must finish bundled-session preparation.");
+        engineFacade.serviceBackgroundWork();
 
         const auto defaultDiagnostics = engineFacade.getDiagnosticsSnapshot();
         require(defaultDiagnostics.available, "Default diagnostics snapshot must be available.");
@@ -111,37 +115,35 @@ int main()
 
         const auto restoreLead = engineFacade.restorePresetStateJson(readTextFile(leadPresetPath));
         require(restoreLead.restored, "Lead fixture should restore before diagnostics are sampled.");
+        require(engineFacade.refreshPreviewToCurrentDraft()
+                    && engineFacade.waitForPreparedPlaybackIdle(),
+                "Lead diagnostics fixture must prepare Preview explicitly.");
+        engineFacade.serviceBackgroundWork();
 
         const auto leadDiagnostics = engineFacade.getDiagnosticsSnapshot();
         require(leadDiagnostics.available, "Lead diagnostics snapshot must remain available.");
         require(leadDiagnostics.loadProfileId == "performance",
                 "Lead diagnostics snapshot should follow the restored performance profile.");
-        require(leadDiagnostics.previewBuildId != 0 && leadDiagnostics.publishedBuildId != 0,
-                "Lead diagnostics snapshot should preserve snapshot build identities.");
-        require(!leadDiagnostics.previewContentDigest.empty() && !leadDiagnostics.publishedContentDigest.empty(),
-                "Lead diagnostics snapshot should preserve snapshot digests.");
-        require(leadDiagnostics.previewPreparedBuildId != 0 && leadDiagnostics.publishedPreparedBuildId != 0,
-                "Lead diagnostics snapshot should preserve prepared playback build identities.");
-        require(!leadDiagnostics.previewPreparedContentDigest.empty() && !leadDiagnostics.publishedPreparedContentDigest.empty(),
-                "Lead diagnostics snapshot should preserve prepared playback digests.");
-        require(leadDiagnostics.previewPreparedOwnershipRecordCount > 0
-                    && leadDiagnostics.publishedPreparedOwnershipRecordCount > 0,
-                "Lead diagnostics snapshot should preserve prepared ownership-record counts.");
-        require(leadDiagnostics.previewPreparedBuildMicros > 0 && leadDiagnostics.publishedPreparedBuildMicros > 0,
-                "Lead diagnostics snapshot should preserve prepared build durations.");
-        require(leadDiagnostics.previewPreparedSampleDataBytes > 0
-                    && leadDiagnostics.publishedPreparedSampleDataBytes > 0,
-                "Lead diagnostics snapshot should preserve prepared sample-data byte counts.");
+        require(leadDiagnostics.previewBuildId != 0,
+                "Lead diagnostics snapshot should preserve its Preview snapshot identity.");
+        require(!leadDiagnostics.previewContentDigest.empty(),
+                "Lead diagnostics snapshot should preserve its Preview snapshot digest.");
+        require(leadDiagnostics.previewPreparedBuildId != 0,
+                "Lead diagnostics snapshot should preserve its prepared Preview identity.");
+        require(!leadDiagnostics.previewPreparedContentDigest.empty(),
+                "Lead diagnostics snapshot should preserve its prepared Preview digest.");
+        require(leadDiagnostics.previewPreparedOwnershipRecordCount > 0,
+                "Lead diagnostics snapshot should preserve prepared Preview ownership records.");
+        require(leadDiagnostics.previewPreparedBuildMicros > 0,
+                "Lead diagnostics snapshot should preserve its prepared Preview duration.");
+        require(leadDiagnostics.previewPreparedSampleDataBytes > 0,
+                "Lead diagnostics snapshot should preserve prepared Preview sample-data bytes.");
         require(leadDiagnostics.previewPreparedBytes == leadDiagnostics.previewPreparedOwnershipBytes
-                    && leadDiagnostics.previewPreparedBytes == leadDiagnostics.previewPreparedSampleDataBytes
-                    && leadDiagnostics.publishedPreparedBytes == leadDiagnostics.publishedPreparedOwnershipBytes
-                    && leadDiagnostics.publishedPreparedBytes == leadDiagnostics.publishedPreparedSampleDataBytes,
-                "Lead diagnostics snapshot should keep prepared residency, ownership, and retained sample-data bytes aligned.");
+                    && leadDiagnostics.previewPreparedBytes == leadDiagnostics.previewPreparedSampleDataBytes,
+                "Lead diagnostics snapshot should keep Preview residency, ownership, and retained sample-data bytes aligned.");
         require(leadDiagnostics.previewPreparationCacheHitRate >= 0.0
-                    && leadDiagnostics.previewPreparationCacheHitRate <= 1.0
-                    && leadDiagnostics.publishedPreparationCacheHitRate >= 0.0
-                    && leadDiagnostics.publishedPreparationCacheHitRate <= 1.0,
-                "Lead diagnostics snapshot should preserve normalized prepared cache hit rates.");
+                    && leadDiagnostics.previewPreparationCacheHitRate <= 1.0,
+                "Lead diagnostics snapshot should preserve a normalized Preview cache hit rate.");
         require(leadDiagnostics.preparedCacheRetentionWorkingSetCount == 2,
                 "Lead diagnostics snapshot should preserve the two-working-set prepared cache policy.");
         require(leadDiagnostics.preparedCacheByteBudget

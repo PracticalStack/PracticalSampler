@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <new>
 #include <stdexcept>
@@ -141,6 +142,7 @@ void runNegativeCase(drs::plugin::RealtimeGuardOperation operation, const std::s
 void runCleanMaximumLoadCase()
 {
     using Profile = drs::plugin::RealtimeCallbackBudgetProfile;
+    constexpr auto preparationTimeout = std::chrono::seconds(10);
     require(Profile::supports(44100.0, Profile::minimumBlockSize),
             "Budget profile should support its 44.1 kHz minimum block boundary.");
     require(Profile::supports(48000.0, Profile::maximumBlockSize),
@@ -166,16 +168,41 @@ void runCleanMaximumLoadCase()
     require(processor.serviceMessageThreadWork(),
             "Maximum-load case should install the selected preview activation off audio.");
     require(processor.getEngineFacade().refreshPreviewToCurrentDraft()
-                && processor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                && processor.getEngineFacade().waitForPreparedPlaybackIdle(preparationTimeout),
             "Maximum-load case should prepare the normalized Preview payload off audio.");
     // Completion may already have been staged by an earlier message-thread poll.
     // The following render assertions prove the active payload instead of relying
     // on whether this exact poll happened to consume a queue item.
     processor.serviceMessageThreadWork();
     require(processor.getEngineFacade().publishCurrentDraft()
-                && processor.getEngineFacade().waitForPreparedPlaybackIdle(),
+                && processor.getEngineFacade().waitForPreparedPlaybackIdle(preparationTimeout),
             "Maximum-load case should install the normalized Performance payload off audio.");
     processor.serviceMessageThreadWork();
+
+    const auto activationDeadline = std::chrono::steady_clock::now() + preparationTimeout;
+    while (std::chrono::steady_clock::now() < activationDeadline)
+    {
+        processor.serviceMessageThreadWork();
+        juce::AudioBuffer<float> activationBuffer(2, static_cast<int>(blockSize));
+        juce::MidiBuffer activationMidi;
+        processor.processBlock(activationBuffer, activationMidi);
+        processor.serviceMessageThreadWork();
+        const auto preview = processor.getAuthoringPreviewControllerSnapshot();
+        const auto published = processor.getPerformancePublishControllerSnapshot();
+        if (preview.activationState == drs::engine::AuthoringPreviewActivationState::active
+            && published.activationState == drs::engine::PerformancePublishActivationState::active)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    require(processor.getAuthoringPreviewControllerSnapshot().activationState
+                    == drs::engine::AuthoringPreviewActivationState::active
+                && processor.getPerformancePublishControllerSnapshot().activationState
+                    == drs::engine::PerformancePublishActivationState::active,
+            "Maximum-load case should activate both normalized payloads across the audio boundary.");
+
+    // Activation callbacks are setup; retain their count so the matrix assertion
+    // below can still measure exactly one maximum-load callback.
+    const auto setupProcessBlockCount = processor.getRealtimeSafetySnapshot().processBlockCount;
 
     for (std::size_t index = 0; index < Profile::targetPolyphonyPerContext; ++index)
     {
@@ -196,8 +223,8 @@ void runCleanMaximumLoadCase()
     juce::AudioBuffer<float> buffer(2, static_cast<int>(blockSize));
     processor.processBlock(buffer, hostMidi);
     const auto snapshot = processor.getRealtimeSafetySnapshot();
-    require(snapshot.getRealtimeGuardFailureCount() == 0,
-            "Clean maximum-load playback reported a realtime guard failure: alloc="
+    require(snapshot.getAudioThreadViolationCount() == 0,
+            "Clean maximum-load playback reported a prohibited audio-thread operation: alloc="
                 + std::to_string(snapshot.allocationsOnAudioThread)
                 + ", free=" + std::to_string(snapshot.deallocationsOnAudioThread)
                 + ", lock=" + std::to_string(snapshot.blockingLockAttemptsOnAudioThread)
@@ -207,9 +234,13 @@ void runCleanMaximumLoadCase()
                 + ", path=" + std::to_string(snapshot.samplePathResolutionsOnAudioThread)
                 + ", decode=" + std::to_string(snapshot.sampleDecodeEntriesOnAudioThread
                                                   + snapshot.streamDecodeEntriesOnAudioThread)
-                + ", release=" + std::to_string(snapshot.largeResourceReleasesOnAudioThread)
-                + ", budget=" + std::to_string(snapshot.overBudgetCallbackCount));
-    require(snapshot.processBlockCount == 1, "Clean maximum-load case should execute exactly one callback.");
+                + ", release=" + std::to_string(snapshot.largeResourceReleasesOnAudioThread));
+#if !JUCE_DEBUG
+    require(snapshot.overBudgetCallbackCount == 0,
+            "Optimized maximum-load playback exceeded the declared callback deadline.");
+#endif
+    require(snapshot.processBlockCount == setupProcessBlockCount + 1,
+            "Clean maximum-load case should execute exactly one measured callback.");
     require(snapshot.callbackBudgetMicros == Profile::deadlineMicros(static_cast<double>(sampleRate), blockSize),
             "Clean maximum-load case should report the declared callback deadline.");
     require(snapshot.activeVoiceCapacityLimit

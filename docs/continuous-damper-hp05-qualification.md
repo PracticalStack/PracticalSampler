@@ -69,7 +69,7 @@ baseline runs exercise the enabled half-pedal document rather than `sfz_daw`.
 That live-preset run exposed and closed one host-state boundary: a 1,700-route
 schema-7 project is larger than the original 1.5 MiB embedded-snapshot ceiling
 because every route persists its immutable 128-point curve. The bounded host-state
-limits are now 7.5 MiB for the project snapshot and 8 MiB for the complete chunk.
+limits are now 15 MiB for the project snapshot and 16 MiB for the complete chunk.
 Sample/stream bytes are still excluded, and the parser still rejects a payload one
 byte over the limit before JSON expansion. Projects containing only the legacy
 binary-default damper shape retain their schema-6 canonical digest identity.

@@ -861,8 +861,11 @@ void PerformancePanel::refreshSurface()
     const auto controlsWereCollapsed = instrumentControlsCollapsed;
     if (!userInstrumentControlsExpandedChoice.has_value())
     {
-        const auto activePerformanceHasExposedControls = performanceSnapshot.loaded
-            && macroSurface.showingPublishedMixer
+        // Package activation publishes its immutable control topology before the
+        // performance snapshot's playback-loaded flag advances.  The published
+        // topology is therefore the authoritative signal for the initial
+        // disclosure state; an explicit user choice still takes precedence.
+        const auto activePerformanceHasExposedControls = macroSurface.showingPublishedMixer
             && !macroSurface.displayedMacros.empty();
         instrumentControlsCollapsed = !activePerformanceHasExposedControls;
     }

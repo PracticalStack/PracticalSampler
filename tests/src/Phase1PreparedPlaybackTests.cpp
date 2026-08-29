@@ -1117,8 +1117,8 @@ int main()
         require(!migratedPreparedRequest.accepted,
                 "Prepared playback request must reject migrated snapshots that still lack playable zones.");
         const auto migratedPreparedRejected = migratedPreparedService.prepare(migratedPreparedRequest,
-                                                                             migratedSnapshot,
-                                                                             referenceStream);
+                                                                               migratedSnapshot,
+                                                                               referenceStream);
         require(!migratedPreparedRejected.built,
                 "Prepared playback must stay rejected while the migrated project has no imported zones.");
         require(migratedPreparedRejected.snapshotBuildId == migratedSnapshot.buildId,
@@ -1198,8 +1198,10 @@ int main()
                 "Imported migrated prepared playback should expose exactly one playable zone.");
         require(importedPrepared.prepared.zones[0].zoneId == importedZone.id,
                 "Imported migrated prepared playback should preserve the imported zone identity.");
-
-        auto editedImportedZone = *migratedSession.getSelectedZone();
+        const auto selectedImportedZone = migratedSession.getSelectedZone();
+        require(selectedImportedZone.has_value(),
+                "Imported migrated authoring content should retain a selected zone for editing.");
+        auto editedImportedZone = *selectedImportedZone;
         editedImportedZone.gainDb = 2.5;
         editedImportedZone.pan = -0.2;
         const auto editedZoneResult = migratedSession.updateSelectedZone(editedImportedZone,
