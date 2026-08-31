@@ -5295,186 +5295,6 @@ add_test(
     COMMAND drs_phase1_runtime_fixture_tool --verify
 )
 
-add_custom_target(drs_all_tests)
-
-add_dependencies(drs_all_tests
-    DecentRhapsodyStudioPlugin
-    drs_instrument_control_phase0_characterization_tests
-    drs_instrument_control_contract_tests
-    drs_instrument_control_persistence_tests
-    drs_instrument_control_binding_tests
-    drs_instrument_control_runtime_tests
-    drs_instrument_control_qualification_tests
-    drs_instrument_control_ui_tests
-    drs_vst3_host_state_qualification_tests
-    drs_package_v2_tests
-    drs_package_secure_crypto_tests
-    drs_package_v3_tests
-    drs_package_v3_file_reader_tests
-    drs_package_v3_streaming_export_tests
-    drs_performance_package_v3_production_export_tests
-    drs_package_signing_keys_tests
-    drs_package_protection_release_gate_tests
-    drs_package_key_lifecycle_tests
-    drs_host_session_state_contract_tests
-    drs_host_project_recall_tests
-    drs_host_state_recovery_ui_tests
-    drs_host_state_restore_stress_tests
-    drs_curated_dsp_contract_tests
-    drs_performance_engine_s0_fixture_tests
-    drs_continuous_damper_hp01_contract_tests
-    drs_continuous_damper_hp02_tests
-    drs_continuous_damper_hp03_tests
-    drs_continuous_damper_hp04_tests
-    drs_continuous_damper_hp05_qualification
-    drs_performance_engine_s1_articulation_tests
-    drs_performance_engine_s2_rule_tests
-    drs_curated_dsp_control_law_tests
-    drs_control_law_tests
-    drs_control_law_project_schema_tests
-    drs_control_law_release_proof_tests
-    drs_curated_dsp_graph_plan_tests
-    drs_curated_dsp_gain_tests
-    drs_curated_dsp_reverb_tests
-    drs_curated_dsp_compact_eq_tests
-    drs_curated_dsp_chorus_tests
-    drs_curated_dsp_scoped_routing_tests
-    drs_curated_dsp_s0_baseline_report
-    drs_project_restore_coordinator_tests
-    drs_sprint4_entry_authored_input_tests
-    drs_sprint4_entry_activation_payload_tests
-    drs_sprint4_entry_diagnostics_concurrency_tests
-    drs_sprint4_concurrency_soak_tests
-    drs_sprint4_entry_realtime_guard_tests
-    drs_sprint4_entry_shell_parity_tests
-    drs_sprint4_render_model_tests
-    drs_sprint4_voice_kernel_tests
-    drs_sprint4_scheduler_tests
-    drs_sprint4_voice_lifecycle_tests
-    drs_sprint4_playback_context_tests
-    drs_sprint4_shell_cutover_tests
-    drs_sprint4_offline_renderer_tests
-    drs_sprint4_crossfade_mixing_tests
-    drs_sprint5_preview_contract_tests
-    drs_sprint5_preview_controller_tests
-    drs_sprint5_preview_controller_integration_tests
-    drs_sprint5_preview_coalescing_tests
-    drs_sprint5_preview_preparation_tests
-    drs_sprint5_preview_audition_tests
-    drs_sprint5_preview_recovery_tests
-    drs_sprint5_preview_shell_parity_tests
-    drs_sprint5_preview_contract_red_tests
-    drs_sprint5_integration_hardening_tests
-    drs_sprint31_sfz_contract_tests
-    drs_sprint31_sfz_fixture_characterization_tests
-    drs_sprint31_sfz_parser_tests
-    drs_sprint31_sfz_normalization_tests
-    drs_sprint31_sfz_compatibility_tests
-    drs_sprint31_sfz_report_model_tests
-    drs_sprint31_sfz_projection_tests
-    drs_sprint31_sfz_review_ui_tests
-    drs_sprint31_sfz_corpus_hardening_tests
-    drs_sfz_import_lifecycle_tests
-    drs_sfz_import_shell_lifecycle_tests
-    drs_wav_import_service_contract_tests
-    drs_wav_import_lifecycle_tests
-    drs_wav_import_staging_tests
-    drs_wav_import_analysis_tests
-    drs_sprint31_sfz_contract_red_tests
-    drs_phase3_crossfade_contract_tests
-    drs_phase3_crossfade_fixture_characterization_tests
-    drs_phase3_crossfade_persistence_tests
-    drs_phase3_crossfade_prepared_playback_tests
-    drs_phase1_zone_groups_contract_tests
-    drs_phase1_zone_groups_schema_persistence_tests
-    drs_layer_contract_phase0_tests
-    drs_layer_schema_persistence_tests
-    drs_layer_import_materialization_tests
-    drs_layer_runtime_tests
-    drs_layer_authoring_tests
-    drs_phase3_round_robin_contract_tests
-    drs_phase3_round_robin_fixture_characterization_tests
-    drs_phase3_round_robin_schema_persistence_tests
-    drs_phase3_round_robin_prepared_playback_tests
-    drs_phase3_round_robin_hardening_tests
-    drs_phase1_zone_groups_contract_red_tests
-    drs_phase3_round_robin_contract_red_tests
-    drs_sprint6_publish_contract_tests
-    drs_sprint6_publish_contract_seam_tests
-    drs_sprint6_publish_controller_tests
-    drs_sprint6_publish_controller_integration_tests
-    drs_sprint6_performance_preparation_tests
-    drs_sprint6_publish_scheduling_tests
-    drs_sprint6_performance_activation_recovery_tests
-    drs_sprint6_voice_generation_cutover_tests
-    drs_sprint6_published_macro_binding_tests
-    drs_performance_mixer_s0_red_tests
-    drs_sprint6_publish_shell_parity_tests
-    drs_sprint6_integration_hardening_tests
-    drs_phase0_smoke_tests
-    drs_native_content_contract_tests
-    drs_phase1_runtime_contract_tests
-    drs_phase1_draft_playback_contract_tests
-    drs_phase1_draft_playback_facade_tests
-    drs_phase1_playback_snapshot_tests
-    drs_phase1_prepared_playback_tests
-    drs_phase1_prepared_playback_worker_tests
-    drs_phase1_realtime_safety_tests
-    drs_phase1_preset_state_tests
-    drs_phase1_state_recall_tests
-    drs_phase2_authoring_foundation_tests
-    drs_phase2_authoring_import_tests
-    drs_wav_import_workflow_tests
-    drs_wav_import_progress_tests
-    drs_wav_import_processor_responsiveness_tests
-    drs_wav_import_lifecycle_io_audit_tests
-    drs_wav_import_ci_budget_tests
-    drs_wav_import_host_validation_tests
-    drs_wav_import_shell_characterization_tests
-    drs_phase2_mapping_workspace_tests
-    drs_sprint8_zone_group_hardening_tests
-    drs_phase2_waveform_preview_tests
-    drs_phase2_macro_routing_tests
-    drs_phase2_performance_bank_tests
-    drs_phase2_performance_ui_tests
-    drs_performance_mixer_ui_tests
-    drs_phase2_authoring_playback_integration_tests
-    drs_phase2_authoring_ui_tests
-    drs_phase2_repeated_structure_density_tests
-    drs_phase1_diagnostics_tests
-    drs_phase1_failure_handling_tests
-    drs_phase1_macro_bridge_tests
-    drs_phase1_runtime_baseline_report
-    drs_phase1_sample_import_tests
-    drs_wav_import_fixture_support_tests
-    drs_wav_import_baseline_report
-    drs_phase1_compile_path_tests
-    drs_phase1_pipeline_report
-    drs_phase1_benchmark_scene
-    drs_phase1_stream_reader_tests
-    drs_phase1_streaming_service_tests
-    drs_phase1_voice_runtime_tests
-    drs_phase1_note_routing_tests
-    drs_phase1_load_profile_tests
-    drs_phase1_runtime_counters_tests
-    drs_phase1_runtime_baseline_guard
-    drs_phase1_runtime_fixture_tool
-    drs_phase1_performance_package_tests
-    drs_packaged_instrument_fx_routing_contract_tests
-    drs_phase1_performance_package_loader_tests
-    drs_phase1_performance_package_session_tests
-    drs_performance_package_export_lifecycle_tests
-    drs_phase1_performance_package_host_validation_tests
-    drs_playable_instrument_license_contract_tests
-    drs_playable_instrument_license_project_import_tests
-    drs_playable_instrument_license_viewer_tests
-    drs_phase1_performance_package_release_gate
-)
-
-set_target_properties(drs_all_tests PROPERTIES
-    FOLDER "Tests"
-)
-
 set_target_properties(drs_phase0_smoke_tests PROPERTIES
     FOLDER "Tests"
 )
@@ -5877,3 +5697,37 @@ set(drs_legacy_package_writer_test_targets
 foreach(test_target IN LISTS drs_legacy_package_writer_test_targets)
     target_link_libraries(${test_target} PRIVATE drs_legacy_package_writers)
 endforeach()
+
+# Keep the aggregate self-maintaining: every executable declared by this tests
+# directory is a build dependency. Expected-red executables are built but remain
+# absent from CTest unless they are explicitly registered with add_test().
+function(drs_register_test_executables aggregate_target)
+    get_property(directory_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+    set(test_executables)
+
+    foreach(candidate_target IN LISTS directory_targets)
+        get_target_property(candidate_type ${candidate_target} TYPE)
+        if(candidate_type STREQUAL "EXECUTABLE")
+            list(APPEND test_executables ${candidate_target})
+        endif()
+    endforeach()
+
+    if(NOT test_executables)
+        message(FATAL_ERROR "No test executables were found for ${aggregate_target}")
+    endif()
+
+    list(REMOVE_DUPLICATES test_executables)
+    list(SORT test_executables)
+    add_dependencies(${aggregate_target} ${test_executables})
+
+    list(LENGTH test_executables test_executable_count)
+    message(STATUS
+        "${aggregate_target} automatically includes ${test_executable_count} test executables")
+endfunction()
+
+add_custom_target(drs_all_tests)
+drs_register_test_executables(drs_all_tests)
+
+# The plug-in bundle is a runtime fixture for host qualification tests.
+add_dependencies(drs_all_tests DecentRhapsodyStudioPlugin)
+set_target_properties(drs_all_tests PROPERTIES FOLDER "Tests")

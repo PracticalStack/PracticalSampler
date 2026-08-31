@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practical Sampler — Failed Test Review — 2026-08-29</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182230;
+      --muted: #5d6876;
+      --line: #d8dee7;
+      --panel: #f7f9fc;
+      --product: #9f2d20;
+      --product-bg: #fff0ec;
+      --test: #8a5a00;
+      --test-bg: #fff8df;
+      --remove: #57606d;
+      --remove-bg: #f1f3f5;
+      --ok: #176b45;
+      --ok-bg: #eaf8f0;
+      --accent: #255fb3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #eef2f7;
+      color: var(--ink);
+      font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1500px, calc(100% - 32px));
+      margin: 28px auto;
+      padding: 38px;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 12px 38px rgba(31, 42, 55, .08);
+    }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 40px); letter-spacing: -.025em; }
+    h2 { margin: 34px 0 12px; font-size: 23px; }
+    h3 { margin: 22px 0 8px; font-size: 17px; }
+    p { max-width: 105ch; }
+    .lede { margin: 0; color: var(--muted); font-size: 17px; }
+    .verdict {
+      margin: 26px 0;
+      padding: 20px 22px;
+      border-left: 5px solid var(--accent);
+      background: #eef5ff;
+      border-radius: 8px;
+    }
+    .verdict strong { display: block; margin-bottom: 5px; font-size: 18px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 22px 0;
+    }
+    .card { padding: 17px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+    .card .count { display: block; font-size: 32px; font-weight: 750; line-height: 1; margin-bottom: 8px; }
+    .card.product .count { color: var(--product); }
+    .card.test .count { color: var(--test); }
+    .card.remove .count { color: var(--remove); }
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+    .pill.product { color: var(--product); background: var(--product-bg); }
+    .pill.test { color: var(--test); background: var(--test-bg); }
+    .pill.remove { color: var(--remove); background: var(--remove-bg); }
+    .pill.pass { color: var(--ok); background: var(--ok-bg); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1120px; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { position: sticky; top: 0; background: #edf1f7; font-size: 12px; text-transform: uppercase; letter-spacing: .045em; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fafcff; }
+    td.num { width: 52px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    td.test-name { width: 290px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+    td.category { width: 190px; }
+    code { padding: 1px 5px; background: #f1f3f6; border-radius: 4px; font-size: .92em; }
+    ul, ol { max-width: 110ch; }
+    li + li { margin-top: 7px; }
+    .note { color: var(--muted); }
+    .evidence {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .evidence > section { padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+    .evidence h3 { margin-top: 0; }
+    footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+    @media (max-width: 850px) {
+      main { width: 100%; margin: 0; padding: 22px; border: 0; border-radius: 0; }
+      .cards, .evidence { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: white; }
+      main { width: 100%; margin: 0; padding: 0; border: 0; box-shadow: none; }
+      .table-wrap { overflow: visible; }
+      table { min-width: 0; font-size: 10px; }
+      th { position: static; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Failed Test Review</h1>
+    <p class="lede">Practical Sampler · Debug test suite · Review performed 29 August 2026</p>
+  </header>
+
+  <div class="verdict">
+    <strong>Verdict: keep all 22 tests.</strong>
+    Twenty failures primarily point to Practical Sampler defects, while two point primarily to test design. None is obsolete, redundant without value, or testing a retired contract. The original crash cluster needs dump-backed investigation even though most cases pass when isolated.
+  </div>
+
+  <div class="cards" aria-label="Classification summary">
+    <div class="card product">
+      <span class="count">20</span>
+      <span class="pill product">1 · Fix Practical Sampler</span>
+      <p>One stable silent-render defect plus nineteen product-facing access-violation/lifecycle failures.</p>
+    </div>
+    <div class="card test">
+      <span class="count">2</span>
+      <span class="pill test">2 · Fix the test</span>
+      <p>Two load-sensitive timing gates are not statistically robust enough for a shared Debug test run.</p>
+    </div>
+    <div class="card remove">
+      <span class="count">0</span>
+      <span class="pill remove">3 · Remove the test</span>
+      <p>No removal is recommended. Every test covers an active user, host, import, or publishing contract.</p>
+    </div>
+  </div>
+
+  <h2>Per-test findings</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>CTest name</th>
+          <th>Classification</th>
+          <th>Focused result</th>
+          <th>Finding and recommended action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">1</td>
+          <td class="test-name">drs.phase0.smoke</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td>Failed again at the same audible-output assertion.</td>
+          <td>The bootstrap Performance activation is installed, but note 57 renders silence through <code>Processor::processBlock</code>. This is a meaningful end-to-end product contract, not an over-specific test. Investigate the bootstrap render-model/sample-source lifetime after <code>resetSessionStateToDefault()</code>; do not lower the audio threshold.</td>
+        </tr>
+        <tr>
+          <td class="num">3</td>
+          <td class="test-name">drs.host_state.vst3_qualification</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Windows recorded <code>0xc0000005</code> inside <code>Practical Sampler.vst3</code>, which directly attributes this crash to the plug-in module. Preserve the host qualification coverage and capture a dump on the next parallel/full-suite failure.</td>
+        </tr>
+        <tr>
+          <td class="num">6</td>
+          <td class="test-name">drs.phase1.draft_playback_facade</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>The original failure was a real access violation. The test exercises an active facade contract and succeeds in isolation, pointing to order/load-sensitive lifetime behavior rather than a bad expectation. Include prepared-playback worker shutdown in the shared crash investigation.</td>
+        </tr>
+        <tr>
+          <td class="num">22</td>
+          <td class="test-name">drs.sprint4.shell_cutover</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>The shell cutover contract remains current. Its access violation belongs with the common shell/Processor teardown cluster; add shutdown instrumentation and retain the test as a regression gate.</td>
+        </tr>
+        <tr>
+          <td class="num">56</td>
+          <td class="test-name">drs.sprint5.preview_controller_integration</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>A valid controller-to-preview integration test encountered <code>0xc0000005</code>. Isolation removes the symptom, so inspect asynchronous preview callbacks and controller destruction rather than weakening assertions.</td>
+        </tr>
+        <tr>
+          <td class="num">60</td>
+          <td class="test-name">drs.sprint5.preview_recovery</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Recovery is specifically where cancellation and stale callbacks matter. The access violation is useful product evidence; verify that recovery invalidates queued preview work before owned state is released.</td>
+        </tr>
+        <tr>
+          <td class="num">61</td>
+          <td class="test-name">drs.sprint5.preview_shell_parity</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>The test guards standalone/plug-in parity and remains valuable. Treat the full-run crash as part of the shared shell lifetime defect and retain parity coverage.</td>
+        </tr>
+        <tr>
+          <td class="num">63</td>
+          <td class="test-name">drs.sprint5.integration_hardening</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>A hardening test crashing is a product signal, not grounds for deletion. Focus on common Preview/Processor shutdown and outstanding worker ownership.</td>
+        </tr>
+        <tr>
+          <td class="num">97</td>
+          <td class="test-name">drs.wav_import.processor_responsiveness</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>The original access violation occurred in a product-linked executable; the responsiveness assertions themselves did not fail. Audit import job cancellation and Processor destruction under suite load.</td>
+        </tr>
+        <tr>
+          <td class="num">98</td>
+          <td class="test-name">drs.wav_import.lifecycle_io_audit</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>This test exists to validate import lifecycle boundaries. A real access violation is directly relevant to that contract; keep it and use it to validate the eventual worker-drain/destruction fix.</td>
+        </tr>
+        <tr>
+          <td class="num">99</td>
+          <td class="test-name">drs.wav_import.lifecycle_stress</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td>1 cycle passed in 3.56 s; 10 cycles passed in 46.30 s. The default 100-cycle run was not completed during review.</td>
+          <td>The test's purpose is to expose lifecycle crashes, so the recorded access violation is primarily a product defect. Separately, make the ordinary lane use a smaller deterministic cycle count and reserve 100 cycles for a stress/qualification lane; its current default is roughly a 7–8 minute Debug workload.</td>
+        </tr>
+        <tr>
+          <td class="num">100</td>
+          <td class="test-name">drs.wav_import.ci_budgets</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>No budget assertion caused the listed failure; Windows recorded an access violation. Keep the budget gate and investigate the common import/Processor lifecycle path.</td>
+        </tr>
+        <tr>
+          <td class="num">101</td>
+          <td class="test-name">drs.wav_import.host_validation</td>
+          <td class="category"><span class="pill test">2 · Fix the test</span></td>
+          <td>One focused run failed at 2688 ms versus a fixed 1500 ms Debug construction cap; three immediate isolated reruns passed.</td>
+          <td>The reproducible signal is a load-sensitive wall-clock gate. Add warm-up, collect multiple samples, compare a percentile/median, and isolate it from competing heavyweight tests. Its original <code>0xc0000005</code> still belongs in the shared crash-dump investigation, but the primary actionable defect in this test is its timing method.</td>
+        </tr>
+        <tr>
+          <td class="num">147</td>
+          <td class="test-name">drs.sprint6.publish_shell_parity</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Publishing parity remains an active product requirement. The full-run access violation should be diagnosed with the shell/Processor teardown cluster.</td>
+        </tr>
+        <tr>
+          <td class="num">148</td>
+          <td class="test-name">drs.sprint6.integration_hardening</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td>Passed once serially; a subsequent repeated run hung for more than two minutes and was interrupted.</td>
+          <td>This supplies a second lifecycle symptom beyond the original access violation. Capture worker/thread state on hang, then ensure all publish/preview work has a bounded cancellation and join path during shutdown.</td>
+        </tr>
+        <tr>
+          <td class="num">156</td>
+          <td class="test-name">drs.host_state.project_recall</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Project recall is release-critical host behavior. Its original access violation warrants product ownership even though the state assertions pass in isolation.</td>
+        </tr>
+        <tr>
+          <td class="num">169</td>
+          <td class="test-name">drs.phase2.waveform_preview</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>The waveform preview behavior remains current and passed repeatedly. Investigate asynchronous waveform/preview teardown in the common crash cluster; do not remove the contract.</td>
+        </tr>
+        <tr>
+          <td class="num">170</td>
+          <td class="test-name">drs.phase2.macro_routing</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Macro routing is user-visible and the assertions pass in isolation. The access violation suggests common destruction/background-work behavior, not obsolete expectations.</td>
+        </tr>
+        <tr>
+          <td class="num">171</td>
+          <td class="test-name">drs.phase2.performance_bank</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Performance-bank behavior is active product functionality. Preserve the test and include bank activation/release in lifecycle diagnostics.</td>
+        </tr>
+        <tr>
+          <td class="num">181</td>
+          <td class="test-name">drs.open_workbench.phase5</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>The workbench integration passed repeatedly in isolation, while the full run produced <code>0xc0000005</code>. Retain this broad integration gate and use it after fixing bounded shutdown.</td>
+        </tr>
+        <tr>
+          <td class="num">203</td>
+          <td class="test-name">drs.performance_package.v3_production_export</td>
+          <td class="category"><span class="pill product">1 · Fix Practical Sampler</span></td>
+          <td><span class="pill pass">Passed 3× serially</span></td>
+          <td>Production export is a shipping contract, and no expectation failed. The access violation should be treated as a product lifecycle defect around export/open cleanup.</td>
+        </tr>
+        <tr>
+          <td class="num">225</td>
+          <td class="test-name">drs.phase1.runtime_baseline_guard</td>
+          <td class="category"><span class="pill test">2 · Fix the test</span></td>
+          <td>Failed on a 17,718 µs cold-load artifact; five fresh reports measured 2,174–2,287 µs, and report + guard then passed.</td>
+          <td>The guard consumed a transient/load-polluted generated measurement. Do not refresh the checked-in 2,061 µs baseline to 17,718 µs. Generate multiple warmed samples, use a robust statistic, tie the guard to the artifact from the same run, and place it in an isolated performance lane.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Cross-cutting findings</h2>
+  <div class="evidence">
+    <section>
+      <h3>The crash labels are genuine</h3>
+      <p>Windows Application Error events recorded <code>0xc0000005</code> for all 20 tests listed as “SEGFAULT.” Nineteen faulted in their statically linked test executable; the VST3 qualification case faulted in <code>Practical Sampler.vst3</code>. CTest did not simply mislabel assertion exits.</p>
+      <p class="note">Because the original run did not preserve crash dumps, a precise source line cannot yet be assigned. The categorization is based on module/event evidence, test purpose, and focused reruns—not a recovered call stack.</p>
+    </section>
+    <section>
+      <h3>The crash cluster is load/order sensitive</h3>
+      <p>Seventeen quick crash-class cases each passed three consecutive serial runs. The remaining cases supplied mixed evidence: lifecycle stress passed at 1 and 10 cycles; host validation exposed timing flakiness; Sprint 6 hardening passed once and later hung. This pattern is consistent with unfinished asynchronous work, teardown ordering, or resource-pressure handling.</p>
+      <p class="note">Passing serially does not exonerate the product. A valid integration test that intermittently crashes or hangs under the supported aggregate run is still reporting a release-relevant defect.</p>
+    </section>
+    <section>
+      <h3>The smoke failure is deterministic</h3>
+      <p><code>tests/src/Phase0SmokeTests.cpp:414–447</code> confirms a default Performance activation is installed before rendering MIDI through the shared Processor path. The activation precondition passes and the rendered magnitude remains below <code>0.0001</code>. The likely fault boundary is between bootstrap activation ownership and the active render model/sample data.</p>
+    </section>
+    <section>
+      <h3>The timing failures are test-design defects</h3>
+      <p><code>WavImportHostValidationTests.cpp</code> uses a single wall-clock sample with a fixed 1500 ms Debug cap. <code>Phase1RuntimeBaselineGuard.cpp</code> compares one generated sample against a checked-in absolute window. Both are vulnerable to cold-cache and machine-load noise and should use controlled, repeated measurements.</p>
+    </section>
+  </div>
+
+  <h2>Recommended sequence</h2>
+  <ol>
+    <li><strong>Enable dump capture first.</strong> Configure Windows Error Reporting LocalDumps (or run the aggregate under a debugger) for <code>drs_*.exe</code> and the VST3 qualification host. Preserve PDBs from the exact build.</li>
+    <li><strong>Instrument bounded shutdown.</strong> Log creation, cancellation, completion, and join of prepared-playback, preview, waveform, import, publish, and export workers. Assert that no callback targets a destroyed Processor, facade, controller, or shell.</li>
+    <li><strong>Fix the deterministic silent bootstrap.</strong> Trace note routing through activation selection, render-model ownership, sample lookup, and voice creation after <code>resetSessionStateToDefault()</code>.</li>
+    <li><strong>Repair the two timing gates.</strong> Warm up, sample repeatedly, use a median or percentile, record diagnostics, and run performance gates with controlled parallelism.</li>
+    <li><strong>Split stress qualification from ordinary CI.</strong> Keep a short deterministic lifecycle-stress case in the aggregate and schedule the full 100-cycle version separately. This is a lane change, not test removal.</li>
+    <li><strong>Re-run the aggregate with normal concurrency.</strong> Require zero crashes, hangs, assertion failures, and missing executables before calling the checkout green.</li>
+  </ol>
+
+  <h2>Review scope and evidence</h2>
+  <ul>
+    <li>Original CTest failure list supplied by the requester and corresponding Windows Application Error events from 22:08–22:13 EDT.</li>
+    <li>Focused Debug reruns through the <code>test-debug</code> preset, primarily serial and repeated up to three times.</li>
+    <li>Relevant test sources and registrations in <code>tests/src</code> and <code>tests/CMakeLists.txt</code>.</li>
+    <li>Checked-in runtime baseline: cold 2,061 µs, warm 1,519 µs, with ±5,000 µs policy; fresh focused observations listed above.</li>
+  </ul>
+
+  <footer>
+    This report makes triage recommendations only. It does not change product code, test expectations, baselines, or CTest registration.
+  </footer>
+</main>
+</body>
+</html>

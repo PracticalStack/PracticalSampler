@@ -13,7 +13,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Bootstrap and run smoke tests
+      - name: Build aggregate, verify CTest executables, and run tests
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File .\tools\bootstrap-windows.ps1 -RunTests
 

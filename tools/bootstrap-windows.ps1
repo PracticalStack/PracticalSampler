@@ -31,12 +31,13 @@ try {
     $bootstrapTargets = "DecentRhapsodyStudioApp DecentRhapsodyStudioPlugin"
     $smokeBuildCommand = "cmake --build --preset $buildPreset --target $bootstrapTargets drs_phase0_smoke_tests"
     $fullTestBuildCommand = "cmake --build --preset $buildPreset --target $bootstrapTargets drs_all_tests"
+    $testExecutableCheckCommand = "cmake -DTEST_PRESET=$testPreset -P tools/verify-ctest-executables.cmake"
     $testCommand = "ctest --preset $testPreset"
 
     $fullCommand = if ($SkipBuild) {
         "call `"$vsDevCmd`" -arch=amd64 && $configureCommand"
     } elseif ($RunTests) {
-        "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $fullTestBuildCommand && $testCommand"
+        "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $fullTestBuildCommand && $testExecutableCheckCommand && $testCommand"
     } else {
         "call `"$vsDevCmd`" -arch=amd64 && $configureCommand && $smokeBuildCommand"
     }
