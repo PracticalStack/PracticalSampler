@@ -269,7 +269,7 @@ public:
             auto chosenDirectory = juce::File(libraryLocationEditor.getText().trim());
             if (libraryLocationEditor.getText().trim().isEmpty())
             {
-                chosenDirectory = {};
+                chosenDirectory = juce::File();
             }
             else if (!ensureDirectoryExists(chosenDirectory))
             {
