@@ -176,6 +176,21 @@ installer instructions.
 - [Playable-package compatibility policy](docs/phase1-performance-package-compatibility-policy.md)
 - [Licensing and distribution](docs/licensing.md)
 
+Published instrument performance surface with authored macros and custom artwork
+
+<img width="2868" height="1698" alt="image" src="https://github.com/user-attachments/assets/f52c4175-1adf-4e4b-b15e-7e50c648a8f7" />
+
+Authoring workspace with Instrument Structure browser, Zone Map and Workbench
+<img width="2870" height="1700" alt="image" src="https://github.com/user-attachments/assets/8f258184-a03e-4049-8a73-13167c17beb2" />
+
+Macros at instrument, layer, group or zone level.
+<img width="2820" height="732" alt="image" src="https://github.com/user-attachments/assets/7bf1399a-ebd5-45e2-bbe8-018a7770e21c" />
+
+Routing at instrument, layer, group or zone level
+<img width="2800" height="744" alt="image" src="https://github.com/user-attachments/assets/3fb727c0-5c11-4011-9e0b-ca0887b2e5c2" />
+
+
+
 ## License
 
 Project-owned software is licensed under the
