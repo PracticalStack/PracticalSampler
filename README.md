@@ -20,7 +20,7 @@ playable packages. Current work is focused on closing the documented SFZ compati
 articulation authoring, and making the DSP system broader and easier to extend.
 
 The dependency-ordered plan from V1 through scripting lives in the
-[V1 capability and engine roadmap](https://github.com/PracticalStack/PracticalWeb/blob/main/public/practical-sampler-v1-roadmap.html).
+[V1 capability and engine roadmap](https://https://practicalsampler.com/practical-sampler-v1-roadmap).
 
 ## Implemented functionality
 
