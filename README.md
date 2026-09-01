@@ -10,9 +10,8 @@ package runtime.
 
 ## Project status
 
-**Pre-release:** Practical Sampler is preparing for its first public V1 release. The current source
-version is `0.1.0`; generated installers are tester/internal packages, not stable releases. Project,
-instrument, and package compatibility may still change until the V1 contracts are frozen.
+**Public V1:** Practical Sampler `1.0.0` is the first stable public release. Project, instrument,
+and package compatibility is governed by the documented V1 contracts and compatibility policies.
 
 The implemented V1 candidate includes a native sampler core, one-way SFZ conversion, layer/group/zone
 authoring, waveform and loop editing, articulations and performance rules, instrument controls with
@@ -90,7 +89,7 @@ The dependency-ordered plan from V1 through scripting lives in the
   parameters, schemas, and settings continuity.
 - REAPER-qualified plug-in scan, instance independence, automation/state round-trip, package recall,
   and editor-open/editor-closed lifecycle behavior.
-- A Windows tester installer that can package the standalone app and VST3, clean up legacy product
+- A Windows installer that packages the standalone app and VST3, cleans up legacy product
   artifacts during upgrade, and install to the standard application/VST3 locations.
 
 ## Current V1 boundaries
@@ -106,8 +105,7 @@ The dependency-ordered plan from V1 through scripting lives in the
   development.
 - Scripting is not implemented. It is intentionally sequenced after stable articulation,
   modulation, DSP, event, persistence, and real-time budget contracts.
-- Windows is the supported development and release target today. Practical Sampler is not yet a
-  stable public release.
+- Windows is the supported development and release target today.
 
 ## Validation
 
@@ -153,7 +151,7 @@ test run:
 powershell -ExecutionPolicy Bypass -File .\tools\bootstrap-windows.ps1 -Configuration Release
 ```
 
-To build a tester installer from the Release outputs (requires Inno Setup 6):
+To build the versioned installer from the Release outputs (requires Inno Setup 6):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\build-tester-installer.ps1 -Configuration Release
@@ -161,7 +159,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\build-tester-installer.ps1 -Con
 
 Build output is written to `build/vs2022-debug/` or `build/vs2022-release/`. See
 [`docs/windows-build.md`](docs/windows-build.md) for direct CMake commands, VST3 installation, and
-tester-installer instructions.
+installer instructions.
 
 ## Documentation
 

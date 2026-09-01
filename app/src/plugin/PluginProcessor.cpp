@@ -3299,6 +3299,7 @@ bool Processor::serviceMessageThreadWork()
     auto synchronizedActivation = false;
     const auto stateRevision = engineFacade.getStateRevision();
     if (stateRevision != observedEngineStateRevision
+        && !performanceCloseRequested.load(std::memory_order_acquire)
         && (!pendingRestoreAudioSilence.load(std::memory_order_acquire)
             || awaitingRestoreActivationGeneration != 0))
     {

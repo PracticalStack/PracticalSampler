@@ -198,6 +198,7 @@ target_compile_definitions(drs_plugin_shell
 target_compile_features(drs_plugin_shell PUBLIC cxx_std_17)
 
 juce_add_gui_app(DecentRhapsodyStudioApp
+    VERSION "${PROJECT_VERSION}"
     PRODUCT_NAME "${DRS_PRODUCT_DISPLAY_NAME}"
     COMPANY_NAME "${DRS_COMPANY_DISPLAY_NAME}"
     BUNDLE_ID "com.decentrhapsody.studio.app"
@@ -228,6 +229,7 @@ target_link_libraries(DecentRhapsodyStudioApp
 )
 
 juce_add_plugin(drs_plugin_bundle
+    VERSION "${PROJECT_VERSION}"
     COMPANY_NAME "${DRS_COMPANY_DISPLAY_NAME}"
     BUNDLE_ID "com.decentrhapsody.studio.plugin"
     IS_SYNTH TRUE

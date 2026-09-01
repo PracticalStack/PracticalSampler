@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.1.0-tester"
+  #error AppVersion must be supplied by the installer build script.
 #endif
 
 #ifndef DRSVst3Source
@@ -40,17 +40,18 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 DisableDirPage=yes
 DisableProgramGroupPage=yes
+LicenseFile=..\LICENSE
 #if DRSHasStandalone
 UninstallDisplayIcon={app}\{#MyAppExeName}
 #endif
 
 [Types]
-Name: "tester"; Description: "Tester install"; Flags: iscustom
+Name: "full"; Description: "Full installation"; Flags: iscustom
 
 [Components]
-Name: "vst3"; Description: "VST3 plug-in"; Types: tester; Flags: fixed
+Name: "vst3"; Description: "VST3 plug-in"; Types: full; Flags: fixed
 #if DRSHasStandalone
-Name: "standalone"; Description: "Standalone app"; Types: tester
+Name: "standalone"; Description: "Standalone app"; Types: full
 #endif
 
 [Dirs]
@@ -62,6 +63,7 @@ Type: files; Name: "{app}\Decent Rhapsody Studio.exe"
 
 [Files]
 Source: "{#DRSVst3Source}\*"; DestDir: "{commoncf}\VST3\Practical Sampler.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 #if DRSHasStandalone
 Source: "{#DRSStandaloneDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: standalone
 #endif

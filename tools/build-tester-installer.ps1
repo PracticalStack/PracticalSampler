@@ -24,7 +24,7 @@ function Get-ProjectVersion {
         return $match.Groups[1].Value
     }
 
-    return "0.1.0"
+    throw "Could not read the project version from '$CMakeListsPath'."
 }
 
 function Find-InnoSetupCompiler {
@@ -94,14 +94,14 @@ function Find-StandaloneDirectory {
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $buildAppRoot = Join-Path $repoRoot "build\vs2022-$($Configuration.ToLowerInvariant())\app"
 $projectVersion = Get-ProjectVersion -CMakeListsPath (Join-Path $repoRoot "CMakeLists.txt")
-$resolvedAppVersion = if ([string]::IsNullOrWhiteSpace($AppVersion)) { "$projectVersion-tester" } else { $AppVersion }
+$resolvedAppVersion = if ([string]::IsNullOrWhiteSpace($AppVersion)) { $projectVersion } else { $AppVersion }
 $resolvedOutputDir = if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     Join-Path $repoRoot "build\installer"
 } else {
     $OutputDir
 }
 
-Write-Host "== Practical Sampler tester installer =="
+Write-Host "== Practical Sampler installer =="
 Write-Host "Repo root: $repoRoot"
 Write-Host "Configuration: $Configuration"
 Write-Host "Installer version: $resolvedAppVersion"
@@ -162,4 +162,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Installer build failed with exit code $LASTEXITCODE."
 }
 
-Write-Host "Tester installer created successfully."
+Write-Host "Installer created successfully."
