@@ -38,7 +38,7 @@ void hashByte(std::uint64_t& hash, std::uint8_t value) noexcept
 
 std::string checksum(const std::array<std::vector<float>, 2>& channels)
 {
-    auto hash = 1469598103934665603ull;
+    std::uint64_t hash = 1469598103934665603ull;    
     for (std::size_t channel = 0; channel < channels.size(); ++channel)
     {
         hashByte(hash, static_cast<std::uint8_t>(channel));
