@@ -13,7 +13,21 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $configurePreset = if ($Configuration -eq "Debug") { "vs2022-debug" } else { "vs2022-release" }
 $buildPreset = if ($Configuration -eq "Debug") { "build-debug" } else { "build-release" }
 $testPreset = if ($Configuration -eq "Debug") { "test-debug" } else { "test-release" }
-$vsDevCmd = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+
+$vswhere = Join-Path ${env:ProgramFiles(x86)} `
+    "Microsoft Visual Studio\Installer\vswhere.exe"
+
+$vsRoot = & $vswhere `
+    -latest `
+    -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property installationPath
+
+if (-not $vsRoot) {
+    throw "Visual Studio 2022 with the C++ build tools was not found."
+}
+
+$vsDevCmd = Join-Path $vsRoot "Common7\Tools\VsDevCmd.bat"
 
 if (-not (Test-Path $vsDevCmd)) {
     throw "VsDevCmd.bat was not found at '$vsDevCmd'. Verify that Visual Studio 2022 Community with Desktop development with C++ is installed."
