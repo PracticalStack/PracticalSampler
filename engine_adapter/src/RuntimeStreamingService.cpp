@@ -66,7 +66,6 @@ struct RuntimeStreamingService::Impl
     mutable std::mutex mutex;
     std::condition_variable condition;
     bool stopRequested = false;
-    std::thread workerThread;
     std::deque<std::string> queuedKeys;
     std::unordered_map<std::string, CachedPageEntry> cache;
     std::unordered_map<std::uint64_t, std::string> leases;
@@ -74,15 +73,16 @@ struct RuntimeStreamingService::Impl
     RuntimeStreamingServiceMetrics metrics;
     std::uint64_t nextLeaseId = 1;
     std::uint64_t touchCounter = 1;
+    std::thread workerThread;
 
     explicit Impl(const RuntimeStreamContainerModel& containerIn,
                   RuntimeStreamingServiceOptions optionsIn)
         : container(containerIn),
-          options(std::move(optionsIn)),
-          workerThread([this] { runWorkerLoop(); })
+          options(std::move(optionsIn))
     {
         metrics.activeLoadProfileId = options.loadProfileId;
         metrics.configuredMaxCachedPages = options.maxCachedPages;
+        workerThread = std::thread([this] { runWorkerLoop(); });
     }
 
     ~Impl()
