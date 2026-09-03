@@ -61,6 +61,10 @@ target_compile_definitions(drs_sample_import
         JUCE_MODULE_AVAILABLE_juce_audio_basics=1
         JUCE_MODULE_AVAILABLE_juce_audio_formats=1
         JUCE_MODULE_AVAILABLE_juce_core=1
+        $<$<CONFIG:Debug>:DEBUG=1>
+        $<$<CONFIG:Debug>:_DEBUG=1>
+        $<$<NOT:$<CONFIG:Debug>>:NDEBUG=1>
+        $<$<NOT:$<CONFIG:Debug>>:_NDEBUG=1>
 )
 
 target_compile_features(drs_sample_import PUBLIC cxx_std_17)
