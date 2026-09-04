@@ -122,6 +122,12 @@ qualification also uses real instrument corpora where licensing and local availa
 These corpora demonstrate the tested compatibility boundary; they do not imply that every SFZ file
 or dialect imports without findings.
 
+## Tested instruments
+https://www.ir.isas.jaxa.jp/~cyamauch/AccurateSalamander/  
+https://sfzinstruments.github.io/pianos/jrhodes3d/  
+https://sfzinstruments.github.io/drums/sm_drums/  
+
+
 ## Repository layout
 
 - `app/` — standalone, VST3, and shared user-interface code
